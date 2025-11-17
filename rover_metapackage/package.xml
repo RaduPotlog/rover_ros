@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rover_metapackage</name>
+  <version>1.0.0</version>
+  <description>Meta package that contains all packages of Mechatronics Academy Rover</description>
+  <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_bringup</depend>
+  <depend condition="$ROVER_ROS_BUILD_TYPE == simulation">rover_gazebo</depend>
+  
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,37 @@
+repositories:
+  rover_bringup:
+    type: git
+    url: https://github.com/RaduPotlog/rover_bringup
+    version: main
+  rover_description:
+    type: git
+    url: https://github.com/RaduPotlog/rover_description
+    version: main
+  rover_controllers:
+    type: git
+    url: https://github.com/RaduPotlog/rover_controller
+    version: main
+  rover_hardware_interface:
+    type: git
+    url: https://github.com/RaduPotlog/rover_hardware_interface
+    version: main
+  rover_localization:
+    type: git
+    url: https://github.com/RaduPotlog/rover_localization
+    version: main
+  rover_diag_manager:
+    type: git
+    url: https://github.com/RaduPotlog/rover_diag_manager
+    version: main
+  rover_msgs:
+    type: git
+    url: https://github.com/RaduPotlog/rover_msgs
+    version: main
+  rover_web_bridge:
+    type: git
+    url: https://github.com/RaduPotlog/rover_web_bridge
+    version: main
+  rover_crsf_teleop:
+    type: git
+    url: https://github.com/RaduPotlog/rover_crsf_teleop
+    version: jazzy

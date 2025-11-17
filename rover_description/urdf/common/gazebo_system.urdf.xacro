@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro 
+    name="controller"
+    params="controller_config_file
+            namespace:=''">
+
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+    
+    <!-- Gazebo simulation system contorller plugin -->
+    <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>${controller_config_file}</parameters>
+        <ros>
+          <namespace>${namespace}</namespace>
+          <remapping>drive_controller/cmd_vel:=cmd_vel</remapping>
+          <remapping>drive_controller/odom:=odometry/wheels</remapping>
+          <remapping>drive_controller/transition_event:=drive_controller/_transition_event</remapping>
+          <remapping>imu_broadcaster/imu:=imu/data</remapping>
+          <remapping>imu_broadcaster/transition_event:=imu_broadcaster/_transition_event</remapping>
+          <remapping>joint_state_broadcaster/transition_event:=joint_state_broadcaster/_transition_event</remapping>
+        </ros>
+      </plugin>
+    </gazebo>
+    
+  </xacro:macro>
+
+</robot>

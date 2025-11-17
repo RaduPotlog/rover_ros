@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro
+    name="rover_a1_robot"
+    params="wheel_config_file
+            controller_config_file
+            use_sim:=false
+            imu_xyz:='0.0 0.0 0.0'
+            imu_rpy:='0.0 0.0 0.0'
+            namespace:=''">
+
+    <xacro:if value="${use_sim}">
+      <xacro:property name="imu_xyz" value="0.052 0.073 -0.235" />
+      <xacro:property name="imu_rpy" value="0.0 0.0 -1.57" />
+    </xacro:if>
+
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+    <xacro:property name="wheel_config" value="${xacro.load_yaml(wheel_config_file)}" />
+    <xacro:property name="wheelbase" value="0.2542" />
+    <xacro:property name="wheel_mount_point_y" value="0.31301" />
+
+    <!-- Rover base macros -->
+    <xacro:include filename="$(find rover_description)/urdf/rover_a1/base.urdf.xacro" ns="body" />
+    <!-- Rover wheel macros -->
+    <xacro:include filename="$(find rover_description)/urdf/common/wheel.urdf.xacro" ns="wheel" />
+    <!-- IMU macros -->
+    <xacro:include filename="$(find rover_description)/urdf/common/imu.urdf.xacro" ns="imu" />
+    <!-- Gazebo system macros -->
+    <xacro:include filename="$(find rover_description)/urdf/common/gazebo_system.urdf.xacro" ns="gazebo_system" />
+    
+    <!-- Rover body -->
+    <xacro:body.body
+      wheel_radius="${wheel_config['wheel_radius']}"
+      imu_xyz="${imu_xyz}"
+      imu_rpy="${imu_rpy}" />
+      
+    <!-- Rover wheel -->
+    <xacro:wheel.wheel
+      config="${wheel_config}"
+      mount_point_x="${wheelbase}"
+      mount_point_y="${wheel_mount_point_y}"
+      prefix="fl" />
+
+    <!-- Rover wheel -->
+    <xacro:wheel.wheel
+      config="${wheel_config}"
+      mount_point_x="${wheelbase}"
+      mount_point_y="${wheel_mount_point_y}"
+      prefix="fr" />
+
+    <!-- Rover wheel -->
+    <xacro:wheel.wheel
+      config="${wheel_config}"
+      mount_point_x="${wheelbase}"
+      mount_point_y="${wheel_mount_point_y}"
+      prefix="rl" />
+
+    <!-- Rover wheel -->
+    <xacro:wheel.wheel
+      config="${wheel_config}"
+      mount_point_x="${wheelbase}"
+      mount_point_y="${wheel_mount_point_y}"
+      prefix="rr" />
+
+    <!-- ROS2 Controller -->
+    <ros2_control name="${ns}rover_system" type="system">
+      <!-- Joints -->
+      <joint name="fl_wheel_base_to_fl_wheel_joint">
+        <command_interface name="velocity" />
+        <state_interface name="position" />
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+      </joint>
+      <joint name="fr_wheel_base_to_fr_wheel_joint">
+        <command_interface name="velocity" />
+        <state_interface name="position" />
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+      </joint>
+      <joint name="rl_wheel_base_to_rl_wheel_joint">
+        <command_interface name="velocity" />
+        <state_interface name="position" />
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+      </joint>
+      <joint name="rr_wheel_base_to_rr_wheel_joint">
+        <command_interface name="velocity" />
+        <state_interface name="position" />
+        <state_interface name="velocity" />
+        <state_interface name="effort" />
+      </joint>
+      
+      <xacro:if value="${use_sim}">
+        <!-- IMU interfaces -->
+        <xacro:imu.imu_interface use_sim="${use_sim}" namespace="${namespace}" />
+      </xacro:if>
+      
+      <!-- Hardware controller plugin -->
+      <hardware>
+        <xacro:if value="${use_sim}">
+          <!-- Gazebo simulation system contorller -->
+          <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        </xacro:if>
+
+        <xacro:unless value="${use_sim}">
+          <!-- Hardware controller system interface -->
+          <plugin>rover_hardware_interface/RoverA1System</plugin>
+
+          <!-- Driver controller update frequency and maximum attempts to initilize and activate -->
+          <param name="driver_states_update_frequency">20.0</param>
+          <param name="max_rover_driver_initialization_attempts">3.0</param>
+          <param name="max_rover_driver_activation_attempts">3.0</param>
+          
+          <!-- Motor parameters -->
+          <param name="motor_torque_constant">0.11</param>
+          <param name="max_rpm_motor_speed">2400</param>
+          <param name="gear_ratio">19.16</param>
+          <param name="gearbox_efficiency">0.70</param>
+          <!-- Encoder parameters -->
+          <param name="encoder_resolution">4000</param>
+
+        </xacro:unless>
+      </hardware>
+    </ros2_control>
+
+    <!-- Instantiate IMU -->
+    <xacro:imu.imu use_sim="${use_sim}" reference_frame="imu_link" namespace="${namespace}" />
+
+    <xacro:if value="${use_sim}">
+    <!-- Instantiate Gazebo System -->
+      <xacro:gazebo_system.controller controller_config_file="${controller_config_file}" namespace="${namespace}" />
+    </xacro:if>
+
+  </xacro:macro>
+
+</robot>

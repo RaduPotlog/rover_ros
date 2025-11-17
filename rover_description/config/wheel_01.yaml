@@ -1,0 +1,9 @@
+wheel_radius: 0.1651
+wheel_width: 0.108
+mount_point_offset: 0.0
+mass: 4.5
+inertia: { ixx: 0.038546, iyy: 0.070058, izz: 0.038546 }
+inertia_y_offset: 0.0
+mesh_package: rover_description
+folder_path: meshes/wheel_01
+mecanum: False

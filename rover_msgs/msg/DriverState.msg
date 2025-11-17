@@ -1,0 +1,10 @@
+float32 current
+float32 temperature
+
+rover_msgs/FaultFlag fault_flag
+rover_msgs/RuntimeError runtime_error
+
+bool motor_states_data_timed_out
+bool driver_state_data_timed_out
+bool comm_error
+bool heartbeat_timeout

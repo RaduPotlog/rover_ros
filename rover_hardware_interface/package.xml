@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rover_hardware_interface</name>
+  <version>1.0.0</version>
+  <description>ROS2 hardware interface controller for rover</description>
+  <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  
+  <build_depend>autoconf</build_depend>
+  <build_depend>autoconf-archive</build_depend>
+  <build_depend>libtool</build_depend>
+  <build_depend>m4</build_depend>
+  <build_depend>pkg-config</build_depend>
+  <build_depend>pluginlib</build_depend>
+
+  <depend>ament_index_cpp</depend>
+  <depend>controller_interface</depend>
+  <depend>diagnostic_updater</depend>
+  <depend>generate_parameter_library</depend>
+  <depend>geometry_msgs</depend>
+  <depend>hardware_interface</depend>
+  <depend>imu_filter_madgwick</depend>
+  <depend>imu-sensor-broadcaster</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>realtime_tools</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+
+  <!-- Rover messages and services -->
+  <depend>rover_msgs</depend>
+    
+  <!-- Phidgets API -->
+  <depend>phidgets_api</depend>
+  
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>google-mock</test_depend>
+  <test_depend>ros_testing</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

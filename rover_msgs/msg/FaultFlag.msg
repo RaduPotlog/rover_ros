@@ -1,0 +1,2 @@
+bool emergency_stop
+bool motor_setup_fault
