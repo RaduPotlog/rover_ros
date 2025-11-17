@@ -23,6 +23,9 @@
   <!-- Rover foxglove bridge dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">foxglove_bridge</exec_depend>
   
+  <!-- Rover radio elrs dependency -->
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">husarion_ugv_crsf_teleop</exec_depend>
+  
   <export>
     <build_type>ament_cmake</build_type>
   </export>

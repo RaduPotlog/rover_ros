@@ -35,6 +35,8 @@ sudo rosdep init
 rosdep update --rosdistro $ROS_DISTRO
 rosdep install --from-paths src -y -i
 
+apt install usbutils
+
 cd src/ma_rover_cppuprofile
 cmake -Bbuild . -DPROFILE_ENABLED=OFF
 cmake --build build
