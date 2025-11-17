@@ -20,12 +20,6 @@ git clone -b main git@github.com:mechatroacademy/ma_rover_ros.git src/ma_rover_r
 export ROVER_ROS_BUILD_TYPE=hardware
 ```
 
-#### Simulation:
-
-```bash
-export ROVER_ROS_BUILD_TYPE=simulation
-```
-
 ### Build
 
 ```bash
