@@ -29,7 +29,7 @@ export ROVER_ROS_BUILD_TYPE=simulation
 ### Build
 
 ```bash
-vcs import src < src/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
+vcs import src < src/ma_rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
 
 sudo rosdep init
 rosdep update --rosdistro $ROS_DISTRO
