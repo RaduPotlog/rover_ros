@@ -149,7 +149,7 @@ def generate_launch_description():
         output='screen',
     )
 
-    rover_crsf_teleop_path = "/home/rovera1/ros2_ws/rover_a1/install/husarion_ugv_crsf_teleop/share/husarion_ugv_crsf_teleop/config/rover_crsf_teleop.yaml"
+    rover_crsf_teleop_path = "/root/ros2_ws/rover_a1/install/husarion_ugv_crsf_teleop/share/husarion_ugv_crsf_teleop/config/rover_crsf_teleop.yaml"
 
     rover_crsf_teleop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
