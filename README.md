@@ -35,6 +35,21 @@ sudo rosdep init
 rosdep update --rosdistro $ROS_DISTRO
 rosdep install --from-paths src -y -i
 
+cd src/ma_rover_cppuprofile
+cmake -Bbuild . -DPROFILE_ENABLED=OFF
+cmake --build build
+cd build
+make install
+cd ../../..
+
+cd src/ma_rover_modbus
+sudo apt install libnet1-dev
+cmake -Bbuild .
+cmake --build build
+cd build
+make install
+cd ../../..
+
 source /opt/ros/$ROS_DISTRO/setup.bash
 colcon build --symlink-install --packages-up-to rover_metapackage --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 
