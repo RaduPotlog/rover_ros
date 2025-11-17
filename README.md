@@ -65,30 +65,3 @@ source install/setup.bash
 ```bash
 ros2 launch rover_bringup rover_bringup.launch.py
 ```
-
-```bash
-sudo apt install ros-$ROS_DISTRO-rqt*
-sudo apt install ros-$ROS_DISTRO-imu-tools
-
-ros2 launch rover_description rover_rviz.launch.py
-
-ros2 run rqt_gui rqt_gui
-```
-
-#### Simulation:
-
-```bash
-ros2 launch rover_gazebo simulation.launch.py
-```
-
-### Rviz:
-
-#### Real rover:
-
-![Robot Model](images/rover_real_imu.png)
-
-### Gazebo
-
-#### Simulation:
-
-![Robot Model](images/rover_simulation_imu.png)
