@@ -25,7 +25,7 @@ export ROVER_ROS_BUILD_TYPE=hardware
 ```bash
 vcs import src < src/ma_rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
 
-sudo rosdep init
+rosdep init
 rosdep update --rosdistro $ROS_DISTRO
 rosdep install --from-paths src -y -i
 
@@ -39,7 +39,7 @@ make install
 cd ../../..
 
 cd src/ma_rover_modbus
-sudo apt install libnet1-dev
+apt install libnet1-dev
 cmake -Bbuild .
 cmake --build build
 cd build
