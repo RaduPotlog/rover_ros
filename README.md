@@ -49,6 +49,8 @@ cd ../../..
 source /opt/ros/$ROS_DISTRO/setup.bash
 colcon build --symlink-install --packages-up-to rover_metapackage --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 
+apt install plocate
+
 source install/setup.bash
 ```
 
