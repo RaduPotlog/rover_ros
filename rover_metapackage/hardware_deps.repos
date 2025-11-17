@@ -1,5 +1,5 @@
 repositories:
-  rover_crsf_teleop:
+  ma_rover_crsf_teleop:
     type: git
-    url: https://github.com/RaduPotlog/rover_crsf_teleop
+    url: https://github.com/mechatroacademy/ma_rover_crsf_teleop
     version: jazzy
