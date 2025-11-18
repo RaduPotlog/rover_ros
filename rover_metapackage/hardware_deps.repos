@@ -1,13 +1,13 @@
 repositories:
-  ma_rover_crsf_teleop:
+  rover_crsf_teleop:
     type: git
-    url: https://github.com/mechatroacademy/ma_rover_crsf_teleop
+    url: https://github.com/RaduPotlog/rover_crsf_teleop
     version: jazzy
-  ma_rover_modbus:
+  rover_modbus:
     type: git
-    url: https://github.com/mechatroacademy/ma_rover_modbus
+    url: https://github.com/RaduPotlog/rover_modbus
     version: master
-  ma_rover_cppuprofile:
+  rover_cppuprofile:
     type: git
-    url: https://github.com/mechatroacademy/ma_rover_cppuprofile
+    url: https://github.com/RaduPotlog/rover_cppuprofile
     version: master
