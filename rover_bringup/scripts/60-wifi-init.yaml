@@ -1,0 +1,10 @@
+network:
+  wifis:
+    wlan0:
+      optional: true
+      access-points:
+          MikroLAB:
+            password: "@2wsxdr%5"
+      dhcp4: true
+      dhcp4-overrides:
+        send-hostname: true
