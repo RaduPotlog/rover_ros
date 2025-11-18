@@ -25,31 +25,31 @@ export ROVER_ROS_BUILD_TYPE=hardware
 ```bash
 vcs import src < src/rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
 
-rosdep init
+sudo rosdep init
 rosdep update --rosdistro $ROS_DISTRO
 rosdep install --from-paths src -y -i
 
-apt install usbutils
+sudo apt install usbutils
 
 cd src/rover_cppuprofile
 cmake -Bbuild . -DPROFILE_ENABLED=OFF
 cmake --build build
 cd build
-make install
+sudo make install
 cd ../../..
 
 cd src/rover_modbus
-apt install libnet1-dev
+sudo apt install libnet1-dev
 cmake -Bbuild .
 cmake --build build
 cd build
-make install
+sudo make install
 cd ../../..
 
 source /opt/ros/$ROS_DISTRO/setup.bash
 colcon build --symlink-install --packages-up-to rover_metapackage --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 
-apt install plocate
+sudo apt install plocate
 
 source install/setup.bash
 ```
