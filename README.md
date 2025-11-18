@@ -9,7 +9,7 @@ Mechatronics Academy's Rover A1 ROS2.
 ```bash
 mkdir -p ~/ros2_ws/rover_a1
 cd ~/ros2_ws/rover_a1
-git clone -b main https://github.com/RaduPotlog/rover_ros.git
+git clone -b main https://github.com/RaduPotlog/rover_ros.git src/rover_ros
 ```
 
 ### Setup environment variables
