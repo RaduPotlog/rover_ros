@@ -23,7 +23,7 @@ export ROVER_ROS_BUILD_TYPE=hardware
 ### Build
 
 ```bash
-vcs import src < src/ma_rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
+vcs import src < src/rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
 
 rosdep init
 rosdep update --rosdistro $ROS_DISTRO
@@ -31,14 +31,14 @@ rosdep install --from-paths src -y -i
 
 apt install usbutils
 
-cd src/ma_rover_cppuprofile
+cd src/rover_cppuprofile
 cmake -Bbuild . -DPROFILE_ENABLED=OFF
 cmake --build build
 cd build
 make install
 cd ../../..
 
-cd src/ma_rover_modbus
+cd src/rover_modbus
 apt install libnet1-dev
 cmake -Bbuild .
 cmake --build build
