@@ -67,7 +67,7 @@ cd build
 cmake ..
 make
 sudo make install
-cd ../..
+cd ../../..
 ```
 
 #### For real rover and simulated rover
