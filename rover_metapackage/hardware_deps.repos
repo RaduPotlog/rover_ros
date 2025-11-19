@@ -7,3 +7,11 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_cppuprofile
     version: master
+  rover_cpplinux_serial:
+    type: git
+    url: https://github.com/RaduPotlog/rover_cpplinux_serial
+    version: master
+  rover_crsf_receiver:
+    type: git
+    url: https://github.com/RaduPotlog/rover_crsf_receiver
+    version: master
