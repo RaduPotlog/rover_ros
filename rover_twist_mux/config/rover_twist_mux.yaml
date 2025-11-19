@@ -1,0 +1,12 @@
+twist_mux:
+  ros__parameters:
+    use_stamped: true
+    topics:
+      cmd_elrs:
+        topic   : teleop_elrs_cmd_vel_stamped
+        timeout : 0.5
+        priority: 10
+      joystick:
+        topic   : teleop_foxglove_cmd_vel_stamped
+        timeout : 0.5
+        priority: 100

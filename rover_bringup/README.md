@@ -7,13 +7,4 @@ Package containing the default launch files and configuration used to start Rove
 
 ## Launch Files
 
-- `rover_bringup.launch.py` - Activates whole rover system.
-
-## Running
--
-
-## RViz
--
-
-## Gazebo
--
+- `rover_bringup.launch.py` - Activates whole rover system on real hardware.

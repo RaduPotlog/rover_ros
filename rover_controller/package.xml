@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rover_controller</name>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <description>ROS2 controllers configuration for rover</description>
   <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
   <license>Apache License 2.0</license>
@@ -22,6 +22,8 @@
   
   <!-- Rover dependency -->
   <exec_depend>rover_description</exec_depend>
+  
+  <!-- Rover real hardware dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_hardware_interface</exec_depend>
   
   <export>

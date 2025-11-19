@@ -1,8 +1,4 @@
 repositories:
-  rover_crsf_teleop:
-    type: git
-    url: https://github.com/RaduPotlog/rover_crsf_teleop
-    version: jazzy
   rover_modbus:
     type: git
     url: https://github.com/RaduPotlog/rover_modbus

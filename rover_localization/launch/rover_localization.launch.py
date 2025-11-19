@@ -29,6 +29,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    
     fuse_gps = LaunchConfiguration("fuse_gps")
     declare_fuse_gps_arg = DeclareLaunchArgument(
         "fuse_gps",

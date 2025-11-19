@@ -20,18 +20,32 @@ git clone -b main https://github.com/RaduPotlog/rover_ros.git src/rover_ros
 export ROVER_ROS_BUILD_TYPE=hardware
 ```
 
+#### Simulated rover:
+
+```bash
+export ROVER_ROS_BUILD_TYPE=simulation
+```
+
+### Clone dependency
+
+```bash
+vcs import src < src/rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
+```
+
 ### Build
 
 ```bash
 sudo apt install usbutils
 sudo apt install plocate
 
-vcs import src < src/rover_ros/rover_metapackage/${ROVER_ROS_BUILD_TYPE}_deps.repos
-
 sudo rosdep init
 rosdep update --rosdistro $ROS_DISTRO
 rosdep install --from-paths src -y -i
+```
 
+#### Only for real rover
+
+```bash
 cd src/rover_cppuprofile
 cmake -Bbuild . -DPROFILE_ENABLED=OFF
 cmake --build build
@@ -46,12 +60,20 @@ cmake --build build
 cd build
 sudo make install
 cd ../../..
+```
 
+#### !!! For real rover and simulated rover
+
+```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 colcon build --symlink-install --packages-up-to rover_metapackage --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 
 source install/setup.bash
+```
 
+## !!! Only for real rover
+
+```bash
 sudo cp src/rover_ros/rover_bringup/scripts/99-elrs.rules /etc/udev/rules.d/
 sudo cp src/rover_ros/rover_bringup/scripts/99-libphidget22.rules /etc/udev/rules.d/
 
@@ -68,7 +90,6 @@ sudo cp src/rover_ros/rover_bringup/scripts/60-switch-init.yaml /etc/netplan/
 sudo chmod 600 /etc/netplan/60-switch-init.yaml
 
 sudo netplan apply
-
 ```
 
 ### Running
@@ -77,4 +98,10 @@ sudo netplan apply
 
 ```bash
 ros2 launch rover_bringup rover_bringup.launch.py
+```
+
+#### Simulated rover:
+
+```bash
+ros2 launch rover_gazebo simulation.launch.py
 ```

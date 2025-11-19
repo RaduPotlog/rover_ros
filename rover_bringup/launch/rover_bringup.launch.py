@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import os
-
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -77,14 +74,6 @@ def generate_launch_description():
         description="Add namespace to all launched nodes.",
     )
 
-    launch_gamepad = LaunchConfiguration("launch_gamepad")
-    declare_launch_gamepad_arg = DeclareLaunchArgument(
-        "launch_gamepad",
-        default_value="false",
-        description="Launch gamepad node.",
-        choices=["True", "true", "False", "false"],
-    )
-
     robot_model_name = EnvironmentVariable(name="ROBOT_MODEL_NAME", default_value="rover_a1")
     robot_serial_no = EnvironmentVariable(name="ROBOT_SERIAL_NO", default_value="----")
     robot_version = EnvironmentVariable(name="ROBOT_VERSION", default_value="1.0")
@@ -102,6 +91,7 @@ def generate_launch_description():
             "log_level": log_level,
             "namespace": namespace,
             "use_sim": "False",
+            "common_dir_path": common_dir_path,
         }.items(),
     )
 
@@ -115,7 +105,12 @@ def generate_launch_description():
                 ]
             ),
         ),
-        launch_arguments={"log_level": log_level, "namespace": namespace}.items(),
+        launch_arguments={
+            "log_level": log_level, 
+            "namespace": namespace,
+            "use_sim": "False",
+            "common_dir_path": common_dir_path,
+        }.items(),
     )
 
     ekf_launch = IncludeLaunchDescription(
@@ -127,41 +122,22 @@ def generate_launch_description():
         launch_arguments={
             "log_level": log_level,
             "namespace": namespace,
+            "use_sim": "False",
             "common_dir_path": common_dir_path,
         }.items(),
     )
 
-    web_bridge_launch = IncludeLaunchDescription(
+    rover_twist_mux_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("rover_web_bridge"), "launch", "rover_web_bridge.launch.py"]
+                [FindPackageShare("rover_twist_mux"), "launch", "rover_twist_mux.launch.py"]
             )
         ),
         launch_arguments={
             "log_level": log_level,
             "namespace": namespace,
+            "use_sim": "False",
             "common_dir_path": common_dir_path,
-        }.items(),
-    )
-    
-    foxglove_bridge_launch = ExecuteProcess(
-        cmd=['ros2', 'launch', 'foxglove_bridge', 'foxglove_bridge_launch.xml', 'port:=9494'],
-        output='screen',
-    )
-
-    rover_crsf_teleop_path = "/home/rovera1-001/ros2_ws/rover_a1/install/husarion_ugv_crsf_teleop/share/husarion_ugv_crsf_teleop/config/rover_crsf_teleop.yaml"
-
-    rover_crsf_teleop_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("husarion_ugv_crsf_teleop"), "launch", "teleop.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "log_level": log_level,
-            "namespace": namespace,
-            "common_dir_path": common_dir_path,
-            "params_file": rover_crsf_teleop_path,
         }.items(),
     )
 
@@ -186,9 +162,7 @@ def generate_launch_description():
         period=10.0,
         actions=[
             ekf_launch,
-            rover_crsf_teleop_launch,
-            foxglove_bridge_launch,
-            web_bridge_launch,
+            rover_twist_mux_launch,
         ],
     )
 

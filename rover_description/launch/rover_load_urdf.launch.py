@@ -32,7 +32,6 @@ from launch_ros.actions import Node, SetParameter
 from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
 
-
 def generate_launch_description():
     
     common_dir_path = LaunchConfiguration("common_dir_path")

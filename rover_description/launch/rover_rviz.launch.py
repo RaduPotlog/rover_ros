@@ -27,7 +27,6 @@ from launch_ros.actions import Node, SetParameter
 from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
 
-
 def generate_launch_description():
 
     namespace = LaunchConfiguration("namespace")
@@ -41,7 +40,7 @@ def generate_launch_description():
     declare_rviz_config_arg = DeclareLaunchArgument(
         "rviz_config",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("rover_description"), "rviz", "rover_imu.rviz"]
+            [FindPackageShare("rover_description"), "rviz", "rover.rviz"]
         ),
         description="RViz configuration file.",
     )

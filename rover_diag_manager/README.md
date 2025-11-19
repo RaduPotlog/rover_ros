@@ -9,12 +9,3 @@ Package contains Rover's diagnostic nodes.
 ## Launch Files
 
 - `system_diag.launch.py` - Loads the Rover's system diagnostic node.
-
-## Running
--
-
-## RViz
--
-
-## Gazebo
--

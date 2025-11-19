@@ -11,17 +11,18 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(
-  ${PROJECT_NAME}
-  "msg/DriverState.msg"
-  "msg/DriverStateNamed.msg"
-  "msg/RoverDriverState.msg"
-  "msg/FaultFlag.msg"
-  "msg/RuntimeError.msg"
-  "msg/SystemStatus.msg"
-  "msg/GpioState.msg"
+    ${PROJECT_NAME}
+    "msg/DriverState.msg"
+    "msg/DriverStateNamed.msg"
+    "msg/RoverDriverState.msg"
+    "msg/FaultFlag.msg"
+    "msg/RuntimeError.msg"
+    "msg/SystemStatus.msg"
+    "msg/GpioState.msg"
 
-  DEPENDENCIES
-  std_msgs)
+    DEPENDENCIES
+        std_msgs
+)
 
 ament_export_dependencies(rosidl_default_runtime)
 

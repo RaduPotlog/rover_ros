@@ -7,12 +7,3 @@ Custom Rover's messages, services and actions
 
 ## Launch Files
 -
-
-## Running
--
-
-## RViz
--
-
-## Gazebo
--

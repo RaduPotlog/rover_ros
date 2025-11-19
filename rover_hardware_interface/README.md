@@ -7,12 +7,3 @@ Package implements system interfaces and sensor interfaces from ros2_control for
 
 ## Launch Files
 -
-
-## Running
--
-
-## RViz
--
-
-## Gazebo
--

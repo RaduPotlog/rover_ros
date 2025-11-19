@@ -9,12 +9,3 @@ Package containing default Rover's controller.
 ## Launch Files
 
 - `controller.launch.py` - Launch default Rover's differential controller.
-
-## Running
--
-
-## RViz
--
-
-## Gazebo
--

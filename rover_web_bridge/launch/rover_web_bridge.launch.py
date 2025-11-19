@@ -45,7 +45,8 @@ def generate_launch_description():
     rover_web_bridge_node = Node(
         package='rosbridge_server',
         executable='rosbridge_websocket',
-        name='rosbridge_websocket',
+        name='rover_web_bridge_socket',
+        namespace=namespace,
         output='screen',
         parameters=[{'port': 9090}]
     )
