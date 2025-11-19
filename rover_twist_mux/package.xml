@@ -9,7 +9,7 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
  
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros_jazzy_twist_mux</exec_depend>
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">twist_mux</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

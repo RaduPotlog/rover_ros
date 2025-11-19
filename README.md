@@ -62,7 +62,7 @@ sudo make install
 cd ../../..
 ```
 
-#### !!! For real rover and simulated rover
+#### For real rover and simulated rover
 
 ```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
@@ -71,7 +71,7 @@ colcon build --symlink-install --packages-up-to rover_metapackage --cmake-args -
 source install/setup.bash
 ```
 
-## !!! Only for real rover
+#### Only for real rover
 
 ```bash
 sudo cp src/rover_ros/rover_bringup/scripts/99-elrs.rules /etc/udev/rules.d/
