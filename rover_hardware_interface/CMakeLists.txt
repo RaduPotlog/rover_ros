@@ -22,6 +22,7 @@ set(PACKAGE_DEPENDENCIES
     rclcpp
     rclcpp_lifecycle
     realtime_tools
+    std_msgs
     std_srvs
     tf2_geometry_msgs
     tf2_ros

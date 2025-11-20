@@ -127,6 +127,20 @@ def generate_launch_description():
         }.items(),
     )
 
+    telep_crfs_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("rover_crfs_teleop"), "launch", "rover_crfs_teleop.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "log_level": log_level,
+            "namespace": namespace,
+            "use_sim": "False",
+            "common_dir_path": common_dir_path,
+        }.items(),
+    )
+
     rover_twist_mux_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -162,6 +176,7 @@ def generate_launch_description():
         period=10.0,
         actions=[
             ekf_launch,
+            telep_crfs_launch,
             rover_twist_mux_launch,
         ],
     )

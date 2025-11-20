@@ -9,9 +9,19 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   
+  <depend>ament_index_cpp</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>realtime_tools</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>diagnostic_updater</depend>
+
   <!-- Rover real hardware dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">crsf_receiver</exec_depend>
-  
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">crsf_receiver_msg</exec_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

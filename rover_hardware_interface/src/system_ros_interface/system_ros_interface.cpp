@@ -86,7 +86,6 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
     realtime_gpio_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<GpioStateMsg>>(gpio_state_publisher_);
     
     diagnostic_updater_.setHardwareID("Rover System");
-
     
     RCLCPP_INFO(rclcpp::get_logger("RoverSystem"), "Node constructed successfully.");
 }
