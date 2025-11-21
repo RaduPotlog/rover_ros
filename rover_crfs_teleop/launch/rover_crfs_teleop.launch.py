@@ -57,7 +57,7 @@ def generate_launch_description():
     rover_crfs_receiver_node = Node(
         package="crsf_receiver",
         executable="crsf_receiver_node",
-        name="rover_crfs_receiver_node",
+        name="rover_crfs_receiver",
         namespace=namespace,
         parameters=[
             {'device': '/dev/ttyELRS'},

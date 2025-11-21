@@ -57,10 +57,11 @@ def generate_launch_description():
     rover_twist_mux_node = Node(
         package='twist_mux',
         executable='twist_mux',
-        output='screen',
+        name="rover_twist_mux",
         namespace=namespace,
+        output='screen',
+        parameters=[twist_mux_config_path],
         remappings={('/cmd_vel_out', '/cmd_vel')},
-        parameters=[twist_mux_config_path]
     )
 
     actions = [

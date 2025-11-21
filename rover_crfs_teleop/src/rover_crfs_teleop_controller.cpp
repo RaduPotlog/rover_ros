@@ -12,10 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <chrono>
+#include <iostream>
+
 #include "rover_crfs_teleop/rover_crfs_teleop_controller.hpp"
 
 namespace rover_crfs_telop
 {
+
+using namespace std::string_literals;
+using namespace std::chrono_literals;
 
 RoverCrfsTeleopController::RoverCrfsTeleopController(const std::string & node_name)
 : Node(node_name)
@@ -31,11 +38,15 @@ RoverCrfsTeleopController::RoverCrfsTeleopController(const std::string & node_na
     };
     
     subscription_ = this->create_subscription<crsf_receiver_msg::msg::CRSFChannels16>(
-        "/rc/channels", rclcpp::QoS(1).best_effort().durability_volatile(), topic_callback);
+        "rc/channels", rclcpp::QoS(1).best_effort().durability_volatile(), topic_callback);
 
     cmd_vel_publisher_ = this->create_publisher<geometry_msgs::msg::TwistStamped>(
-        "/teleop_elrs_cmd_vel_stamped", 10
+        "teleop_elrs_cmd_vel_stamped", 10
     );
+
+    e_stop_set_set_ = this->create_client<std_srvs::srv::Trigger>("hardware_interface/sw_user_e_stop_set");
+    e_stop_set_reset_ = this->create_client<std_srvs::srv::Trigger>("hardware_interface/sw_user_e_stop_reset");
+    sw_e_stop_latch_reset_ = this->create_client<std_srvs::srv::Trigger>("hardware_interface/sw_e_stop_latch_reset");
 
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(20), 
@@ -60,6 +71,87 @@ void RoverCrfsTeleopController::main_timer_callback()
     msg.twist.angular.z = twist_angular_z;
 
     cmd_vel_publisher_->publish(msg);
+
+    unsigned int e_stop_current_value = channels_values_.ch5;
+    bool e_stop_triggered = false;
+
+    if (e_stop_current_value != e_stop_old_value) {
+        e_stop_old_value = e_stop_current_value;
+        e_stop_triggered = true;
+    }
+
+    if (e_stop_triggered) {
+        if (e_stop_current_value < 500) {
+            
+            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+            
+            while (!e_stop_set_set_->wait_for_service(1s)) {
+                if (!rclcpp::ok()) {
+                    return;
+                }
+                
+                RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
+            }
+
+            e_stop_set_set_->async_send_request(request, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+                auto response = future.get();
+            });
+
+        } else {
+                
+            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+            
+            while (!e_stop_set_reset_->wait_for_service(1s)) {
+                if (!rclcpp::ok()) {
+                    return;
+                }
+                
+                RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
+            }
+
+            e_stop_set_reset_->async_send_request(request, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+                auto response = future.get();
+            });
+        }
+    }
+    
+    unsigned int e_stop_latch_reset_current_value = channels_values_.ch4;
+    bool e_stop_latch_reset_triggered = false;
+
+    if (!e_stop_latch_reset_init) {
+        e_stop_latch_reset_old_value = e_stop_latch_reset_current_value;
+
+        if (e_stop_latch_reset_init_counter > 0) {
+            e_stop_latch_reset_init_counter--;
+        } else {
+            e_stop_latch_reset_init = true;
+        }
+    }
+
+    if (e_stop_latch_reset_current_value != e_stop_latch_reset_old_value) {
+        e_stop_latch_reset_old_value = e_stop_latch_reset_current_value;
+        e_stop_latch_reset_triggered = true;
+    }
+
+    if (e_stop_latch_reset_triggered) {
+        if (e_stop_latch_reset_current_value < 500) {
+            
+            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+            
+            while (!sw_e_stop_latch_reset_->wait_for_service(1s)) {
+                if (!rclcpp::ok()) {
+                    return;
+                }
+                
+                RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
+            }
+
+            sw_e_stop_latch_reset_->async_send_request(request, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+                auto response = future.get();
+            });
+
+        }
+    }
 }
 
 } // rover_crfs_telop

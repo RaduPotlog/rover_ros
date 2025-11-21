@@ -25,6 +25,10 @@
 #include <rcutils/logging_macros.h>
 #include "rclcpp/qos.hpp"
 
+#include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/set_bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
+
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include "crsf_receiver_msg/msg/crsf_channels16.hpp"
@@ -69,9 +73,18 @@ private:
 
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_publisher_;
 
+    rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr e_stop_set_reset_;
+    rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr e_stop_set_set_;
+    rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr sw_e_stop_latch_reset_;
+
     rclcpp::TimerBase::SharedPtr timer_;
 
     RoverCrfsTeleopControllerChannels channels_values_;
+
+    unsigned int e_stop_old_value{0};
+    unsigned int e_stop_latch_reset_old_value{0};
+    bool e_stop_latch_reset_init{false};
+    unsigned int e_stop_latch_reset_init_counter{100};
 };
 
 }  // namespace rover_crfs_telop
