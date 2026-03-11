@@ -23,7 +23,7 @@
       </Sequence>
       <Sequence name="BatteryDeadSequence"
                 _skipIf="battery_health != POWER_SUPPLY_HEALTH_DEAD">
-        <SignalShutdown reason="Battery dead"/>
+        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"/>
       </Sequence>
       <Sequence name="BatteryOvervoltageSequence"
                 _skipIf="battery_health != POWER_SUPPLY_HEALTH_OVERVOLTAGE">

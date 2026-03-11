@@ -591,12 +591,14 @@ RoverBatteryNode::ReturnStatus RoverBatteryNode::getCellBalanceState() // 0x97
 
 std::uint8_t RoverBatteryNode::getBatteryHealth()
 {
-    if (alarm.levelOnePackVoltageTooLow == true) {
+    if ((alarm.levelOnePackVoltageTooLow == true) || (alarm.levelOneCellVoltageTooLow == true) || 
+        (alarm.levelOneStateOfChargeTooLow == true)) {
         return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_DEAD;
+    } else if ((alarm.levelOnePackVoltageTooHigh == true) || (alarm.levelOneCellVoltageTooHigh == true) || 
+        (alarm.levelOneStateOfChargeTooHigh == true)) {
+        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERVOLTAGE;
     } else if (alarm.levelOneChargeTempTooHigh == true || alarm.levelOneDischargeTempTooHigh == true) {
         return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERHEAT;
-    } else if (alarm.levelOnePackVoltageTooHigh == true) {
-        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERVOLTAGE;
     } else if (alarm.levelOneChargeTempTooLow == true || alarm.levelOneDischargeTempTooLow == true) {
         return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_COLD;
     } else {
