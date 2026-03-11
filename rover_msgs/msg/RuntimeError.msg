@@ -1,0 +1,1 @@
+bool safety_stop_active

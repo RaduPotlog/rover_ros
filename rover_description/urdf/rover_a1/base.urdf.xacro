@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro
+    name="body"
+    params="wheel_radius 
+            imu_xyz 
+            imu_rpy">
+
+    <link name="base_link" />
+
+    <joint name="base_to_body_joint" type="fixed">
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+      <parent link="base_link" />
+      <child link="body_link" />
+    </joint>
+
+    <link name="body_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://rover_description/meshes/rover_a1/base.STL" />
+        </geometry>
+      </visual>
+
+      <inertial>
+        <origin xyz="-0.0352516654672473 0.000230769565957786 0.0766816513547671" rpy="0 0 0" />
+        <mass value="33.445952" />
+        <inertia ixx="0.233794970398492" ixy="-0.000820762950210979" ixz="1.94037912313266E-05"
+                 iyy="0.228604041647293" iyz="3.84951327810773E-08" izz="0.363260170153768" />
+      </inertial>
+    </link>
+
+    <joint name="body_to_imu_joint" type="fixed">
+      <origin xyz="${imu_xyz}" rpy="${imu_rpy}" />
+      <parent link="body_link" />
+      <child link="imu_link" />
+    </joint>
+
+    <link name="imu_link" />
+
+    <joint name="body_to_footprint_joint" type="fixed">
+      <origin xyz="0.0 0.0 -0.1359" rpy="0.0 0.0 0.0" />
+      <parent link="body_link" />
+      <child link="base_footprint" />
+    </joint>
+    
+    <link name="base_footprint" />
+
+  </xacro:macro>
+</robot>

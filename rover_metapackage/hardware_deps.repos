@@ -1,0 +1,41 @@
+repositories:
+  rover_modbus:
+    type: git
+    url: https://github.com/RaduPotlog/rover_modbus
+    version: master
+  rover_cppuprofile:
+    type: git
+    url: https://github.com/RaduPotlog/rover_cppuprofile
+    version: master
+  rover_cpplinux_serial:
+    type: git
+    url: https://github.com/RaduPotlog/rover_cpplinux_serial
+    version: master
+  rover_crsf_receiver:
+    type: git
+    url: https://github.com/RaduPotlog/rover_crsf_receiver
+    version: master
+  rover_controllers:
+    type: git
+    url: https://github.com/RaduPotlog/rover_controllers
+    version: master_6_3_0
+  rover_arch:
+    type: git
+    url: https://github.com/RaduPotlog/rover_arch
+    version: main
+  rover_foxglove:
+    type: git
+    url: https://github.com/RaduPotlog/rover_foxglove
+    version: main
+  rover_behavior_tree:
+    type: git
+    url: https://github.com/RaduPotlog/rover_behavior_tree
+    version: master
+  rover_rslidar_sdk:
+    type: git
+    url: https://github.com/RaduPotlog/rover_rslidar_sdk
+    version: main
+  rover_orchestrator:
+    type: git
+    url: https://github.com/RaduPotlog/rover_orchestrator
+    version: main

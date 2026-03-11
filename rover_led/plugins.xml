@@ -1,0 +1,8 @@
+<library path="animation_plugins">
+  <class type="rover_led::ImageAnimation" base_class_type="rover_led::Animation">
+    <description>Animation processed from an image</description>
+  </class>
+  <class type="rover_led::MovingImageAnimation" base_class_type="rover_led::Animation">
+    <description>Animation processed from an image with ability to change animation plcement</description>
+  </class>
+</library>

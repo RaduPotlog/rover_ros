@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+  
+  <xacro:macro 
+    name="imu_interface"
+    params="use_sim:=false
+            namespace:=''">
+
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+    
+    <sensor name="${ns}imu">
+      <state_interface name="orientation.x" />
+      <state_interface name="orientation.y" />
+      <state_interface name="orientation.z" />
+      <state_interface name="orientation.w" />
+      <state_interface name="angular_velocity.x" />
+      <state_interface name="angular_velocity.y" />
+      <state_interface name="angular_velocity.z" />
+      <state_interface name="linear_acceleration.x" />
+      <state_interface name="linear_acceleration.y" />
+      <state_interface name="linear_acceleration.z" />
+    </sensor>    
+  </xacro:macro>
+
+  <!-- Gauss noise macro -->
+  <xacro:macro 
+    name="gauss_noise"
+    params="mean:=0.0
+            stddev:=0.0 
+            bias_mean:=0.0 
+            bias_stddev:=0.0 
+            precision:=0.0">
+    
+    <noise type="gaussian">
+      <mean>${mean}</mean>
+      <stddev>${stddev}</stddev>
+      <bias_mean>${bias_mean}</bias_mean>
+      <bias_stddev>${bias_stddev}</bias_stddev>
+      <precision>${precision}</precision>
+    </noise>
+  </xacro:macro>
+
+  <!-- IMU macro -->
+  <xacro:macro
+    name="imu"
+    params="use_sim:=false
+            reference_frame:=''
+            namespace:=''">
+
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+    
+    <!-- Gazebo IMU -->
+    <xacro:if value="${use_sim}">
+      <gazebo reference="${reference_frame}">
+        <sensor name="${ns}imu" type="imu">
+          <always_on>true</always_on>
+          <update_rate>50</update_rate>
+          <topic>${ns}imu/data_raw</topic>
+          <visualize>false</visualize>
+          <enable_metrics>false</enable_metrics>
+          <gz_frame_id>imu_link</gz_frame_id>
+          <imu>
+            <orientation_reference_frame>
+            <localization>ENU</localization>
+            </orientation_reference_frame>
+            <angular_velocity>
+              <!-- rad/s -->
+              <x>
+                <xacro:gauss_noise stddev="0.01" bias_mean="3.3e-5" precision="1.2e-3" />
+              </x>
+              <y>
+                <xacro:gauss_noise stddev="0.01" bias_mean="3.3e-5" precision="1.2e-3" />
+              </y>
+              <z>
+                <xacro:gauss_noise stddev="0.01" bias_mean="3.3e-5" precision="1.2e-3" />
+              </z>
+            </angular_velocity>
+            <linear_acceleration>
+              <!-- m/s^2 -->
+              <x>
+                <xacro:gauss_noise stddev="27.5e-3" bias_mean="18.6e-3" precision="9.6e-3" />
+              </x>
+              <y>
+                <xacro:gauss_noise stddev="27.5e-3" bias_mean="18.6e-3" precision="9.6e-3" />
+              </y>
+              <z>
+                <xacro:gauss_noise stddev="27.5e-3" bias_mean="18.6e-3" precision="9.6e-3" />
+              </z>
+            </linear_acceleration>
+          </imu>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+
+    <!-- ROS2 controller -->
+    <ros2_control name="${ns}imu" type="sensor">
+      <xacro:unless value="${use_sim}">
+        <hardware>
+          <!-- Hardware IMU sensor interface  -->
+          <plugin>rover_hardware_interface/PhidgetImuSensor</plugin>
+          <param name="serial">-1</param>
+          <param name="hub_port">0</param>
+          <param name="data_interval_ms">8</param>
+          <param name="callback_delta_epsilon_ms">1</param>
+
+          <!-- Madgwick Filter Params -->
+          <param name="gain">0.00304</param>
+          <param name="zeta">0.00151</param>
+          <param name="mag_bias_x">0.0</param>
+          <param name="mag_bias_y">0.0</param>
+          <param name="mag_bias_z">0.0</param>
+          <param name="use_mag">true</param>
+          <param name="stateless">false</param>
+          <param name="remove_gravity_vector">false</param>
+          <param name="world_frame">enu</param>
+        </hardware>
+      
+        <!-- IMU interfaces -->
+        <xacro:imu_interface use_sim="${use_sim}" namespace="${namespace}" />
+      
+      </xacro:unless>
+    </ros2_control> 
+  </xacro:macro>
+
+</robot>

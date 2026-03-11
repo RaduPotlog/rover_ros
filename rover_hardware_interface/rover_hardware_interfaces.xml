@@ -1,0 +1,14 @@
+<library path="rover_hardware_interface">
+  
+  <class name="rover_hardware_interface/RoverA1System"
+    type="rover_hardware_interface::RoverA1System"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>Hardware system controller for Rover-A1's Phidget motor controller</description>
+  </class>
+
+  <class name="rover_hardware_interface/PhidgetImuSensor"
+    type="rover_hardware_interface::PhidgetImuSensor"
+    base_class_type="hardware_interface::SensorInterface">
+    <description>Hardware IMU sensor for Phidget Spatial IMU</description>
+  </class>
+</library>

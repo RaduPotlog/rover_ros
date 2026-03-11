@@ -1,0 +1,7 @@
+rover_msgs/LedImageAnimation front
+rover_msgs/LedImageAnimation rear
+bool interrupting
+bool repeating
+---
+bool success
+string message
