@@ -32,8 +32,10 @@ CallSetBoolService::CallSetBoolService(
 
 BT::PortsList CallSetBoolService::providedPorts() 
 {
-    return { BT::InputPort<std::string>("service_name", "/default/set_bool"),
-             BT::InputPort<bool>("data")};
+    return { 
+        BT::InputPort<std::string>("service_name", "/default/set_bool"),
+        BT::InputPort<bool>("data")
+    };
 }
 
 BT::NodeStatus CallSetBoolService::tick()

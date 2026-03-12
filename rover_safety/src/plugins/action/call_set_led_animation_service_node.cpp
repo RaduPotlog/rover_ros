@@ -32,17 +32,35 @@ CallSetLedAnimationService::CallSetLedAnimationService(
 
 BT::PortsList CallSetLedAnimationService::providedPorts() 
 {
-    return providedBasicPorts(
-        {
-            BT::InputPort<unsigned>("id", "Animation ID to trigger."),
-            BT::InputPort<std::string>("param", "Optional animation parameter."),
-            BT::InputPort<bool>("repeating", "Specifies whether the animation should repeated continuously.")
-        });
+    return {
+        BT::InputPort<std::string>("service_name", "/led/set_animation"),
+        BT::InputPort<unsigned>("id", "Animation ID to trigger."),
+        BT::InputPort<std::string>("param", "Optional animation parameter."),
+        BT::InputPort<bool>("repeating", "Specifies whether the animation should repeated continuously.")
+    };
 }
 
 BT::NodeStatus CallSetLedAnimationService::tick()
 {
-    return nav2_behavior_tree::BtServiceNode<rover_msgs::srv::SetLedAnimation>::tick();
+    unsigned animation_id;
+    
+    if (!getInput<unsigned>("id", animation_id)) {
+        return BT::NodeStatus::FAILURE;
+    }
+
+    request_->animation.id = static_cast<uint16_t>(animation_id);
+
+    if (!getInput<std::string>("param", request_->animation.param)) {
+        return BT::NodeStatus::FAILURE;
+    }
+
+    if (!getInput<bool>("repeating", request_->repeating)) {
+        return BT::NodeStatus::FAILURE;
+    }
+
+    service_client_->async_send_request(request_);
+    
+    return BT::NodeStatus::SUCCESS;
 }
 
 }  // namespace rover_safety

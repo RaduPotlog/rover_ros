@@ -28,6 +28,7 @@
 #include "std_msgs/msg/bool.hpp"
 
 #include "rover_msgs/msg/led_animation.hpp"
+#include "rover_msgs/msg/gpio_state.hpp"
 
 #include "rover_safety/behavior_tree.hpp"
 #include "rover_safety/led_safety_parameters.hpp"
@@ -39,6 +40,7 @@ using BatteryStateMsg = sensor_msgs::msg::BatteryState;
 using BoolMsg = std_msgs::msg::Bool;
 using LedAnimationMsg = rover_msgs::msg::LedAnimation;
 using JoyMsg = sensor_msgs::msg::Joy;
+using GpioMsg = rover_msgs::msg::GpioState; 
 
 class LedSafetyNode : public rclcpp::Node
 {
@@ -72,7 +74,7 @@ private:
   
     void batteryCallback(const BatteryStateMsg::SharedPtr battery);
     
-    void eStopCallback(const BoolMsg::SharedPtr e_stop);
+    void gpioCallback(const GpioMsg::SharedPtr gpio_state);
     
     void joyCallback(const JoyMsg::SharedPtr joy);
     
@@ -86,7 +88,7 @@ private:
     led_safety::Params params_;
 
     rclcpp::Subscription<BatteryStateMsg>::SharedPtr battery_sub_;
-    rclcpp::Subscription<BoolMsg>::SharedPtr e_stop_sub_;
+    rclcpp::Subscription<GpioMsg>::SharedPtr gpio_sub_;
     rclcpp::Subscription<JoyMsg>::SharedPtr joy_sub_;
     rclcpp::TimerBase::SharedPtr led_tree_timer_;
 

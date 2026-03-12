@@ -58,7 +58,7 @@ void LedSafetyNode::init()
     const auto initial_blackboard = createLedInitialBlackboard();
     
     led_tree_ = std::make_unique<BehaviorTreeSafety>(
-        this->shared_from_this(), "LedSafety", initial_blackboard, bt_server_port);
+        this->shared_from_this(), "RoverLedSafety", initial_blackboard, bt_server_port);
     registerBehaviorTree();
     led_tree_->init(factory_);
 
@@ -67,9 +67,9 @@ void LedSafetyNode::init()
     battery_sub_ = this->create_subscription<BatteryStateMsg>(
         "rover_battery/battery_status", 10, std::bind(&LedSafetyNode::batteryCallback, this, _1));
     
-    e_stop_sub_ = this->create_subscription<BoolMsg>(
-        "hardware/e_stop", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
-        std::bind(&LedSafetyNode::eStopCallback, this, _1));
+    gpio_sub_ = this->create_subscription<GpioMsg>(
+        "hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        std::bind(&LedSafetyNode::gpioCallback, this, _1));
     
     joy_sub_ = this->create_subscription<JoyMsg>(
         "joy", 10, std::bind(&LedSafetyNode::joyCallback, this, _1));
@@ -78,7 +78,7 @@ void LedSafetyNode::init()
     const auto timer_period = std::chrono::duration<double>(1.0 / timer_freq);
 
     led_tree_timer_ = this->create_wall_timer(
-    timer_period, std::bind(&LedSafetyNode::ledTreeTimerCallback, this));
+        timer_period, std::bind(&LedSafetyNode::ledTreeTimerCallback, this));
 
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
 }
@@ -146,6 +146,10 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
         {"POWER_SUPPLY_STATUS_FULL", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_FULL)},
         // battery health constants
         {"POWER_SUPPLY_HEALTH_OVERHEAT", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT)},
+        
+        {"default_server_timeout", std::chrono::milliseconds(5000)},
+        {"bt_loop_duration", std::chrono::milliseconds(100)},
+        {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
     };
 
     RCLCPP_INFO(this->get_logger(), "Blackboard created.");
@@ -169,12 +173,12 @@ void LedSafetyNode::batteryCallback(const BatteryStateMsg::SharedPtr battery_sta
 
     led_tree_->getBlackboard()->set<float>("battery_percent", battery_percent_);
     led_tree_->getBlackboard()->set<std::string>("battery_percent_round",
-    std::to_string(round(battery_percent_ / update_charging_anim_step_) * update_charging_anim_step_));
+        std::to_string(round(battery_percent_ / update_charging_anim_step_) * update_charging_anim_step_));
 }
 
-void LedSafetyNode::eStopCallback(const BoolMsg::SharedPtr e_stop)
+void LedSafetyNode::gpioCallback(const GpioMsg::SharedPtr gpio_state)
 {
-    led_tree_->getBlackboard()->set<bool>("e_stop_state", e_stop->data);
+    led_tree_->getBlackboard()->set<bool>("e_stop_state", gpio_state->gpio_pin_hw_e_stop_user_button);
 }
 
 void LedSafetyNode::joyCallback(const JoyMsg::SharedPtr joy)

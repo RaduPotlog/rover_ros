@@ -30,7 +30,7 @@ led_animations:
     priority: 3
     animations:
       - type: rover_led::ImageAnimation
-        segments: front
+        segments: all
         animation:
           image: $(find rover_led)/animations/rover_a1/ready_front.png
           duration: 6

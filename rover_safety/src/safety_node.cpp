@@ -75,9 +75,10 @@ void SafetyNode::init()
         "rover_battery/battery_status", 10, 
         std::bind(&SafetyNode::batteryStateSubscriberCallback, this, _1));
     driver_state_sub_ = this->create_subscription<RoverDriverStateMsg>(
-        "hardware/rover_driver_state", 10, std::bind(&SafetyNode::driverStateSubscriberCallback, this, _1));
+        "hardware_interface/rover_driver_state", 10, 
+        std::bind(&SafetyNode::driverStateSubscriberCallback, this, _1));
     io_state_sub_ = this->create_subscription<IOStateMsg>(
-        "hardware/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        "hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
         std::bind(&SafetyNode::ioStateSubscriberCallback, this, _1));
     system_status_sub_ = this->create_subscription<SystemStatusMsg>(
         "system_status", 10, 

@@ -13,8 +13,8 @@
           low: 30.0
         charging_anim_step: 0.05
       ros_communication_timeout:
-        availability: 1.0
-        response: 1.0
+        availability: 1000.0
+        response: 5000.0
       plugin_libs:
         - tick_after_timeout_bt_node
       ros_plugin_libs:
