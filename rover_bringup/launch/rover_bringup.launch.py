@@ -148,7 +148,6 @@ def generate_launch_description():
         launch_arguments={
             "log_level": log_level,
             "namespace": namespace,
-            "use_sim": "False",
             "common_dir_path": common_dir_path,
         }.items(),
     )
@@ -163,6 +162,19 @@ def generate_launch_description():
             "log_level": log_level,
             "namespace": namespace,
             "use_sim": "False",
+            "common_dir_path": common_dir_path,
+        }.items(),
+    )
+
+    rover_led_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("rover_led"), "launch", "rover_led.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "log_level": log_level,
+            "namespace": namespace,
             "common_dir_path": common_dir_path,
         }.items(),
     )
@@ -255,9 +267,10 @@ def generate_launch_description():
     rover_delayed_action = TimerAction(
         period=10.0,
         actions=[
-            rover_ekf_launch,
             rover_battery_launch,
+            rover_led_launch,
             rover_safety_launch,
+            rover_ekf_launch,
             rover_crfs_teleop_launch,
             rover_twist_mux_launch,
             rover_web_bridge_launch,

@@ -114,7 +114,7 @@ target_link_libraries(led_safety_node ${plugin_libs}
 install(TARGETS ${plugin_libs} 
     DESTINATION lib)
 
-install(TARGETS ${PROJECT_NAME}_node
+install(TARGETS ${PROJECT_NAME}_node led_safety_node
     DESTINATION lib/${PROJECT_NAME}
 )
 

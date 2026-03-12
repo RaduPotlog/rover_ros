@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from rover_utils.logging import limit_log_level_to_info
+from rover_utils.logging import limit_log_level_to_info
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import UnlessCondition
@@ -50,6 +51,15 @@ def generate_launch_description():
 
     rover_safety_pkg = FindPackageShare("rover_safety")
 
+    led_bt_project_path = LaunchConfiguration("led_bt_project_path")
+    declare_led_bt_project_path_arg = DeclareLaunchArgument(
+        "led_bt_project_path",
+        default_value=PathJoinSubstitution(
+            [rover_safety_common_dir, "behavior_trees", "RoverLedBT.btproj"]
+        ),
+        description="Path to BehaviorTree project file, responsible for led management.",
+    )
+
     log_level = LaunchConfiguration("log_level")
     declare_log_level_arg = DeclareLaunchArgument(
         "log_level",
@@ -81,7 +91,28 @@ def generate_launch_description():
         description="Whether simulation is used",
     )
 
-    safety_node = Node(
+    rover_led_safety_node = Node(
+        package="rover_safety",
+        executable="led_safety_node",
+        name="led_safety_node",
+        parameters=[
+            PathJoinSubstitution([rover_safety_pkg, "config", "led_safety.yaml"]),
+            {
+                "bt_project_path": led_bt_project_path,
+            },
+        ],
+        namespace=namespace,
+        arguments=[
+            "--ros-args",
+            "--log-level",
+            log_level,
+            "--log-level",
+            limit_log_level_to_info("rcl", log_level),
+        ],
+        emulate_tty=True,
+    )
+
+    rover_safety_node = Node(
         package="rover_safety",
         executable="rover_safety_node",
         name="rover_safety_node",
@@ -106,10 +137,12 @@ def generate_launch_description():
     actions = [
         declare_common_dir_path_arg,
         declare_log_level_arg,
+        declare_led_bt_project_path_arg,
         declare_safety_bt_project_path_arg,
         declare_namespace_arg,
         declare_use_sim_arg,
-        safety_node,
+        rover_led_safety_node,
+        rover_safety_node,
     ]
 
     return LaunchDescription(actions)
