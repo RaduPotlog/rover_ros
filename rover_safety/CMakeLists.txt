@@ -39,6 +39,10 @@ add_library(call_trigger_service_bt_node SHARED
     src/plugins/action/call_trigger_service_node.cpp)
 list(APPEND plugin_libs call_trigger_service_bt_node)
 
+add_library(call_set_led_animation_service_bt_node SHARED
+            src/plugins/action/call_set_led_animation_service_node.cpp)
+list(APPEND plugin_libs call_set_led_animation_service_bt_node)
+
 add_library(execute_command_bt_node SHARED
     src/plugins/action/execute_command_node.cpp)
 list(APPEND plugin_libs execute_command_bt_node)
@@ -81,6 +85,30 @@ generate_parameter_library(safety_parameters
 target_link_libraries(${PROJECT_NAME}_node 
     ${plugin_libs}
     safety_parameters
+)
+
+add_executable(led_safety_node src/led_safety_main.cpp
+                                   src/led_safety_node.cpp)
+
+ament_target_dependencies(
+    led_safety_node
+    behaviortree_cpp
+    geometry_msgs
+    rover_msgs
+    rover_utils
+    rclcpp
+    sensor_msgs
+    std_msgs
+    tf2_geometry_msgs
+    nav2_behavior_tree
+)
+
+generate_parameter_library(led_safety_parameters
+                           src/led_safety_parameters.yaml
+)
+
+target_link_libraries(led_safety_node ${plugin_libs}
+                      led_safety_parameters
 )
 
 install(TARGETS ${plugin_libs} 
