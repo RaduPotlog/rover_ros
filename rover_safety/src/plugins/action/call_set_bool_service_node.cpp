@@ -40,7 +40,9 @@ BT::PortsList CallSetBoolService::providedPorts()
 
 BT::NodeStatus CallSetBoolService::tick()
 {
-    return nav2_behavior_tree::BtServiceNode<std_srvs::srv::SetBool>::tick();
+    service_client_->async_send_request(request_);
+    
+    return BT::NodeStatus::SUCCESS;
 }
 
 }  // namespace rover_safety

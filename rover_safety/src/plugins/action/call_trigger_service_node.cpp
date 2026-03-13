@@ -37,7 +37,9 @@ BT::PortsList CallTriggerService::providedPorts()
 
 BT::NodeStatus CallTriggerService::tick()
 {
-    return nav2_behavior_tree::BtServiceNode<std_srvs::srv::Trigger>::tick();
+    service_client_->async_send_request(request_);
+    
+    return BT::NodeStatus::SUCCESS;
 }
 
 }  // namespace rover_safety
