@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4" project_name="RoverLedBT">
-    <include path="rover_led.xml"/>
+    <include path="rover_led_safety.xml"/>
     <TreeNodesModel>
         <Action ID="CallSetLedAnimationService" editable="true">
             <input_port name="id">animation ID</input_port>

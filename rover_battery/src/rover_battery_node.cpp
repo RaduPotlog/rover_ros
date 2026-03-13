@@ -340,23 +340,43 @@ void RoverBatteryNode::publishBatteryInfo()
     }
 
     if (get.chargeDischargeStatus == "Charge") {
-        battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_CHARGING;
+        if (battery_state_msgs_.percentage >= 100.0) {
+            battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_FULL;
+        }
+        else {
+            battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_CHARGING;
+        }
+        
         charging_state_msgs_.charging           = true;
         charging_state_msgs_.current            = get.packCurrent;
         charging_state_msgs_.current_battery    = get.packCurrent;
         charging_state_msgs_.charger_type       = rover_msgs::msg::ChargingStatus::WIRED;
     }
-    else {
+    else if (get.chargeDischargeStatus == "Discharge") {
+        battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_DISCHARGING;
+        charging_state_msgs_.charging           = false;
+        charging_state_msgs_.current            = get.packCurrent;
+        charging_state_msgs_.current_battery    = get.packCurrent;
+        charging_state_msgs_.charger_type       = rover_msgs::msg::ChargingStatus::WIRED;
+    }
+    else if (get.chargeDischargeStatus == "Stationary") {
         battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_NOT_CHARGING;
+        charging_state_msgs_.charging           = false;
+        charging_state_msgs_.current            = get.packCurrent;
+        charging_state_msgs_.current_battery    = get.packCurrent;
+        charging_state_msgs_.charger_type       = rover_msgs::msg::ChargingStatus::UNKNOWN;
+    }
+    else {
+        battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_UNKNOWN;
         charging_state_msgs_.charging        = false;
-        charging_state_msgs_.current         = 0.0;
+        charging_state_msgs_.current         = get.packCurrent;
         charging_state_msgs_.current_battery = get.packCurrent;
-        charging_state_msgs_.charger_type    = 0x01;
+        charging_state_msgs_.charger_type    = rover_msgs::msg::ChargingStatus::UNKNOWN;
     }
 
     battery_state_msgs_.power_supply_health = getBatteryHealth();
     
-        // Publish state
+    // Publish state
     battery_publisher_->publish(battery_state_msgs_, charging_state_msgs_, error_msg_);
 }
 

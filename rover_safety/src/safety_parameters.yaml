@@ -14,7 +14,7 @@ safety:
 
   bt_server_port:
     type: int
-    default_value: 1234
+    default_value: 6666
     description: Port number for the BehaviorTree server.
     validation: { gt<>: 0 }
 

@@ -63,9 +63,11 @@ void SafetyNode::init()
 {
     RCLCPP_INFO(this->get_logger(), "Initializing.");
 
+    const auto bt_server_port = this->get_parameter("bt_server_port").as_int();
     const auto safety_initial_blackboard = createSafetyInitialBlackboard();
+    
     safety_tree_ = std::make_unique<BehaviorTreeSafety>(
-        this->shared_from_this(), "RoverSafety", safety_initial_blackboard, 1667);
+        this->shared_from_this(), "RoverSafety", safety_initial_blackboard, bt_server_port);
     registerBehaviorTree();
     safety_tree_->init(factory_);
     

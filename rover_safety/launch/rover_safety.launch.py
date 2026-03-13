@@ -55,7 +55,7 @@ def generate_launch_description():
     declare_led_bt_project_path_arg = DeclareLaunchArgument(
         "led_bt_project_path",
         default_value=PathJoinSubstitution(
-            [rover_safety_common_dir, "behavior_trees", "RoverLedBT.btproj"]
+            [rover_safety_common_dir, "behavior_trees", "RoverLedSafetyBT.btproj"]
         ),
         description="Path to BehaviorTree project file, responsible for led management.",
     )
