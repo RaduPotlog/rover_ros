@@ -1,8 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4">
+  <BehaviorTree ID="ErrorAnimationSubtree">
+    <Sequence name="ErrorSequence">
+      <Sequence _skipIf="current_error_anim_id == ERROR_ANIM_ID">
+        <CallSetLedAnimationService name="SetErrorAnimation"
+                                    id="{ERROR_ANIM_ID}"
+                                    param=""
+                                    repeating="true"
+                                    service_name="led/set_animation"
+                                    _skipIf="battery_status != POWER_SUPPLY_STATUS_CHARGING \&#10;|| battery_health != POWER_SUPPLY_HEALTH_OVERHEAT"
+                                    _onSuccess="current_error_anim_id = ERROR_ANIM_ID"/>
+        <CallSetLedAnimationService name="SetErrorAnimation"
+                                    id="{ERROR_ANIM_ID}"
+                                    param=""
+                                    repeating="true"
+                                    service_name="led/set_animation"
+                                    _skipIf="battery_status != POWER_SUPPLY_STATUS_UNKNOWN"
+                                    _onSuccess="current_error_anim_id = ERROR_ANIM_ID"/>
+      </Sequence>
+      <Sequence _skipIf="current_error_anim_id == NO_ERROR_ANIM_ID">
+        <CallSetLedAnimationService name="SetNoErrorAnimation"
+                                    id="{NO_ERROR_ANIM_ID}"
+                                    param=""
+                                    repeating="true"
+                                    service_name="led/set_animation"
+                                    _skipIf="battery_status == POWER_SUPPLY_STATUS_UNKNOWN \&#10;|| (battery_status == POWER_SUPPLY_STATUS_CHARGING \&#10;&amp;&amp; battery_health == POWER_SUPPLY_HEALTH_OVERHEAT)"
+                                    _onSuccess="current_error_anim_id = NO_ERROR_ANIM_ID"/>
+      </Sequence>
+    </Sequence>
+  </BehaviorTree>
+
   <BehaviorTree ID="RoverLedSafety">
-    <SubTree ID="StateAnimationSubtree"
-             _autoremap="true"/>
+    <Parallel failure_count="1"
+              success_count="-1">
+      <SubTree ID="ErrorAnimationSubtree"
+               _autoremap="true"/>
+      <SubTree ID="StateAnimationSubtree"
+               _autoremap="true"/>
+    </Parallel>
   </BehaviorTree>
 
   <BehaviorTree ID="StateAnimationSubtree">
@@ -23,14 +58,13 @@
                                     _skipIf="(!drive_state) || current_anim_id == MANUAL_ACTION_ANIM_ID"
                                     _onSuccess="current_anim_id = MANUAL_ACTION_ANIM_ID"/>
       </Sequence>
-      <Sequence _skipIf="(!e_stop_state) || current_anim_id == E_STOP_ANIM_ID">
-        <CallSetLedAnimationService name="SetEStopAnimation"
-                                    id="{E_STOP_ANIM_ID}"
-                                    param=""
-                                    repeating="true"
-                                    service_name="/led/set_animation"
-                                    _onSuccess="current_anim_id = E_STOP_ANIM_ID"/>
-      </Sequence>
+      <CallSetLedAnimationService name="SetEStopAnimation"
+                                  id="{E_STOP_ANIM_ID}"
+                                  param=""
+                                  repeating="true"
+                                  service_name="led/set_animation"
+                                  _skipIf="(!e_stop_state) || current_anim_id == E_STOP_ANIM_ID"
+                                  _onSuccess="current_anim_id = E_STOP_ANIM_ID"/>
     </Sequence>
   </BehaviorTree>
 

@@ -340,7 +340,7 @@ void RoverBatteryNode::publishBatteryInfo()
     }
 
     if (get.chargeDischargeStatus == "Charge") {
-        if (battery_state_msgs_.percentage >= 100.0) {
+        if (battery_state_msgs_.percentage >= 1.0f) {
             battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_FULL;
         }
         else {
@@ -614,8 +614,8 @@ std::uint8_t RoverBatteryNode::getBatteryHealth()
     if ((alarm.levelOnePackVoltageTooLow == true) || (alarm.levelOneCellVoltageTooLow == true) || 
         (alarm.levelOneStateOfChargeTooLow == true)) {
         return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_DEAD;
-    } else if ((alarm.levelOnePackVoltageTooHigh == true) || //(alarm.levelOneCellVoltageTooHigh == true) || (levelTwoCellVoltageTooHigh == true) ||
-        (alarm.levelOneStateOfChargeTooHigh == true)) {
+    } else if ((alarm.levelTwoPackVoltageTooHigh == true) || //(alarm.levelTwoCellVoltageTooHigh == true) ||
+        (alarm.levelTwoStateOfChargeTooHigh == true)) {
         return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERVOLTAGE;
     } else if (alarm.levelOneChargeTempTooHigh == true || alarm.levelOneDischargeTempTooHigh == true) {
         return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERHEAT;
