@@ -69,7 +69,7 @@ void BatteryPublisher::batteryStatusLogger(const BatteryStateMsg & battery_state
         case BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING:
             msg = "The robot is not charging. Current battery percentage: " +
                 std::to_string(static_cast<int>(round(battery_state.percentage * 100.0))) + "%.";
-            RCLCPP_INFO_STREAM_THROTTLE(getLogger(), *getClock(), 600000, msg);
+            RCLCPP_INFO_STREAM_THROTTLE(getLogger(), *getClock(), 10000, msg);
             break;
 
         case BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING:
@@ -86,7 +86,7 @@ void BatteryPublisher::batteryStatusLogger(const BatteryStateMsg & battery_state
 
         case BatteryStateMsg::POWER_SUPPLY_STATUS_FULL:
             msg = "The battery is fully charged. Robot can be disconnected from the charger.";
-            RCLCPP_WARN_STREAM_THROTTLE(getLogger(), *getClock(), 600000, msg);
+            RCLCPP_WARN_STREAM_THROTTLE(getLogger(), *getClock(), 10000, msg);
             break;
 
         default:
