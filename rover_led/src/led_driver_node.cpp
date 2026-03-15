@@ -52,19 +52,19 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
     this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
     enable_led_control_client_ = this->create_client<SetBoolSrv>(
-    "hardware/led_control_enable", rclcpp::ServicesQoS(), client_callback_group_);
+        "hardware/led_control_enable", rclcpp::ServicesQoS(), client_callback_group_);
 
     set_brightness_server_ = this->create_service<SetLedBrightnessSrv>(
-    "led/set_brightness", std::bind(&LedDriverNode::setBrightnessCallback, this, _1, _2));
+        "led/set_brightness", std::bind(&LedDriverNode::setBrightnessCallback, this, _1, _2));
 
     initialization_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100), std::bind(&LedDriverNode::initializationTimerCallback, this));
 
     channel_1_ts_ = this->get_clock()->now();
     channel_1_sub_ = this->create_subscription<ImageMsg>(
-    "led/channel_1_frame", 5, [&](const ImageMsg::UniquePtr & msg) {
-        frameCallback(msg, channel_1_, channel_1_ts_, "channel_1");
-        channel_1_ts_ = msg->header.stamp;
+        "led/channel_1_frame", 5, [&](const ImageMsg::UniquePtr & msg) {
+            frameCallback(msg, channel_1_, channel_1_ts_, "channel_1");
+            channel_1_ts_ = msg->header.stamp;
     });
 
     diagnostic_updater_.setHardwareID("Bumper Led");
