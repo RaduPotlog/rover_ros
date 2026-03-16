@@ -168,9 +168,7 @@ void SafetyNode::driverStateSubscriberCallback(const RoverDriverStateMsg::Shared
 
 void SafetyNode::ioStateSubscriberCallback(const IOStateMsg::SharedPtr io_state)
 {
-    (void)io_state;
-
-    // TODO: IO Safety Requirements
+    safety_tree_->getBlackboard()->set<bool>("sw_e_stop_state", io_state->gpio_pin_sw_e_stop_user_button);
 }
 
 void SafetyNode::systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr system_status)
@@ -183,10 +181,11 @@ void SafetyNode::systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr
 
 bool SafetyNode::systemReady()
 {
-    if (!safety_tree_->getBlackboard()->getEntry("battery_health") ||
-        !safety_tree_->getBlackboard()->getEntry("battery_status") ||
-        !safety_tree_->getBlackboard()->getEntry("bat_temp") ||
-        !safety_tree_->getBlackboard()->getEntry("cpu_temp")) {
+    if (!safety_tree_->getBlackboard()->getEntry("battery_health")  ||  \
+        !safety_tree_->getBlackboard()->getEntry("battery_status")  ||  \
+        !safety_tree_->getBlackboard()->getEntry("bat_temp")        ||  \
+        !safety_tree_->getBlackboard()->getEntry("cpu_temp")        ||  \
+        !safety_tree_->getBlackboard()->getEntry("sw_e_stop_state")) {
 
         RCLCPP_INFO_THROTTLE(
             this->get_logger(), *this->get_clock(), 5000, "Waiting for required system messages to arrive.");

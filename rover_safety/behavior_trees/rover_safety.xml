@@ -3,9 +3,9 @@
   <BehaviorTree ID="RoverSafety">
     <Sequence>
       <Sequence name="BatteryOverheatSequence"
-                _description="No response over UART"
                 _skipIf="battery_health != POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE">
-        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"/>
+        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
+                            _skipIf="sw_e_stop_state"/>
       </Sequence>
       <Sequence name="BatteryOverheatSequence"
                 _skipIf="battery_health != POWER_SUPPLY_HEALTH_OVERHEAT">
@@ -17,17 +17,20 @@
                   _skipIf="bat_temp &gt; FATAL_BAT_TEMP">
           <Sequence name="CriticalBatTempSequence"
                     _skipIf="bat_temp &lt;= CRITICAL_BAT_TEMP">
-            <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"/>
+            <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
+                                _skipIf="sw_e_stop_state"/>
           </Sequence>
         </Sequence>
       </Sequence>
       <Sequence name="BatteryDeadSequence"
                 _skipIf="battery_health != POWER_SUPPLY_HEALTH_DEAD">
-        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"/>
+        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
+                            _skipIf="sw_e_stop_state"/>
       </Sequence>
       <Sequence name="BatteryOvervoltageSequence"
                 _skipIf="battery_health != POWER_SUPPLY_HEALTH_OVERVOLTAGE">
-        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"/>
+        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
+                            _skipIf="sw_e_stop_state"/>
       </Sequence>
     </Sequence>
   </BehaviorTree>
