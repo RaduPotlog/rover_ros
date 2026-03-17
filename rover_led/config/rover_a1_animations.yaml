@@ -55,3 +55,80 @@ led_animations:
           image: $(find rover_led)/animations/rover_a1/empty.png
           duration: 1
           repeat: 1
+
+  - id: 5
+    name: LOW_BATTERY
+    priority: 2
+    animations:
+      - type: husarion_ugv_lights::MovingImageAnimation
+        segments: all
+        animation:
+          image: $(find husarion_ugv_lights)/animations/panther/low_battery.png
+          duration: 10
+          repeat: 1
+          center_offset: 24
+          object_width: 2
+          splash_duration: 10.0
+
+  - id: 6
+    name: CRITICAL_BATTERY
+    priority: 2
+    animations:
+      - type: husarion_ugv_lights::MovingImageAnimation
+        segments: all
+        animation:
+          image: $(find husarion_ugv_lights)/animations/panther/critical_battery.png
+          duration: 10
+          repeat: 1
+          center_offset: 24
+          object_width: 2
+          splash_duration: 10.0
+
+  - id: 7
+    name: CHARGING_BATTERY
+    priority: 2
+    animations:
+      - type: husarion_ugv_lights::MovingImageAnimation
+        segments: all
+        animation:
+          image: $(find husarion_ugv_lights)/animations/panther/charging_battery.png
+          duration: 10
+          repeat: 1
+          center_offset: 38
+          object_width: 1
+          splash_duration: 10.0
+
+  - id: 8
+    name: BATTERY_CHARGED
+    priority: 2
+    animations:
+      - type: husarion_ugv_lights::MovingImageAnimation
+        segments: all
+        animation:
+          image: $(find husarion_ugv_lights)/animations/panther/battery_charged.png
+          duration: 10
+          repeat: 1
+          center_offset: 38
+          object_width: 1
+          splash_duration: 10.0
+
+  - id: 9
+    name: CHARGER_INSERTED
+    priority: 1
+    animations:
+      - type: husarion_ugv_lights::ImageAnimation
+        segments: all
+        animation:
+          image: $(find husarion_ugv_lights)/animations/panther/charger_inserted.png
+          duration: 8
+
+  - id: 10
+    name: BATTERY_NOMINAL
+    priority: 2
+    animations:
+      - type: husarion_ugv_lights::ImageAnimation
+        segments: all
+        animation:
+          image: $(find husarion_ugv_lights)/animations/panther/empty.png
+          duration: 1
+          repeat: 1

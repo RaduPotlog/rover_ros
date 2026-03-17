@@ -32,6 +32,8 @@
 
 // Actions
 #include "rover_safety/plugins/action/call_set_led_animation_service_node.hpp"
+// Decorators
+#include "rover_safety/plugins/decorator/tick_after_timeout_node.hpp"
 
 namespace rover_safety
 {
@@ -90,6 +92,8 @@ void LedSafetyNode::registerBehaviorTree()
     // TODO: Register form config file
     // Actions
     factory_.registerNodeType<CallSetLedAnimationService>("CallSetLedAnimationService");
+    // Decorators
+    factory_.registerNodeType<SafetyBtTickAfterTimeout>("SafetyBtTickAfterTimeout");
     
     factory_.registerBehaviorTreeFromFile(bt_project_path);
 
@@ -120,7 +124,7 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
         {"CRITICAL_BATTERY_THRESHOLD_PERCENT", critical_battery_threshold_percent},
         {"LOW_BATTERY_ANIM_PERIOD", low_battery_anim_period},
         {"LOW_BATTERY_THRESHOLD_PERCENT", low_battery_threshold_percent},
-        // anim constants
+        // Animation images constants
         {"E_STOP_ANIM_ID", unsigned(LedAnimationMsg::E_STOP)},
         {"READY_ANIM_ID", unsigned(LedAnimationMsg::READY)},
         {"ERROR_ANIM_ID", unsigned(LedAnimationMsg::ERROR)},
@@ -132,21 +136,15 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
         {"BATTERY_CHARGED_ANIM_ID", unsigned(LedAnimationMsg::BATTERY_CHARGED)},
         {"CHARGER_INSERTED_ANIM_ID", unsigned(LedAnimationMsg::CHARGER_INSERTED)},
         {"BATTERY_NOMINAL_ANIM_ID", unsigned(LedAnimationMsg::BATTERY_NOMINAL)},
-        {"AUTONOMOUS_READY_ANIM_ID", unsigned(LedAnimationMsg::AUTONOMOUS_READY)},
-        {"AUTONOMOUS_ACTION_ANIM_ID", unsigned(LedAnimationMsg::AUTONOMOUS_ACTION)},
-        {"GOAL_ACHIEVED_ANIM_ID", unsigned(LedAnimationMsg::GOAL_ACHIEVED)},
-        {"BLINKER_LEFT_ANIM_ID", unsigned(LedAnimationMsg::BLINKER_LEFT)},
-        {"BLINKER_RIGHT_ANIM_ID", unsigned(LedAnimationMsg::BLINKER_RIGHT)},
-        // battery status constants
+        // Battery status constants
         {"POWER_SUPPLY_STATUS_UNKNOWN", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN)},
         {"POWER_SUPPLY_STATUS_CHARGING", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING)},
         {"POWER_SUPPLY_STATUS_DISCHARGING", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_DISCHARGING)},
-        {"POWER_SUPPLY_STATUS_NOT_CHARGING",
-            unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING)},
+        {"POWER_SUPPLY_STATUS_NOT_CHARGING", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING)},
         {"POWER_SUPPLY_STATUS_FULL", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_FULL)},
-        // battery health constants
+        // Battery health constants
         {"POWER_SUPPLY_HEALTH_OVERHEAT", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT)},
-        
+        // Behaviour tree constants
         {"default_server_timeout", std::chrono::milliseconds(5000)},
         {"bt_loop_duration", std::chrono::milliseconds(100)},
         {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
