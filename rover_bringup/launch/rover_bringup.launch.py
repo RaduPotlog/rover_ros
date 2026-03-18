@@ -221,6 +221,20 @@ def generate_launch_description():
         }.items(),
     )
 
+    rover_ublox_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("ublox_gps"), "launch", "rover_ublox_gps.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "log_level": log_level,
+            "namespace": namespace,
+            "use_sim": "False",
+            "common_dir_path": common_dir_path,
+        }.items(),
+    )
+
     rover_bringup_common_dir = PythonExpression(
         [
             "'",
@@ -267,6 +281,7 @@ def generate_launch_description():
     rover_delayed_action = TimerAction(
         period=10.0,
         actions=[
+            rover_ublox_launch,
             rover_battery_launch,
             rover_led_launch,
             rover_safety_launch,

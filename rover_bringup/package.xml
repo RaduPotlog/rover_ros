@@ -34,7 +34,10 @@
 
   <!-- Lidar Robosense dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rslidar_sdk</exec_depend>
-  
+
+  <!-- Ublox F9P dependency -->
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ublox</exec_depend>
+
   <!-- Rover web bridge dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_web_bridge</exec_depend>
   
