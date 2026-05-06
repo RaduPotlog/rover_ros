@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import os
-
 from rover_utils.messages import (
     ErrorMessages,
     error_msg,
