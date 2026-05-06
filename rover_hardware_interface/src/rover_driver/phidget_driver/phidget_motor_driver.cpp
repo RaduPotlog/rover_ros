@@ -163,7 +163,7 @@ void PhidgetMotorDriver::initialize()
     }
 
     // Set current limit
-    ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, 15.0);
+    ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, 10.0);
 
     if (ret != EPHIDGET_OK) {
         throw std::runtime_error("Failed to set current limit for motor channel " + 
@@ -173,13 +173,19 @@ void PhidgetMotorDriver::initialize()
     /*
      *  CurrentRegulatorGain = CurrentLimit * (Voltage / 12)
      */
-    ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, 15.0);
+    ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, 20.0);
 
     if (ret != EPHIDGET_OK) {
         throw std::runtime_error("Failed to set current regulator gain for motor channel " + 
             std::to_string(channel_));
     }
 
+    ret = PhidgetDCMotor_setTargetBrakingStrength(motor_handle_, 1.0f);
+	
+    if (ret != EPHIDGET_OK)
+	    throw std::runtime_error("Failed to disable braking for motor channel " + 
+            std::to_string(channel_));
+    
     // Enable fail safe
     ret = PhidgetDCMotor_enableFailsafe(motor_handle_, 5000);
 
@@ -187,7 +193,7 @@ void PhidgetMotorDriver::initialize()
         throw std::runtime_error("Failed to enable fail safe mode for motor channel " + 
             std::to_string(channel_));
     }
-
+    
     int enabled = 0;
 
     ret = PhidgetEncoder_create(&encoder_handle_);

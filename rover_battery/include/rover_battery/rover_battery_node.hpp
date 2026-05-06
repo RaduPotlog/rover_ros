@@ -274,6 +274,8 @@ private:
     bool rx_timeout_started_{false};
     bool rx_timeout_reached_{false};
     
+    int retry_read_counter_{0};
+    
     rclcpp::TimerBase::SharedPtr battery_read_timeout_;
     
     BatteryStateMsg battery_state_msgs_;

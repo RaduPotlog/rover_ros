@@ -168,7 +168,7 @@ def generate_launch_description():
             "--log-level",
             limit_log_level_to_info(joint_state_broadcaster_log_unit, log_level),
             "--log-level",
-            limit_log_level_to_info(controller_manager_log_unit, log_level),    
+            limit_log_level_to_info(controller_manager_log_unit, log_level),
         ],
         condition=UnlessCondition(use_sim),
         emulate_tty=True,
@@ -186,23 +186,7 @@ def generate_launch_description():
         "--log-level",
         limit_log_level_to_info("rcl", log_level), 
     ]
-
-    rover_filter_controllers_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            # "rl_wheel_base_to_rl_wheel_joint",
-            # "rr_wheel_base_to_rr_wheel_joint",
-            # "fl_wheel_base_to_fl_wheel_joint",
-            # "fr_wheel_base_to_fr_wheel_joint",
-            "--activate-as-group",
-            *rover_spawner_common_args,
-        ],
-        namespace=namespace,
-        emulate_tty=True,
-    )
-
+    
     rover_pid_controllers_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -231,7 +215,6 @@ def generate_launch_description():
         SetParameter(name="use_sim_time", value=use_sim),
         load_urdf,
         rover_control_node,
-        TimerAction(period=2.0, actions=[rover_filter_controllers_spawner]),
         TimerAction(period=4.0, actions=[rover_pid_controllers_spawner]),
     ]
 

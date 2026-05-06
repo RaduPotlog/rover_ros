@@ -44,23 +44,28 @@ void RoverA1System::updateHwStates(const rclcpp::Time & time)
     const auto rear_left_data = rover_driver_->getData(DriverNames::REAR_LEFT);
     const auto rear_right_data = rover_driver_->getData(DriverNames::REAR_RIGHT);
 
+    const auto front_left_data = rover_driver_->getData(DriverNames::FRONT_LEFT);
+    const auto front_right_data = rover_driver_->getData(DriverNames::FRONT_RIGHT);
+
     const auto rear_left = rear_left_data.getMotorState(MotorChannels::DEFAULT);
     const auto rear_right = rear_right_data.getMotorState(MotorChannels::DEFAULT);
+    const auto front_left = front_left_data.getMotorState(MotorChannels::DEFAULT);
+    const auto front_right = front_right_data.getMotorState(MotorChannels::DEFAULT);
 
     hw_states_positions_[2] = rear_left.getPosition();
     hw_states_positions_[1] = rear_right.getPosition();
-    hw_states_positions_[0] = rear_left.getPosition();
-    hw_states_positions_[3] = rear_right.getPosition();
+    hw_states_positions_[0] = front_left.getPosition();
+    hw_states_positions_[3] = front_right.getPosition();
 
     hw_states_velocities_[2] = rear_left.getVelocity();
     hw_states_velocities_[1] = rear_right.getVelocity();
-    hw_states_velocities_[0] = rear_left.getVelocity();
-    hw_states_velocities_[3] = rear_right.getVelocity();
+    hw_states_velocities_[0] = front_left.getVelocity();
+    hw_states_velocities_[3] = front_right.getVelocity();
     
     hw_states_efforts_[2] = rear_left.getTorque();
     hw_states_efforts_[1] = rear_right.getTorque();
-    hw_states_efforts_[0] = rear_left.getTorque();
-    hw_states_efforts_[3] = rear_right.getTorque();
+    hw_states_efforts_[0] = front_left.getTorque();
+    hw_states_efforts_[3] = front_right.getTorque();
 }
 
 void RoverA1System::updateDriverStateMsg()

@@ -42,6 +42,7 @@ RoverBatteryNode::RoverBatteryNode(
     this->declare_parameter("receiver_rate", 50);
 
     serial_device_name_ = this->get_parameter("device").as_string();
+    
     int baudrate = this->get_parameter("baudrate").as_int();
     int rate = this->get_parameter("receiver_rate").as_int();
     int period = static_cast<int>((1.0f / static_cast<float>(rate) * 1000.0f));
@@ -59,9 +60,8 @@ RoverBatteryNode::RoverBatteryNode(
         std::bind(&RoverBatteryNode::batteryReadTimerCallback, this)
     );
 
-    
     battery_read_timeout_ = this->create_wall_timer(
-        std::chrono::milliseconds(1000), 
+        std::chrono::milliseconds(period * 25), 
         std::bind(&RoverBatteryNode::batteryReadTimeoutCallback, this)
     );
     
@@ -94,10 +94,7 @@ void RoverBatteryNode::batteryReadTimerCallback()
 void RoverBatteryNode::batteryReadTimeoutCallback()
 {
     battery_read_timeout_->cancel();
-    rx_timeout_reached_ = true;
-    battery_state_msgs_.power_supply_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE;
-    battery_publisher_->publish(battery_state_msgs_, charging_state_msgs_, error_msg_);
-    RCLCPP_WARN(this->get_logger(), "Battery response timeout");
+    rx_timeout_reached_ = true; 
 }
 
 bool RoverBatteryNode::updateBatteryStatus()
@@ -111,6 +108,7 @@ bool RoverBatteryNode::updateBatteryStatus()
             current_command_state_ = CommandState::TRANSMIT;
             // Reset command
             current_command_ = Command::VOUT_IOUT_SOC;
+            retry_read_counter_ = 0;                 
             break;
 
         case CommandState::TRANSMIT:
@@ -131,7 +129,7 @@ bool RoverBatteryNode::updateBatteryStatus()
         case CommandState::WAIT_RX:
 
             ret = parseAllIncomingCommandBytes(current_command_);
-
+            
             if (ret == ReturnStatus::E_OK) {
                 rx_timeout_started_ = false;
                 battery_read_timeout_->cancel();
@@ -146,20 +144,43 @@ bool RoverBatteryNode::updateBatteryStatus()
                 else {
                     current_command_state_ = CommandState::TRANSMIT;
                 }
+
+                retry_read_counter_ = 0;
             }
             else if (ret == ReturnStatus::E_NOK) {
-                // Reset state
-                current_command_state_ = CommandState::IDLE;
-                rx_timeout_started_ = false;
-                battery_read_timeout_->cancel();
+                if (rx_timeout_reached_ == true) {
+                    current_command_state_ = CommandState::TRANSMIT;
+                    retry_read_counter_++;
+                    rx_timeout_started_ = false;
+                    rx_timeout_reached_ = false;
+                    battery_read_timeout_->cancel();
+                } 
+                else {
+                    if (retry_read_counter_ == 3) {
+                        // Reset state
+                        current_command_state_ = CommandState::IDLE;
+                        rx_timeout_started_ = false;
+                        battery_read_timeout_->cancel();
+                    }
+                }
             }
             else {
-               current_command_state_ = CommandState::WAIT_RX;
+                if (rx_timeout_reached_ == true) {
+                    current_command_state_ = CommandState::TRANSMIT;
+                    retry_read_counter_++;
+                    rx_timeout_started_ = false;
+                    rx_timeout_reached_ = false;
+                    battery_read_timeout_->cancel();
+                } 
+                else {
+                    current_command_state_ = CommandState::WAIT_RX;
+                }
             }
 
-            if (rx_timeout_reached_ == true) {
+            if (retry_read_counter_ > 3) {
                 current_command_state_ = CommandState::TIMEOUT;
                 battery_read_timeout_->cancel();
+                retry_read_counter_ = 0;
             }
 
             break;
@@ -177,8 +198,12 @@ bool RoverBatteryNode::updateBatteryStatus()
             current_command_state_ = CommandState::TRANSMIT;
             rx_timeout_started_ = false;
             rx_timeout_reached_ = false;
+            retry_read_counter_ = 0;
             // Reset command
             current_command_ = Command::VOUT_IOUT_SOC;
+            battery_state_msgs_.power_supply_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE;
+            battery_publisher_->publish(battery_state_msgs_, charging_state_msgs_, error_msg_);
+            RCLCPP_WARN(this->get_logger(), "Battery response timeout");
             break;
 
         default:
