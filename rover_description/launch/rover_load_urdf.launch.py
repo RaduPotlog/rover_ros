@@ -18,7 +18,8 @@
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, Shutdown, IncludeLaunchDescription
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
     Command,
     EnvironmentVariable,
@@ -163,24 +164,34 @@ def generate_launch_description():
         ]
     )
 
-    namespace_ext = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
+    robot_description = {"robot_description": robot_description_content}
+
+    publish_robot_state = LaunchConfiguration("publish_robot_state")
+    declare_publish_robot_state_arg = DeclareLaunchArgument(
+        "publish_robot_state",
+        default_value="True",
+        description=(
+            "Whether to launch the robot_state_publisher node."
+            "When set to False, users should publish their own robot description."
+        ),
+        choices=["True", "true", "False", "false"],
+    )
 
     robot_state_pub_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        parameters=[
-            {"robot_description": robot_description_content},
-            {"frame_prefix": namespace_ext},
-        ],
+        arguments=["--ros-args", "--disable-stdout-logs"],
+        parameters=[robot_description, {"frame_prefix": ns}],
         namespace=namespace,
-        emulate_tty=True,
+        condition=IfCondition(publish_robot_state),
     )
-
+ 
     actions = [
         declare_common_dir_path_arg,
         declare_components_config_path_arg,
         declare_robot_model_arg,
         declare_wheel_type_arg,
+        declare_publish_robot_state_arg,
         declare_controller_config_path_arg,
         declare_namespace_arg,
         declare_use_sim_arg,

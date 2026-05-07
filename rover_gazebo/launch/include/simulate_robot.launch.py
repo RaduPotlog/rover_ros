@@ -91,7 +91,7 @@ def generate_launch_description():
         choices=["rover_a1"],
     )
 
-    spawn_robot_launch = IncludeLaunchDescription(
+    rover_spawn_robot_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [FindPackageShare("rover_gazebo"), "launch", "include/spawn_robot.launch.py"]
@@ -104,49 +104,46 @@ def generate_launch_description():
         }.items(),
     )
 
-    controller_launch = IncludeLaunchDescription(
+    rover_controller_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [
                     FindPackageShare("rover_controller"),
                     "launch",
-                    "controller.launch.py",
+                    "rover_controller.launch.py",
                 ]
             )
         ),
         launch_arguments={
             "log_level": log_level,
             "namespace": namespace,
-            "publish_robot_state": "False",
+            "publish_robot_state": "True",
             "use_sim": "True",
         }.items(),
     )
 
-    ekf_launch = IncludeLaunchDescription(
+    rover_ekf_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [
-                    FindPackageShare("rover_localization"),
-                    "launch",
-                    "rover_localization.launch.py",
-                ]
+                [FindPackageShare("rover_localization"), "launch", "rover_localization.launch.py"]
             )
         ),
         launch_arguments={
             "log_level": log_level,
             "namespace": namespace,
             "use_sim": "True",
+            "use_ekf": "True",
         }.items(),
     )
 
-    model_name = PythonExpression(["'", namespace, "' if '", namespace, "' else 'rover_a1'])"])
+    model_name = PythonExpression(["'", namespace, "' if '", namespace, "' != '' else 'rover_a1'"])
 
     namespaced_gz_bridge_config_path = ReplaceString(
         source_file=gz_bridge_config_path,
         replacements={"<model_name>": model_name, "<namespace>": namespace, "//": "/"},
     )
 
-    gz_bridge = Node(
+    rover_gz_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         name="gz_bridge",
@@ -157,7 +154,7 @@ def generate_launch_description():
 
     child_tf = PythonExpression(["'", namespace, "' + '/odom' if '", namespace, "' else 'odom'"])
 
-    world_transform = Node(
+    rover_world_transform = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_tf_publisher",
@@ -193,11 +190,11 @@ def generate_launch_description():
         declare_log_level_arg,
         declare_namespace_arg,
         SetUseSimTime(True),
-        spawn_robot_launch,
-        controller_launch,
-        ekf_launch,
-        gz_bridge,
-        world_transform,
+        rover_spawn_robot_launch,
+        rover_controller_launch,
+        rover_ekf_launch,
+        rover_gz_bridge,
+        rover_world_transform,
     ]
 
     return LaunchDescription(actions)

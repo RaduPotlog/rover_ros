@@ -16,8 +16,9 @@
 
 from rover_utils.logging import limit_log_level_to_info
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Shutdown, TimerAction
-from launch.conditions import UnlessCondition
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Shutdown, RegisterEventHandler, TimerAction
+from launch.conditions import IfCondition, UnlessCondition
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     EnvironmentVariable,
@@ -124,7 +125,7 @@ def generate_launch_description():
 
     ns = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
     ns_controller_config_path = ReplaceString(controller_config_path, {"<namespace>/": ns})
-
+    
     joint_state_broadcaster_log_unit = PythonExpression(
         [
             "'",
@@ -196,12 +197,65 @@ def generate_launch_description():
             "pid_controller_fl_wheel_base_to_fl_wheel_joint",
             "pid_controller_fr_wheel_base_to_fr_wheel_joint",
             "drive_controller",
-            "imu_broadcaster",
-            "--activate-as-group",
-            *rover_spawner_common_args,
+            "--controller-manager",
+            "controller_manager",
+            "--controller-manager-timeout",
+            "10",
+            "--ros-args",
+            "--log-level",
+            log_level,
+            "--log-level",
+            limit_log_level_to_info("rcl", log_level),
         ],
         namespace=namespace,
         emulate_tty=True,
+    )
+
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "joint_state_broadcaster",
+            "--controller-manager",
+            "controller_manager",
+            "--controller-manager-timeout",
+            "10",
+        ],
+        namespace=namespace,
+        emulate_tty=True,
+    )
+
+    imu_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "imu_broadcaster",
+            "--controller-manager",
+            "controller_manager",
+            "--controller-manager-timeout",
+            "10",
+            "--ros-args",
+            "--log-level",
+            log_level,
+            "--log-level",
+            limit_log_level_to_info("rcl", log_level),
+        ],
+        namespace=namespace,
+        emulate_tty=True,
+    )
+
+    delay_drive_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[rover_pid_controllers_spawner],
+        )
+    )
+
+    delay_imu_broadcaster_spawner_after_drive_controller_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=rover_pid_controllers_spawner,
+            on_exit=[imu_broadcaster_spawner],
+        ),
     )
 
     actions = [
@@ -215,7 +269,9 @@ def generate_launch_description():
         SetParameter(name="use_sim_time", value=use_sim),
         load_urdf,
         rover_control_node,
-        TimerAction(period=4.0, actions=[rover_pid_controllers_spawner]),
+        joint_state_broadcaster_spawner,
+        delay_drive_controller_spawner_after_joint_state_broadcaster_spawner,
+        delay_imu_broadcaster_spawner_after_drive_controller_spawner,
     ]
 
     return LaunchDescription(actions)

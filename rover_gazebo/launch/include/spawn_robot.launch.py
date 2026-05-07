@@ -130,7 +130,7 @@ def generate_launch_description():
         declare_pitch_arg,
         declare_yaw_arg,
         SetUseSimTime(True),
-        load_urdf,
+        # load_urdf,
         spawn_robot,
     ]
 

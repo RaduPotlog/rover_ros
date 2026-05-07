@@ -91,7 +91,7 @@
   drive_controller:
     ros__parameters:
 
-      tf_frame_prefix: "~"
+      
 
       left_wheel_names: ["pid_controller_rl_wheel_base_to_rl_wheel_joint/rl_wheel_base_to_rl_wheel_joint", "pid_controller_fl_wheel_base_to_fl_wheel_joint/fl_wheel_base_to_fl_wheel_joint"]
       right_wheel_names: ["pid_controller_rr_wheel_base_to_rr_wheel_joint/rr_wheel_base_to_rr_wheel_joint", "pid_controller_fr_wheel_base_to_fr_wheel_joint/fr_wheel_base_to_fr_wheel_joint"]

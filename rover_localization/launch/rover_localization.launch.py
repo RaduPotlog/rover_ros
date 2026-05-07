@@ -133,7 +133,7 @@ def generate_launch_description():
             ("enable", "localization/enable"),
             ("set_pose", "localization/set_pose"),
             ("toggle", "localization/toggle"),
-            ('/odometry/filtered', '/odom'),
+            ('/odometry/filtered', 'odom'),
         ],
         arguments=[
             "--ros-args",
@@ -184,8 +184,8 @@ def generate_launch_description():
         declare_use_sim_arg,
         SetParameter(name="use_sim_time", value=use_sim),
         ekf_filter_node,
-        nmea_navsat_launch,
-        navsat_transform_node,
+        # nmea_navsat_launch,
+        # navsat_transform_node,
     ]
 
     return LaunchDescription(actions)
