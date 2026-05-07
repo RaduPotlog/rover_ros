@@ -280,10 +280,10 @@ def generate_launch_description():
     rover_delayed_action = TimerAction(
         period=10.0,
         actions=[
-            # rover_ublox_launch,
-            rover_battery_launch,
+            rover_ublox_launch,
+            # rover_battery_launch,
             # rover_led_launch,
-            rover_safety_launch,
+            # rover_safety_launch,
             rover_ekf_launch,
             # rover_crfs_teleop_launch,
             rover_twist_mux_launch,
