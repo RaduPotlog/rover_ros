@@ -132,12 +132,19 @@ def generate_launch_description():
     ns = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
     ns_controller_config_path = ReplaceString(controller_config_path, {"<namespace>/": ns})
 
-    imu_pos_x = os.environ.get("ROBOT_IMU_LOCALIZATION_X", "-0.05345")
-    imu_pos_y = os.environ.get("ROBOT_IMU_LOCALIZATION_Y", "-0.1875")
-    imu_pos_z = os.environ.get("ROBOT_IMU_LOCALIZATION_Z", "0.230")
+    imu_pos_x = os.environ.get("ROBOT_IMU_LOCALIZATION_X", "0.0")
+    imu_pos_y = os.environ.get("ROBOT_IMU_LOCALIZATION_Y", "0.0")
+    imu_pos_z = os.environ.get("ROBOT_IMU_LOCALIZATION_Z", "0.0")
     imu_rot_r = os.environ.get("ROBOT_IMU_ORIENTATION_R", "0.0")
     imu_rot_p = os.environ.get("ROBOT_IMU_ORIENTATION_P", "0.0")
     imu_rot_y = os.environ.get("ROBOT_IMU_ORIENTATION_Y", "0.0")
+
+    lidar_pos_x = os.environ.get("ROBOT_LIDAR_LOCALIZATION_X", "0.0")
+    lidar_pos_y = os.environ.get("ROBOT_LIDAR_LOCALIZATION_Y", "0.0")
+    lidar_pos_z = os.environ.get("ROBOT_LIDAR_LOCALIZATION_Z", "0.0")
+    lidar_rot_r = os.environ.get("ROBOT_LIDAR_ORIENTATION_R", "0.0")
+    lidar_rot_p = os.environ.get("ROBOT_LIDAR_ORIENTATION_P", "0.0")
+    lidar_rot_y = os.environ.get("ROBOT_LIDAR_ORIENTATION_Y", "0.0")
 
     urdf_file = PythonExpression(["'", robot_model, ".urdf.xacro'"])
     robot_description_content = Command(
@@ -157,6 +164,10 @@ def generate_launch_description():
             f"'{imu_pos_x} {imu_pos_y} {imu_pos_z}'",
             " imu_rpy:=",
             f"'{imu_rot_r} {imu_rot_p} {imu_rot_y}'",
+            " lidar_xyz:=",
+            f"'{lidar_pos_x} {lidar_pos_y} {lidar_pos_z}'",
+            " lidar_rpy:=",
+            f"'{lidar_rot_r} {lidar_rot_p} {lidar_rot_y}'",
             " namespace:=",
             namespace,
             " components_config_path:=",

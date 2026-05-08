@@ -5,7 +5,9 @@
     name="body"
     params="wheel_radius 
             imu_xyz 
-            imu_rpy">
+            imu_rpy
+            lidar_xyz
+            lidar_rpy">
 
     <link name="base_link" />
 
@@ -37,6 +39,14 @@
     </joint>
 
     <link name="imu_link" />
+
+    <joint name="body_to_lidar_joint" type="fixed">
+      <origin xyz="${lidar_xyz}" rpy="${lidar_rpy}" />
+      <parent link="body_link" />
+      <child link="lidar_link" />
+    </joint>
+
+    <link name="lidar_link" />
 
     <joint name="body_to_footprint_joint" type="fixed">
       <origin xyz="0.0 0.0 -0.1359" rpy="0.0 0.0 0.0" />

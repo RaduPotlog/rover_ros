@@ -8,11 +8,15 @@
             use_sim:=false
             imu_xyz:='0.0 0.0 0.0'
             imu_rpy:='0.0 0.0 0.0'
+            lidar_xyz:='0.0 0.0 0.0'
+            lidar_rpy:='0.0 0.0 0.0'
             namespace:=''">
 
     <xacro:if value="${use_sim}">
-      <xacro:property name="imu_xyz" value="0.052 0.073 -0.235" />
-      <xacro:property name="imu_rpy" value="0.0 0.0 -1.57" />
+      <xacro:property name="imu_xyz" value="0.0 0.0 0.0" />
+      <xacro:property name="imu_rpy" value="0.0 0.0 0.0" />
+      <xacro:property name="lidar_xyz" value="0.0 0.0 0.25" />
+      <xacro:property name="lidar_rpy" value="0.0 0.0 0.0" />
     </xacro:if>
 
     <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
@@ -26,6 +30,8 @@
     <xacro:include filename="$(find rover_description)/urdf/common/wheel.urdf.xacro" ns="wheel" />
     <!-- IMU macros -->
     <xacro:include filename="$(find rover_description)/urdf/common/imu.urdf.xacro" ns="imu" />
+    <!-- Lidar macros -->
+    <xacro:include filename="$(find rover_description)/urdf/common/lidar.urdf.xacro" ns="lidar" />
     <!-- Gazebo system macros -->
     <xacro:include filename="$(find rover_description)/urdf/common/gazebo_system.urdf.xacro" ns="gazebo_system" />
     
@@ -33,8 +39,10 @@
     <xacro:body.body
       wheel_radius="${wheel_config['wheel_radius']}"
       imu_xyz="${imu_xyz}"
-      imu_rpy="${imu_rpy}" />
-      
+      imu_rpy="${imu_rpy}"
+      lidar_xyz="${lidar_xyz}"
+      lidar_rpy="${lidar_rpy}" />
+
     <!-- Rover wheel -->
     <xacro:wheel.wheel
       config="${wheel_config}"
@@ -126,6 +134,8 @@
 
     <!-- Instantiate IMU -->
     <xacro:imu.imu use_sim="${use_sim}" reference_frame="imu_link" namespace="${namespace}" />
+    <!-- Instantiate LIDAR -->
+    <xacro:lidar.lidar use_sim="${use_sim}" reference_frame="lidar_link" namespace="${namespace}" />
 
     <xacro:if value="${use_sim}">
     <!-- Instantiate Gazebo System -->
