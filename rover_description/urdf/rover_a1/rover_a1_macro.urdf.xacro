@@ -13,9 +13,9 @@
             namespace:=''">
 
     <xacro:if value="${use_sim}">
-      <xacro:property name="imu_xyz" value="0.0 0.0 0.0" />
+      <xacro:property name="imu_xyz" value="0.26 0.0 0.18" />
       <xacro:property name="imu_rpy" value="0.0 0.0 0.0" />
-      <xacro:property name="lidar_xyz" value="0.0 0.0 0.25" />
+      <xacro:property name="lidar_xyz" value="0.0 0.0 0.0" />
       <xacro:property name="lidar_rpy" value="0.0 0.0 0.0" />
     </xacro:if>
 

@@ -3,9 +3,9 @@
 
   <xacro:arg name="use_sim" default="false" />
   <xacro:arg name="imu_xyz" default="0.0 0.0 0.0" />
-  <xacro:arg name="imu_rpy" default="0.0 0.0 -1.57" />
+  <xacro:arg name="imu_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="lidar_xyz" default="0.0 0.0 0.0" />
-  <xacro:arg name="lidar_rpy" default="0.0 0.0 -1.57" />
+  <xacro:arg name="lidar_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="wheel_config_file" default="$(find rover_description)/config/wheel_01.yaml" />
   <xacro:arg name="controller_config_file" default="$(find rover_controller)/config/wheel_01_controller.yaml" />
   <xacro:arg name="namespace" default="" />
