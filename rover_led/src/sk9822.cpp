@@ -34,26 +34,9 @@ SK9822::SK9822(
 , speed_(speed)
 , file_descriptor_(spi_device->open(device_name))
 {
-    if (file_descriptor_ < 0) {
-        throw std::ios_base::failure("Failed to open " + device_name_ + ".");
-    }
+    (void)cs_high;
 
-    static std::uint8_t mode = cs_high ? SPI_MODE_3 : SPI_MODE_3 | SPI_CS_HIGH;
-    
-    if (spi_device_->ioctrl(file_descriptor_, SPI_IOC_WR_MODE32, &mode) == -1) {
-        spi_device_->close(file_descriptor_);
-        throw std::ios_base::failure("Failed to set mode for " + device_name_ + ".");
-    }
-
-    if (spi_device_->ioctrl(file_descriptor_, SPI_IOC_WR_BITS_PER_WORD, &kBits) == -1) {
-        spi_device_->close(file_descriptor_);
-        throw std::ios_base::failure("Can't set bits per word for " + device_name_ + ".");
-    }
-
-    if (spi_device_->ioctrl(file_descriptor_, SPI_IOC_WR_MAX_SPEED_HZ, &speed_) == -1) {
-        spi_device_->close(file_descriptor_);
-        throw std::ios_base::failure("Can't set speed for " + device_name_ + ".");
-    }
+    spi_device_->open(device_name_);
 }
 
 SK9822::~SK9822() 
@@ -112,22 +95,11 @@ std::vector<std::uint8_t> SK9822::rgbFrameToBGRBuffer(
 
 void SK9822::spiSendBuffer(const std::vector<std::uint8_t> & buffer) const
 {
-    struct spi_ioc_transfer tr;
-    
-    memset(&tr, 0, sizeof(tr));
-    
-    tr.tx_buf = reinterpret_cast<std::uint64_t>(buffer.data());
-    tr.rx_buf = 0;
-    tr.len = static_cast<std::uint32_t>(buffer.size());
-    tr.speed_hz = speed_;
-    tr.delay_usecs = 0;
-    tr.bits_per_word = kBits;
-
-    const int ret = spi_device_->ioctrl(file_descriptor_, SPI_IOC_MESSAGE(1), &tr);
-
-    if (ret < 1) {
-        throw std::ios_base::failure("Failed to send data over SPI " + device_name_ + ".");
+    if (buffer.size() == 0) {
+        throw std::runtime_error("Buffer size must be at least 1 byte.");
     }
+
+    spi_device_->ioctrl(buffer);
 }
 
 }  // namespace rover_led

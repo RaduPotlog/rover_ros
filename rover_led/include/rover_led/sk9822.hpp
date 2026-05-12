@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include <rover_led/rover_modbus/modbus.hpp>
+
 namespace rover_led
 {
 
@@ -37,7 +39,7 @@ public:
 
     virtual int open(const std::string & device) = 0;
 
-    virtual int ioctrl(int fd, unsigned long request, const void * arg) = 0;
+    virtual int ioctrl(const std::vector<std::uint8_t> & buffer) = 0;
 
     virtual int close(int fd) = 0;
 
@@ -49,17 +51,33 @@ class SPIDevice : public SPIDeviceInterface
 
 public:
   
-    int open(const std::string & device) override { return ::open(device.c_str(), O_WRONLY); }
+    int open(const std::string & device) override 
+    { 
+        (void)device;
+        
+        rover_modbus_ = std::make_shared<RoverModbus>("172.17.10.116", 502);
 
-    int ioctrl(int fd, unsigned long request, const void * arg) override
+        return 0;    
+    }
+
+    int ioctrl(const std::vector<std::uint8_t>& buffer) override
     {
-        return ::ioctl(fd, request, arg);
+        rover_modbus_->writeMultipleRegisters(buffer, 0);
+
+        return 0;
     }
 
     int close(int fd) override 
     { 
-        return ::close(fd); 
+        (void)fd;
+        rover_modbus_.reset();
+        return 0; 
     }
+
+protected:
+
+    std::shared_ptr<RoverModbus> rover_modbus_;
+    
 };
 
 class SK9822Interface
@@ -74,6 +92,7 @@ public:
     virtual void setPanel(const std::vector<std::uint8_t> & frame) const = 0;
 
     using SharedPtr = std::shared_ptr<SK9822Interface>;
+    
 };
 
 class SK9822 : public SK9822Interface

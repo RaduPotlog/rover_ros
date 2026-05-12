@@ -36,8 +36,10 @@ ament_target_dependencies(animation_plugins rover_utils pluginlib rclcpp)
                                      
 target_link_libraries(animation_plugins png yaml-cpp)
 
-add_library(led_driver_node_component SHARED src/led_driver_node.cpp
-                                   src/sk9822.cpp)
+add_library(led_driver_node_component SHARED 
+                src/rover_modbus/modbus.cpp                
+                src/led_driver_node.cpp
+                src/sk9822.cpp)
                                    
 ament_target_dependencies(
     led_driver_node_component
@@ -54,7 +56,9 @@ generate_parameter_library(led_driver_parameters
                            src/led_driver_parameters.yaml
 )
 
-target_link_libraries(led_driver_node_component led_driver_parameters)
+target_link_libraries(led_driver_node_component
+                        Modbus_Core
+                        led_driver_parameters)
 
 add_library(
     led_controller_node_component SHARED
