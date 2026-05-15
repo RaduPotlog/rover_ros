@@ -22,6 +22,8 @@
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_utils</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_safety</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_led</exec_depend>
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">udp_driver</exec_depend>
+
   <!-- <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_navigation</exec_depend> -->
 
   <!-- Medkit dependency -->

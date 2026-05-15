@@ -35,8 +35,6 @@ SK9822::SK9822(
 , file_descriptor_(spi_device->open(device_name))
 {
     (void)cs_high;
-
-    spi_device_->open(device_name_);
 }
 
 SK9822::~SK9822() 
@@ -62,10 +60,11 @@ void SK9822::setGlobalBrightness(const std::uint8_t brightness)
     global_brightness_ = std::uint16_t(brightness);
 }
 
-void SK9822::setPanel(const std::vector<std::uint8_t> & frame) const
+std::vector<std::uint8_t> SK9822::setPanel(const std::vector<std::uint8_t> & frame) const
 {
     const auto buffer = rgbFrameToBGRBuffer(frame);
-    spiSendBuffer(buffer);
+
+    return buffer;
 }
 
 std::vector<std::uint8_t> SK9822::rgbFrameToBGRBuffer(

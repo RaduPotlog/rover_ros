@@ -12,6 +12,7 @@
   <depend>ament_index_cpp</depend>
   <depend>diagnostic_updater</depend>
   <depend>generate_parameter_library</depend>
+  <depend>udp_msgs</depend>
   <depend>rover_msgs</depend>
   <depend>rover_utils</depend>
   <depend>image_transport</depend>

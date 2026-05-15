@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-#include <rover_led/rover_modbus/modbus.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 namespace rover_led
 {
@@ -54,30 +54,22 @@ public:
     int open(const std::string & device) override 
     { 
         (void)device;
-        
-        rover_modbus_ = std::make_shared<RoverModbus>("172.17.10.116", 502);
-
         return 0;    
     }
 
     int ioctrl(const std::vector<std::uint8_t>& buffer) override
     {
-        rover_modbus_->writeMultipleRegisters(buffer, 0);
-
         return 0;
     }
 
     int close(int fd) override 
     { 
         (void)fd;
-        rover_modbus_.reset();
         return 0; 
     }
 
 protected:
-
-    std::shared_ptr<RoverModbus> rover_modbus_;
-    
+ 
 };
 
 class SK9822Interface
@@ -89,7 +81,7 @@ public:
 
     virtual void setGlobalBrightness(const std::uint8_t brightness) = 0;
     virtual void setGlobalBrightness(const float brightness) = 0;
-    virtual void setPanel(const std::vector<std::uint8_t> & frame) const = 0;
+    virtual std::vector<std::uint8_t> setPanel(const std::vector<std::uint8_t> & frame) const = 0;
 
     using SharedPtr = std::shared_ptr<SK9822Interface>;
     
@@ -112,7 +104,7 @@ public:
 
     void setGlobalBrightness(const float brightness) override;
 
-    void setPanel(const std::vector<std::uint8_t> & frame) const override;
+    std::vector<std::uint8_t> setPanel(const std::vector<std::uint8_t> & frame) const override;
 
 protected:
   
@@ -136,6 +128,8 @@ private:
     const std::string device_name_;
     const std::uint32_t speed_;
     const int file_descriptor_;
+
+    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
 };
 
 }  // namespace rover_led

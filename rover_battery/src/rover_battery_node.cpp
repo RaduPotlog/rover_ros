@@ -83,8 +83,7 @@ void RoverBatteryNode::batteryReadTimerCallback()
             serial_port_.Open();
             
         } catch(const CppLinuxSerial::Exception& e) {
-            RCLCPP_WARN(this->get_logger(), "Can not open serial port: %s", serial_device_name_.c_str());
-            return;
+            //RCLCPP_WARN(this->get_logger(), "Can not open serial port: %s", serial_device_name_.c_str());
         }
     }
 
@@ -118,6 +117,7 @@ bool RoverBatteryNode::updateBatteryStatus()
                 current_command_state_ = CommandState::IDLE;
             }
             else {
+                RCLCPP_WARN(this->get_logger(), "Wait for rx");
                 // Wait for rx    
                 current_command_state_ = CommandState::WAIT_RX;
                 rx_timeout_started_ = true;
@@ -158,9 +158,9 @@ bool RoverBatteryNode::updateBatteryStatus()
                 else {
                     if (retry_read_counter_ == 3) {
                         // Reset state
-                        current_command_state_ = CommandState::IDLE;
                         rx_timeout_started_ = false;
                         battery_read_timeout_->cancel();
+                        RCLCPP_WARN(this->get_logger(), "Retry read failed 3 times, resetting transfer");
                     }
                 }
             }
@@ -177,7 +177,7 @@ bool RoverBatteryNode::updateBatteryStatus()
                 }
             }
 
-            if (retry_read_counter_ > 3) {
+            if (retry_read_counter_ >= 3) {
                 current_command_state_ = CommandState::TIMEOUT;
                 battery_read_timeout_->cancel();
                 retry_read_counter_ = 0;
@@ -195,7 +195,7 @@ bool RoverBatteryNode::updateBatteryStatus()
 
         case CommandState::TIMEOUT:
             // Reset state
-            current_command_state_ = CommandState::TRANSMIT;
+            current_command_state_ = CommandState::IDLE;
             rx_timeout_started_ = false;
             rx_timeout_reached_ = false;
             retry_read_counter_ = 0;
@@ -228,6 +228,10 @@ uint8_t RoverBatteryNode::evalChecksum(std::vector<uint8_t> & buff)
 
 RoverBatteryNode::ReturnStatus RoverBatteryNode::checkRxBuffer()
 {
+    if (serial_port_.GetState() == CppLinuxSerial::State::CLOSED) {
+        return ReturnStatus::E_NOK;
+    }
+
     if (serial_port_.Available()) {
         rx_buffer_.clear();
         serial_port_.ReadBinary(rx_buffer_);
@@ -251,6 +255,10 @@ RoverBatteryNode::ReturnStatus RoverBatteryNode::checkRxBuffer()
 
 bool RoverBatteryNode::sendCommand(Command cmd_id)
 {
+    if (serial_port_.GetState() == CppLinuxSerial::State::CLOSED) {
+        return true;
+    }
+    
     // Claear rx buffer
     if (serial_port_.Available()) {
         rx_buffer_.clear();

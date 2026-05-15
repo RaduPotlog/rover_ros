@@ -47,5 +47,9 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_ntrip_client
     version: ros2
+  rover_transport:
+    type: git
+    url: https://github.com/RaduPotlog/rover_transport
+    version: main
     
  

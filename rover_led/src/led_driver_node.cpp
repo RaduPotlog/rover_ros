@@ -67,6 +67,8 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
             channel_1_ts_ = msg->header.stamp;
     });
 
+    channel_1_pub_ = this->create_publisher<UdpPacketMsg>("udp_write", 5);
+
     diagnostic_updater_.setHardwareID("Bumper Led");
     diagnostic_updater_.add("Led driver status", this, &LedDriverNode::diagnoseLeds);
 
@@ -113,7 +115,19 @@ void LedDriverNode::initializationTimerCallback()
 
 void LedDriverNode::clearLeds()
 {
-    channel_1_->setPanel(std::vector<std::uint8_t>(channel_1_num_led_ * 4, 0));
+    const auto buffer = channel_1_->setPanel(std::vector<std::uint8_t>(channel_1_num_led_ * 4, 0));
+
+    udp_msgs::msg::UdpPacket msg_;
+    msg_.address = "172.17.10.126";
+    msg_.src_port = 3333;
+    msg_.data = {72, 101, 108, 108, 111};  // "Hello"
+    
+    auto now = this->now();
+    msg_.header.stamp.sec = now.seconds();
+    msg_.header.stamp.nanosec = now.nanoseconds();
+    msg_.header.frame_id = "";
+
+    channel_1_pub_->publish(msg_);
 }
 
 void LedDriverNode::toggleLedControl(const bool enable)
@@ -197,7 +211,25 @@ void LedDriverNode::frameCallback(
         return;
     }
 
-    panel->setPanel(msg->data);
+    udp_msgs::msg::UdpPacket udp_msg;
+    udp_msg.address = "192.168.99.101";
+    udp_msg.src_port = 3333;
+    
+    auto now = this->now();
+    udp_msg.header.stamp.sec = now.seconds();
+    udp_msg.header.stamp.nanosec = now.nanoseconds();
+    udp_msg.header.frame_id = "";
+
+    const auto buffer = panel->setPanel(msg->data);
+
+    for (size_t i = 0; i < buffer.size(); i += 4) {                
+        udp_msg.data.push_back(buffer[i + 1]);
+        udp_msg.data.push_back(buffer[i + 2]);
+        udp_msg.data.push_back(buffer[i + 3]);
+        udp_msg.data.push_back(buffer[i + 0]);
+    }
+    
+    channel_1_pub_->publish(udp_msg);
 }
 
 void LedDriverNode::setBrightnessCallback(

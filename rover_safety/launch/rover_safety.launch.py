@@ -141,8 +141,8 @@ def generate_launch_description():
         declare_safety_bt_project_path_arg,
         declare_namespace_arg,
         declare_use_sim_arg,
-        # rover_led_safety_node,
         rover_safety_node,
+        rover_led_safety_node,
     ]
 
     return LaunchDescription(actions)
