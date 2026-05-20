@@ -22,6 +22,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "sensor_msgs/msg/image.hpp"
+#include "udp_msgs/msg/udp_packet.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 
 #include "rover_msgs/srv/set_led_brightness.hpp"
@@ -33,6 +34,7 @@ namespace rover_led
 {
 
 using ImageMsg = sensor_msgs::msg::Image;
+using UdpPacketMsg = udp_msgs::msg::UdpPacket;
 using SetBoolSrv = std_srvs::srv::SetBool;
 using SetLedBrightnessSrv = rover_msgs::srv::SetLedBrightness;
 
@@ -102,6 +104,8 @@ private:
     rclcpp::CallbackGroup::SharedPtr client_callback_group_;
 
     rclcpp::Subscription<ImageMsg>::SharedPtr channel_1_sub_;
+
+    rclcpp::Publisher<UdpPacketMsg>::SharedPtr channel_1_pub_;
 
     diagnostic_updater::Updater diagnostic_updater_;
 };

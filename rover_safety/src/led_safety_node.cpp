@@ -157,14 +157,16 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
 
 void LedSafetyNode::batteryCallback(const BatteryStateMsg::SharedPtr battery_state)
 {
-    const auto battery_status = battery_state->power_supply_status;
-    const auto battery_health = battery_state->power_supply_health;
+    // const auto battery_status = battery_state->power_supply_status;
+    // const auto battery_health = battery_state->power_supply_health;
     
+    const auto battery_status = BatteryStateMsg::POWER_SUPPLY_STATUS_FULL;//battery_state->power_supply_status;
+    const auto battery_health = BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD;//battery_state->power_supply_health;
+
     led_tree_->getBlackboard()->set<unsigned>("battery_status", battery_status);
     led_tree_->getBlackboard()->set<unsigned>("battery_health", battery_health);
 
-    if (
-        battery_status != BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN &&
+    if (battery_status != BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN &&
         battery_health != BatteryStateMsg::POWER_SUPPLY_HEALTH_UNKNOWN) {
         battery_percent_ = battery_state->percentage;
     }

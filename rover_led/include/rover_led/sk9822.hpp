@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include <rclcpp/rclcpp.hpp>
+
 namespace rover_led
 {
 
@@ -37,7 +39,7 @@ public:
 
     virtual int open(const std::string & device) = 0;
 
-    virtual int ioctrl(int fd, unsigned long request, const void * arg) = 0;
+    virtual int ioctrl(const std::vector<std::uint8_t> & buffer) = 0;
 
     virtual int close(int fd) = 0;
 
@@ -49,17 +51,25 @@ class SPIDevice : public SPIDeviceInterface
 
 public:
   
-    int open(const std::string & device) override { return ::open(device.c_str(), O_WRONLY); }
+    int open(const std::string & device) override 
+    { 
+        (void)device;
+        return 0;    
+    }
 
-    int ioctrl(int fd, unsigned long request, const void * arg) override
+    int ioctrl(const std::vector<std::uint8_t>& buffer) override
     {
-        return ::ioctl(fd, request, arg);
+        return 0;
     }
 
     int close(int fd) override 
     { 
-        return ::close(fd); 
+        (void)fd;
+        return 0; 
     }
+
+protected:
+ 
 };
 
 class SK9822Interface
@@ -71,9 +81,10 @@ public:
 
     virtual void setGlobalBrightness(const std::uint8_t brightness) = 0;
     virtual void setGlobalBrightness(const float brightness) = 0;
-    virtual void setPanel(const std::vector<std::uint8_t> & frame) const = 0;
+    virtual std::vector<std::uint8_t> setPanel(const std::vector<std::uint8_t> & frame) const = 0;
 
     using SharedPtr = std::shared_ptr<SK9822Interface>;
+    
 };
 
 class SK9822 : public SK9822Interface
@@ -93,7 +104,7 @@ public:
 
     void setGlobalBrightness(const float brightness) override;
 
-    void setPanel(const std::vector<std::uint8_t> & frame) const override;
+    std::vector<std::uint8_t> setPanel(const std::vector<std::uint8_t> & frame) const override;
 
 protected:
   
@@ -117,6 +128,8 @@ private:
     const std::string device_name_;
     const std::uint32_t speed_;
     const int file_descriptor_;
+
+    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
 };
 
 }  // namespace rover_led

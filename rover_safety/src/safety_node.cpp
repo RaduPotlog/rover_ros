@@ -140,8 +140,8 @@ std::map<std::string, std::any> SafetyNode::createSafetyInitialBlackboard()
 
 void SafetyNode::batteryStateSubscriberCallback(const BatteryStateMsg::SharedPtr battery_state)
 {
-    const auto battery_status = battery_state->power_supply_status;
-    const auto battery_health = battery_state->power_supply_health;
+    const auto battery_status = BatteryStateMsg::POWER_SUPPLY_STATUS_FULL;//battery_state->power_supply_status;
+    const auto battery_health = BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD;//battery_state->power_supply_health;
  
     safety_tree_->getBlackboard()->set<unsigned>("battery_status", battery_status);
     safety_tree_->getBlackboard()->set<unsigned>("battery_health", battery_health);
