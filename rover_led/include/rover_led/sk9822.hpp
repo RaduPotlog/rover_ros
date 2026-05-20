@@ -59,6 +59,7 @@ public:
 
     int ioctrl(const std::vector<std::uint8_t>& buffer) override
     {
+        (void)buffer;
         return 0;
     }
 
