@@ -24,6 +24,7 @@ from launch.substitutions import (
 )
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.actions.lifecycle_node import LifecycleNode
 
 def generate_launch_description():
     
@@ -55,6 +56,19 @@ def generate_launch_description():
         description="Specify the path to the rover battery configuration file.",
     )
 
+    rover_udp_battery_receiver_node = LifecycleNode(
+        package='udp_driver',
+        name="rover_udp_battery_receiver_node",
+        namespace=namespace,
+        executable='udp_receiver_node_exe',
+        parameters=[rover_battery_config_path],
+        remappings=[
+            ('/udp_read', '/rover_battery_udp_data')
+        ],
+        autostart=True,
+        emulate_tty=True,
+    )
+
     rover_battery_node = Node(
         package="rover_battery",
         executable="rover_battery_node",
@@ -70,11 +84,12 @@ def generate_launch_description():
         ],
         emulate_tty=True,
     )
-
+    
     actions = [
         declare_log_level_arg,
         declare_namespace_arg,
         declare_rover_battery_config_path_arg,
+        rover_udp_battery_receiver_node,
         rover_battery_node,
     ]
 

@@ -60,7 +60,7 @@ def generate_launch_description():
         name="rover_crfs_receiver_node",
         namespace=namespace,
         parameters=[
-            {'device': '/dev/ttyUSB1'},
+            {'device': '/dev/ttyUSB0'},
             {'baud_rate': '460800'},
             {'link_stats': True},
             {'receiver_rate': 50},

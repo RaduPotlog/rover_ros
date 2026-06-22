@@ -25,21 +25,12 @@
 #include "rover_battery/battery_publisher/battery_publisher.hpp"
 #include "rover_battery/battery_publisher/single_battery_publisher.hpp"
 
+#include <udp_msgs/msg/udp_packet.hpp>
+
 #include "diagnostic_updater/diagnostic_updater.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-#include <CppLinuxSerial/SerialPort.hpp>
-
 using namespace std::chrono_literals;
-using namespace mn;
-
-#define bitRead(value, bit) (((value) >> (bit)) & 0x01)
-
-#define XFER_BUFFER_LENGTH          13
-#define MIN_NUMBER_CELLS            1
-#define MAX_NUMBER_CELLS            8
-#define MIN_NUMBER_TEMP_SENSORS     1
-#define MAX_NUMBER_TEMP_SENSORS     2
 
 namespace rover_battery
 {
@@ -49,45 +40,11 @@ class RoverBatteryNode : public rclcpp::Node
 
 public:
 
-    enum ReturnStatus
-    {
-        E_NOK   = 0x00U,
-        E_OK    = 0x01U,
-        E_BUSY  = 0x03U,
-    };
-
-    enum CommandState
-    {
-        IDLE     = 0x00U,
-        TRANSMIT = 0x01U,
-        WAIT_RX  = 0x02U,
-        RECEIVED = 0x03U,
-        TIMEOUT  = 0xFFU,
-    };
-
-    enum Command : uint8_t
-    {
-        BMS_RESET                   = 0x00U,
-        VOUT_IOUT_SOC               = 0x90U,
-        MIN_MAX_CELL_VOLTAGE        = 0x91U,
-        MIN_MAX_TEMPERATURE         = 0x92U,
-        DISCHARGE_CHARGE_MOS_STATUS = 0x93U,
-        STATUS_INFO                 = 0x94U,
-        CELL_VOLTAGES               = 0x95U,
-        CELL_TEMPERATURE            = 0x96U,
-        CELL_BALANCE_STATE          = 0x97U,
-        FAILURE_CODES               = 0x98U,
-        DISCHRG_FET                 = 0xD9U,
-        CHRG_FET                    = 0xDAU,
-       
-        END_OF_ENUM                 = 0xFFU,
-    };
-
     /**
      * @brief get struct holds all the data collected from the BMS and is populated using the update() API
      * @details Comments specify precision and units where applicable
      */
-    struct
+    struct __attribute__((packed)) Data
     {
         // data from 0x90
         float packVoltage; // Total pack voltage (0.1 V)
@@ -107,7 +64,7 @@ public:
         float tempAverage; // Average of temp sensors
 
         // data from 0x93
-        std::string chargeDischargeStatus; // charge/discharge status (0 stationary, 1 charge, 2 discharge)
+        int chargeDischargeStatus;    // charge/discharge status (0 stationary, 1 charge, 2 discharge)
         bool chargeFetState;          // charging MOSFET status
         bool disChargeFetState;       // discharge MOSFET state
         int bmsHeartBeat;             // BMS life (0~255 cycles)?
@@ -130,80 +87,76 @@ public:
         // data from 0x97
         bool cellBalanceState[48]; // bool array of cell balance states
         bool cellBalanceActive;    // bool is cell balance active
-
-        // debug data string
-        std::string aDebug;
     } get;
 
     /**
      * @brief alarm struct holds booleans corresponding to all the possible alarms
      * (aka errors/warnings) the BMS can report
      */
-
-    struct
-    {
-        // data from 0x98
+    struct __attribute__((packed)) Alarm {
         /* 0x00 */
-        bool levelOneCellVoltageTooHigh;
-        bool levelTwoCellVoltageTooHigh;
-        bool levelOneCellVoltageTooLow;
-        bool levelTwoCellVoltageTooLow;
-        bool levelOnePackVoltageTooHigh;
-        bool levelTwoPackVoltageTooHigh;
-        bool levelOnePackVoltageTooLow;
-        bool levelTwoPackVoltageTooLow;
+        uint8_t levelOneCellVoltageTooHigh   : 1;
+        uint8_t levelTwoCellVoltageTooHigh   : 1;
+        uint8_t levelOneCellVoltageTooLow    : 1;
+        uint8_t levelTwoCellVoltageTooLow    : 1;
+        uint8_t levelOnePackVoltageTooHigh   : 1;
+        uint8_t levelTwoPackVoltageTooHigh   : 1;
+        uint8_t levelOnePackVoltageTooLow    : 1;
+        uint8_t levelTwoPackVoltageTooLow    : 1;
 
         /* 0x01 */
-        bool levelOneChargeTempTooHigh;
-        bool levelTwoChargeTempTooHigh;
-        bool levelOneChargeTempTooLow;
-        bool levelTwoChargeTempTooLow;
-        bool levelOneDischargeTempTooHigh;
-        bool levelTwoDischargeTempTooHigh;
-        bool levelOneDischargeTempTooLow;
-        bool levelTwoDischargeTempTooLow;
+        uint8_t levelOneChargeTempTooHigh    : 1;
+        uint8_t levelTwoChargeTempTooHigh    : 1;
+        uint8_t levelOneChargeTempTooLow     : 1;
+        uint8_t levelTwoChargeTempTooLow     : 1;
+        uint8_t levelOneDischargeTempTooHigh : 1;
+        uint8_t levelTwoDischargeTempTooHigh : 1;
+        uint8_t levelOneDischargeTempTooLow  : 1;
+        uint8_t levelTwoDischargeTempTooLow  : 1;
 
         /* 0x02 */
-        bool levelOneChargeCurrentTooHigh;
-        bool levelTwoChargeCurrentTooHigh;
-        bool levelOneDischargeCurrentTooHigh;
-        bool levelTwoDischargeCurrentTooHigh;
-        bool levelOneStateOfChargeTooHigh;
-        bool levelTwoStateOfChargeTooHigh;
-        bool levelOneStateOfChargeTooLow;
-        bool levelTwoStateOfChargeTooLow;
+        uint8_t levelOneChargeCurrentTooHigh    : 1;
+        uint8_t levelTwoChargeCurrentTooHigh    : 1;
+        uint8_t levelOneDischargeCurrentTooHigh : 1;
+        uint8_t levelTwoDischargeCurrentTooHigh : 1;
+        uint8_t levelOneStateOfChargeTooHigh    : 1;
+        uint8_t levelTwoStateOfChargeTooHigh    : 1;
+        uint8_t levelOneStateOfChargeTooLow     : 1;
+        uint8_t levelTwoStateOfChargeTooLow     : 1;
 
         /* 0x03 */
-        bool levelOneCellVoltageDifferenceTooHigh;
-        bool levelTwoCellVoltageDifferenceTooHigh;
-        bool levelOneTempSensorDifferenceTooHigh;
-        bool levelTwoTempSensorDifferenceTooHigh;
+        uint8_t levelOneCellVoltageDifferenceTooHigh : 1;
+        uint8_t levelTwoCellVoltageDifferenceTooHigh : 1;
+        uint8_t levelOneTempSensorDifferenceTooHigh  : 1;
+        uint8_t levelTwoTempSensorDifferenceTooHigh  : 1;
+        uint8_t : 4; // Padding bits to finish the 0x03 byte boundary
 
         /* 0x04 */
-        bool chargeFETTemperatureTooHigh;
-        bool dischargeFETTemperatureTooHigh;
-        bool failureOfChargeFETTemperatureSensor;
-        bool failureOfDischargeFETTemperatureSensor;
-        bool failureOfChargeFETAdhesion;
-        bool failureOfDischargeFETAdhesion;
-        bool failureOfChargeFETTBreaker;
-        bool failureOfDischargeFETBreaker;
+        uint8_t chargeFETTemperatureTooHigh            : 1;
+        uint8_t dischargeFETTemperatureTooHigh         : 1;
+        uint8_t failureOfChargeFETTemperatureSensor    : 1;
+        uint8_t failureOfDischargeFETTemperatureSensor : 1;
+        uint8_t failureOfChargeFETAdhesion             : 1;
+        uint8_t failureOfDischargeFETAdhesion          : 1;
+        uint8_t failureOfChargeFETTBreaker             : 1;
+        uint8_t failureOfDischargeFETBreaker           : 1;
 
         /* 0x05 */
-        bool failureOfAFEAcquisitionModule;
-        bool failureOfVoltageSensorModule;
-        bool failureOfTemperatureSensorModule;
-        bool failureOfEEPROMStorageModule;
-        bool failureOfRealtimeClockModule;
-        bool failureOfPrechargeModule;
-        bool failureOfVehicleCommunicationModule;
-        bool failureOfIntranetCommunicationModule;
+        uint8_t failureOfAFEAcquisitionModule        : 1;
+        uint8_t failureOfVoltageSensorModule         : 1;
+        uint8_t failureOfTemperatureSensorModule     : 1;
+        uint8_t failureOfEEPROMStorageModule         : 1;
+        uint8_t failureOfRealtimeClockModule         : 1;
+        uint8_t failureOfPrechargeModule             : 1;
+        uint8_t failureOfVehicleCommunicationModule   : 1;
+        uint8_t failureOfIntranetCommunicationModule  : 1;
 
         /* 0x06 */
-        bool failureOfCurrentSensorModule;
-        bool failureOfMainVoltageSensorModule;
-        bool failureOfShortCircuitProtection;
-        bool failureOfLowVoltageNoCharging;
+        uint8_t failureOfCurrentSensorModule     : 1;
+        uint8_t failureOfMainVoltageSensorModule : 1;
+        uint8_t failureOfShortCircuitProtection  : 1;
+        uint8_t failureOfLowVoltageNoCharging    : 1;
+        uint8_t : 4; // Padding bits to finish the 0x06 byte boundary
     } alarm;
 
     RoverBatteryNode(
@@ -212,70 +165,21 @@ public:
     
     void init();
     
-    /*
-     * 0x00 Reset the BMS
-     */
-    bool batteryReset();
-    
-    /*
-     * 0xDA 0x80 First Byte 0x01=ON 0x00=OFF
-     */
-    bool setChargeMOS(bool sw);
-    
-    /*
-     * 0xD9 0x80 First Byte 0x01=ON 0x00=OFF
-     */
-    bool setDischargeMOS(bool sw);
-    
 private:
 
     static constexpr float kDesignedCapacity = 40.0;
     static constexpr std::string_view kSerialNumber = "224KA141600043";
+
+    void batteryUdpDataCallback(const udp_msgs::msg::UdpPacket::SharedPtr msg);
+
+    void batteryUdpDataSubsciberTimeoutCallback();
     
-    void batteryReadTimerCallback();
-    void batteryReadTimeoutCallback();
+    std::uint8_t updateBatteryHealth();
 
-    std::uint8_t getBatteryHealth();
-
-    bool updateBatteryStatus();
-
-    uint8_t evalChecksum(std::vector<uint8_t> & buff);
-    bool sendCommand(Command cmd_id);
-    
-    ReturnStatus parseAllIncomingCommandBytes(Command cmd_id);
-    ReturnStatus checkRxBuffer();
-    ReturnStatus getPackMeasurements();         // 0x90
-    ReturnStatus getMinMaxCellVoltage();        // 0x91
-    ReturnStatus getPackTemp();                 // 0x92
-    ReturnStatus getDischargeChargeMosStatus(); // 0x93
-    ReturnStatus getStatusInfo();               // 0x94
-    ReturnStatus getCellVoltages();             // 0x95
-    ReturnStatus getCellTemperature();          // 0x96
-    ReturnStatus getCellBalanceState();         // 0x97
-    ReturnStatus getFailureCodes();             // 0x98
+    void updateFailureCodes();
     
     void publishBatteryInfo();
 
-    std::vector<uint8_t> tx_buffer_;
-    std::vector<uint8_t> rx_buffer_;
-    
-    bool wait_for_receiver_{false};
-
-    CppLinuxSerial::SerialPort serial_port_;
-
-    std::string serial_device_name_;
-    
-    CommandState current_command_state_{CommandState::IDLE};
-
-    Command current_command_{Command::VOUT_IOUT_SOC};
-    
-    rclcpp::TimerBase::SharedPtr battery_read_timer_;
-    
-    bool rx_timeout_started_{false};
-    bool rx_timeout_reached_{false};
-    
-    int retry_read_counter_{0};
-    
     rclcpp::TimerBase::SharedPtr battery_read_timeout_;
     
     BatteryStateMsg battery_state_msgs_;
@@ -284,6 +188,8 @@ private:
     
     std::shared_ptr<BatteryPublisher> battery_publisher_;
 
+    rclcpp::Subscription<udp_msgs::msg::UdpPacket>::SharedPtr battery_subscriber_;
+    
     std::shared_ptr<diagnostic_updater::Updater> diagnostic_updater_;
 };
 

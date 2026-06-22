@@ -21,9 +21,9 @@ set(PACKAGE_DEPENDENCIES
     std_msgs
     std_srvs
     sensor_msgs
+    udp_msgs
     geometry_msgs
     rover_msgs
-    CppLinuxSerial
 )
 
 foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
@@ -42,8 +42,6 @@ add_executable(${PROJECT_NAME}_node
 target_include_directories(${PROJECT_NAME}_node PUBLIC 
                            ${CMAKE_INSTALL_PREFIX}/include
 )
-
-target_link_libraries(${PROJECT_NAME}_node CppLinuxSerial)
 
 ament_target_dependencies(${PROJECT_NAME}_node ${PACKAGE_DEPENDENCIES})
 
