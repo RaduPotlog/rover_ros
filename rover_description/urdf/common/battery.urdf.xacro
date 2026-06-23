@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro name="battery" params="battery_config_file namespace:=''">
+
+    <xacro:property name="battery_config" value="${xacro.load_yaml(battery_config_file)}" />
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+
+    <gazebo>
+      <plugin filename="gz-sim-linearbatteryplugin-system"
+        name="gz::sim::systems::LinearBatteryPlugin">
+        <battery_name>${ns}battery</battery_name>
+        <voltage>41.4</voltage>
+        <open_circuit_voltage_constant_coef>42.0</open_circuit_voltage_constant_coef>
+        <open_circuit_voltage_linear_coef>-10.0</open_circuit_voltage_linear_coef>
+        <initial_charge>${battery_config['initial_charge_percentage']*battery_config['capacity']}</initial_charge>
+        <capacity>${battery_config['capacity']}</capacity>
+        <resistance>0.15</resistance>
+        <smooth_current_tau>2.0</smooth_current_tau>
+        <enable_recharge>true</enable_recharge>
+        <charging_time>${battery_config['charging_time']}</charging_time>
+        <soc_threshold>2.0</soc_threshold>
+        <!-- TODO Because of https://github.com/gazebosim/gz-sim/issues/225 division by 100 -->
+        <power_load>${battery_config['power_load']/100.0}</power_load>
+        <start_draining>${battery_config['simulate_discharging']}</start_draining>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+</robot>

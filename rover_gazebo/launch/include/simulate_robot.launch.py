@@ -40,6 +40,18 @@ def generate_launch_description():
         choices=["True", "true", "False", "false"],
     )
 
+    battery_config_path = LaunchConfiguration("battery_config_path")
+    declare_battery_config_path_arg = DeclareLaunchArgument(
+        "battery_config_path",
+        default_value=PathJoinSubstitution(
+            [FindPackageShare("rover_gazebo"), "config", "battery.yaml"]
+        ),
+        description=(
+            "Path to the Ignition LinearBatteryPlugin configuration file. "
+            "This configuration is intended for use in simulations only."
+        ),
+    )
+
     components_config_path = LaunchConfiguration("components_config_path")
     declare_components_config_path_arg = DeclareLaunchArgument(
         "components_config_path",
@@ -101,6 +113,7 @@ def generate_launch_description():
             "namespace": namespace,
             "robot_model": robot_model,
             "log_level": log_level,
+            "battery_config_path": battery_config_path,
         }.items(),
     )
 
@@ -183,6 +196,7 @@ def generate_launch_description():
 
     actions = [
         declare_add_world_transform_arg,
+        declare_battery_config_path_arg,
         declare_robot_model_arg,
         declare_components_config_path_arg,
         declare_disable_manager_arg,

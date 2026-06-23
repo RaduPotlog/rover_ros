@@ -1,0 +1,17 @@
+# If set to true, the battery will discharge and if it depletes completely, the robot will stop moving.
+simulate_discharging: false
+
+# Battery capacity
+# BAT01 - 40 Ah
+capacity: 40.0 # [Ah]
+
+# Sets the initial charge percentage of the battery (range 0-1).
+initial_charge_percentage: 0.7
+
+# Specifies the charging time for the battery in hours.
+charging_time: 8.0 # [h]
+
+# Constant power discharging the battery.
+# 160W – represents the power consumed during normal operation.
+# With this power load, the robot equipped with BAT01 should work for about 6 hours.
+power_load: 160.0 # [W]

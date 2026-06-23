@@ -7,6 +7,7 @@
   <xacro:arg name="lidar_xyz" default="0.0 0.0 0.0" />
   <xacro:arg name="lidar_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="wheel_config_file" default="$(find rover_description)/config/wheel_01.yaml" />
+  <xacro:arg name="battery_config_file" default="$(find rover_description)/config/battery.yaml" />
   <xacro:arg name="controller_config_file" default="$(find rover_controller)/config/wheel_01_controller.yaml" />
   <xacro:arg name="namespace" default="" />
 
@@ -18,6 +19,7 @@
     lidar_xyz="$(arg lidar_xyz)"
     lidar_rpy="$(arg lidar_rpy)"
     wheel_config_file="$(arg wheel_config_file)"
+    battery_config_file="$(arg battery_config_file)"
     controller_config_file="$(arg controller_config_file)"
     namespace="$(arg namespace)" />
 </robot>

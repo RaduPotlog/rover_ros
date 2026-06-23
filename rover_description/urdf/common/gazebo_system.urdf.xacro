@@ -4,7 +4,7 @@
   <xacro:macro 
     name="controller"
     params="controller_config_file
-            namespace:=''">
+    namespace:=''">
 
     <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
     
