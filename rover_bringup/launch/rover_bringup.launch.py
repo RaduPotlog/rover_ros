@@ -221,46 +221,17 @@ def generate_launch_description():
         }.items(),
     )
 
-    rover_rslidar_config_arg = DeclareLaunchArgument(
-        'config',
-        default_value='src/rslidar_sdk/config/config.yaml',
-        description='Path to rslidar_sdk config.yaml'
-    )
-
-    rover_rslidar_config_path = LaunchConfiguration("rover_rslidar_config_path")
-    declare_rover_rslidar_config_path_arg = DeclareLaunchArgument(
-        "rover_rslidar_config_path",
-        default_value=PathJoinSubstitution(
-            [
-                FindPackageShare("rslidar_sdk"),
-                "config",
-                "config.yaml",
-            ]
-        ),
-        description="Specify the path to the rover rslidar configuration file.",
-    )
-
-    rover_rslidar_node = Node(
-        package='rslidar_sdk',
-        executable='rslidar_sdk_node',
-        name='rover_rslidar_node',
-        parameters=[rover_rslidar_config_path],
-        namespace=namespace,
-        output='screen',
-        emulate_tty=True,
-    )
-
-    rover_rslidar_to_lidar_link_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='rover_rslidar_to_lidar_link_tf',
-        arguments=[
-            '0.0', '0.0', '0.10',
-            '0.0', '0.0', '0.0',
-            'rover_rslidar',
-            'odom'
-        ],
-    )
+    # rover_rslidar_to_lidar_link_tf = Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='rover_rslidar_to_lidar_link_tf',
+    #     arguments=[
+    #         '0.0', '0.0', '0.10',
+    #         '0.0', '0.0', '0.0',
+    #         'rover_rslidar',
+    #         'odom'
+    #     ],
+    # )
 
     rover_bringup_common_dir = PythonExpression(
         [
@@ -332,7 +303,6 @@ def generate_launch_description():
         declare_disable_manager_arg,
         declare_log_level_arg,
         declare_namespace_arg,
-        declare_rover_rslidar_config_path_arg,
         welcome_info,
         incorrect_hw_config_action,
         incorrect_os_version_action,

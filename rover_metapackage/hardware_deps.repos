@@ -31,22 +31,6 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_behavior_tree
     version: master
-  rover_rslidar_sdk:
-    type: git
-    url: https://github.com/RaduPotlog/rover_rslidar_sdk
-    version: main
-  rover_orchestrator:
-    type: git
-    url: https://github.com/RaduPotlog/rover_orchestrator
-    version: main
-  rover_ubox:
-    type: git
-    url: https://github.com/RaduPotlog/rover_ublox
-    version: ros2
-  rover_ntrip_client:
-    type: git
-    url: https://github.com/RaduPotlog/rover_ntrip_client
-    version: ros2
   rover_transport:
     type: git
     url: https://github.com/RaduPotlog/rover_transport

@@ -24,25 +24,6 @@
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_led</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">udp_driver</exec_depend>
 
-  <!-- <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_navigation</exec_depend> -->
-
-  <!-- Medkit dependency -->
-  <!-- <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros2_medkit_diagnostic_bridge</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros2_medkit_fault_manager</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros2_medkit_fault_reporter</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros2_medkit_gateway</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros2_medkit_msgs</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ros2_medkit_serialization</exec_depend> -->
-
-  <!-- Lidar Robosense dependency -->
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rslidar_sdk</exec_depend>
-
-  <!-- Ublox F9P dependency -->
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">ublox</exec_depend>
-
-  <!-- Rover web bridge dependency -->
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_web_bridge</exec_depend>
-  
   <!-- Rover foxglove bridge dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">foxglove_bridge</exec_depend>
   
