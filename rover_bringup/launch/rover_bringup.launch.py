@@ -207,20 +207,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    rover_web_bridge_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("rover_web_bridge"), "launch", "rover_web_bridge.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "log_level": log_level,
-            "namespace": namespace,
-            "use_sim": "False",
-            "common_dir_path": common_dir_path,
-        }.items(),
-    )
-
     rover_ublox_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -328,7 +314,6 @@ def generate_launch_description():
             rover_ekf_launch,
             rover_crfs_teleop_launch,
             rover_twist_mux_launch,
-            rover_web_bridge_launch,
         ],
     )
 
