@@ -18,11 +18,11 @@ repositories:
   rover_arch:
     type: git
     url: https://github.com/RaduPotlog/rover_arch
-    version: main
+    version: master
   rover_foxglove:
     type: git
     url: https://github.com/RaduPotlog/rover_foxglove
-    version: main
+    version: master
   rover_behavior_tree:
     type: git
     url: https://github.com/RaduPotlog/rover_behavior_tree
@@ -30,6 +30,6 @@ repositories:
   rover_transport:
     type: git
     url: https://github.com/RaduPotlog/rover_transport
-    version: main
+    version: master
     
  
