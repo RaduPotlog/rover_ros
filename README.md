@@ -60,14 +60,6 @@ cmake --build build
 cd build
 sudo make install
 cd ../../..
-
-cd src/rover_cpplinux_serial
-mkdir build/
-cd build
-cmake ..
-make
-sudo make install
-cd ../../..
 ```
 
 #### For real rover and simulated rover
