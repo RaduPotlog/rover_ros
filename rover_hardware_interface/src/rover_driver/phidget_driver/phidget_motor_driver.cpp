@@ -224,6 +224,38 @@ void PhidgetMotorDriver::initialize()
             std::to_string(channel_));
     }
 
+    double minDataRate = 0.0;
+
+    ret = PhidgetEncoder_getMinDataRate(encoder_handle_, &minDataRate);
+	
+    if (ret != EPHIDGET_OK) {
+		throw std::runtime_error("Failed to get minimum data rate of the encoder for motor channel " + 
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetEncoder_setDataRate(encoder_handle_, minDataRate);
+
+    if (ret != EPHIDGET_OK) {
+		throw std::runtime_error("Failed to set minimum data rate of the encoder for motor channel " + 
+            std::to_string(channel_));
+    }
+
+    uint32_t minDataInterval = 0;
+
+    ret = PhidgetEncoder_getMinDataInterval(encoder_handle_, &minDataInterval);
+	
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to get minimum data interval of the encoder for motor channel " + 
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetEncoder_setDataInterval(encoder_handle_, minDataInterval);
+	
+    if (ret != EPHIDGET_OK) {
+		 throw std::runtime_error("Failed to set minimum data interval of the encoder for motor channel " + 
+            std::to_string(channel_));
+    }
+
     ret = PhidgetEncoder_setOnPositionChangeHandler(encoder_handle_, positionChangeHandler, this);
 
     if (ret != EPHIDGET_OK) {
