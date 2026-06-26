@@ -79,7 +79,7 @@
       prefix="rr" />
 
     <!-- ROS2 Controller -->
-    <ros2_control name="${ns}rover_system" type="system">
+    <ros2_control name="${ns}rover_system_node" type="system">
       <!-- Joints -->
       <joint name="fl_wheel_base_to_fl_wheel_joint">
         <command_interface name="velocity" />

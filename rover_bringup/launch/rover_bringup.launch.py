@@ -221,18 +221,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    # rover_rslidar_to_lidar_link_tf = Node(
-    #     package='tf2_ros',
-    #     executable='static_transform_publisher',
-    #     name='rover_rslidar_to_lidar_link_tf',
-    #     arguments=[
-    #         '0.0', '0.0', '0.10',
-    #         '0.0', '0.0', '0.0',
-    #         'rover_rslidar',
-    #         'odom'
-    #     ],
-    # )
-
     rover_bringup_common_dir = PythonExpression(
         [
             "'",

@@ -1,5 +1,5 @@
 /**:
-  ekf_node:
+  rover_ekf_node:
     ros__parameters:
       frequency: 50.0
       sensor_timeout: 0.05

@@ -191,6 +191,7 @@ def generate_launch_description():
     robot_state_pub_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
+        name="rover_state_publisher_node",
         arguments=["--ros-args", "--disable-stdout-logs"],
         parameters=[robot_description, {"frame_prefix": ns}],
         namespace=namespace,

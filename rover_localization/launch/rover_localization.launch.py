@@ -125,7 +125,7 @@ def generate_launch_description():
     ekf_filter_node = Node(
         package="robot_localization",
         executable="ekf_node",
-        name="ekf_node",
+        name="rover_ekf_node",
         parameters=[localization_config_path, {"tf_prefix": namespace}],
         namespace=namespace,
         remappings=[
