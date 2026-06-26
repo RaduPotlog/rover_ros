@@ -15,10 +15,6 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_crsf_receiver
     version: master
-  rover_controllers:
-    type: git
-    url: https://github.com/RaduPotlog/rover_controllers
-    version: master_6_3_0
   rover_arch:
     type: git
     url: https://github.com/RaduPotlog/rover_arch
