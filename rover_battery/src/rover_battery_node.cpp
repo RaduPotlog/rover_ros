@@ -80,23 +80,63 @@ void RoverBatteryNode::batteryUdpDataCallback(const udp_msgs::msg::UdpPacket::Sh
 
 void RoverBatteryNode::batteryUdpDataSubsciberTimeoutCallback()
 {
-    RCLCPP_INFO(this->get_logger(), "timeout");
+    RCLCPP_WARN(this->get_logger(), "Battery UDP receiver timeout...");
+    
+    battery_state_msgs_.voltage                 = 0.0;
+    battery_state_msgs_.temperature             = 0.0;
+    battery_state_msgs_.current                 = 0.0;
+    battery_state_msgs_.charge                  = 0.0;
+    battery_state_msgs_.capacity                = 0.0;
+    battery_state_msgs_.design_capacity         = kDesignedCapacity;
+    battery_state_msgs_.percentage              = 0.0;
+    battery_state_msgs_.power_supply_technology = sensor_msgs::msg::BatteryState::POWER_SUPPLY_TECHNOLOGY_LIFE;
+    battery_state_msgs_.present                 = false;
+    battery_state_msgs_.location                = "rover";
+    battery_state_msgs_.serial_number           = kSerialNumber;
+    
+    // Check to make sure we have a valid number of cells
+    battery_state_msgs_.cell_voltage.clear();
+
+    for (int i = 0; i < get.numberOfCells; i++) {
+        battery_state_msgs_.cell_voltage.push_back(0.0);
+    }
+        
+    battery_state_msgs_.cell_temperature.clear();
+
+    for (int i = 0; i < get.numOfTempSensors; i++) {
+        battery_state_msgs_.cell_temperature.push_back(0.0);
+    }
+
+    battery_state_msgs_.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_FULL;
+    
+    charging_state_msgs_.charging           = false;
+    charging_state_msgs_.current            = 0.0;
+    charging_state_msgs_.current_battery    = 0.0;
+    charging_state_msgs_.charger_type       = rover_msgs::msg::ChargingStatus::UNKNOWN;
+    
+    battery_state_msgs_.power_supply_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE;
+    error_msg_ = "Battery watchdog expired";
+    battery_publisher_->publish(battery_state_msgs_, charging_state_msgs_, error_msg_);
 }
 
 std::uint8_t RoverBatteryNode::updateBatteryHealth()
 {
+    std::uint8_t batt_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_GOOD;
+
     if ((alarm.levelOnePackVoltageTooLow == true) || (alarm.levelOneCellVoltageTooLow == true) || 
         (alarm.levelOneStateOfChargeTooLow == true)) {
-        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_DEAD;
+        batt_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_DEAD;
     } else if ((alarm.levelTwoPackVoltageTooHigh == true) || (alarm.levelTwoStateOfChargeTooHigh == true)) {
-        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERVOLTAGE;
-    } else if (alarm.levelOneChargeTempTooHigh == true || alarm.levelOneDischargeTempTooHigh == true) {
-        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERHEAT;
-    } else if (alarm.levelOneChargeTempTooLow == true || alarm.levelOneDischargeTempTooLow == true) {
-        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_COLD;
-    } else {
-        return sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_GOOD;
+        batt_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERVOLTAGE;
     }
+    
+    if (alarm.levelOneChargeTempTooHigh == true || alarm.levelOneDischargeTempTooHigh == true) {
+        batt_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERHEAT;
+    } else if (alarm.levelOneChargeTempTooLow == true || alarm.levelOneDischargeTempTooLow == true) {
+        batt_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_COLD;
+    } 
+    
+    return batt_health;
 }
 
 void RoverBatteryNode::updateFailureCodes()
