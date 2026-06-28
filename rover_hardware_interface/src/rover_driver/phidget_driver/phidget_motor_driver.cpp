@@ -335,14 +335,14 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
 
         driver->position_time_change_ = timeChange / 1000.0f;
         
-        int64_t delta_encoder_ticks = driver->encoder_ticks_ - driver->prev_encoder_ticks_;
+        int64_t delta_encoder_ticks = (driver->encoder_ticks_ - driver->prev_encoder_ticks_) / 4.0;
 
-        driver->state_.vel = static_cast<int16_t>(driver->calculateRPM(delta_encoder_ticks, driver->position_time_change_, driver->encoder_resolution_) / 8.0);
-        driver->state_.pos = driver->encoder_ticks_;
+        driver->state_.vel = static_cast<int16_t>(driver->calculateRPM(delta_encoder_ticks, driver->position_time_change_, driver->encoder_resolution_));
+        driver->state_.pos = driver->encoder_ticks_ / 4.0;
         
         driver->prev_encoder_ticks_ = driver->encoder_ticks_;
         
-        //RCLCPP_INFO(driver->logger_, "Encoder position changed channel = %d, position = %ld, velocity = %d, time = %lf", driver->channel_, driver->state_.pos, driver->state_.vel, driver->position_time_change_);
+        // RCLCPP_WARN(driver->logger_, "Encoder position changed channel = %d, position = %ld, velocity = %d, time = %lf", driver->channel_, driver->state_.pos, driver->state_.vel, driver->position_time_change_);
     }
 }
 

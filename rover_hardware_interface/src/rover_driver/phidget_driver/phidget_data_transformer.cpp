@@ -128,12 +128,9 @@ float PhidgetVelocityCommandDataTransformer::convert(const float cmd) const
 
 PhidgetMotorStateTransformer::PhidgetMotorStateTransformer(const DrivetrainSettings & drivetrain_settings)
 {
-    phidget_pos_feedback_to_radians_ = (1.0f / drivetrain_settings.encoder_resolution / 16.0) *
-                                       (1.0f / drivetrain_settings.gear_ratio) * (2.0f * M_PI);
-
-    phidget_vel_feedback_to_radians_per_second_ = (drivetrain_settings.max_rpm_motor_speed / 1000.0f) * 
-                                                  (1.0f / drivetrain_settings.gear_ratio) *
-                                                  (1.0f / 60.0f) * (2.0f * M_PI);
+    phidget_pos_feedback_to_radians_ = (2.0f * M_PI) / (drivetrain_settings.encoder_resolution * drivetrain_settings.gear_ratio);
+    
+    phidget_vel_feedback_to_radians_per_second_ = (2.0f * M_PI) / 60.0f / drivetrain_settings.gear_ratio;
 
     phidget_current_feedback_to_newton_meters_ = (1.0f / 10.0f) * drivetrain_settings.motor_torque_constant * 
                                                  drivetrain_settings.gear_ratio * 
@@ -152,12 +149,12 @@ float PhidgetMotorStateTransformer::getPosition() const
 
 float PhidgetMotorStateTransformer::getVelocity() const
 {
-    return motor_state_.vel * phidget_vel_feedback_to_radians_per_second_;
+    return static_cast<float>(motor_state_.vel) * phidget_vel_feedback_to_radians_per_second_;
 }
 
 float PhidgetMotorStateTransformer::getTorque() const
 {
-    return motor_state_.current * phidget_current_feedback_to_newton_meters_;
+    return static_cast<float>(motor_state_.current) * phidget_current_feedback_to_newton_meters_;
 }
 
 PhidgetDriverDataTransformer::PhidgetDriverDataTransformer(const DrivetrainSettings & drivetrain_settings)
