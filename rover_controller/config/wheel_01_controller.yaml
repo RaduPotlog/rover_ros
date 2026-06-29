@@ -36,7 +36,7 @@
         - velocity
         
       gains:
-        rl_wheel_base_to_rl_wheel_joint: {"p": 1.1, "i": 0.000015, "d": 0.007, "i_clamp_min": -6.0, "i_clamp_max": 6.0, "enable_feedforward:": true, "antiwindup": true, "feedforward_gain": 2.5}
+        rl_wheel_base_to_rl_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
 
   pid_controller_rr_wheel_base_to_rr_wheel_joint:
     ros__parameters:
@@ -50,7 +50,7 @@
         - velocity
         
       gains:
-        rr_wheel_base_to_rr_wheel_joint: {"p": 1.1, "i": 0.000015, "d": 0.007, "i_clamp_min": -6.0, "i_clamp_max": 6.0, "enable_feedforward:": true, "antiwindup": true, "feedforward_gain": 2.5}
+        rr_wheel_base_to_rr_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
 
   pid_controller_fl_wheel_base_to_fl_wheel_joint:
     ros__parameters:
@@ -64,7 +64,7 @@
         - velocity
         
       gains:
-        fl_wheel_base_to_fl_wheel_joint: {"p": 1.1, "i": 0.000015, "d": 0.007, "i_clamp_min": -6.0, "i_clamp_max": 6.0, "enable_feedforward:": true, "antiwindup": true, "feedforward_gain": 2.5}
+        fl_wheel_base_to_fl_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
 
   pid_controller_fr_wheel_base_to_fr_wheel_joint:
     ros__parameters:
@@ -78,7 +78,7 @@
         - velocity
         
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 1.1, "i": 0.000015, "d": 0.007, "i_clamp_min": -6.0, "i_clamp_max": 6.0, "enable_feedforward:": true, "antiwindup": true, "feedforward_gain": 2.5}
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
 
   imu_broadcaster:
     ros__parameters:

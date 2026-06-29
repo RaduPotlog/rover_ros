@@ -155,7 +155,7 @@ void PhidgetMotorDriver::initialize()
     (void)PhidgetDCMotor_resetFailsafe(motor_handle_);
 	
     // Set acceleration
-    ret = PhidgetDCMotor_setAcceleration(motor_handle_, 1.0f);
+    ret = PhidgetDCMotor_setAcceleration(motor_handle_, 2.0f);
 
     if (ret != EPHIDGET_OK) {
         throw std::runtime_error("Failed to set acceleration for motor channel " + 
@@ -182,10 +182,11 @@ void PhidgetMotorDriver::initialize()
 
     ret = PhidgetDCMotor_setTargetBrakingStrength(motor_handle_, 1.0f);
 	
-    if (ret != EPHIDGET_OK)
-	    throw std::runtime_error("Failed to disable braking for motor channel " + 
+    if (ret != EPHIDGET_OK) {
+	    throw std::runtime_error("Failed to set braking strength for motor channel " + 
             std::to_string(channel_));
-    
+    }
+
     // Enable fail safe
     ret = PhidgetDCMotor_enableFailsafe(motor_handle_, 5000);
 
