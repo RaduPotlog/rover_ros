@@ -59,8 +59,6 @@ protected:
 
     void loadDefaultAnimations(const YAML::Node & animations_description);
 
-    void loadUserAnimations(const std::string & user_led_animations_path);
-
     void loadAnimation(const YAML::Node & animation_description);
 
     void updateAndPublishAnimation();
@@ -83,16 +81,23 @@ private:
     void controllerTimerCallback();
 
     std::unordered_map<std::size_t, std::shared_ptr<LedPanel>> led_panels_;
+    
     std::unordered_map<std::size_t, rclcpp::Publisher<ImageMsg>::SharedPtr> panel_publishers_;
+    
     std::unordered_map<std::string, std::shared_ptr<LedSegment>> segments_;
+    
     std::unordered_map<std::string, std::vector<std::string>> segments_map_;
+    
     std::unordered_map<std::size_t, LedAnimationDescription> animations_descriptions_;
+    
     std::shared_ptr<SegmentConverter> segment_converter_;
 
     std::shared_ptr<led_controller::ParamListener> param_listener_;
+    
     led_controller::Params params_;
 
     rclcpp::Service<SetLedAnimationSrv>::SharedPtr set_led_animation_server_;
+    
     rclcpp::TimerBase::SharedPtr controller_timer_;
 
     bool animation_finished_ = true;

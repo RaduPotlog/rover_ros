@@ -54,7 +54,6 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     this->params_ = this->param_listener_->get_params();
 
     const auto animations_config_path = this->params_.animations_config_path;
-    const auto user_led_animations_path = this->params_.user_led_animations_path;
     const float controller_freq = static_cast<float>(this->params_.controller_frequency);
     YAML::Node led_config_desc = YAML::LoadFile(animations_config_path);
 
@@ -63,10 +62,6 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     initializeLedSegmentsMap(led_config_desc["segments_map"]);
     loadDefaultAnimations(led_config_desc["led_animations"]);
     
-    if (user_led_animations_path != "") {
-        loadUserAnimations(user_led_animations_path);
-    }
-
     segment_converter_ = std::make_shared<SegmentConverter>();
 
     set_led_animation_server_ = this->create_service<SetLedAnimationSrv>(
@@ -154,39 +149,6 @@ void LedControllerNode::loadDefaultAnimations(const YAML::Node & animations_desc
     }
 
     RCLCPP_INFO(this->get_logger(), "Loaded default animations.");
-}
-
-void LedControllerNode::loadUserAnimations(const std::string & user_led_animations_path)
-{
-    RCLCPP_DEBUG(this->get_logger(), "Loading user's animations.");
-
-    try {
-        YAML::Node user_led_animations = YAML::LoadFile(user_led_animations_path);
-        auto user_animations = rover_utils::getYAMLKeyValue<std::vector<YAML::Node>>(user_led_animations, "user_animations");
-
-        for (auto & animation_description : user_animations) {
-            try {
-                auto id = rover_utils::getYAMLKeyValue<std::size_t>(animation_description, "id");
-                if (id < 20) {
-                    throw std::runtime_error("Animation ID must be greater than 19.");
-                }
-
-                auto priority = rover_utils::getYAMLKeyValue<std::size_t>(animation_description, "priority", LedAnimation::kDefaultPriority);
-            
-                if (priority == 0) {
-                    throw std::runtime_error("User animation can not have priority 0.");
-                }
-
-                loadAnimation(animation_description);
-            } catch (const std::runtime_error & e) {
-                RCLCPP_WARN_STREAM(this->get_logger(), "Skipping user animation that failed to load: " << e.what());
-            }
-        }
-    } catch (const std::exception & e) {
-        RCLCPP_WARN_STREAM(this->get_logger(), "Failed to load user animations: " << e.what());
-    }
-
-    RCLCPP_INFO(this->get_logger(), "Loaded user's animations.");
 }
 
 void LedControllerNode::loadAnimation(const YAML::Node & animation_description)

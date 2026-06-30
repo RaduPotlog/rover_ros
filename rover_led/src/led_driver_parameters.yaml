@@ -14,5 +14,11 @@ led_driver:
   channel_1_num_led:
     type: int
     default_value: 24
-    description: Number of LEDs in the first bumper.
+    description: Number of LEDs in the front bumper.
+    validation: { gt<>: 0 }
+  
+  channel_2_num_led:
+    type: int
+    default_value: 24
+    description: Number of LEDs in the rear bumper.
     validation: { gt<>: 0 }

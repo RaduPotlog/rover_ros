@@ -25,21 +25,14 @@
 namespace rover_led
 {
 
-SK9822::SK9822(
-    SPIDeviceInterface::SharedPtr spi_device, 
-    const std::string & device_name,
-    const std::uint32_t speed, const bool cs_high)
-: spi_device_(spi_device)
-, device_name_(device_name)
-, speed_(speed)
-, file_descriptor_(spi_device->open(device_name))
+SK9822::SK9822()
 {
-    (void)cs_high;
+
 }
 
 SK9822::~SK9822() 
 { 
-    spi_device_->close(file_descriptor_); 
+
 }
 
 void SK9822::setGlobalBrightness(const float brightness)
@@ -63,7 +56,7 @@ void SK9822::setGlobalBrightness(const std::uint8_t brightness)
 std::vector<std::uint8_t> SK9822::setPanel(const std::vector<std::uint8_t> & frame) const
 {
     const auto buffer = rgbFrameToBGRBuffer(frame);
-
+    
     return buffer;
 }
 
@@ -90,15 +83,6 @@ std::vector<std::uint8_t> SK9822::rgbFrameToBGRBuffer(
     }
 
     return buffer;
-}
-
-void SK9822::spiSendBuffer(const std::vector<std::uint8_t> & buffer) const
-{
-    if (buffer.size() == 0) {
-        throw std::runtime_error("Buffer size must be at least 1 byte.");
-    }
-
-    spi_device_->ioctrl(buffer);
 }
 
 }  // namespace rover_led

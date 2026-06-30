@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_LED_APA102_HPP_
-#define ROVER_LED_APA102_HPP_
-
-#include <fcntl.h>
-#include <linux/spi/spidev.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
+#ifndef ROVER_LED_SK9822_HPP_
+#define ROVER_LED_SK9822_HPP_
 
 #include <cstdint>
 #include <memory>
@@ -30,62 +25,20 @@
 namespace rover_led
 {
 
-class SPIDeviceInterface
-{
-
-public:
-  
-    virtual ~SPIDeviceInterface() = default;
-
-    virtual int open(const std::string & device) = 0;
-
-    virtual int ioctrl(const std::vector<std::uint8_t> & buffer) = 0;
-
-    virtual int close(int fd) = 0;
-
-    using SharedPtr = std::shared_ptr<SPIDeviceInterface>;
-};
-
-class SPIDevice : public SPIDeviceInterface
-{
-
-public:
-  
-    int open(const std::string & device) override 
-    { 
-        (void)device;
-        return 0;    
-    }
-
-    int ioctrl(const std::vector<std::uint8_t>& buffer) override
-    {
-        (void)buffer;
-        return 0;
-    }
-
-    int close(int fd) override 
-    { 
-        (void)fd;
-        return 0; 
-    }
-
-protected:
- 
-};
-
 class SK9822Interface
 {
 
 public:
   
+    using SharedPtr = std::shared_ptr<SK9822Interface>;
+    
     virtual ~SK9822Interface() = default;
 
     virtual void setGlobalBrightness(const std::uint8_t brightness) = 0;
-    virtual void setGlobalBrightness(const float brightness) = 0;
-    virtual std::vector<std::uint8_t> setPanel(const std::vector<std::uint8_t> & frame) const = 0;
-
-    using SharedPtr = std::shared_ptr<SK9822Interface>;
     
+    virtual void setGlobalBrightness(const float brightness) = 0;
+    
+    virtual std::vector<std::uint8_t> setPanel(const std::vector<std::uint8_t> & frame) const = 0;
 };
 
 class SK9822 : public SK9822Interface
@@ -93,11 +46,7 @@ class SK9822 : public SK9822Interface
 
 public:
 
-    SK9822(
-        SPIDeviceInterface::SharedPtr spi_device, 
-        const std::string & device_name,
-        const std::uint32_t speed = 800000, 
-        const bool cs_high = false);
+    SK9822();
     
     ~SK9822();
 
@@ -122,17 +71,11 @@ private:
     static constexpr std::uint16_t kCorrRed = 245;
     static constexpr std::uint16_t kCorrGreen = 255;
     static constexpr std::uint16_t kCorrBlue = 240;
-    static constexpr float kCorrectionGamma = 2.2;
-
-    SPIDeviceInterface::SharedPtr spi_device_;
-
-    const std::string device_name_;
-    const std::uint32_t speed_;
-    const int file_descriptor_;
+    static constexpr float kCorrectionGamma = 2.2f;
 
     rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
 };
 
 }  // namespace rover_led
 
-#endif  // ROVER_LED_APA102_HPP_
+#endif  // ROVER_LED_SK9822_HPP_

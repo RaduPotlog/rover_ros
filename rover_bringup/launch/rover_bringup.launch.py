@@ -268,7 +268,7 @@ def generate_launch_description():
         period=10.0,
         actions=[
             rover_battery_launch,
-            # rover_led_launch,
+            rover_led_launch,
             rover_safety_launch,
             rover_ekf_launch,
             rover_crfs_teleop_launch,

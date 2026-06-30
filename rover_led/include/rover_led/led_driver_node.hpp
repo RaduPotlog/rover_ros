@@ -46,7 +46,8 @@ public:
     LedDriverNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
     LedDriverNode(
-        SK9822Interface::SharedPtr channel_1,
+        SK9822Interface::SharedPtr channel_1, 
+        SK9822Interface::SharedPtr channel_2,
         const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
 protected:
@@ -64,11 +65,18 @@ protected:
     void panelThrottleWarnLog(const std::string panel_name, const std::string message);
 
     int channel_1_num_led_;
+    
+    int channel_2_num_led_;
+    
     double frame_timeout_;
+    
     bool led_control_granted_;
+    
     bool led_control_pending_;
 
     rclcpp::Time channel_1_ts_;
+
+    rclcpp::Time channel_2_ts_;
 
 private:
   
@@ -93,12 +101,16 @@ private:
 
     SK9822Interface::SharedPtr channel_1_;
 
+    SK9822Interface::SharedPtr channel_2_;
+
     std::shared_ptr<led_driver::ParamListener> param_listener_;
+
     led_driver::Params params_;
 
     rclcpp::TimerBase::SharedPtr initialization_timer_;
 
     rclcpp::Client<SetBoolSrv>::SharedPtr enable_led_control_client_;
+    
     rclcpp::Service<SetLedBrightnessSrv>::SharedPtr set_brightness_server_;
 
     rclcpp::CallbackGroup::SharedPtr client_callback_group_;
@@ -106,6 +118,22 @@ private:
     rclcpp::Subscription<ImageMsg>::SharedPtr channel_1_sub_;
 
     rclcpp::Publisher<UdpPacketMsg>::SharedPtr channel_1_pub_;
+    
+    rclcpp::Subscription<ImageMsg>::SharedPtr channel_2_sub_;
+
+    rclcpp::Publisher<UdpPacketMsg>::SharedPtr channel_2_pub_;
+    
+    udp_msgs::msg::UdpPacket channel_1_msg_;
+
+    udp_msgs::msg::UdpPacket channel_2_msg_;
+
+    std::string channel_1_ip_address_{"172.17.10.126"};
+
+    std::string channel_2_ip_address_{"172.17.10.127"};
+
+    int channel_1_src_port_{3333};
+    
+    int channel_2_src_port_{3334};
 
     diagnostic_updater::Updater diagnostic_updater_;
 };

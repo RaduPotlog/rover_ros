@@ -1,3 +1,17 @@
+// Copyright 2025 Mechatronics Academy
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <cstdint>
 #include <filesystem>
 #include <limits>
@@ -31,7 +45,8 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
 , led_control_granted_(true)
 , led_control_pending_(false)
 , initialization_attempt_(0)
-, channel_1_(std::make_shared<SK9822>(std::make_shared<SPIDevice>(), "/dev/spidev0.0"))
+, channel_1_(std::make_shared<SK9822>())
+, channel_2_(std::make_shared<SK9822>())
 , diagnostic_updater_(this)
 {
     RCLCPP_INFO(this->get_logger(), "Constructing node.");
@@ -44,9 +59,11 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
 
     frame_timeout_ = this->params_.frame_timeout;
     channel_1_num_led_ = this->params_.channel_1_num_led;
+    channel_2_num_led_ = this->params_.channel_2_num_led;
 
     const float global_brightness = this->params_.global_brightness;
     channel_1_->setGlobalBrightness(global_brightness);
+    channel_2_->setGlobalBrightness(global_brightness);
 
     client_callback_group_ =
     this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -67,7 +84,15 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
             channel_1_ts_ = msg->header.stamp;
     });
 
-    channel_1_pub_ = this->create_publisher<UdpPacketMsg>("udp_write", 5);
+    channel_2_ts_ = this->get_clock()->now();
+    channel_2_sub_ = this->create_subscription<ImageMsg>(
+        "led/channel_2_frame", 5, [&](const ImageMsg::UniquePtr & msg) {
+            frameCallback(msg, channel_2_, channel_2_ts_, "channel_2");
+            channel_2_ts_ = msg->header.stamp;
+    });
+
+    channel_1_pub_ = this->create_publisher<UdpPacketMsg>("udp_write/led_channel_1", 5);
+    channel_2_pub_ = this->create_publisher<UdpPacketMsg>("udp_write/led_channel_2", 5);
 
     diagnostic_updater_.setHardwareID("Bumper Led");
     diagnostic_updater_.add("Led driver status", this, &LedDriverNode::diagnoseLeds);
@@ -115,19 +140,29 @@ void LedDriverNode::initializationTimerCallback()
 
 void LedDriverNode::clearLeds()
 {
-    const auto buffer = channel_1_->setPanel(std::vector<std::uint8_t>(channel_1_num_led_ * 4, 0));
+    const auto buffer_channel_1 = channel_1_->setPanel(std::vector<std::uint8_t>(channel_1_num_led_ * 4, 0));
+    const auto buffer_channel_2 = channel_2_->setPanel(std::vector<std::uint8_t>(channel_2_num_led_ * 4, 0));
 
-    udp_msgs::msg::UdpPacket msg_;
-    msg_.address = "172.17.10.126";
-    msg_.src_port = 3333;
-    msg_.data = {72, 101, 108, 108, 111};  // "Hello"
+    channel_1_msg_.address = channel_1_ip_address_;
+    channel_1_msg_.src_port = channel_1_src_port_;
+    channel_1_msg_.data = buffer_channel_1;
+    
+    channel_2_msg_.address = channel_2_ip_address_;
+    channel_2_msg_.src_port = channel_2_src_port_;
+    channel_2_msg_.data = buffer_channel_2;
     
     auto now = this->now();
-    msg_.header.stamp.sec = now.seconds();
-    msg_.header.stamp.nanosec = now.nanoseconds();
-    msg_.header.frame_id = "";
-
-    channel_1_pub_->publish(msg_);
+    
+    channel_1_msg_.header.stamp.sec = now.seconds();
+    channel_1_msg_.header.stamp.nanosec = now.nanoseconds();
+    channel_1_msg_.header.frame_id = "";
+    
+    channel_2_msg_.header.stamp.sec = now.seconds();
+    channel_2_msg_.header.stamp.nanosec = now.nanoseconds();
+    channel_2_msg_.header.frame_id = "";
+    
+    channel_1_pub_->publish(channel_1_msg_);
+    channel_2_pub_->publish(channel_2_msg_);
 }
 
 void LedDriverNode::toggleLedControl(const bool enable)
@@ -200,7 +235,7 @@ void LedDriverNode::frameCallback(
         message = "Incorrect image encoding ('" + msg->encoding + "')";
     } else if (msg->height != 1) {
         message = "Incorrect image height " + std::to_string(msg->height);
-    } else if (msg->width !=  static_cast<std::uint32_t>(channel_1_num_led_)) {
+    } else if (msg->width != static_cast<std::uint32_t>(panel_name == "channel_1" ? channel_1_num_led_ : channel_2_num_led_)) {
         message = "Incorrect image width " + std::to_string(msg->width);
     }
 
@@ -210,18 +245,15 @@ void LedDriverNode::frameCallback(
         diagnostic_updater_.broadcast(diagnostic_msgs::msg::DiagnosticStatus::WARN, warn_msg);
         return;
     }
-
-    udp_msgs::msg::UdpPacket udp_msg;
-    udp_msg.address = "192.168.99.101";
-    udp_msg.src_port = 3333;
     
+    const auto buffer = panel->setPanel(msg->data);
     auto now = this->now();
+        
+    udp_msgs::msg::UdpPacket udp_msg;
     udp_msg.header.stamp.sec = now.seconds();
     udp_msg.header.stamp.nanosec = now.nanoseconds();
     udp_msg.header.frame_id = "";
-
-    const auto buffer = panel->setPanel(msg->data);
-
+    
     for (size_t i = 0; i < buffer.size(); i += 4) {                
         udp_msg.data.push_back(buffer[i + 1]);
         udp_msg.data.push_back(buffer[i + 2]);
@@ -229,7 +261,25 @@ void LedDriverNode::frameCallback(
         udp_msg.data.push_back(buffer[i + 0]);
     }
     
-    channel_1_pub_->publish(udp_msg);
+    message.clear();
+    
+    if (panel == channel_1_) {
+        udp_msg.address = channel_1_ip_address_;
+        udp_msg.src_port = channel_1_src_port_;
+        channel_1_pub_->publish(udp_msg);
+    } else if (panel == channel_2_){
+        udp_msg.address = channel_2_ip_address_;
+        udp_msg.src_port = channel_2_src_port_;
+        channel_2_pub_->publish(udp_msg);
+    } else {
+        message = "Incorrect pannel";
+    }
+
+    if (!message.empty()) {
+        auto warn_msg = message + " on " + panel_name + "!";
+        panelThrottleWarnLog(panel_name, warn_msg);
+        diagnostic_updater_.broadcast(diagnostic_msgs::msg::DiagnosticStatus::WARN, warn_msg);
+    }
 }
 
 void LedDriverNode::setBrightnessCallback(
@@ -240,6 +290,7 @@ void LedDriverNode::setBrightnessCallback(
 
     try {
         channel_1_->setGlobalBrightness(brightness);
+        channel_2_->setGlobalBrightness(brightness);
     } catch (const std::out_of_range & e) {
         res->success = false;
         res->message = "Failed to set brightness: " + std::string(e.what());

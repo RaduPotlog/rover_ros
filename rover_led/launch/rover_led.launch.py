@@ -75,15 +75,6 @@ def generate_launch_description():
         description="Whether simulation is used",
     )
 
-    user_led_animations_path = LaunchConfiguration("user_led_animations_path")
-    declare_user_led_animations_path_arg = DeclareLaunchArgument(
-        "user_led_animations_path",
-        default_value=PathJoinSubstitution(
-            [rover_led_common_dir, "config", "user_animations.yaml"]
-        ),
-        description="Path to a YAML file with a description of the user defined animations.",
-    )
-
     driver_config = PythonExpression(["'", robot_model, "_driver.yaml'"])
     driver_config_path = PathJoinSubstitution([rover_led_pkg, "config", driver_config])
     led_container = ComposableNodeContainer(
@@ -111,7 +102,6 @@ def generate_launch_description():
                 namespace=namespace,
                 parameters=[
                     {"animations_config_path": animations_config_path},
-                    {"user_led_animations_path": user_led_animations_path},
                 ],
                 extra_arguments=[
                     {"use_intra_process_comms": True},
@@ -138,7 +128,6 @@ def generate_launch_description():
         declare_log_level_arg,
         declare_namespace_arg,
         declare_use_sim_arg,
-        declare_user_led_animations_path_arg,
         led_container,
     ]
 

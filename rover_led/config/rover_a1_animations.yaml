@@ -1,7 +1,8 @@
 panels:
   - channel: 1
     number_of_leds: 24
-
+  - channel: 2
+    number_of_leds: 24
 segments:
   - name: front_1
     channel: 1
@@ -9,9 +10,15 @@ segments:
   - name: front_2
     channel: 1
     led_range: 23-12
+  - name: rear_1
+    channel: 2
+    led_range: 0-11
+  - name: rear_2
+    channel: 2
+    led_range: 23-12
 
 segments_map:
-  all: [front_1, front_2]
+  all: [front_1, front_2, rear_1, rear_2,]
 
 led_animations:
   - id: 0
