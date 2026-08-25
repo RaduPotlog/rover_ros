@@ -22,7 +22,7 @@ hardware bring-up failure (USB not attached, wrong serial, Modbus host down)
 segfaults the controller_manager process instead of reporting a clean
 `ERROR` state — the exact case `on_error()` exists to handle.
 
-**2. E-stop is never consulted from the RT loop; safety gating is dead code**
+**2. [FIXED] E-stop is never consulted from the RT loop; safety gating is dead code**
 - `include/rover_hardware_interface/system_e_stop/system_e_stop.hpp:37,39` +
   `src/system_e_stop/system_e_stop.cpp:39-57` —
   `readEStopState()`/`readEStopLatchState()` are defined but **never called**
@@ -39,6 +39,17 @@ software stack has no independent knowledge of E-stop state and will happily
 keep writing velocity commands to the Phidget motors the whole time. Any
 future refactor that removes/bypasses the hardware relay (or a coil-write
 failure) removes the *only* safety interlock.
+
+*Fix:* added `RoverSystem::updateEStopState()`, called every `read()` cycle,
+which polls both `EmergencyStop::readEStopState()` (user-triggered) and
+`readEStopLatchState()` (latched) and caches the OR of the two in
+`e_stop_active_` (`include/.../rover_system.hpp`, defaults `true` —
+fail-safe until the first successful read). `write()` now returns early
+without calling `handleRoverDriverWriteOperation()`/`sendSpeedCmd()`
+whenever `e_stop_active_` is true, so software no longer commands motion
+while E-Stop is active, independent of the hardware relay. Note: this does
+**not** fix item #3 below — a stale nonzero `hw_commands_velocities_` at the
+moment of an E-Stop reset can still be written on the very next cycle.
 
 **3. `zeroVelocityCheck` safety check is constructed but never invoked**
 `include/rover_hardware_interface/system_e_stop/system_e_stop.hpp:57,77`,

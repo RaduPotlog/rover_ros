@@ -15,6 +15,7 @@
 #ifndef ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_SYSTEM_HPP_
 #define ROVER_HARDWARE_INTERFACE_ROBOT_SYSTEM_ROVER_SYSTEM_HPP_
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -91,6 +92,7 @@ protected:
 
     void updateMotorsState(const rclcpp::Time & time);
     void updateDriverState();
+    void updateEStopState();
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 
     virtual void updateDriverStateMsg() = 0;
@@ -120,6 +122,9 @@ protected:
     std::shared_ptr<RoverController> rover_controller_;
     // Rover emergency stop interface
     std::shared_ptr<EmergencyStopInterface> e_stop_;
+    // Cached result of the last updateEStopState() poll; gates write() while true.
+    // Defaults to true (fail-safe: no motion commands until confirmed clear).
+    std::atomic_bool e_stop_active_{true};
 
     // Drive train system settings
     DrivetrainSettings drivetrain_settings_;

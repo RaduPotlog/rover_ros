@@ -238,8 +238,8 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
     
         next_driver_state_update_time_ = time + driver_states_update_period_;
     }
-    
-    // TODO: Update e-stop state 
+
+    updateEStopState();
 
     return return_type::OK;
 }
@@ -247,8 +247,14 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
 return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Duration & /* period */)
 {
     const auto lifecycle_state = this->get_lifecycle_state().id();
-    
+
     if (lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
+        if (e_stop_active_) {
+            // E-Stop (user-triggered or latched) is active: do not command motion in software,
+            // regardless of what the hardware relay is doing.
+            return return_type::OK;
+        }
+
         handleRoverDriverWriteOperation([this] {
             const auto speed_cmds = getSpeedCmd();
             rover_driver_->sendSpeedCmd(speed_cmds);
@@ -455,6 +461,19 @@ void RoverSystem::updateDriverState()
             logger_, steady_clock_, 5000,
             "An exception occurred while updating drivers states: " << e.what());
     }
+}
+
+void RoverSystem::updateEStopState()
+{
+    if (!e_stop_) {
+        e_stop_active_ = true;
+        return;
+    }
+
+    const bool user_e_stop_triggered = e_stop_->readEStopState();
+    const bool e_stop_latched = e_stop_->readEStopLatchState();
+
+    e_stop_active_ = user_e_stop_triggered || e_stop_latched;
 }
 
 void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_operation)
