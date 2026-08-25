@@ -481,23 +481,27 @@ void PhidgetImuSensor::spatialDataCallback(
 
 void PhidgetImuSensor::spatialAttachCallback()
 {
+    // Called on the Phidget SDK's own callback thread. Must not re-enter the SDK (spatial_->...)
+    // or invoke lifecycle-shaped callbacks (on_activate/on_deactivate) — those are owned by
+    // controller_manager's own state tracking and are only ever meant to run once, from the
+    // actual configure/activate transition. Re-running them here previously risked reentering
+    // the SDK from its own dispatch thread and, via calibrate()'s condition-variable wait, could
+    // self-deadlock that same thread if Phidget serializes callback delivery.
     RCLCPP_INFO(logger_, "IMU sensor has successfully attached and is now connected.");
-    
+
     imu_connected_ = true;
-    on_activate(rclcpp_lifecycle::State{});
 }
 
 void PhidgetImuSensor::spatialDetachCallback()
 {
+    // See spatialAttachCallback(): no SDK calls, no on_activate()/on_deactivate() from here.
     RCLCPP_WARN(logger_, "IMU sensor has detached! If the USB IMU cable has not been intentionally unplugged, please check the connection.");
-  
+
     imu_connected_ = false;
     algorithm_initialized_ = false;
-  
+
     setStateValuesToNans();
     restartMadgwickAlgorithm();
-    
-    on_deactivate(rclcpp_lifecycle::State{});
 }
 
 void PhidgetImuSensor::updateMadgwickAlgorithm(

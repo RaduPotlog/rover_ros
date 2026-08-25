@@ -142,7 +142,7 @@ function to target the staging buffer, since carrying a known-broken
 formula into new code made no sense; now writes
 `linear_acceleration_z = lin_acc.z - gz`.
 
-**6. Lifecycle transitions invoked directly from the vendor SDK's own callback thread**
+**6. [FIXED] Lifecycle transitions invoked directly from the vendor SDK's own callback thread**
 `src/rover_sensors/phidget_imu_sensor.cpp:476-495` —
 `spatialAttachCallback()`/`spatialDetachCallback()` call
 `on_activate(...)`/`on_deactivate(...)` directly. This bypasses
@@ -151,6 +151,30 @@ view of the component's lifecycle state is never updated to match), and
 re-enters the Phidget API (`configureCompassParams`,
 `spatial_->setHeatingEnabled`, etc.) from inside a callback owned by that
 same Phidget device — a reentrancy hazard into `libphidget22`.
+
+*Fix:* removed the `on_activate(...)`/`on_deactivate(...)` calls from both
+SDK-thread callbacks entirely. `spatialAttachCallback()` now only sets
+`imu_connected_ = true` and logs; `spatialDetachCallback()` keeps its
+existing non-SDK bookkeeping (`imu_connected_ = false`,
+`algorithm_initialized_ = false`, `setStateValuesToNans()`,
+`restartMadgwickAlgorithm()` — none of which touch the Phidget SDK or
+`spatial_`). This also incidentally closes a latent self-deadlock: the old
+attach path called `on_activate()` → `calibrate()`, which blocks on
+`calibration_cv_` until a *subsequent* `spatialDataCallback()` notifies
+it — if Phidget serializes callback delivery on a single dispatch thread
+(typical for this kind of event-driven vendor SDK), that data callback
+could never run while the attach callback was still blocked waiting for
+it, deadlocking the SDK's own thread on every reattach. Residual
+behavior change worth knowing: on a hot reattach, the sensor no longer
+re-runs `spatial_->zero()` / compass / heating configuration (that still
+happens once, correctly, via the real `on_activate()` triggered by
+controller_manager on first activation) — recalibrating those from a
+foreign thread was the actual bug, and I didn't have a safe way to defer
+that work to a proper thread without larger new infrastructure, so I
+removed it rather than leave the reentrancy hazard in place. If
+reconfiguration-on-reattach turns out to be operationally necessary,
+that needs a deliberate design (e.g. a queued task picked up by a
+dedicated worker thread), not a quick patch.
 
 **7. Suspicious front-right/rear-right index swap (state read + command write)**
 - `src/rover_system/rover_a1_system.cpp:55-68` (`updateHwStates`): index
