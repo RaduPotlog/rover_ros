@@ -51,7 +51,7 @@ while E-Stop is active, independent of the hardware relay. Note: this does
 **not** fix item #3 below — a stale nonzero `hw_commands_velocities_` at the
 moment of an E-Stop reset can still be written on the very next cycle.
 
-**3. `zeroVelocityCheck` safety check is constructed but never invoked**
+**3. [FIXED] `zeroVelocityCheck` safety check is constructed but never invoked**
 `include/rover_hardware_interface/system_e_stop/system_e_stop.hpp:57,77`,
 wired in `src/rover_system/rover_system.cpp:404`
 (`std::bind(&RoverSystem::areVelocityCommandsNearZero, this)`), consumed
@@ -61,6 +61,18 @@ resets E-stop while a nonzero velocity command is still latched in
 `hw_commands_velocities_` (e.g., controller never zeroed cmd_vel before the
 stop) → rover lurches the instant the contactor re-engages, exactly what
 this dead check was clearly meant to prevent.
+
+*Fix:* `EmergencyStop::resetEStop()` (`src/system_e_stop/system_e_stop.cpp`)
+now calls `zeroVelocityCheck()` before writing the reset coil and throws
+`std::runtime_error` (surfaced to the caller as
+`sw_user_e_stop_reset`'s `response.success=false` /
+`response.message`, per the existing `ROSServiceWrapper` exception-to-
+response mapping in `system_ros_interface.cpp:43-56`) if velocity commands
+are not near zero — the reset is refused rather than silently applied.
+Since `RoverSystem::write()` (fix for item #2) blocks motion while *either*
+the user-trigger or the latch is active, gating only `resetEStop()` is
+sufficient: the latch alone being reset (`resetEStopLatch()`, left
+unchecked, matching the audit's scope) cannot re-enable motion on its own.
 
 **4. Data race on `PhidgetMotorDriver::state_`**
 `src/rover_driver/phidget_driver/phidget_motor_driver.cpp:310-376`

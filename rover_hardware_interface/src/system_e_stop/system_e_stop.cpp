@@ -70,7 +70,12 @@ void EmergencyStop::setEStop()
 void EmergencyStop::resetEStop()
 {
     std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_);
-    
+
+    if (zeroVelocityCheck && !zeroVelocityCheck()) {
+        throw std::runtime_error(
+            "Can't reset User E-Stop: velocity commands are not zero.");
+    }
+
     try {
         rover_controller_->eStopUserBtnTrigger(false);
     } catch (const std::runtime_error & e) {
