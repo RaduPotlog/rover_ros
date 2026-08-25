@@ -16,6 +16,7 @@
 #define ROVER_HARDWARE_INTERFACE_PHIDGET_IMU_SENSOR_PHIDGET_IMU_SENSOR_HPP_
 
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -124,7 +125,20 @@ protected:
 
     bool isMagnitudeSynchronizedWithAccelerationAndGyration(const geometry_msgs::msg::Vector3 & mag_compensated);
 
+    // Copies imu_sensor_state_staging_ into imu_sensor_state_ (the buffer whose addresses are
+    // handed out by export_state_interfaces()). Called once per read() cycle on the RT thread;
+    // non-blocking, so it never stalls the RT loop waiting on the Phidget SDK callback thread.
+    void updateExportedStateValues();
+
+    // The buffer backing the exported StateInterfaces. Only ever written by
+    // updateExportedStateValues() (RT thread), so reads of it by the hardware_interface
+    // framework (same thread, after read()) are race-free.
     std::vector<double> imu_sensor_state_;
+
+    // Written by the Phidget SDK's callback thread (spatialDataCallback / spatialDetachCallback);
+    // guarded by imu_sensor_state_mtx_. Never read directly by the RT thread.
+    std::vector<double> imu_sensor_state_staging_;
+    std::mutex imu_sensor_state_mtx_;
 
     rclcpp::Logger logger_{rclcpp::get_logger("PhidgetImuSensor")};
     rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
@@ -153,7 +167,7 @@ protected:
 
     std::unique_ptr<ImuFilter> filter_;
     WorldFrame::WorldFrame world_frame_;
-    bool imu_connected_ = false;
+    std::atomic_bool imu_connected_{false};
 
     bool imu_calibrated_ = false;
     std::mutex calibration_mutex_;

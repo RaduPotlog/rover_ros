@@ -123,8 +123,16 @@ private:
     int64_t prev_encoder_ticks_{0};
 
     double position_time_change_{0.0f};
+
+    // `state_` is written from the Phidget SDK's callback thread
+    // (positionChangeHandler/currentChangeHandler/temperatureChangeHandler) and read from the
+    // RT control thread via readState(). `state_mtx_` guards `state_` itself; `state_snapshot_`
+    // is the last successfully-read copy, only ever touched from readState() on the RT thread,
+    // so readState() never blocks the RT loop waiting for the SDK thread to release the lock.
+    std::mutex state_mtx_;
     MotorDriverState state_;
-    
+    MotorDriverState state_snapshot_{};
+
     float encoder_resolution_;
 
     bool direction_reversed_;

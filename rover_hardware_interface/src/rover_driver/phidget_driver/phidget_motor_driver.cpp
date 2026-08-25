@@ -299,7 +299,15 @@ void PhidgetMotorDriver::initialize()
 
 MotorDriverState PhidgetMotorDriver::readState()
 {
-    return state_;
+    // Non-blocking: never stall the RT control loop waiting on the SDK callback thread.
+    // On contention, just return the last successfully-read snapshot.
+    std::unique_lock<std::mutex> lck(state_mtx_, std::try_to_lock);
+
+    if (lck.owns_lock()) {
+        state_snapshot_ = state_;
+    }
+
+    return state_snapshot_;
 }
 
 double PhidgetMotorDriver::calculateRPM(int64_t delta_ticks, double dt, float ppr)
@@ -335,12 +343,18 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
         }
 
         driver->position_time_change_ = timeChange / 1000.0f;
-        
+
         int64_t delta_encoder_ticks = (driver->encoder_ticks_ - driver->prev_encoder_ticks_) / 4.0;
 
-        driver->state_.vel = static_cast<int16_t>(driver->calculateRPM(delta_encoder_ticks, driver->position_time_change_, driver->encoder_resolution_));
-        driver->state_.pos = driver->encoder_ticks_ / 4.0;
-        
+        const int16_t vel = static_cast<int16_t>(driver->calculateRPM(delta_encoder_ticks, driver->position_time_change_, driver->encoder_resolution_));
+        const int64_t pos = driver->encoder_ticks_ / 4.0;
+
+        {
+            std::lock_guard<std::mutex> lck(driver->state_mtx_);
+            driver->state_.vel = vel;
+            driver->state_.pos = pos;
+        }
+
         driver->prev_encoder_ticks_ = driver->encoder_ticks_;
         
         // RCLCPP_WARN(driver->logger_, "Encoder position changed channel = %d, position = %ld, velocity = %d, time = %lf", driver->channel_, driver->state_.pos, driver->state_.vel, driver->position_time_change_);
@@ -357,7 +371,10 @@ void CCONV PhidgetMotorDriver::currentChangeHandler(
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
-    driver->state_.current = static_cast<int16_t>(current * 1000.0);
+    {
+        std::lock_guard<std::mutex> lck(driver->state_mtx_);
+        driver->state_.current = static_cast<int16_t>(current * 1000.0);
+    }
 
     // RCLCPP_INFO(driver->logger_, "Motor current changed channel = %d, current = %f", driver->channel_, current);
 }
@@ -372,6 +389,7 @@ void CCONV PhidgetMotorDriver::temperatureChangeHandler(
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
+    std::lock_guard<std::mutex> lck(driver->state_mtx_);
     driver->state_.temp = static_cast<float>(temperature);
 }
 

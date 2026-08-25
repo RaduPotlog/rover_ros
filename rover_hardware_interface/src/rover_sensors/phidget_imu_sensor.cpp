@@ -14,6 +14,7 @@
 
 #include "rover_hardware_interface/rover_sensors/phidget_imu_sensor.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -169,10 +170,12 @@ std::vector<StateInterface> PhidgetImuSensor::export_state_interfaces()
 
 return_type PhidgetImuSensor::read(const rclcpp::Time & /* time */, const rclcpp::Duration & /* period */)
 {
+    updateExportedStateValues();
+
     if (!imu_connected_) {
         return return_type::ERROR;
     }
-    
+
     return return_type::OK;
 }
 
@@ -271,6 +274,9 @@ void PhidgetImuSensor::checkMadgwickFilterWorldFrameParam()
 void PhidgetImuSensor::setInitialValues()
 {
     imu_sensor_state_.resize(info_.sensors.at(0).state_interfaces.size(), std::numeric_limits<double>::quiet_NaN());
+
+    std::lock_guard<std::mutex> lck(imu_sensor_state_mtx_);
+    imu_sensor_state_staging_.resize(info_.sensors.at(0).state_interfaces.size(), std::numeric_limits<double>::quiet_NaN());
 }
 
 void PhidgetImuSensor::calibrate()
@@ -512,40 +518,57 @@ void PhidgetImuSensor::updateMadgwickAlgorithmIMU(
     filter_->madgwickAHRSupdateIMU(ang_vel.x, ang_vel.y, ang_vel.z, lin_acc.x, lin_acc.y, lin_acc.z, dt);
 }
 
+// Assumes imu_sensor_state_mtx_ is already held by the caller (updateAllStatesValues()).
 void PhidgetImuSensor::updateAccelerationAndGyrationStateValues(
-    const geometry_msgs::msg::Vector3 & ang_vel, 
+    const geometry_msgs::msg::Vector3 & ang_vel,
     const geometry_msgs::msg::Vector3 & lin_acc)
 {
-    imu_sensor_state_[angular_velocity_x] = ang_vel.x;
-    imu_sensor_state_[angular_velocity_y] = ang_vel.y;
-    imu_sensor_state_[angular_velocity_z] = ang_vel.z;
+    imu_sensor_state_staging_[angular_velocity_x] = ang_vel.x;
+    imu_sensor_state_staging_[angular_velocity_y] = ang_vel.y;
+    imu_sensor_state_staging_[angular_velocity_z] = ang_vel.z;
 
     if (params_.remove_gravity_vector) {
         float gx, gy, gz;
         filter_->getGravity(gx, gy, gz);
-        imu_sensor_state_[linear_acceleration_x] = lin_acc.x - gx;
-        imu_sensor_state_[linear_acceleration_y] = lin_acc.y - gy;
-        imu_sensor_state_[linear_acceleration_z] = lin_acc.y - gz;
+        imu_sensor_state_staging_[linear_acceleration_x] = lin_acc.x - gx;
+        imu_sensor_state_staging_[linear_acceleration_y] = lin_acc.y - gy;
+        imu_sensor_state_staging_[linear_acceleration_z] = lin_acc.z - gz;
     } else {
-        imu_sensor_state_[linear_acceleration_x] = lin_acc.x;
-        imu_sensor_state_[linear_acceleration_y] = lin_acc.y;
-        imu_sensor_state_[linear_acceleration_z] = lin_acc.z;
+        imu_sensor_state_staging_[linear_acceleration_x] = lin_acc.x;
+        imu_sensor_state_staging_[linear_acceleration_y] = lin_acc.y;
+        imu_sensor_state_staging_[linear_acceleration_z] = lin_acc.z;
     }
 }
 
 void PhidgetImuSensor::updateAllStatesValues(
-    const geometry_msgs::msg::Vector3 & ang_vel, 
+    const geometry_msgs::msg::Vector3 & ang_vel,
     const geometry_msgs::msg::Vector3 & lin_acc)
 {
-    filter_->getOrientation(imu_sensor_state_[orientation_w], imu_sensor_state_[orientation_x],
-        imu_sensor_state_[orientation_y], imu_sensor_state_[orientation_z]);
+    // Held for the whole sample (orientation + angular velocity + linear acceleration) so
+    // updateExportedStateValues() (RT thread) never copies out a torn, half-updated sample.
+    std::lock_guard<std::mutex> lck(imu_sensor_state_mtx_);
+
+    filter_->getOrientation(imu_sensor_state_staging_[orientation_w], imu_sensor_state_staging_[orientation_x],
+        imu_sensor_state_staging_[orientation_y], imu_sensor_state_staging_[orientation_z]);
 
     updateAccelerationAndGyrationStateValues(ang_vel, lin_acc);
 }
 
 void PhidgetImuSensor::setStateValuesToNans()
 {
-    std::fill(imu_sensor_state_.begin(), imu_sensor_state_.end(), std::numeric_limits<double>::quiet_NaN());
+    std::lock_guard<std::mutex> lck(imu_sensor_state_mtx_);
+    std::fill(imu_sensor_state_staging_.begin(), imu_sensor_state_staging_.end(), std::numeric_limits<double>::quiet_NaN());
+}
+
+void PhidgetImuSensor::updateExportedStateValues()
+{
+    // Non-blocking: never stall the RT control loop waiting on the SDK callback thread.
+    // On contention, the exported state simply keeps its previous values for this cycle.
+    std::unique_lock<std::mutex> lck(imu_sensor_state_mtx_, std::try_to_lock);
+
+    if (lck.owns_lock()) {
+        std::copy(imu_sensor_state_staging_.begin(), imu_sensor_state_staging_.end(), imu_sensor_state_.begin());
+    }
 }
 
 }  // namespace rover_hardware_interface

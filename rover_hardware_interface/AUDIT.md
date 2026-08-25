@@ -74,7 +74,7 @@ the user-trigger or the latch is active, gating only `resetEStop()` is
 sufficient: the latch alone being reset (`resetEStopLatch()`, left
 unchecked, matching the audit's scope) cannot re-enable motion on its own.
 
-**4. Data race on `PhidgetMotorDriver::state_`**
+**4. [FIXED] Data race on `PhidgetMotorDriver::state_`**
 `src/rover_driver/phidget_driver/phidget_motor_driver.cpp:310-376`
 (`positionChangeHandler`/`currentChangeHandler`/`temperatureChangeHandler`,
 invoked on the Phidget SDK's internal thread) write
@@ -84,7 +84,16 @@ invoked on the Phidget SDK's internal thread) write
 lock/atomic. Undefined behavior; can surface as torn/stale state feedback
 fed straight into `hw_states_*`.
 
-**5. Data race on `PhidgetImuSensor::imu_sensor_state_` — the exact buffer backing exported `StateInterface`s**
+*Fix:* added `state_mtx_` guarding `state_` (`phidget_motor_driver.hpp`).
+The three SDK-thread callback handlers now take a blocking
+`std::lock_guard` before writing their field(s) of `state_` (cheap, tiny
+critical sections, not RT-reachable). `readState()` (RT thread) uses a
+**non-blocking** `try_lock` — matching the `ContactCoilHandler` idiom
+already used elsewhere in this codebase — and returns a cached
+`state_snapshot_` on contention rather than ever blocking the control
+loop.
+
+**5. [FIXED] Data race on `PhidgetImuSensor::imu_sensor_state_` — the exact buffer backing exported `StateInterface`s**
 `include/.../phidget_imu_sensor.hpp:127` /
 `src/rover_sensors/phidget_imu_sensor.cpp:159-168`
 (`export_state_interfaces()` hands out raw pointers into this vector) is
@@ -94,6 +103,44 @@ thread, while controller_manager/broadcasters read those same doubles
 through the loaned state interfaces on the RT thread — zero synchronization.
 `imu_connected_` (line 156, checked in `read()` at line 172) has the same
 problem: plain `bool` written from the SDK callback thread, read from RT.
+
+*Fix:* `imu_connected_` is now `std::atomic_bool` — a complete, trivial
+fix for that half of the item.
+
+For `imu_sensor_state_` the situation needed more care: it's not our own
+`read()` that races with the SDK thread, it's the hardware_interface
+framework's `get_value()` on the exported `StateInterface` — code we
+don't control, which (because this component uses the deprecated raw
+`double*` `Handle` constructor) does no locking against direct writes
+into that memory. A mutex on the writer side alone can't create a
+happens-before edge with a reader that never takes it. So instead of
+locking the exported buffer directly, introduced a staging buffer
+(`imu_sensor_state_staging_`, guarded by `imu_sensor_state_mtx_`) that
+the SDK thread (`spatialDataCallback`'s `updateAllStatesValues()` /
+`updateAccelerationAndGyrationStateValues()`, and
+`spatialDetachCallback`'s `setStateValuesToNans()`) writes to under a
+blocking lock. A new `updateExportedStateValues()`, called every
+`read()` cycle, non-blockingly (`try_lock`, same pattern as item #4 and
+`ContactCoilHandler`) copies the staging buffer into `imu_sensor_state_`
+— the actually-exported memory. Because `imu_sensor_state_` is now
+*only* ever written by our own RT-thread `read()`, and the framework's
+`get_value()` reads happen on that same RT thread afterward (single-
+threaded controller_manager execution model: `read()` → controllers
+update → `write()`), there is no remaining concurrent access to the
+exported memory — the race is fully closed, not just narrowed.
+`updateAllStatesValues()` also now holds the staging lock for the whole
+sample (orientation + angular velocity + linear acceleration together),
+so a reader never sees a torn cross-field sample either.
+
+Incidental fix while touching `updateAccelerationAndGyrationStateValues()`:
+the gravity-removal branch had a real bug (see nice-to-have #1 below) —
+both the y and z entries were being written to the `linear_acceleration_y`
+index (`... = lin_acc.y - gy;` then `... = lin_acc.y - gz;`), so
+`linear_acceleration_z` was never actually updated when
+`remove_gravity_vector` was enabled. Fixed as part of rewriting this
+function to target the staging buffer, since carrying a known-broken
+formula into new code made no sense; now writes
+`linear_acceleration_z = lin_acc.z - gz`.
 
 **6. Lifecycle transitions invoked directly from the vendor SDK's own callback thread**
 `src/rover_sensors/phidget_imu_sensor.cpp:476-495` —
@@ -197,10 +244,15 @@ disallowed by the RT rules.
 
 ## Nice to have
 
-1. **Copy/paste typo in gravity removal.**
-   `src/rover_sensors/phidget_imu_sensor.cpp:528` —
-   `imu_sensor_state_[linear_acceleration_y] = lin_acc.y - gz;` uses `gz`
-   instead of `gy` when `remove_gravity_vector` is enabled.
+1. **[FIXED, incidentally via item #5] Copy/paste typo in gravity removal.**
+   `src/rover_sensors/phidget_imu_sensor.cpp:528` (original) —
+   `imu_sensor_state_[linear_acceleration_y] = lin_acc.y - gz;` — this was
+   actually worse than a typo: both branches wrote to the
+   `linear_acceleration_y` index, so `linear_acceleration_z` was never
+   set at all when `remove_gravity_vector` was enabled. Fixed while
+   rewriting `updateAccelerationAndGyrationStateValues()` for the item #5
+   staging-buffer race fix; now correctly writes
+   `linear_acceleration_z = lin_acc.z - gz`.
 2. **Broken include guard.**
    `include/rover_hardware_interface/rover_system/rover_system.hpp:15-16` —
    `#ifndef ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_SYSTEM_HPP_` /
