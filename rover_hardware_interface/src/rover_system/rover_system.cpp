@@ -167,11 +167,13 @@ CallbackReturn RoverSystem::on_shutdown(const rclcpp_lifecycle::State &)
 
 CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
 {
-    try {
-        e_stop_->setEStop();
-    } catch (const std::runtime_error & e) {
-        RCLCPP_ERROR_STREAM(logger_, "Handling error failed: " << e.what());
-        return CallbackReturn::ERROR;
+    if (e_stop_) {
+        try {
+            e_stop_->setEStop();
+        } catch (const std::runtime_error & e) {
+            RCLCPP_ERROR_STREAM(logger_, "Handling error failed: " << e.what());
+            return CallbackReturn::ERROR;
+        }
     }
 
     if (system_ros_interface_) {
@@ -181,10 +183,12 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
 
         system_ros_interface_.reset();
     }
-    
-    rover_driver_->deinitialize();
-    rover_driver_.reset();
-    
+
+    if (rover_driver_) {
+        rover_driver_->deinitialize();
+        rover_driver_.reset();
+    }
+
     rover_controller_.reset();
     e_stop_.reset();
 
