@@ -245,7 +245,7 @@ on the routine contended-lock path.
 
 ## Should fix
 
-1. **Hardware "activation" happens in `on_configure()`, not `on_activate()`.**
+1. **[FIXED] Hardware "activation" happens in `on_configure()`, not `on_activate()`.**
    `rover_system.cpp:98-103` calls `RoverDriverInterface::activate()`
    (which sends a zero-velocity command and sleeps 1s,
    `phidget_rover_driver.cpp:71-84`) from inside `on_configure()`;
@@ -253,6 +253,24 @@ on the routine contended-lock path.
    (`rover_system.cpp:147-155`). This blurs the inactive/active boundary —
    a merely-*configured* hardware component has already commanded and
    armed the motors' Phidget fail-safe timers.
+
+   *Fix:* moved the `operationWithAttempts(..., RoverDriverInterface::activate, ...)`
+   call (and its error handling) out of `on_configure()` and into
+   `on_activate()`. `on_configure()` now only prepares resources —
+   creating/initializing the driver and controller objects, the E-Stop
+   object, the ROS services/diagnostics, and zeroing the command/state
+   buffers — none of which command motion. `on_deactivate()` is left as
+   a no-op, matching pre-existing behavior: `RoverDriverInterface` has no
+   `deactivate()` counterpart, and `write()` already stops being called
+   once the component leaves `ACTIVE`, so no further commands are sent.
+   Note this is a **pre-existing, unchanged residual gap**, not something
+   introduced by this fix: once a component goes `INACTIVE`, the motors
+   simply keep running at their last commanded velocity until Phidget's
+   own failsafe timer (5s with no `sendCmdVel`, enabled during
+   `initialize()`) eventually stops them — there's no explicit "send zero
+   velocity on deactivate" safety command. Adding one is a reasonable
+   follow-up but changes real motor-stop behavior on the physical robot,
+   so I left it out of this fix rather than bundle it in unasked.
 2. **Hardcoded Modbus endpoint.** `src/rover_controller/rover_controller.cpp:196`
    — `RoverModbus("192.168.88.11", 502)` is a literal, not read from
    `info_.hardware_parameters`/URDF `<param>`. Can't be reconfigured per-robot

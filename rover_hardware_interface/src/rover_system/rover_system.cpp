@@ -95,13 +95,6 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
     std::fill(hw_states_velocities_.begin(), hw_states_velocities_.end(), 0.0);
     std::fill(hw_states_efforts_.begin(), hw_states_efforts_.end(), 0.0);
 
-    if (!operationWithAttempts(std::bind(&RoverDriverInterface::activate, rover_driver_), 
-        max_rover_driver_activation_attempts_)) {
-            RCLCPP_ERROR_STREAM(logger_, "Failed to activate Rover System: Couldn't activate RoverDriver in " 
-                                         << max_rover_driver_activation_attempts_ << " attempts.");
-        return CallbackReturn::ERROR;
-    }
-
     system_ros_interface_ = std::make_unique<SystemROSInterface>("hardware_controller");
 
     system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
@@ -146,6 +139,16 @@ CallbackReturn RoverSystem::on_cleanup(const rclcpp_lifecycle::State &)
 
 CallbackReturn RoverSystem::on_activate(const rclcpp_lifecycle::State &)
 {
+    // Actually engaging the motors (sending a zero-velocity command to each driver and waiting
+    // for them to arm) belongs here, not in on_configure() — a merely-configured component
+    // should not yet be commanding hardware.
+    if (!operationWithAttempts(std::bind(&RoverDriverInterface::activate, rover_driver_),
+        max_rover_driver_activation_attempts_)) {
+        RCLCPP_ERROR_STREAM(logger_, "Failed to activate Rover System: Couldn't activate RoverDriver in "
+                                     << max_rover_driver_activation_attempts_ << " attempts.");
+        return CallbackReturn::ERROR;
+    }
+
     return CallbackReturn::SUCCESS;
 }
 
