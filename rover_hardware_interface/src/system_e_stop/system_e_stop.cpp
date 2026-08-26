@@ -38,22 +38,25 @@ EmergencyStop::EmergencyStop(
 
 bool EmergencyStop::readEStopState()
 {
+    // Polarity matches the write side (setEStop()/resetEStop() below): the coil reads back
+    // `true` when the E-Stop is triggered, `false` when clear — isPinActive() already *is*
+    // "is triggered," no negation.
     if (e_stop_manipulation_mtx_.try_lock()) {
         std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_, std::adopt_lock);
-        e_stop_triggered_ = !rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON);
+        user_e_stop_triggered_ = rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON);
     }
 
-    return e_stop_triggered_;
+    return user_e_stop_triggered_;
 }
 
 bool EmergencyStop::readEStopLatchState()
 {
     if (e_stop_manipulation_mtx_.try_lock()) {
         std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_, std::adopt_lock);
-        e_stop_triggered_ = !rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS);
+        latch_triggered_ = rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS);
     }
 
-    return e_stop_triggered_;
+    return latch_triggered_;
 }
 
 void EmergencyStop::setEStop()

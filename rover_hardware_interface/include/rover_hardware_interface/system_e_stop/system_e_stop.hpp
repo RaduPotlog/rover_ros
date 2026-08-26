@@ -77,7 +77,11 @@ protected:
     std::function<bool()> zeroVelocityCheck;
 
     std::mutex e_stop_manipulation_mtx_;
-    std::atomic_bool e_stop_triggered_ = true;
+
+    // Separate atomics (not one shared flag) so readEStopState() and readEStopLatchState()
+    // can't return each other's last-known value under lock contention.
+    std::atomic_bool user_e_stop_triggered_ = true;
+    std::atomic_bool latch_triggered_ = true;
 };
 
 }  // namespace rover_hardware_interface

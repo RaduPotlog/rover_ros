@@ -6,6 +6,42 @@ Full-package audit (no pending diff existed at review time). Performed by the
 `rover_a1_macro.urdf.xacro`, `imu.urdf.xacro`, and
 `wheel_01_controller.yaml` in sibling packages.
 
+## Regression found and fixed after the audit (2026-08-26)
+
+**E-Stop polarity inversion made `write()` permanently refuse to command motion.**
+`src/system_e_stop/system_e_stop.cpp` — after wiring the (previously dead)
+`EmergencyStop::readEStopState()`/`readEStopLatchState()` into
+`RoverSystem::updateEStopState()` for item #2 above, the user reported
+that `RoverSystem::write()` never reached
+`handleRoverDriverWriteOperation(...)` at all, even under healthy
+conditions. Investigation found `readEStopState()`/`readEStopLatchState()`
+computed `!rover_controller_->isPinActive(pin)` — inverted relative to
+the write-side convention established in the same file by `setEStop()`
+(writes coil `true` = triggered) / `resetEStop()` (writes coil `false`
+= cleared). Under healthy conditions both relevant coils correctly read
+back `false` ("clear"), so the stray `!` made both functions report
+`true` ("triggered") permanently, holding `e_stop_active_` stuck `true`
+forever. This bug was **pre-existing in the original dead code**, not
+introduced by the item #2 fix — activating that dead code just exposed
+it for the first time.
+
+*Fix:* removed the `!` in both `readEStopState()` and
+`readEStopLatchState()`, matching the write-side polarity. Also split
+the single shared `std::atomic_bool e_stop_triggered_` member (used by
+both functions) into two independent members
+(`user_e_stop_triggered_`, `latch_triggered_` in
+`system_e_stop.hpp`) — a related latent bug found during the same
+investigation: under lock contention, each function could return the
+*other* function's last-known value instead of its own.
+
+**Not verified against real hardware.** This is safety-critical E-Stop
+logic; no Modbus rig or colcon build is available in this environment.
+Before trusting this on the physical robot: build the package, then run
+a supervised E-Stop press/release test and confirm (a) motion is
+refused while the E-Stop is held and (b) motion resumes after a clean
+release + reset, in that order — don't just trust the code-review trace
+above.
+
 ## Must fix
 
 **1. [FIXED] `on_error()` dereferences possibly-null members → crash in the error path itself**
