@@ -256,8 +256,8 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
         }
 
         handleRoverDriverWriteOperation([this] {
-            const auto speed_cmds = getSpeedCmd();
-            rover_driver_->sendSpeedCmd(speed_cmds);
+            getSpeedCmd(speed_cmd_buffer_);
+            rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
         });
     }
 
@@ -300,6 +300,8 @@ void RoverSystem::setInitialValues()
     hw_states_positions_.resize(joint_size_, std::numeric_limits<double>::quiet_NaN());
     hw_states_velocities_.resize(joint_size_, std::numeric_limits<double>::quiet_NaN());
     hw_states_efforts_.resize(joint_size_, std::numeric_limits<double>::quiet_NaN());
+
+    speed_cmd_buffer_.resize(joint_size_, 0.0f);
 }
 
 void RoverSystem::checkInterfaces() const
@@ -478,24 +480,26 @@ void RoverSystem::updateEStopState()
 
 void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_operation)
 {
+    std::unique_lock<std::mutex> driver_write_lck(*rover_driver_write_mtx_, std::defer_lock);
+
+    if (!driver_write_lck.try_lock()) {
+        // Lock contention (e.g. a concurrent E-Stop reset/service call) is expected and
+        // recoverable — skip this write cycle rather than pay exception cost on every
+        // contended RT tick.
+        RCLCPP_WARN_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "Couldn't acquire mutex for writing commands; skipping this write cycle.");
+        return;
+    }
+
     try {
-        {
-            std::unique_lock<std::mutex> driver_write_lck(
-                *rover_driver_write_mtx_, std::defer_lock);
-            
-            if (!driver_write_lck.try_lock()) {
-                throw std::runtime_error(
-                "Can't acquire mutex for writing commands");
-            }
-            
-            write_operation();
-        }
-        
+        write_operation();
+
         // TODO: update error
-    
+
     } catch (const std::runtime_error & e) {
         RCLCPP_WARN_STREAM(logger_, "An exception occurred while writing commands: " << e.what());
-        
+
         // TODO: update error
     }
 }

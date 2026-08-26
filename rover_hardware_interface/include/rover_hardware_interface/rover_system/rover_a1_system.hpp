@@ -70,7 +70,7 @@ protected:
 
     void updateDriverStateMsg() override;
     
-    std::vector<float> getSpeedCmd() const;
+    void getSpeedCmd(std::vector<float> & speed_cmd) const override;
 
     void diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper & status) override;
     void diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper & status) override;

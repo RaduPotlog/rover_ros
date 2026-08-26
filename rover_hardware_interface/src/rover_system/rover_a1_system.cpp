@@ -173,13 +173,12 @@ void RoverA1System::diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper &
     status.summary(level, message);
 }
 
-std::vector<float> RoverA1System::getSpeedCmd() const
+void RoverA1System::getSpeedCmd(std::vector<float> & speed_cmd) const
 {
-    return { static_cast<float>(hw_commands_velocities_[0]), 
-             static_cast<float>(hw_commands_velocities_[1]),
-             static_cast<float>(hw_commands_velocities_[2]),
-             static_cast<float>(hw_commands_velocities_[3])
-           };
+    speed_cmd[0] = static_cast<float>(hw_commands_velocities_[0]);
+    speed_cmd[1] = static_cast<float>(hw_commands_velocities_[1]);
+    speed_cmd[2] = static_cast<float>(hw_commands_velocities_[2]);
+    speed_cmd[3] = static_cast<float>(hw_commands_velocities_[3]);
 }
 
 }  // namespace rover_hardware_interface

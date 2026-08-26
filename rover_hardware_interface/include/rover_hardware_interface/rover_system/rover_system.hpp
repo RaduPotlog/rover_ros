@@ -101,7 +101,9 @@ protected:
 
     bool areVelocityCommandsNearZero();
 
-    virtual std::vector<float> getSpeedCmd() const = 0;
+    // Fills the (already correctly-sized) `speed_cmd` buffer in place — no allocation, so it's
+    // safe to call from write() every RT cycle.
+    virtual void getSpeedCmd(std::vector<float> & speed_cmd) const = 0;
 
     virtual void diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper & status) = 0;
     virtual void diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper & status) = 0;
@@ -115,6 +117,10 @@ protected:
     std::vector<double> hw_states_positions_;
     std::vector<double> hw_states_velocities_;
     std::vector<double> hw_states_efforts_;
+
+    // Reused across write() cycles by getSpeedCmd() to avoid allocating on the RT thread.
+    // Sized once in setInitialValues().
+    std::vector<float> speed_cmd_buffer_;
 
     // Rover driver interface
     std::shared_ptr<RoverDriverInterface> rover_driver_;

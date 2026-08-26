@@ -209,20 +209,39 @@ silently. **This changes which physical motor receives which command —
 verify on the real robot (e.g. a slow, supervised `cmd_vel` test with
 each wheel hand-checked) before trusting it in the field.**
 
-**8. Heap allocation every `write()` cycle**
+**8. [FIXED] Heap allocation every `write()` cycle**
 `src/rover_system/rover_a1_system.cpp:174-181` — `getSpeedCmd()` returns a
 freshly-constructed `std::vector<float>` on every call, invoked
 unconditionally from `RoverSystem::write()` (`rover_system.cpp:243-255`)
 whenever the component is ACTIVE. Classic RT allocation violation
 (`ros2_control_architecture.md` §5).
 
-**9. Exception-as-control-flow inside the RT `write()` path**
+*Fix:* changed the (pure virtual) `getSpeedCmd()` contract from
+"return a freshly-built `std::vector<float>`" to "fill the caller-owned
+`speed_cmd` buffer in place" (`getSpeedCmd(std::vector<float> &)`,
+`rover_system.hpp`/`rover_a1_system.hpp`). Added a persistent
+`speed_cmd_buffer_` member, sized once in `setInitialValues()`
+(`on_init()`, non-RT). `write()` now calls
+`getSpeedCmd(speed_cmd_buffer_)` and passes that same buffer to
+`sendSpeedCmd()` — no allocation on the RT path after startup.
+
+**9. [FIXED] Exception-as-control-flow inside the RT `write()` path**
 `src/rover_system/rover_system.cpp:456-478`
 (`handleRoverDriverWriteOperation`) — a failed `try_lock()` on the write
 mutex (an *expected*, recoverable condition under contention) throws
 `std::runtime_error`, caught two frames up. Throwing/catching on every
 lock-contention cycle in the hot path is expensive and explicitly
 disallowed by the RT rules.
+
+*Fix:* restructured `handleRoverDriverWriteOperation()` so a failed
+`try_lock()` returns early with a throttled warning
+(`RCLCPP_WARN_STREAM_THROTTLE`, 5s) instead of throwing — lock
+contention is an expected, recoverable condition (e.g. a concurrent
+E-Stop reset service call), not exceptional control flow. The
+`try`/`catch` around `write_operation()` itself is kept, since a
+`sendSpeedCmd()` failure from the driver *is* a genuine, rare error
+condition — that remains a legitimate use of exceptions, just no longer
+on the routine contended-lock path.
 
 ## Should fix
 
