@@ -120,7 +120,7 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
     system_ros_interface_->addDiagnosticTask(
     std::string("system status"), this, &RoverSystem::diagnoseStatus);
 
-    const auto gpio_state = rover_controller_->queryControlInterfaceIOStates();
+    const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
     system_ros_interface_->updateMsgGpioStates(gpio_state);
     system_ros_interface_->publishGpioStateMsg();
 
@@ -236,10 +236,10 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
         updateDriverStateMsg();
         system_ros_interface_->publishRobotDriverState();
         
-        const auto gpio_state = rover_controller_->queryControlInterfaceIOStates();
+        const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
         system_ros_interface_->updateMsgGpioStates(gpio_state);
         system_ros_interface_->publishGpioStateMsg();
-    
+
         next_driver_state_update_time_ = time + driver_states_update_period_;
     }
 

@@ -126,16 +126,14 @@ void ContactCoilHandler::eStopLatchReset()
     write_to_modbus_mtx_.unlock();
 }
 
-std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::getIoState()
+void ContactCoilHandler::getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state)
 {
-    std::unordered_map<RoverControllerGpio, bool> io_state;
-
     if (write_to_modbus_mtx_.try_lock()) {
         std::lock_guard<std::mutex> e_stop_lck(write_to_modbus_mtx_, std::adopt_lock);
         io_state = io_state_;
     }
-
-    return io_state;
+    // else: leave `io_state` as-is (the caller's last-known-good values) rather than clobber it
+    // with an empty map on contention.
 }
 
 void ContactCoilHandler::initCoils()
@@ -232,30 +230,21 @@ void RoverController::eStopLatchReset()
     contactCoilHandler_->eStopLatchReset();
 }
 
-std::unordered_map<RoverControllerGpio, bool> RoverController::queryControlInterfaceIOStates() const
+const std::unordered_map<RoverControllerGpio, bool> & RoverController::queryControlInterfaceIOStates()
 {
-    std::unordered_map<RoverControllerGpio, bool> io_state;
-
-    if (!contactCoilHandler_->isContactCoilHandlerEnabled()) {
-        return io_state;
+    if (contactCoilHandler_->isContactCoilHandlerEnabled()) {
+        contactCoilHandler_->getIoState(io_state_cache_);
     }
 
-    io_state = contactCoilHandler_->getIoState();
-
-    return io_state;
+    return io_state_cache_;
 }
 
 bool RoverController::isPinActive(const RoverControllerGpio pin)
 {
-    std::unordered_map<RoverControllerGpio, bool> io_state;
+    const auto & io_state = queryControlInterfaceIOStates();
+    const auto it = io_state.find(pin);
 
-    if (!contactCoilHandler_->isContactCoilHandlerEnabled()) {
-        return false;
-    }
-
-    io_state = contactCoilHandler_->getIoState();
-
-    return (io_state[pin] == true);
+    return it != io_state.end() && it->second;
 }
 
 bool RoverController::waitFor(std::chrono::milliseconds timeout)

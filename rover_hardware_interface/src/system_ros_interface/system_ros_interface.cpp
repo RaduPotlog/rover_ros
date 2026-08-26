@@ -14,6 +14,7 @@
 
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
+#include <array>
 #include <memory>
 #include <string>
 #include <thread>
@@ -24,6 +25,26 @@
 
 namespace rover_hardware_interface
 {
+
+namespace
+{
+
+// driverNamesToString() builds a fresh std::string on every call; getDriverStateByName() is on
+// the RT path (called every driver-state-update cycle), so look the name up in a table computed
+// once instead.
+const std::string & cachedDriverName(const DriverNames name)
+{
+    static const std::array<std::string, 4> kNames = {
+        driverNamesToString(DriverNames::REAR_LEFT),
+        driverNamesToString(DriverNames::REAR_RIGHT),
+        driverNamesToString(DriverNames::FRONT_LEFT),
+        driverNamesToString(DriverNames::FRONT_RIGHT),
+    };
+
+    return kNames.at(static_cast<std::size_t>(name));
+}
+
+}  // namespace
 
 template class ROSServiceWrapper<std_srvs::srv::SetBool, std::function<void(bool)>>;
 template class ROSServiceWrapper<std_srvs::srv::Trigger, std::function<void()>>;
@@ -224,13 +245,13 @@ DriverStateNamedMsg & SystemROSInterface::getDriverStateByName(
     RoverDriverStateMsg & robot_driver_state,
     const DriverNames name)
 {
-    const auto name_str = driverNamesToString(name);
+    const auto & name_str = cachedDriverName(name);
     auto & driver_states = robot_driver_state.driver_states;
 
     auto it = std::find_if(
         driver_states.begin(), driver_states.end(),
-        [&name_str](const DriverStateNamedMsg & msg) { 
-            return msg.name == name_str; 
+        [&name_str](const DriverStateNamedMsg & msg) {
+            return msg.name == name_str;
     });
 
     if (it == driver_states.end()) {

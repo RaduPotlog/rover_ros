@@ -55,7 +55,10 @@ public:
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
 
-    std::unordered_map<RoverControllerGpio, bool> getIoState();
+    // Fills `io_state` from the last-polled IO state. Non-blocking: on lock contention with the
+    // poll thread, `io_state` is left unchanged (i.e. the caller's own last-known-good values),
+    // so this is safe to call from the RT thread.
+    void getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state);
 
 private:
     
@@ -103,12 +106,15 @@ public:
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
 
-    std::unordered_map<RoverControllerGpio, bool> queryControlInterfaceIOStates() const;
+    // Non-blocking; returns a reference to a cache owned by this RoverController, refreshed
+    // in place on each call (best-effort — see ContactCoilHandler::getIoState()). Safe to call
+    // from the RT thread; avoids allocating a new map on every call.
+    const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates();
 
     bool isPinActive(const RoverControllerGpio pin);
 
 private:
-    
+
     std::unique_ptr<ContactCoilHandler> contactCoilHandler_;
 
     bool waitFor(std::chrono::milliseconds timeout);
@@ -116,10 +122,13 @@ private:
     std::shared_ptr<RoverModbus> rover_modbus_;
 
     std::mutex e_stop_cv_mtx_;
-    
+
     std::condition_variable e_stop_cv_;
-    
+
     volatile std::atomic_bool should_abort_e_stop_reset_ = false;
+
+    // Reused across calls by queryControlInterfaceIOStates() to avoid allocating on the RT thread.
+    std::unordered_map<RoverControllerGpio, bool> io_state_cache_;
 };
 
 }  // namespace rover_hardware_interface

@@ -368,7 +368,7 @@ on the routine contended-lock path.
    with plain CMake to a prefix on `CMAKE_PREFIX_PATH` *before* building
    this workspace. That's the explicit tradeoff of this option vs. the
    "full ament_cmake package" alternative that was not chosen.
-4. **Periodic RT-thread allocations, gated but not eliminated.**
+4. **[FIXED] Periodic RT-thread allocations, gated but not eliminated.**
    `RoverSystem::read()` (`rover_system.cpp:226-236`) →
    `ContactCoilHandler::getIoState()` (`rover_controller.cpp:129-139`)
    copies an `std::unordered_map`; `updateDriverStateMsg()` →
@@ -377,6 +377,54 @@ on the routine contended-lock path.
    (allocates a `std::string`) on every invocation. Both run on the RT
    thread, throttled by `driver_states_update_frequency` (20 Hz vs. 100 Hz
    control loop per `wheel_01_controller.yaml`) but not removed.
+
+   *Note: this got hotter than described here* — the item #2 E-Stop fix
+   (`RoverSystem::updateEStopState()`) added two calls per **every**
+   `read()` cycle (100 Hz, unthrottled) into
+   `RoverController::isPinActive()` → the same `getIoState()`/map-copy
+   path, not just the throttled 20 Hz diagnostics path this item
+   originally described.
+
+   *Fix — GPIO/IO-state path (the real allocation: `std::unordered_map`
+   has no SSO):*
+   - `ContactCoilHandler::getIoState()` now fills a caller-provided
+     `std::unordered_map&` in place instead of returning a fresh one by
+     value, and on lock contention **leaves the caller's buffer
+     unchanged** (previously returned an empty map on contention — a
+     latent correctness quirk, not just a perf one: via `isPinActive()`'s
+     old `io_state[pin]` default-to-`false` behavior, contention could
+     transiently read as "pin inactive," and since both e-stop checks use
+     `!isPinActive(...)`, that briefly reads as e-stop *triggered* —
+     fail-safe direction, but a spurious stop under load. Fixed for free
+     by this same change).
+   - `RoverController` now owns a persistent `io_state_cache_` member;
+     `queryControlInterfaceIOStates()` returns `const std::unordered_map&`
+     into it (refreshed in place) instead of a fresh copy each call.
+   - `RoverController::isPinActive()` now uses `.find()` instead of
+     `operator[]` on the (now shared, persistent) cache — `operator[]`
+     would have inserted a spurious `false` entry into the shared cache
+     for any pin never yet reported, silently growing/mutating it as a
+     side effect of a "read" call.
+   - Updated the two `rover_system.cpp` call sites
+     (`on_configure()`/`read()`) from `const auto gpio_state = ...` to
+     `const auto & gpio_state = ...` so the reference is used directly
+     with no further copy.
+
+   *Fix — driver-name lookup (smaller impact than described: `"rear_left"`
+   etc. all fit libstdc++'s small-string-optimization buffer, so
+   `driverNamesToString()`'s returned `std::string` likely never actually
+   heap-allocates today — still fixed since a `std::string` construction
+   happens on every call either way, and it's what the audit named):*
+   `SystemROSInterface::getDriverStateByName()` now looks the name up via
+   a new file-local `cachedDriverName()` helper
+   (`system_ros_interface.cpp`) backed by a `static const std::array`
+   computed once, instead of calling `driverNamesToString()` (which
+   constructs a new `std::string`) on every call. Left `driverNamesToString()`
+   itself untouched — it's also used in several non-RT exception-message
+   call sites (`phidget_rover_driver.cpp`, `phidget_motor_driver.cpp`) via
+   `operator+` string concatenation, which a `std::string`→`const char*`
+   signature change would have broken; not worth that ripple for a
+   throttled, SSO-avoided allocation.
 5. **Unthrottled logging in the write() error path.** `rover_system.cpp:474`
    — `RCLCPP_WARN_STREAM` (no throttle) inside
    `handleRoverDriverWriteOperation`'s catch block; sustained lock
