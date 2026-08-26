@@ -32,6 +32,11 @@ foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
   find_package(${PACKAGE} REQUIRED)
 endforeach()
 
+# Modbus_Core is a plain CMake package (not ament) from the sibling rover_modbus repo —
+# not colcon-discoverable, so it must be built and installed (cmake --install) to a prefix on
+# CMAKE_PREFIX_PATH *before* building this package. See src/rover_modbus/README.md.
+find_package(Modbus_Core REQUIRED)
+
 include_directories(include)
 
 generate_parameter_library(phidgets_spatial_parameters
@@ -61,7 +66,7 @@ ament_target_dependencies(${PROJECT_NAME} ${PACKAGE_DEPENDENCIES})
 
 target_link_libraries(
     ${PROJECT_NAME} phidgets_spatial_parameters
-                    Modbus_Core
+                    Modbus_Core::Modbus_Core
 )
 
 target_compile_definitions(

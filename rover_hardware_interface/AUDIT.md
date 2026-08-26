@@ -291,7 +291,7 @@ on the routine contended-lock path.
    unless a deployment overrides them) — reconfiguring the endpoint is
    now a URDF edit, not a rebuild, matching every other tunable in this
    package.
-3. **Implicit/unmanaged build dependency on `Modbus_Core`.**
+3. **[FIXED] Implicit/unmanaged build dependency on `Modbus_Core`.**
    `CMakeLists.txt:62-65` does
    `target_link_libraries(${PROJECT_NAME} phidgets_spatial_parameters Modbus_Core)`
    with no `find_package`/`pkg_check_modules` for `Modbus_Core`, and neither
@@ -301,6 +301,73 @@ on the routine contended-lock path.
    in `src/rover_modbus/build/`). This will fail to link on any fresh
    checkout/CI unless that sibling tree happens to have been built first by
    hand.
+
+   *Investigation confirmed this was live, not hypothetical:* on this
+   machine `Modbus_Core` only linked because someone had manually copied
+   `libModbus_Core.so` into `/usr/local/lib` and its headers flat into
+   `/usr/local/include` — an undocumented, unreproducible step.
+
+   *Fix (user chose "CMake `find_package` export"):*
+   - `src/rover_modbus/src/CMakeLists.txt` — uncompleted/uncommented the
+     `install(EXPORT Modbus_CoreTargets ...)` block and added a generated
+     `Modbus_CoreConfig.cmake` (new template:
+     `src/rover_modbus/cmake/Modbus_CoreConfig.cmake.in`) via
+     `configure_package_config_file`, so `find_package(Modbus_Core)` now
+     works against any prefix it's installed to.
+   - Fixed two latent packaging bugs this surfaced (both previously
+     dormant because the export was never active):
+     1. `target_sources(... INTERFACE ${CORE_HEADER_FILES})` embedded
+        bare source-tree paths, which CMake refuses to export — dropped
+        the `INTERFACE` header listing (cosmetic/IDE-only, not needed
+        for consumers, who already get headers via `install(FILES...)`
+        + the include dirs below).
+     2. `target_include_directories` pointed the `PUBLIC` interface at
+        the **build-tree source path**, which would silently break for
+        any consumer using the installed package from a different
+        machine/prefix. Now uses
+        `$<BUILD_INTERFACE:.../include/MB>` / `$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>`
+        generator expressions so the exported target is relocatable —
+        matching the flat header layout `install(FILES...)` actually
+        produces (`<prefix>/include/*.hpp`, no `MB/` subdir), which is
+        what `rover_hardware_interface`'s existing unqualified
+        `#include <modbusRequest.hpp>` already expects. Also had to add
+        `include/` back as a **private-only** dir for `Modbus_Core`'s
+        own compilation, since `crc.cpp` (unlike its siblings) does
+        `#include "MB/crc.hpp"` — a pre-existing inconsistency in this
+        vendored library, not something to "fix" beyond keeping it
+        compiling.
+   - `rover_hardware_interface/CMakeLists.txt` — added
+     `find_package(Modbus_Core REQUIRED)` (kept separate from the
+     ament `PACKAGE_DEPENDENCIES` loop, since `Modbus_Core` isn't an
+     ament package) and changed `target_link_libraries` to the proper
+     imported target `Modbus_Core::Modbus_Core`.
+   - Documented the required manual build+install step in
+     `src/rover_modbus/README.md` (a new subsection — the file is
+     otherwise the upstream `Mazurel/Modbus` README and didn't cover
+     the `find_package` flow at all).
+   - **Verified end-to-end**, outside the actual workspace: built +
+     installed `Modbus_Core` to a throwaway prefix, then configured,
+     built, linked, and ran a standalone consumer against it via
+     `find_package(Modbus_Core REQUIRED)` — confirmed the exported
+     target resolves correctly and is relocatable.
+   - Rebuilt the same fixed `Modbus_Core` targeting
+     `-DCMAKE_INSTALL_PREFIX=/usr/local` (matching this machine's
+     existing ad-hoc install location) so this dev environment stays
+     buildable, but the `sudo cmake --install` step itself is blocked by
+     this session's permissions — **the user needs to run it manually**
+     (command left in chat).
+   - **Not yet verified:** an actual `colcon build` /
+     `ament_target_dependencies` build of `rover_hardware_interface`
+     itself against the new `find_package(Modbus_Core)` — only the
+     isolated standalone-consumer test above was run. Build it for real
+     before trusting this.
+
+   Residual limitation, by design of the option chosen: `rover_modbus`
+   is still **not** a colcon/ament package, so `colcon build` will not
+   build or order it automatically — it must be built and installed
+   with plain CMake to a prefix on `CMAKE_PREFIX_PATH` *before* building
+   this workspace. That's the explicit tradeoff of this option vs. the
+   "full ament_cmake package" alternative that was not chosen.
 4. **Periodic RT-thread allocations, gated but not eliminated.**
    `RoverSystem::read()` (`rover_system.cpp:226-236`) →
    `ContactCoilHandler::getIoState()` (`rover_controller.cpp:129-139`)
