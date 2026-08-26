@@ -464,10 +464,18 @@ on the routine contended-lock path.
    `ros_testing` as test dependencies. None of the lifecycle transitions,
    interface export, or (especially) E-stop gating logic is exercised by
    any test.
-8. **`pluginlib` declared only as `build_depend`.** `package.xml:17` —
+8. **[FIXED] `pluginlib` declared only as `build_depend`.** `package.xml:17` —
    should be a `<depend>` given `pluginlib` headers are used and the plugin
    mechanism is exercised at runtime by the loading process; current
    declaration is inconsistent with the rest of the manifest.
+
+   *Fix:* moved `pluginlib` from `<build_depend>` into the main
+   `<depend>` block in `package.xml` (which covers build + exec + their
+   export variants), alongside the other real dependencies. Left the
+   other `build_depend`s (`autoconf`, `autoconf-archive`, `libtool`,
+   `m4`, `pkg-config`) as-is — those are genuinely build-only autotools
+   tooling, not something this package's own code depends on at
+   runtime.
 
 ## Nice to have
 
