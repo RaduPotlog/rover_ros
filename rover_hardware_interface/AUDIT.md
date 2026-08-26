@@ -488,13 +488,18 @@ on the routine contended-lock path.
    rewriting `updateAccelerationAndGyrationStateValues()` for the item #5
    staging-buffer race fix; now correctly writes
    `linear_acceleration_z = lin_acc.z - gz`.
-2. **Broken include guard.**
+2. **[FIXED] Broken include guard.**
    `include/rover_hardware_interface/rover_system/rover_system.hpp:15-16` —
    `#ifndef ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_SYSTEM_HPP_` /
    `#define ROVER_HARDWARE_INTERFACE_ROBOT_SYSTEM_ROVER_SYSTEM_HPP_` (ROVER
    vs. ROBOT) — the guard doesn't actually guard; harmless today only
    because the header isn't currently double-included. `#endif` comment at
    line 146 has the same typo.
+
+   *Fix:* corrected `ROBOT_SYSTEM` → `ROVER_SYSTEM` in both the `#define`
+   and the trailing `#endif` comment, so all three tokens
+   (`#ifndef`/`#define`/`#endif` comment) match. Grepped the whole
+   package for the same typo elsewhere — this was the only occurrence.
 3. **Fragile substring joint-name matching.**
    `sortAndCheckJointNames()`/`checkIfJointNameContainValidSequence`
    (`rover_system.cpp:266-284`) matches joints by substring containment of
