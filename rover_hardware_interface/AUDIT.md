@@ -176,7 +176,7 @@ reconfiguration-on-reattach turns out to be operationally necessary,
 that needs a deliberate design (e.g. a queued task picked up by a
 dedicated worker thread), not a quick patch.
 
-**7. Suspicious front-right/rear-right index swap (state read + command write)**
+**7. [FIXED] Suspicious front-right/rear-right index swap (state read + command write)**
 - `src/rover_system/rover_a1_system.cpp:55-68` (`updateHwStates`): index
   0(`fl`)←`FRONT_LEFT`, index 2(`rl`)←`REAR_LEFT` are consistent, but index
   **1(`fr`)←`REAR_RIGHT`** and index **3(`rr`)←`FRONT_RIGHT`** are swapped
@@ -195,6 +195,19 @@ error" will be looking at the wrong motor. Given `fl`/`rl` are mapped
 straightforwardly, this looks like a copy/paste bug rather than an
 intentional wiring convention; needs verification against the actual
 harness, and a comment either way.
+
+*Fix:* user confirmed (2026-08-25) this was a genuine copy/paste bug, not
+intentional wiring compensation — URDF joint `fr` (`hw_states_*[1]` /
+`hw_commands_velocities_[1]`) should map to `DriverNames::FRONT_RIGHT`,
+and `rr` (index 3) to `DriverNames::REAR_RIGHT`. Swapped both
+`RoverA1System::updateHwStates()` (state read) and
+`RoverA1Driver::sendSpeedCmd()` (command write) to match, and added a
+one-line comment at each site pointing at `joint_order_` in
+`rover_a1_system.hpp` (`{"fl", "fr", "rl", "rr"}`) as the source of
+truth for the index ↔ joint mapping, so this doesn't drift again
+silently. **This changes which physical motor receives which command —
+verify on the real robot (e.g. a slow, supervised `cmd_vel` test with
+each wheel hand-checked) before trusting it in the field.**
 
 **8. Heap allocation every `write()` cycle**
 `src/rover_system/rover_a1_system.cpp:174-181` — `getSpeedCmd()` returns a

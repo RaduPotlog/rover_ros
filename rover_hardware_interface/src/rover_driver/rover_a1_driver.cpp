@@ -38,10 +38,11 @@ void RoverA1Driver::sendSpeedCmd(const std::vector<float> & speeds)
             std::to_string(speeds.size()));
     }
 
-    const auto speed_rear_left = this->getCmdVelConverter().convert(speeds.at(2));
-    const auto speed_rear_right = this->getCmdVelConverter().convert(speeds.at(1));
+    // speeds is ordered per joint_order_ (rover_a1_system.hpp) = {"fl", "fr", "rl", "rr"}.
     const auto speed_front_left = this->getCmdVelConverter().convert(speeds.at(0));
-    const auto speed_front_right = this->getCmdVelConverter().convert(speeds.at(3));
+    const auto speed_front_right = this->getCmdVelConverter().convert(speeds.at(1));
+    const auto speed_rear_left = this->getCmdVelConverter().convert(speeds.at(2));
+    const auto speed_rear_right = this->getCmdVelConverter().convert(speeds.at(3));
 
     try {
         drivers_.at(DriverNames::REAR_LEFT)->getMotorDriver(MotorNames::DEFAULT)->sendCmdVel(speed_rear_left);

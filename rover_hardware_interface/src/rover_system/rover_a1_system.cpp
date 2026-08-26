@@ -52,20 +52,22 @@ void RoverA1System::updateHwStates(const rclcpp::Time & time)
     const auto front_left = front_left_data.getMotorState(MotorChannels::DEFAULT);
     const auto front_right = front_right_data.getMotorState(MotorChannels::DEFAULT);
 
-    hw_states_positions_[2] = rear_left.getPosition();
-    hw_states_positions_[1] = rear_right.getPosition();
+    // joint_order_ (rover_a1_system.hpp) is {"fl", "fr", "rl", "rr"}, so index 0=front_left,
+    // 1=front_right, 2=rear_left, 3=rear_right.
     hw_states_positions_[0] = front_left.getPosition();
-    hw_states_positions_[3] = front_right.getPosition();
+    hw_states_positions_[1] = front_right.getPosition();
+    hw_states_positions_[2] = rear_left.getPosition();
+    hw_states_positions_[3] = rear_right.getPosition();
 
-    hw_states_velocities_[2] = rear_left.getVelocity();
-    hw_states_velocities_[1] = rear_right.getVelocity();
     hw_states_velocities_[0] = front_left.getVelocity();
-    hw_states_velocities_[3] = front_right.getVelocity();
-    
-    hw_states_efforts_[2] = rear_left.getTorque();
-    hw_states_efforts_[1] = rear_right.getTorque();
+    hw_states_velocities_[1] = front_right.getVelocity();
+    hw_states_velocities_[2] = rear_left.getVelocity();
+    hw_states_velocities_[3] = rear_right.getVelocity();
+
     hw_states_efforts_[0] = front_left.getTorque();
-    hw_states_efforts_[3] = front_right.getTorque();
+    hw_states_efforts_[1] = front_right.getTorque();
+    hw_states_efforts_[2] = rear_left.getTorque();
+    hw_states_efforts_[3] = rear_right.getTorque();
 }
 
 void RoverA1System::updateDriverStateMsg()
