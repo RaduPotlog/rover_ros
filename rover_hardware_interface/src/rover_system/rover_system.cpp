@@ -513,7 +513,9 @@ void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_op
         // TODO: update error
 
     } catch (const std::runtime_error & e) {
-        RCLCPP_WARN_STREAM(logger_, "An exception occurred while writing commands: " << e.what());
+        RCLCPP_WARN_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "An exception occurred while writing commands: " << e.what());
 
         // TODO: update error
     }

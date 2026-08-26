@@ -425,12 +425,20 @@ on the routine contended-lock path.
    `operator+` string concatenation, which a `std::string`→`const char*`
    signature change would have broken; not worth that ripple for a
    throttled, SSO-avoided allocation.
-5. **Unthrottled logging in the write() error path.** `rover_system.cpp:474`
+5. **[FIXED] Unthrottled logging in the write() error path.** `rover_system.cpp:474`
    — `RCLCPP_WARN_STREAM` (no throttle) inside
    `handleRoverDriverWriteOperation`'s catch block; sustained lock
    contention would flood the logger every RT cycle. The read-path
    equivalents at lines 439-441/450-452 correctly use
    `RCLCPP_ERROR_STREAM_THROTTLE`.
+
+   *Fix:* changed to `RCLCPP_WARN_STREAM_THROTTLE(logger_, steady_clock_, 5000, ...)`,
+   matching the read-path convention exactly (same 5s window, same
+   `steady_clock_` member already used elsewhere in this class). Note the
+   lock-contention branch right above this one in the same function was
+   already throttled as a side effect of the item #9 fix (exception-as-
+   control-flow) — this closes the one remaining unthrottled spot in
+   `handleRoverDriverWriteOperation()`.
 6. **Unbounded blocking wait in `on_activate()`.**
    `src/rover_sensors/phidget_imu_sensor.cpp:276-286` (`calibrate()`) —
    `calibration_cv_.wait(lock, ...)` has no timeout; a dead/disconnected IMU
