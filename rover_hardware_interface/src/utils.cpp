@@ -46,30 +46,26 @@ bool operationWithAttempts(
 }
 
 bool checkIfJointNameContainValidSequence(
-    const std::string & name, 
+    const std::string & name,
     const std::string & sequence)
 {
-    const std::size_t pos = name.find(sequence);
-    
-    if (pos == std::string::npos) {
+    // `sequence` (e.g. "fl") must be the leading token of the joint's own local name — i.e.
+    // right after any namespace prefix (everything up to and including the last '/'), and
+    // either the whole local name or immediately followed by '_'. This is deliberately
+    // stricter than "sequence appears anywhere as a delimited substring": that older check
+    // could false-positive on a namespace segment that happens to equal `sequence` (e.g. a
+    // "my_fr_robot/fl_..." namespace containing "fr" as its own delimited token), which a
+    // plain substring-with-delimiter-boundaries scan can't distinguish from the real prefix.
+    const std::size_t namespace_end = name.find_last_of('/');
+    const std::size_t local_name_start = (namespace_end == std::string::npos) ? 0 : namespace_end + 1;
+
+    if (name.compare(local_name_start, sequence.length(), sequence) != 0) {
         return false;
     }
 
-    if (pos >= 1) {
-        const std::size_t id_before_sequence = pos - 1;
-    
-        if (name[id_before_sequence] != '_' && name[id_before_sequence] != '/') {
-            return false;
-        }
-    }
+    const std::size_t sequence_end = local_name_start + sequence.length();
 
-    const std::size_t id_after_sequence = pos + sequence.length();
-    
-    if (id_after_sequence < name.length() && name[id_after_sequence] != '_') {
-        return false;
-    }
-
-    return true;
+    return sequence_end == name.length() || name[sequence_end] == '_';
 }
 
 }  // namespace rover_hardware_interface

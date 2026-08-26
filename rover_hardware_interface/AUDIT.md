@@ -500,11 +500,37 @@ on the routine contended-lock path.
    and the trailing `#endif` comment, so all three tokens
    (`#ifndef`/`#define`/`#endif` comment) match. Grepped the whole
    package for the same typo elsewhere — this was the only occurrence.
-3. **Fragile substring joint-name matching.**
+3. **[FIXED] Fragile substring joint-name matching.**
    `sortAndCheckJointNames()`/`checkIfJointNameContainValidSequence`
    (`rover_system.cpp:266-284`) matches joints by substring containment of
    `"fl"/"fr"/"rl"/"rr"` — would silently misassign if a namespaced joint
    name ever contained more than one token.
+
+   *Investigation note:* re-reading the original implementation
+   (`utils.cpp`), the `match_count != 1` check in `sortAndCheckJointNames()`
+   already throws (rather than silently misassigning) for most ambiguous
+   cases — an accidental extra match on another joint pushes the count to
+   2+. So this was less "silent misassignment" than "fragile and hard to
+   verify by inspection," but it is still possible to construct a real
+   silent false-positive: with the old delimiter-based substring scan,
+   a namespace segment that happened to equal a full delimited token
+   (e.g. `"my_fr_robot/fl_wheel_base_to_fl_wheel_joint"` — "fr" appears
+   `_`-delimited inside the namespace) would match sequence `"fr"` even
+   though the joint is actually `"fl"`.
+
+   *Fix:* rewrote `checkIfJointNameContainValidSequence()` (`utils.cpp`)
+   to require `sequence` be the **leading token of the joint's own local
+   name** — i.e. right after any namespace prefix (everything up to and
+   including the last `/`), and either the whole local name or
+   immediately followed by `_`. This directly reflects the actual xacro
+   naming convention (`${prefix}_wheel_base_to_${prefix}_wheel_joint`,
+   confirmed in `rover_description/urdf/common/wheel.urdf.xacro:46`) —
+   the prefix is always the leading segment of the joint's own name — and
+   it structurally can't match a namespace segment anymore, since the
+   namespace is stripped before comparison rather than merely
+   delimiter-checked. No behavior change for the current (unnamespaced)
+   joint names; only namespaced-deployment edge cases are affected, and
+   only for the better.
 
 ---
 
