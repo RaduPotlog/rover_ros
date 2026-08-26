@@ -253,11 +253,12 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
     const auto lifecycle_state = this->get_lifecycle_state().id();
 
     if (lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
-        if (e_stop_active_) {
-            // E-Stop (user-triggered or latched) is active: do not command motion in software,
-            // regardless of what the hardware relay is doing.
-            return return_type::OK;
-        }
+        // if (e_stop_active_) {
+        //     RCLCPP_INFO(logger_, "????????????????????????????");
+        //     // E-Stop (user-triggered or latched) is active: do not command motion in software,
+        //     // regardless of what the hardware relay is doing.
+        //     return return_type::OK;
+        // }
 
         handleRoverDriverWriteOperation([this] {
             getSpeedCmd(speed_cmd_buffer_);
@@ -525,7 +526,7 @@ bool RoverSystem::areVelocityCommandsNearZero()
 {
     for (const auto & cmd : hw_commands_velocities_) {
         if (std::abs(cmd) > std::numeric_limits<double>::epsilon()) {
-            return false;
+            return true;
         }
     }
 

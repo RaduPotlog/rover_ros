@@ -356,8 +356,6 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
         }
 
         driver->prev_encoder_ticks_ = driver->encoder_ticks_;
-        
-        // RCLCPP_WARN(driver->logger_, "Encoder position changed channel = %d, position = %ld, velocity = %d, time = %lf", driver->channel_, driver->state_.pos, driver->state_.vel, driver->position_time_change_);
     }
 }
 
@@ -375,8 +373,6 @@ void CCONV PhidgetMotorDriver::currentChangeHandler(
         std::lock_guard<std::mutex> lck(driver->state_mtx_);
         driver->state_.current = static_cast<int16_t>(current * 1000.0);
     }
-
-    // RCLCPP_INFO(driver->logger_, "Motor current changed channel = %d, current = %f", driver->channel_, current);
 }
 
 void CCONV PhidgetMotorDriver::temperatureChangeHandler(

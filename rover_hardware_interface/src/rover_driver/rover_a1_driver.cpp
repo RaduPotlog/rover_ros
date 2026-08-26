@@ -67,13 +67,13 @@ void RoverA1Driver::defineDrivers()
     auto front_right_driver = std::make_shared<PhidgetDriver>();
 
     auto rear_left_motor_driver = std::make_shared<PhidgetMotorDriver>(drivetrain_settings_,
-        std::dynamic_pointer_cast<PhidgetDriver>(rear_left_driver), 0, -1, true);
+        std::dynamic_pointer_cast<PhidgetDriver>(rear_left_driver), 4, -1, true);
     auto rear_right_motor_driver = std::make_shared<PhidgetMotorDriver>(drivetrain_settings_,
         std::dynamic_pointer_cast<PhidgetDriver>(rear_right_driver), 5, -1, false);
     auto front_left_motor_driver = std::make_shared<PhidgetMotorDriver>(drivetrain_settings_,
-        std::dynamic_pointer_cast<PhidgetDriver>(front_left_driver), 1, -1, true);
+        std::dynamic_pointer_cast<PhidgetDriver>(front_left_driver), 0, -1, true);
     auto front_right_motor_driver = std::make_shared<PhidgetMotorDriver>(drivetrain_settings_,
-        std::dynamic_pointer_cast<PhidgetDriver>(front_right_driver), 4, -1, false);
+        std::dynamic_pointer_cast<PhidgetDriver>(front_right_driver), 1, -1, false);
     
     rear_left_driver->addMotorDriver(MotorNames::DEFAULT, rear_left_motor_driver);
     rear_right_driver->addMotorDriver(MotorNames::DEFAULT, rear_right_motor_driver);
