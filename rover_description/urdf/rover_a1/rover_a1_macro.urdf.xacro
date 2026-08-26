@@ -122,6 +122,10 @@
           <!-- Hardware controller system interface -->
           <plugin>rover_hardware_interface/RoverA1System</plugin>
 
+          <!-- Modbus TCP endpoint for the safety controller (E-Stop / GPIO) -->
+          <param name="modbus_host">192.168.88.11</param>
+          <param name="modbus_port">502</param>
+
           <!-- Driver controller update frequency and maximum attempts to initilize and activate -->
           <param name="driver_states_update_frequency">20.0</param>
           <param name="max_rover_driver_initialization_attempts">3.0</param>

@@ -32,6 +32,12 @@ struct DrivetrainSettings
     float max_rpm_motor_speed;
 };
 
+struct ModbusSettings
+{
+    std::string host;
+    int port;
+};
+
 bool operationWithAttempts(
     const std::function<void()> operation, 
     const unsigned max_attempts,

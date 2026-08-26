@@ -71,6 +71,7 @@ CallbackReturn RoverSystem::on_init(const hardware_interface::HardwareComponentI
         readDrivetrainSettings();
         readDriverStatesUpdateFrequency();
         readDriverInitAndActivationAttempts();
+        readModbusSettings();
     } catch (const std::invalid_argument & e) {
         RCLCPP_ERROR_STREAM(logger_, "An exception occurred while reading the parameters: " << e.what());
         return CallbackReturn::ERROR;
@@ -381,10 +382,21 @@ void RoverSystem::readDriverInitAndActivationAttempts()
         std::stoi(info_.hardware_parameters["max_rover_driver_activation_attempts"]);
 }
 
+void RoverSystem::readModbusSettings()
+{
+    modbus_settings_.host = info_.hardware_parameters["modbus_host"];
+
+    if (modbus_settings_.host.empty()) {
+        throw std::invalid_argument("Missing or empty 'modbus_host' hardware parameter.");
+    }
+
+    modbus_settings_.port = std::stoi(info_.hardware_parameters["modbus_port"]);
+}
+
 void RoverSystem::configureRoverController()
 {
     rover_driver_write_mtx_ = std::make_shared<std::mutex>();
-    rover_controller_ = std::make_shared<RoverController>();
+    rover_controller_ = std::make_shared<RoverController>(modbus_settings_.host, modbus_settings_.port);
 
     rover_controller_->start();
     // TODO: Check if e-stop interface can be used

@@ -18,6 +18,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -87,8 +88,8 @@ class RoverController
 {
 
 public:
-  
-    RoverController();
+
+    RoverController(const std::string & modbus_host, const int modbus_port);
 
     // Start resources and ContactCoilHandler thread
     void start();

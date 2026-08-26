@@ -271,10 +271,26 @@ on the routine contended-lock path.
    velocity on deactivate" safety command. Adding one is a reasonable
    follow-up but changes real motor-stop behavior on the physical robot,
    so I left it out of this fix rather than bundle it in unasked.
-2. **Hardcoded Modbus endpoint.** `src/rover_controller/rover_controller.cpp:196`
+2. **[FIXED] Hardcoded Modbus endpoint.** `src/rover_controller/rover_controller.cpp:196`
    — `RoverModbus("192.168.88.11", 502)` is a literal, not read from
    `info_.hardware_parameters`/URDF `<param>`. Can't be reconfigured per-robot
    without a rebuild, unlike every other tunable in this package.
+
+   *Fix:* added a `ModbusSettings {host, port}` struct (`utils.hpp`,
+   alongside `DrivetrainSettings`) and `RoverSystem::readModbusSettings()`
+   (`rover_system.cpp`, called from `on_init()` alongside the other
+   parameter readers — throws `std::invalid_argument` on a missing/empty
+   `modbus_host` or unparseable `modbus_port`, same convention as the
+   existing readers). `RoverController`'s constructor now takes
+   `(modbus_host, modbus_port)` instead of hardcoding them, and
+   `RoverSystem::configureRoverController()` passes `modbus_settings_`
+   through. Added `<param name="modbus_host">192.168.88.11</param>` /
+   `<param name="modbus_port">502</param>` to
+   `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`
+   (defaulting to the previous hardcoded values, so behavior is unchanged
+   unless a deployment overrides them) — reconfiguring the endpoint is
+   now a URDF edit, not a rebuild, matching every other tunable in this
+   package.
 3. **Implicit/unmanaged build dependency on `Modbus_Core`.**
    `CMakeLists.txt:62-65` does
    `target_link_libraries(${PROJECT_NAME} phidgets_spatial_parameters Modbus_Core)`

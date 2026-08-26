@@ -80,6 +80,7 @@ protected:
     void readDrivetrainSettings();
     void readDriverStatesUpdateFrequency();
     void readDriverInitAndActivationAttempts();
+    void readModbusSettings();
 
     void configureRoverController();
     void configureRoverDriver();
@@ -134,6 +135,8 @@ protected:
 
     // Drive train system settings
     DrivetrainSettings drivetrain_settings_;
+    // Modbus TCP endpoint for the safety controller (E-Stop / GPIO), read from URDF
+    ModbusSettings modbus_settings_;
 
     // ROS hardware interface 
     std::unique_ptr<SystemROSInterface> system_ros_interface_;
