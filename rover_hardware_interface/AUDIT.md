@@ -439,11 +439,25 @@ on the routine contended-lock path.
    already throttled as a side effect of the item #9 fix (exception-as-
    control-flow) — this closes the one remaining unthrottled spot in
    `handleRoverDriverWriteOperation()`.
-6. **Unbounded blocking wait in `on_activate()`.**
+6. **[FIXED] Unbounded blocking wait in `on_activate()`.**
    `src/rover_sensors/phidget_imu_sensor.cpp:276-286` (`calibrate()`) —
    `calibration_cv_.wait(lock, ...)` has no timeout; a dead/disconnected IMU
    hangs the `on_activate()` transition (and thus the calling
    service/controller_manager activation) forever with no failure path.
+
+   *Fix:* `calibrate()` now uses `calibration_cv_.wait_for(lock,
+   kCalibrationTimeout, pred)` with a fixed 5s timeout (generous vs. the
+   "remains stationary for 2 seconds" the log message already asks for)
+   and throws `std::runtime_error` on timeout instead of blocking
+   forever. `on_activate()` gained a `catch (const std::runtime_error &)`
+   alongside its existing `catch (const phidgets::Phidget22Error &)`, so
+   a calibration timeout now returns `CallbackReturn::ERROR` with a
+   logged reason, same as any other activation failure, instead of
+   hanging the whole activation service call. Note: like the existing
+   `Phidget22Error` catch branch it sits beside, this doesn't reset
+   `imu_connected_`/`spatial_` on failure — matching, not fixing, that
+   pre-existing gap, since that's a separate concern from the unbounded
+   wait this item is about.
 7. **No test coverage.** No `test/` directory anywhere in the package, and
    `CMakeLists.txt` has no `if(BUILD_TESTING)` block at all, despite
    `package.xml:41-43` declaring `ament_cmake_gtest`, `google-mock`,

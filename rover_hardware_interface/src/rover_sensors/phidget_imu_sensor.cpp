@@ -137,6 +137,9 @@ CallbackReturn PhidgetImuSensor::on_activate(const rclcpp_lifecycle::State &)
     } catch (const phidgets::Phidget22Error & err) {
         RCLCPP_ERROR_STREAM(logger_, "An error occurred in the Spatial module: " << err.what());
         return CallbackReturn::ERROR;
+    } catch (const std::runtime_error & err) {
+        RCLCPP_ERROR_STREAM(logger_, "Failed to activate IMU sensor: " << err.what());
+        return CallbackReturn::ERROR;
     }
 
     return CallbackReturn::SUCCESS;
@@ -285,8 +288,18 @@ void PhidgetImuSensor::calibrate()
 
     RCLCPP_INFO(logger_, "Calibrating IMU sensor please ensure the robot remains stationary for 2 seconds.");
 
+    // Bounded wait: a dead/disconnected IMU must not hang on_activate() (and therefore the
+    // calling controller_manager activation) forever.
+    constexpr auto kCalibrationTimeout = std::chrono::seconds(5);
+
     std::unique_lock<std::mutex> lock(calibration_mutex_);
-    calibration_cv_.wait(lock, [this]() { return imu_calibrated_; });
+    const bool calibrated = calibration_cv_.wait_for(
+        lock, kCalibrationTimeout, [this]() { return imu_calibrated_; });
+
+    if (!calibrated) {
+        throw std::runtime_error(
+            "Timed out waiting for IMU calibration to complete (no valid IMU data received).");
+    }
 
     RCLCPP_INFO(logger_, "IMU sensor calibration completed.");
 }
