@@ -16,6 +16,7 @@
 #define ROVER_HARDWARE_INTERFACE_ROVER_CONTROLLER_ROVER_CONTROLLER_HPP_
 
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
@@ -92,7 +93,10 @@ class RoverController
 
 public:
 
-    RoverController(const std::string & modbus_host, const int modbus_port);
+    RoverController(
+        const std::string & modbus_host, const int modbus_port,
+        const unsigned modbus_connection_retry_count,
+        const std::chrono::milliseconds modbus_connection_retry_delay);
 
     // Start resources and ContactCoilHandler thread
     void start();

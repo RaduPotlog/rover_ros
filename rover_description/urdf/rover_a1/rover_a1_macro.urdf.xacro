@@ -125,6 +125,11 @@
           <!-- Modbus TCP endpoint for the safety controller (E-Stop / GPIO) -->
           <param name="modbus_host">192.168.88.11</param>
           <param name="modbus_port">502</param>
+          <!-- 0 = retry the initial Modbus connection forever (blocking on_configure() until
+               reachable, matching the previous hardcoded behavior). Set to a positive count to
+               instead fail on_configure() cleanly after that many attempts. -->
+          <param name="modbus_connection_retry_count">0.0</param>
+          <param name="modbus_connection_retry_delay_ms">1000.0</param>
 
           <!-- Driver controller update frequency and maximum attempts to initilize and activate -->
           <param name="driver_states_update_frequency">20.0</param>

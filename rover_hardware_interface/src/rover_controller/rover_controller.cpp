@@ -189,9 +189,13 @@ void ContactCoilHandler::contactCoilHandlerThread()
     }
 }
 
-RoverController::RoverController(const std::string & modbus_host, const int modbus_port)
+RoverController::RoverController(
+    const std::string & modbus_host, const int modbus_port,
+    const unsigned modbus_connection_retry_count,
+    const std::chrono::milliseconds modbus_connection_retry_delay)
 {
-    rover_modbus_ = std::make_shared<RoverModbus>(modbus_host, modbus_port);
+    rover_modbus_ = std::make_shared<RoverModbus>(
+        modbus_host, modbus_port, modbus_connection_retry_count, modbus_connection_retry_delay);
 }
 
 void RoverController::start()

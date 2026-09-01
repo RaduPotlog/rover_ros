@@ -16,14 +16,16 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 
 namespace rover_hardware_interface
 {
 
 bool operationWithAttempts(
-    const std::function<void()> operation, 
+    const std::function<void()> operation,
     const unsigned max_attempts,
-    const std::function<void()> on_error)
+    const std::function<void()> on_error,
+    const std::chrono::milliseconds delay_between_attempts)
 {
     for (unsigned i = 0; i < max_attempts; ++i) {
         try {
@@ -38,6 +40,10 @@ bool operationWithAttempts(
                 std::cerr << "An exception occurred while handling on_error() function: "
                         << on_error_e.what() << std::endl;
                 return false;
+            }
+
+            if (delay_between_attempts.count() > 0 && i + 1 < max_attempts) {
+                std::this_thread::sleep_for(delay_between_attempts);
             }
         }
     }

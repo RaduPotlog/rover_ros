@@ -14,24 +14,40 @@
 
 #include "rover_hardware_interface/rover_modbus/modbus.hpp"
 
+#include <limits>
+
+#include "rover_hardware_interface/utils.hpp"
+
 namespace rover_hardware_interface
 {
 
-RoverModbus::RoverModbus(const std::string &ip, const int port)
+RoverModbus::RoverModbus(
+    const std::string &ip, const int port,
+    const unsigned max_connection_attempts,
+    const std::chrono::milliseconds retry_delay)
 {
     if (ip.empty()) {
         throw std::invalid_argument("Please provide an IP address for TCP connection.");
     }
 
-    // TODO: re-try defined by a config
-    while (true) {
-        try {
-            connection_ = std::make_unique<ModbusTcpConnection>(ip, port);
-            break;
-        } catch (const std::exception &ex) {
-            std::cerr << "Failed to establish TCP connection: " << ex.what() << ". Retrying in 1 second..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+    // A configured attempt count of 0 means "retry forever" (matches the previous unconditional
+    // while(true) behavior); translated locally rather than teaching operationWithAttempts a
+    // second meaning for 0 that its other callers (RoverSystem::on_activate/on_configure) don't
+    // expect ("0 attempts" there means "don't even try").
+    const unsigned attempts = (max_connection_attempts == 0)
+        ? std::numeric_limits<unsigned>::max()
+        : max_connection_attempts;
+
+    const bool connected = operationWithAttempts(
+        [this, &ip, port]() { connection_ = std::make_unique<ModbusTcpConnection>(ip, port); },
+        attempts,
+        []() {},
+        retry_delay);
+
+    if (!connected) {
+        throw std::runtime_error(
+            "Failed to establish Modbus TCP connection to " + ip + ":" + std::to_string(port) +
+            " after " + std::to_string(max_connection_attempts) + " attempts.");
     }
 }
 

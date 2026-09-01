@@ -15,6 +15,7 @@
 #ifndef ROVER_HARDWARE_INTERFACE_ROVER_MODBUS_ROVER_MODBUS_HPP_
 #define ROVER_HARDWARE_INTERFACE_ROVER_MODBUS_ROVER_MODBUS_HPP_
 
+#include <chrono>
 #include <memory>
 #include <vector>
 #include <string>
@@ -45,7 +46,10 @@ public:
     
     const uint8_t MODBUS_DEVICE_ID = 255U;
 
-    RoverModbus(const std::string &ip, const int port);
+    RoverModbus(
+        const std::string &ip, const int port,
+        const unsigned max_connection_attempts,
+        const std::chrono::milliseconds retry_delay);
     
     ~RoverModbus();
 

@@ -392,12 +392,20 @@ void RoverSystem::readModbusSettings()
     }
 
     modbus_settings_.port = std::stoi(info_.hardware_parameters["modbus_port"]);
+
+    modbus_settings_.connection_retry_count =
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters["modbus_connection_retry_count"]));
+    modbus_settings_.connection_retry_delay_ms =
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters["modbus_connection_retry_delay_ms"]));
 }
 
 void RoverSystem::configureRoverController()
 {
     rover_driver_write_mtx_ = std::make_shared<std::mutex>();
-    rover_controller_ = std::make_shared<RoverController>(modbus_settings_.host, modbus_settings_.port);
+    rover_controller_ = std::make_shared<RoverController>(
+        modbus_settings_.host, modbus_settings_.port,
+        modbus_settings_.connection_retry_count,
+        std::chrono::milliseconds(modbus_settings_.connection_retry_delay_ms));
 
     rover_controller_->start();
     // TODO: Check if e-stop interface can be used

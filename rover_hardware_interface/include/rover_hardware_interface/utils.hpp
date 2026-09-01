@@ -15,6 +15,7 @@
 #ifndef ROVER_HARDWARE_INTERFACE_UTILS_HPP_
 #define ROVER_HARDWARE_INTERFACE_UTILS_HPP_
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
@@ -36,12 +37,15 @@ struct ModbusSettings
 {
     std::string host;
     int port;
+    unsigned connection_retry_count;      // 0 = retry forever
+    unsigned connection_retry_delay_ms;
 };
 
 bool operationWithAttempts(
-    const std::function<void()> operation, 
+    const std::function<void()> operation,
     const unsigned max_attempts,
-    const std::function<void()> on_error = []() {});
+    const std::function<void()> on_error = []() {},
+    const std::chrono::milliseconds delay_between_attempts = std::chrono::milliseconds(0));
 
 bool checkIfJointNameContainValidSequence(
     const std::string & name, 
