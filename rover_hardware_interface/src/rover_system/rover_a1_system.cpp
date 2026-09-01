@@ -47,10 +47,10 @@ void RoverA1System::updateHwStates(const rclcpp::Time & time)
     const auto front_left_data = rover_driver_->getData(DriverNames::FRONT_LEFT);
     const auto front_right_data = rover_driver_->getData(DriverNames::FRONT_RIGHT);
 
-    const auto rear_left = rear_left_data.getMotorState(MotorChannels::DEFAULT);
-    const auto rear_right = rear_right_data.getMotorState(MotorChannels::DEFAULT);
-    const auto front_left = front_left_data.getMotorState(MotorChannels::DEFAULT);
-    const auto front_right = front_right_data.getMotorState(MotorChannels::DEFAULT);
+    const auto rear_left = rear_left_data.getMotorState(MotorNames::DEFAULT);
+    const auto rear_right = rear_right_data.getMotorState(MotorNames::DEFAULT);
+    const auto front_left = front_left_data.getMotorState(MotorNames::DEFAULT);
+    const auto front_right = front_right_data.getMotorState(MotorNames::DEFAULT);
 
     // joint_order_ (rover_a1_system.hpp) is {"fl", "fr", "rl", "rr"}, so index 0=front_left,
     // 1=front_right, 2=rear_left, 3=rear_right.

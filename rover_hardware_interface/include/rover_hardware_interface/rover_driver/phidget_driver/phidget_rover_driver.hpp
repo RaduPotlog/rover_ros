@@ -21,16 +21,12 @@
 
 #include "rover_hardware_interface/rover_driver/driver.hpp"
 #include "rover_hardware_interface/rover_driver/rover_driver.hpp"
+#include "rover_hardware_interface/rover_driver/driver_data_snapshot.hpp"
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_motor_driver.hpp"
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_data_transformer.hpp"
 
 namespace rover_hardware_interface
 {
-
-struct MotorChannels
-{
-    static constexpr std::uint8_t DEFAULT = PhidgetDriver::motorChannelDefault;
-};
 
 class PhidgetRoverDriver : public RoverDriverInterface
 {
@@ -59,7 +55,7 @@ public:
 
     bool isCommunicationError() override;
 
-    const PhidgetDriverDataTransformer & getData(const DriverNames name) override;
+    const DriverDataSnapshot & getData(const DriverNames name) override;
 
 protected:
 
@@ -77,18 +73,18 @@ private:
     void initDrivers();
 
     void setMotorsStates(
-        PhidgetDriverDataTransformer & data, 
+        DriverDataSnapshot & data,
         const MotorDriverState & state,
         const timespec & current_time);
-    
+
     void setDriverState(
-        PhidgetDriverDataTransformer & data, 
-        const DriverState & state, 
+        DriverDataSnapshot & data,
+        const DriverState & state,
         const timespec & current_time);
 
     bool initialized_ = false;
 
-    std::unordered_map<DriverNames, PhidgetDriverDataTransformer> data_;
+    std::unordered_map<DriverNames, DriverDataSnapshot> data_;
 
     PhidgetVelocityCommandDataTransformer phidget_vel_cmd_converter_;
 

@@ -21,7 +21,6 @@
 
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_rover_driver.hpp"
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_motor_driver.hpp"
-#include "rover_hardware_interface/rover_driver/phidget_driver/phidget_data_transformer.hpp"
 
 namespace rover_hardware_interface
 {

@@ -35,7 +35,7 @@
 #include "rover_msgs/msg/gpio_state.hpp"
 
 #include "rover_hardware_interface/rover_driver/driver.hpp"
-#include "rover_hardware_interface/rover_driver/phidget_driver/phidget_data_transformer.hpp"
+#include "rover_hardware_interface/rover_driver/driver_data_snapshot.hpp"
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 #include "rover_hardware_interface/rover_controller/rover_controller_types.hpp"
@@ -119,12 +119,12 @@ public:
     }
 
     void updateMsgErrorFlags(
-        const DriverNames name, 
-        const PhidgetDriverDataTransformer & data);
+        const DriverNames name,
+        const DriverDataSnapshot & data);
 
     void updateMsgDriversStates(
-        const DriverNames name, 
-        const PhidgetDriverStateTransformer & state);
+        const DriverNames name,
+        const DriverStateReading & state);
 
     void publishRobotDriverState();
 

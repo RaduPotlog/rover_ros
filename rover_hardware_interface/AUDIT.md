@@ -392,11 +392,16 @@ on the routine contended-lock path.
      buildable, but the `sudo cmake --install` step itself is blocked by
      this session's permissions — **the user needs to run it manually**
      (command left in chat).
-   - **Not yet verified:** an actual `colcon build` /
-     `ament_target_dependencies` build of `rover_hardware_interface`
-     itself against the new `find_package(Modbus_Core)` — only the
-     isolated standalone-consumer test above was run. Build it for real
-     before trusting this.
+   - **Verified (2026-09-01):** `colcon build --packages-select
+     rover_hardware_interface` succeeds end-to-end against the installed
+     `Modbus_Core` (found at `/usr/local`, per the manual install step
+     above having since been run) — no new warnings under this package's
+     `-Wall -Wextra -Wpedantic -Wshadow -Wold-style-cast`. The "not yet
+     verified" gap this bullet used to describe is closed.
+   - Vendoring decision (plain-CMake package, not full ament conversion)
+     re-confirmed and documented directly in
+     `src/rover_modbus/README.md` (new "Why this stays a plain-CMake
+     vendored package" subsection) rather than left implicit here only.
 
    Residual limitation, by design of the option chosen: `rover_modbus`
    is still **not** a colcon/ament package, so `colcon build` will not

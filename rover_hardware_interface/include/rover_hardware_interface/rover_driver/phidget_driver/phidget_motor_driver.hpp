@@ -40,8 +40,6 @@ class PhidgetDriver : public DriverInterface
     
 public:
 
-    static constexpr std::uint8_t motorChannelDefault = 0;
-
     PhidgetDriver();
 
     std::future<void> initialize() override;

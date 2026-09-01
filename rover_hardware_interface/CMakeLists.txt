@@ -52,6 +52,7 @@ add_library(
     src/rover_driver/phidget_driver/phidget_motor_driver.cpp
     src/rover_driver/phidget_driver/phidget_rover_driver.cpp
     src/rover_driver/phidget_driver/phidget_data_transformer.cpp
+    src/rover_driver/driver_data_snapshot.cpp
     src/rover_driver/rover_a1_driver.cpp
     src/rover_system/rover_a1_system.cpp
     src/rover_system/rover_system.cpp

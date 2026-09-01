@@ -23,6 +23,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
 
+#include "rover_msgs/msg/fault_flag.hpp"
+#include "rover_msgs/msg/runtime_error.hpp"
+
 namespace rover_hardware_interface
 {
 
@@ -42,6 +45,26 @@ const std::string & cachedDriverName(const DriverNames name)
     };
 
     return kNames.at(static_cast<std::size_t>(name));
+}
+
+// Both messages are built from FaultFlag/RuntimeError's own named bit accessors (not a
+// re-decoded copy of the bitset), the same accessors getErrorMap() is built from internally, so
+// the published fault/runtime-error topics can never disagree with what diagnoseErrors() reports
+// for the same underlying flags. Deliberately allocation-free (no intermediate std::map): this
+// runs on the RT thread via RoverSystem::read() -> updateDriverStateMsg() -> updateMsgErrorFlags().
+rover_msgs::msg::FaultFlag toFaultFlagMsg(const FaultFlag & fault_flag)
+{
+    rover_msgs::msg::FaultFlag msg;
+    msg.emergency_stop = fault_flag.isEmergencyStop();
+    msg.motor_setup_fault = fault_flag.isMotorSetupFault();
+    return msg;
+}
+
+rover_msgs::msg::RuntimeError toRuntimeErrorMsg(const RuntimeError & runtime_error)
+{
+    rover_msgs::msg::RuntimeError msg;
+    msg.safety_stop_active = runtime_error.isSafetyStopActive();
+    return msg;
 }
 
 }  // namespace
@@ -131,23 +154,25 @@ SystemROSInterface::~SystemROSInterface()
 }
 
 void SystemROSInterface::updateMsgErrorFlags(
-    const DriverNames name, 
-    const PhidgetDriverDataTransformer & data)
+    const DriverNames name,
+    const DriverDataSnapshot & data)
 {
     auto & driver_state = realtime_driver_state_publisher_->msg_;
     auto & driver_state_named = getDriverStateByName(driver_state, name);
 
     driver_state.header.stamp = node_->get_clock()->now();
 
-    driver_state_named.state.fault_flag = 
-        data.getFaultFlag().getMessage();
+    driver_state_named.state.fault_flag = toFaultFlagMsg(data.getFaultFlag());
     driver_state_named.state.runtime_error =
-        data.getRuntimeError(PhidgetDriver::motorChannelDefault).getMessage();
+        toRuntimeErrorMsg(data.getRuntimeError(MotorNames::DEFAULT));
+
+    driver_state_named.state.motor_states_data_timed_out = data.isMotorStatesDataTimedOut();
+    driver_state_named.state.driver_state_data_timed_out = data.isDriverStateDataTimedOut();
 }
 
 void SystemROSInterface::updateMsgDriversStates(
-    const DriverNames name, 
-    const PhidgetDriverStateTransformer & state)
+    const DriverNames name,
+    const DriverStateReading & state)
 {
     auto & driver_state = realtime_driver_state_publisher_->msg_;
     auto & driver_state_named = getDriverStateByName(driver_state, name);

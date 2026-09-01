@@ -50,7 +50,7 @@ void PhidgetRoverDriver::initialize()
         defineDrivers();
         
         for (auto & [name, driver] : drivers_) {
-            data_.emplace(name, PhidgetDriverDataTransformer(drivetrain_settings_));
+            data_.emplace(name, DriverDataSnapshot(drivetrain_settings_));
         }
 
         initDrivers();
@@ -119,7 +119,7 @@ bool PhidgetRoverDriver::isCommunicationError()
     return false;
 }
 
-const PhidgetDriverDataTransformer & PhidgetRoverDriver::getData(const DriverNames name)
+const DriverDataSnapshot & PhidgetRoverDriver::getData(const DriverNames name)
 {
     if (data_.find(name) == data_.end()) {
         throw std::runtime_error("Data with name '" + driverNamesToString(name) + "' does not exist.");
@@ -159,19 +159,19 @@ void PhidgetRoverDriver::initDrivers()
 }
 
 void PhidgetRoverDriver::setMotorsStates(
-    PhidgetDriverDataTransformer & data, 
+    DriverDataSnapshot & data,
     const MotorDriverState & state,
     const timespec & current_time)
 {
     (void)current_time;
-    
+
     const bool data_timed_out = false;
     data.setMotorsStates(state, data_timed_out);
 }
-    
+
 void PhidgetRoverDriver::setDriverState(
-    PhidgetDriverDataTransformer & data, 
-    const DriverState & state, 
+    DriverDataSnapshot & data,
+    const DriverState & state,
     const timespec & current_time)
 {
     (void)current_time;
