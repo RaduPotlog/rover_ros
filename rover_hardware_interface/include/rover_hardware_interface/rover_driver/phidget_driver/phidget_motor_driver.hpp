@@ -29,7 +29,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "rover_hardware_interface/rover_driver/driver.hpp"
+#include "rover_hardware_interface/domain/driver.hpp"
 #include "rover_hardware_interface/utils.hpp"
 
 namespace rover_hardware_interface

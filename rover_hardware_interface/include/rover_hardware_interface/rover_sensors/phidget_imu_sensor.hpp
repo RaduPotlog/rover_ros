@@ -39,6 +39,7 @@
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/vector3.hpp"
 
+#include "rover_hardware_interface/domain/imu_calibration.hpp"
 #include "rover_hardware_interface/phidgets_spatial_parameters.hpp"
 
 using namespace std::placeholders;
@@ -111,7 +112,6 @@ protected:
     void restartMadgwickAlgorithm();
 
     bool isIMUCalibrated(const geometry_msgs::msg::Vector3 & mag_compensated);
-    bool isVectorFinite(const geometry_msgs::msg::Vector3 & vec);
 
     void updateMadgwickAlgorithm(const geometry_msgs::msg::Vector3 & ang_vel, const geometry_msgs::msg::Vector3 & lin_acc,
                                  const geometry_msgs::msg::Vector3 & mag_compensated, const double dt);
@@ -122,8 +122,6 @@ protected:
     void setStateValuesToNans();
 
     void calibrate();
-
-    bool isMagnitudeSynchronizedWithAccelerationAndGyration(const geometry_msgs::msg::Vector3 & mag_compensated);
 
     // Copies imu_sensor_state_staging_ into imu_sensor_state_ (the buffer whose addresses are
     // handed out by export_state_interfaces()). Called once per read() cycle on the RT thread;
@@ -169,7 +167,7 @@ protected:
     WorldFrame::WorldFrame world_frame_;
     std::atomic_bool imu_connected_{false};
 
-    bool imu_calibrated_ = false;
+    ImuCalibrationGate imu_calibration_gate_;
     std::mutex calibration_mutex_;
     std::condition_variable calibration_cv_;
 

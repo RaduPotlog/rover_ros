@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_ROVER_DRIVER_HPP_
-#define ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_ROVER_DRIVER_HPP_
+#ifndef ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_DRIVER_HPP_
+#define ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_DRIVER_HPP_
 
 #include <string>
 #include <vector>
 
-#include "rover_hardware_interface/rover_driver/driver.hpp"
+#include "rover_hardware_interface/domain/driver.hpp"
 
-#include "rover_hardware_interface/rover_driver/driver_data_snapshot.hpp"
+#include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
 
 namespace rover_hardware_interface
 {
@@ -59,4 +59,4 @@ public:
 
 }  // namespace rover_hardware_interface
 
-#endif  // ROVER_HARDWARE_INTERFACES_ROVER_DRIVER_ROVER_DRIVER_HPP_
+#endif  // ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_DRIVER_HPP_

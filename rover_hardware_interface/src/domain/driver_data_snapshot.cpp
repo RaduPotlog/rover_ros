@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rover_hardware_interface/rover_driver/driver_data_snapshot.hpp"
+#include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
 
 #include <cmath>
 #include <stdexcept>

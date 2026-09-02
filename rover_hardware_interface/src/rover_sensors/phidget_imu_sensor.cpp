@@ -48,6 +48,18 @@
 namespace rover_hardware_interface
 {
 
+namespace
+{
+
+// Infrastructure-side boundary conversion: domain calibration logic (isVectorFinite,
+// ImuCalibrationGate) works in plain Vector3, never geometry_msgs types.
+Vector3 toVector3(const geometry_msgs::msg::Vector3 & vec)
+{
+    return Vector3{vec.x, vec.y, vec.z};
+}
+
+}  // namespace
+
 CallbackReturn PhidgetImuSensor::on_init(const hardware_interface::HardwareComponentInterfaceParams & params)
 {
     if (hardware_interface::SensorInterface::on_init(params) != CallbackReturn::SUCCESS) {
@@ -294,7 +306,7 @@ void PhidgetImuSensor::calibrate()
 
     std::unique_lock<std::mutex> lock(calibration_mutex_);
     const bool calibrated = calibration_cv_.wait_for(
-        lock, kCalibrationTimeout, [this]() { return imu_calibrated_; });
+        lock, kCalibrationTimeout, [this]() { return imu_calibration_gate_.isCalibrated(); });
 
     if (!calibrated) {
         throw std::runtime_error(
@@ -421,23 +433,7 @@ void PhidgetImuSensor::restartMadgwickAlgorithm()
 
 bool PhidgetImuSensor::isIMUCalibrated(const geometry_msgs::msg::Vector3 & mag_compensated)
 {
-    if (imu_calibrated_) {
-        return true;
-    }
-
-    imu_calibrated_ = isVectorFinite(mag_compensated);
-  
-    return imu_calibrated_;
-}
-
-bool PhidgetImuSensor::isVectorFinite(const geometry_msgs::msg::Vector3 & vec)
-{
-    return std::isfinite(vec.x) && std::isfinite(vec.y) && std::isfinite(vec.z);
-}
-
-bool PhidgetImuSensor::isMagnitudeSynchronizedWithAccelerationAndGyration(const geometry_msgs::msg::Vector3 & mag_compensated)
-{
-    return isVectorFinite(mag_compensated);
+    return imu_calibration_gate_.update(toVector3(mag_compensated));
 }
 
 void PhidgetImuSensor::spatialDataCallback(
@@ -462,7 +458,7 @@ void PhidgetImuSensor::spatialDataCallback(
     auto dt = (spatial_data_timestamp - last_spatial_data_timestamp_).seconds();
     last_spatial_data_timestamp_ = spatial_data_timestamp;
 
-    if (!algorithm_initialized_ && !isMagnitudeSynchronizedWithAccelerationAndGyration(mag_compensated)) {
+    if (!algorithm_initialized_ && !isMagnitudeSynchronizedWithAccelerationAndGyration(toVector3(mag_compensated))) {
         return;
     }
 
@@ -482,7 +478,7 @@ void PhidgetImuSensor::spatialDataCallback(
                 "Time difference between acquired IMU data is 0, Madgwick Filter will not update the orientation!");
         }
 
-        if (isMagnitudeSynchronizedWithAccelerationAndGyration(mag_compensated) && params_.use_mag) {
+        if (isMagnitudeSynchronizedWithAccelerationAndGyration(toVector3(mag_compensated)) && params_.use_mag) {
             updateMadgwickAlgorithm(ang_vel, lin_acc, mag_compensated, dt);
         } else {
             updateMadgwickAlgorithmIMU(ang_vel, lin_acc, dt);

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_DRIVER_DATA_SNAPSHOT_HPP_
-#define ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_DRIVER_DATA_SNAPSHOT_HPP_
+#ifndef ROVER_HARDWARE_INTERFACE_DOMAIN_DRIVER_DATA_SNAPSHOT_HPP_
+#define ROVER_HARDWARE_INTERFACE_DOMAIN_DRIVER_DATA_SNAPSHOT_HPP_
 
 #include <bitset>
 #include <cstdint>
@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-#include "rover_hardware_interface/rover_driver/driver.hpp"
+#include "rover_hardware_interface/domain/driver.hpp"
 #include "rover_hardware_interface/utils.hpp"
 
 namespace rover_hardware_interface
@@ -217,4 +217,4 @@ private:
 
 } // namespace rover_hardware_interface
 
-#endif  // ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_DRIVER_DATA_SNAPSHOT_HPP_
+#endif  // ROVER_HARDWARE_INTERFACE_DOMAIN_DRIVER_DATA_SNAPSHOT_HPP_

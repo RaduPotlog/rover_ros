@@ -34,8 +34,8 @@
 #include "rover_msgs/msg/rover_driver_state.hpp"
 #include "rover_msgs/msg/gpio_state.hpp"
 
-#include "rover_hardware_interface/rover_driver/driver.hpp"
-#include "rover_hardware_interface/rover_driver/driver_data_snapshot.hpp"
+#include "rover_hardware_interface/domain/driver.hpp"
+#include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 #include "rover_hardware_interface/rover_controller/rover_controller_types.hpp"

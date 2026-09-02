@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_HARDWARE_INTERFACE_SYSTEM_ERROR_FILTER_ROVER_ERROR_FILTER_HPP_
-#define ROVER_HARDWARE_INTERFACE_SYSTEM_ERROR_FILTER_ROVER_ERROR_FILTER_HPP_
+#ifndef ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_ERROR_FILTER_HPP_
+#define ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_ERROR_FILTER_HPP_
 
 #include <atomic>
 #include <map>
@@ -95,4 +95,4 @@ private:
 
 }  // namespace rover_hardware_interface
 
-#endif  // ROVER_HARDWARE_INTERFACE_SYSTEM_ERROR_FILTER_ROVER_ERROR_FILTER_HPP_
+#endif  // ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_ERROR_FILTER_HPP_

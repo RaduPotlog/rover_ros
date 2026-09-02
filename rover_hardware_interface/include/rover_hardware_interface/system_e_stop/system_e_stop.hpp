@@ -20,7 +20,7 @@
 #include <mutex>
 
 #include "rover_hardware_interface/rover_controller/rover_controller.hpp"
-#include "rover_hardware_interface/rover_driver/rover_driver.hpp"
+#include "rover_hardware_interface/domain/rover_driver.hpp"
 
 namespace rover_hardware_interface
 {

@@ -52,13 +52,14 @@ add_library(
     src/rover_driver/phidget_driver/phidget_motor_driver.cpp
     src/rover_driver/phidget_driver/phidget_rover_driver.cpp
     src/rover_driver/phidget_driver/phidget_data_transformer.cpp
-    src/rover_driver/driver_data_snapshot.cpp
+    src/domain/driver_data_snapshot.cpp
+    src/domain/rover_error_filter.cpp
+    src/domain/imu_calibration.cpp
     src/rover_driver/rover_a1_driver.cpp
     src/rover_system/rover_a1_system.cpp
     src/rover_system/rover_system.cpp
     src/system_ros_interface/system_ros_interface.cpp
     src/system_e_stop/system_e_stop.cpp
-    src/system_error_filter/rover_error_filter.cpp
     src/utils.cpp
     src/rover_modbus/modbus.cpp
     src/rover_controller/rover_controller.cpp
@@ -94,5 +95,17 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 pluginlib_export_plugin_description_file(hardware_interface
                                          rover_hardware_interfaces.xml
 )
+
+if(BUILD_TESTING)
+  # Domain code (include/rover_hardware_interface/domain/, src/domain/) must stay free of
+  # ROS/hardware_interface/vendor-SDK dependencies. This mechanically enforces that rule so a
+  # future change can't silently reintroduce one. Plain CTest add_test (pass/fail via exit code)
+  # rather than ament_add_test, since the script has no JUnit-XML result-file contract to satisfy.
+  enable_testing()
+  add_test(
+    NAME domain_purity_check
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_domain_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+endif()
 
 ament_package()

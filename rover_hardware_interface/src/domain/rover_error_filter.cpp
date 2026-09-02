@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rover_hardware_interface/system_error_filter/rover_error_filter.hpp"
+#include "rover_hardware_interface/domain/rover_error_filter.hpp"
 
 #include <algorithm>
 

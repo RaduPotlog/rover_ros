@@ -19,9 +19,9 @@
 #include <string>
 #include <vector>
 
-#include "rover_hardware_interface/rover_driver/driver.hpp"
-#include "rover_hardware_interface/rover_driver/rover_driver.hpp"
-#include "rover_hardware_interface/rover_driver/driver_data_snapshot.hpp"
+#include "rover_hardware_interface/domain/driver.hpp"
+#include "rover_hardware_interface/domain/rover_driver.hpp"
+#include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_motor_driver.hpp"
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_data_transformer.hpp"
 
