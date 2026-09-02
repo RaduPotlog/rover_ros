@@ -84,8 +84,6 @@ install(
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
-
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 
 ament_export_include_directories(include/${PROJECT_NAME})
