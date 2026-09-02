@@ -94,7 +94,7 @@ void ROSServiceWrapper<SrvT, CallbackT>::callbackWrapper(SrvRequestConstPtr requ
         response->message = err.what();
 
         RCLCPP_WARN_STREAM(
-            rclcpp::get_logger("RoverSystem"),
+            rclcpp::get_logger("ROSServiceWrapper"),
             "An exception occurred while handling the request: " << err.what());
     }
 }
@@ -114,7 +114,7 @@ void ROSServiceWrapper<std_srvs::srv::Trigger, std::function<void()>>::proccessC
 SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclcpp::NodeOptions & node_options)
 : node_(rclcpp::Node::make_shared(node_name, node_options)), diagnostic_updater_(node_)
 {
-    RCLCPP_INFO(rclcpp::get_logger("RoverSystem"), "Constructing node.");
+    RCLCPP_INFO(rclcpp::get_logger("SystemROSInterface"), "Constructing node.");
 
     executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
     executor_->add_node(node_);
@@ -126,12 +126,23 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
     driver_state_publisher_ = node_->create_publisher<RoverDriverStateMsg>("hardware_interface/rover_driver_state", 5);
     realtime_driver_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<RoverDriverStateMsg>>(driver_state_publisher_);
 
+    // Pre-populate all 4 driver-state slots up front so getDriverStateByName() never has to
+    // push_back() on the RT thread (RoverSystem::read() -> updateDriverStateMsg()) the first time
+    // each DriverNames value is looked up.
+    for (const auto name :
+         {DriverNames::REAR_LEFT, DriverNames::REAR_RIGHT, DriverNames::FRONT_LEFT,
+          DriverNames::FRONT_RIGHT}) {
+        DriverStateNamedMsg driver_state_named;
+        driver_state_named.name = cachedDriverName(name);
+        realtime_driver_state_publisher_->msg_.driver_states.push_back(driver_state_named);
+    }
+
     gpio_state_publisher_ = node_->create_publisher<GpioStateMsg>("hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
     realtime_gpio_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<GpioStateMsg>>(gpio_state_publisher_);
     
     diagnostic_updater_.setHardwareID("Rover System");
     
-    RCLCPP_INFO(rclcpp::get_logger("RoverSystem"), "Node constructed successfully.");
+    RCLCPP_INFO(rclcpp::get_logger("SystemROSInterface"), "Node constructed successfully.");
 }
 
 SystemROSInterface::~SystemROSInterface()

@@ -17,15 +17,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp/logging.hpp>
 
 #include "rover_hardware_interface/rover_controller/rover_controller_types.hpp"
 #include "rover_hardware_interface/rover_modbus/modbus.hpp"
@@ -84,8 +83,6 @@ private:
     std::mutex write_to_modbus_mtx_;
 
     std::unordered_map<RoverControllerGpio, bool> io_state_;
-
-    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
 };
 
 class RoverController

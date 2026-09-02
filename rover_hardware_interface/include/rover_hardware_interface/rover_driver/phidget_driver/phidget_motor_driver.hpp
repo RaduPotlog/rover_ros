@@ -58,8 +58,6 @@ private:
     std::promise<void> init_promise_;
 
     std::unordered_map<MotorNames, std::shared_ptr<MotorDriverInterface>> motor_drivers_;
-
-    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
 };
 
 class PhidgetMotorDriver : public MotorDriverInterface
@@ -157,7 +155,7 @@ private:
 
     const std::chrono::nanoseconds comm_timeout_;
 
-    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
+    rclcpp::Logger logger_{rclcpp::get_logger("PhidgetMotorDriver")};
 };
 
 } // namespace rover_hardware_interface

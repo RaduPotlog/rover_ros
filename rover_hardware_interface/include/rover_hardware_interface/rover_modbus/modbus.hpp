@@ -30,9 +30,6 @@
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp/logging.hpp>
-
 #include "rover_hardware_interface/rover_modbus/modbus_connection.hpp"
 #include "rover_hardware_interface/rover_modbus/modbus_tcp_connection.hpp"
 
@@ -64,8 +61,6 @@ private:
     MB::ModbusResponse sendRequest(const MB::ModbusRequest &request);
 
     std::unique_ptr<ModbusConnection> connection_;
-
-    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
 };
 
 }  // namespace rover_hardware_interface

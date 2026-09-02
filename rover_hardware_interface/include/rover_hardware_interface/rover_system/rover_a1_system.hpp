@@ -77,12 +77,6 @@ protected:
 
     static const inline std::vector<std::string> joints_ = {"fl", "fr", "rl", "rr"};
 
-    // Write operation lock
-    std::shared_ptr<std::mutex> rover_driver_write_mtx_;
-
-    rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
-    
-    rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
     rclcpp::Time last_time_{0, 0, RCL_STEADY_TIME};
 };
 
