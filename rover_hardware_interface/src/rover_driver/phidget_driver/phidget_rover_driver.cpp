@@ -122,6 +122,39 @@ bool PhidgetRoverDriver::isCommunicationError()
     return has_communication_error_;
 }
 
+bool PhidgetRoverDriver::isMotorStatesDataTimedOut()
+{
+    for (const auto & [name, driver_data] : data_) {
+        if (driver_data.isMotorStatesDataTimedOut()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool PhidgetRoverDriver::isDriverStateDataTimedOut()
+{
+    for (const auto & [name, driver_data] : data_) {
+        if (driver_data.isDriverStateDataTimedOut()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool PhidgetRoverDriver::isFlagError()
+{
+    for (const auto & [name, driver_data] : data_) {
+        if (driver_data.isFlagError()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 const DriverDataSnapshot & PhidgetRoverDriver::getData(const DriverNames name)
 {
     if (data_.find(name) == data_.end()) {

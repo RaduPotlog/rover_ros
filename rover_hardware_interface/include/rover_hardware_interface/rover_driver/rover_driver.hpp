@@ -49,6 +49,12 @@ public:
     virtual void attemptErrorFlagReset() = 0;
 
     virtual bool isCommunicationError() = 0;
+
+    virtual bool isMotorStatesDataTimedOut() = 0;
+
+    virtual bool isDriverStateDataTimedOut() = 0;
+
+    virtual bool isFlagError() = 0;
 };
 
 }  // namespace rover_hardware_interface

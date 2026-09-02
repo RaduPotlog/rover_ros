@@ -184,6 +184,11 @@ void SystemROSInterface::updateMsgDriversStates(
     driver_state_named.state.temperature = state.getTemperature();
 }
 
+void SystemROSInterface::updateMsgError(const bool error)
+{
+    realtime_driver_state_publisher_->msg_.error = error;
+}
+
 void SystemROSInterface::publishRobotDriverState()
 {
     if (realtime_driver_state_publisher_->trylock()) {

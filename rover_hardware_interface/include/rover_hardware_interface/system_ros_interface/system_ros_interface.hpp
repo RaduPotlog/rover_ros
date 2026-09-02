@@ -126,6 +126,8 @@ public:
         const DriverNames name,
         const DriverStateReading & state);
 
+    void updateMsgError(const bool error);
+
     void publishRobotDriverState();
 
     void updateMsgGpioStates(

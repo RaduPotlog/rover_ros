@@ -58,6 +58,7 @@ add_library(
     src/rover_system/rover_system.cpp
     src/system_ros_interface/system_ros_interface.cpp
     src/system_e_stop/system_e_stop.cpp
+    src/system_error_filter/rover_error_filter.cpp
     src/utils.cpp
     src/rover_modbus/modbus.cpp
     src/rover_controller/rover_controller.cpp

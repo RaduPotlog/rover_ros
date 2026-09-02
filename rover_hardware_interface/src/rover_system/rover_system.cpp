@@ -72,6 +72,7 @@ CallbackReturn RoverSystem::on_init(const hardware_interface::HardwareComponentI
         readDriverStatesUpdateFrequency();
         readDriverInitAndActivationAttempts();
         readModbusSettings();
+        readErrorFilterMaxErrorsCounts();
     } catch (const std::invalid_argument & e) {
         RCLCPP_ERROR_STREAM(logger_, "An exception occurred while reading the parameters: " << e.what());
         return CallbackReturn::ERROR;
@@ -234,6 +235,7 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
 
     if (time >= next_driver_state_update_time_) {
         updateDriverState();
+        updateFlagErrors();
         updateDriverStateMsg();
         system_ros_interface_->publishRobotDriverState();
         
@@ -402,6 +404,24 @@ void RoverSystem::readModbusSettings()
         static_cast<unsigned>(std::stoi(info_.hardware_parameters["modbus_connection_retry_delay_ms"]));
 }
 
+void RoverSystem::readErrorFilterMaxErrorsCounts()
+{
+    const unsigned max_write_cmds_errors_count = static_cast<unsigned>(
+        std::stoi(info_.hardware_parameters["max_write_cmds_errors_count"]));
+    const unsigned max_read_motor_states_errors_count = static_cast<unsigned>(
+        std::stoi(info_.hardware_parameters["max_read_motor_states_errors_count"]));
+    const unsigned max_read_driver_state_errors_count = static_cast<unsigned>(
+        std::stoi(info_.hardware_parameters["max_read_driver_state_errors_count"]));
+
+    // Not URDF-configurable, mirroring the reference Roboteq implementation's fault-flag
+    // category: a single occurrence escalates immediately, with no debounce.
+    constexpr unsigned kMaxFaultFlagErrorsCount = 1;
+
+    rover_error_filter_ = std::make_unique<RoverErrorFilter>(
+        max_write_cmds_errors_count, max_read_motor_states_errors_count,
+        max_read_driver_state_errors_count, kMaxFaultFlagErrorsCount);
+}
+
 void RoverSystem::configureRoverController()
 {
     rover_driver_write_mtx_ = std::make_shared<std::mutex>();
@@ -467,6 +487,11 @@ void RoverSystem::resetEStopLatch()
     }
 
     e_stop_->resetEStopLatch();
+
+    // Resetting the driver-fault latch is the operator's explicit signal that the underlying
+    // fault has been addressed - clear all accumulated per-category error-filter state too, not
+    // just the fault-flag category.
+    rover_error_filter_->setClearErrorsFlag();
 }
 
 void RoverSystem::updateMotorsState(const rclcpp::Time & time)
@@ -474,10 +499,21 @@ void RoverSystem::updateMotorsState(const rclcpp::Time & time)
     try {
         rover_driver_->updateMotorsState();
         updateHwStates(time);
+        updateMotorsStateDataTimedOut();
     } catch (const std::runtime_error & e) {
         RCLCPP_ERROR_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while updating motors states: " << e.what());
+        rover_error_filter_->updateError(ErrorsFilterIds::READ_MOTOR_STATES, true);
+    }
+}
+
+void RoverSystem::updateMotorsStateDataTimedOut()
+{
+    if (rover_driver_->isMotorStatesDataTimedOut()) {
+        rover_error_filter_->updateError(ErrorsFilterIds::READ_MOTOR_STATES, true);
+    } else {
+        rover_error_filter_->updateError(ErrorsFilterIds::READ_MOTOR_STATES, false);
     }
 }
 
@@ -485,10 +521,31 @@ void RoverSystem::updateDriverState()
 {
     try {
         rover_driver_->updateDriversState();
+        updateDriverStateDataTimedOut();
     } catch (const std::runtime_error & e) {
         RCLCPP_ERROR_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while updating drivers states: " << e.what());
+        rover_error_filter_->updateError(ErrorsFilterIds::READ_DRIVER_STATE, true);
+    }
+}
+
+void RoverSystem::updateDriverStateDataTimedOut()
+{
+    if (rover_driver_->isDriverStateDataTimedOut()) {
+        rover_error_filter_->updateError(ErrorsFilterIds::READ_DRIVER_STATE, true);
+    } else {
+        rover_error_filter_->updateError(ErrorsFilterIds::READ_DRIVER_STATE, false);
+    }
+}
+
+void RoverSystem::updateFlagErrors()
+{
+    if (rover_driver_->isFlagError()) {
+        rover_error_filter_->updateError(ErrorsFilterIds::FAULT_FLAG, true);
+        handleRoverDriverWriteOperation([this] { rover_driver_->attemptErrorFlagReset(); });
+    } else {
+        rover_error_filter_->updateError(ErrorsFilterIds::FAULT_FLAG, false);
     }
 }
 
@@ -527,15 +584,18 @@ void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_op
         RCLCPP_WARN_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "Couldn't acquire mutex for writing commands; skipping this write cycle.");
+        rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, true);
         return;
     }
 
     try {
         write_operation();
+        rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, false);
     } catch (const std::runtime_error & e) {
         RCLCPP_WARN_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while writing commands: " << e.what());
+        rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, true);
     }
 }
 
@@ -543,7 +603,7 @@ bool RoverSystem::areVelocityCommandsNearZero()
 {
     for (const auto & cmd : hw_commands_velocities_) {
         if (std::abs(cmd) > std::numeric_limits<double>::epsilon()) {
-            return true;
+            return false;
         }
     }
 

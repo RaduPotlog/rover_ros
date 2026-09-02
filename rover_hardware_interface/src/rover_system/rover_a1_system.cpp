@@ -97,6 +97,8 @@ void RoverA1System::updateDriverStateMsg()
         driver_front_right_data.getDriverState());
     system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_RIGHT,
         driver_front_right_data);
+
+    system_ros_interface_->updateMsgError(rover_error_filter_->isError());
 }
 
 void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper & status)
@@ -142,6 +144,14 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
 
         RoverA1System::addKeyValueIfTrue(
             status, rear_right_driver_data.getErrorMap(), "Rear right driver error: ");
+    }
+
+    if (rover_error_filter_->isError()) {
+        level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+        message = "Error detected.";
+
+        RoverA1System::addKeyValueIfTrue(
+            status, rover_error_filter_->getErrorMap(), "Error filter - ");
     }
 
     status.summary(level, message);

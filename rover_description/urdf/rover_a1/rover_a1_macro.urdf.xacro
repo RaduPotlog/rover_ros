@@ -136,6 +136,16 @@
           <param name="max_rover_driver_initialization_attempts">3.0</param>
           <param name="max_rover_driver_activation_attempts">3.0</param>
 
+          <!-- Consecutive-cycle thresholds for the RoverErrorFilter: number of consecutive
+               failed/faulty cycles before a category latches into an active (debounced) error.
+               Reported only via diagnostics ("system errors" task) and the error/comm_error
+               message fields - never gates read()/write() return codes or triggers a lifecycle
+               transition. The fault-flag category has no URDF param: it is hardcoded to 1
+               (immediate escalation, no debounce). -->
+          <param name="max_write_cmds_errors_count">2</param>
+          <param name="max_read_motor_states_errors_count">2</param>
+          <param name="max_read_driver_state_errors_count">2</param>
+
           <!-- Max time (ms) since the last Phidget SDK telemetry callback (position/current/
                temperature) before a wheel driver is considered to have a communication error
                (e.g. a USB disconnect). Tune against the measured minDataInterval on the real

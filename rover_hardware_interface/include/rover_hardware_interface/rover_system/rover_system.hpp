@@ -36,6 +36,7 @@
 
 #include "rover_hardware_interface/rover_controller/rover_controller.hpp"
 #include "rover_hardware_interface/system_e_stop/system_e_stop.hpp"
+#include "rover_hardware_interface/system_error_filter/rover_error_filter.hpp"
 
 namespace rover_hardware_interface
 {
@@ -81,6 +82,7 @@ protected:
     void readDriverStatesUpdateFrequency();
     void readDriverInitAndActivationAttempts();
     void readModbusSettings();
+    void readErrorFilterMaxErrorsCounts();
 
     void configureRoverController();
     void configureRoverDriver();
@@ -94,6 +96,9 @@ protected:
     void updateMotorsState(const rclcpp::Time & time);
     void updateDriverState();
     void updateCommunicationStatus();
+    void updateMotorsStateDataTimedOut();
+    void updateDriverStateDataTimedOut();
+    void updateFlagErrors();
     void updateEStopState();
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 
@@ -130,6 +135,12 @@ protected:
     std::shared_ptr<RoverController> rover_controller_;
     // Rover emergency stop interface
     std::shared_ptr<EmergencyStopInterface> e_stop_;
+    // Debounced/latched per-category error state (write cmds, read-motor-states,
+    // read-driver-state, fault-flag). Diagnostics-only: never gates read()/write() return codes
+    // or triggers a lifecycle transition. Built once in on_init() (readErrorFilterMaxErrorsCounts())
+    // from URDF thresholds; unlike rover_driver_/rover_controller_/e_stop_ it owns no hardware
+    // handles, so it is NOT reset in on_cleanup()/on_shutdown()/on_error().
+    std::unique_ptr<RoverErrorFilter> rover_error_filter_;
     // Cached result of the last updateEStopState() poll; gates write() while true.
     // Defaults to true (fail-safe: no motion commands until confirmed clear).
     std::atomic_bool e_stop_active_{true};

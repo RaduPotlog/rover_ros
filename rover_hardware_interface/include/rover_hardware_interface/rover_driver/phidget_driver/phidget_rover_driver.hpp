@@ -55,6 +55,12 @@ public:
 
     bool isCommunicationError() override;
 
+    bool isMotorStatesDataTimedOut() override;
+
+    bool isDriverStateDataTimedOut() override;
+
+    bool isFlagError() override;
+
     const DriverDataSnapshot & getData(const DriverNames name) override;
 
 protected:
