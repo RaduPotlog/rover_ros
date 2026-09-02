@@ -55,8 +55,8 @@ void RoverA1Driver::sendSpeedCmd(const std::vector<float> & speeds)
 }
 
 void RoverA1Driver::attemptErrorFlagReset()
-{ 
-    sendSpeedCmd({0.0, 0.0});
+{
+    sendSpeedCmd({0.0, 0.0, 0.0, 0.0});
 }
 
 void RoverA1Driver::defineDrivers()

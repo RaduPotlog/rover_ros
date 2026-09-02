@@ -93,6 +93,7 @@ protected:
 
     void updateMotorsState(const rclcpp::Time & time);
     void updateDriverState();
+    void updateCommunicationStatus();
     void updateEStopState();
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 

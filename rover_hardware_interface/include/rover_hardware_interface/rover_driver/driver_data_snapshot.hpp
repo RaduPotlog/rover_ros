@@ -185,6 +185,10 @@ public:
         return isFlagError() || motor_states_data_timed_out_ || driver_state_data_timed_out_;
     }
 
+    bool isCommunicationError() const {
+        return motor_states_data_timed_out_ || driver_state_data_timed_out_;
+    }
+
     const MotorStateReading & getMotorState(const MotorNames channel) const;
 
     const DriverStateReading & getDriverState() const;

@@ -168,6 +168,9 @@ void SystemROSInterface::updateMsgErrorFlags(
 
     driver_state_named.state.motor_states_data_timed_out = data.isMotorStatesDataTimedOut();
     driver_state_named.state.driver_state_data_timed_out = data.isDriverStateDataTimedOut();
+    driver_state_named.state.comm_error = data.isCommunicationError();
+    // heartbeat_timeout intentionally left at its default (false): there is no heartbeat
+    // protocol in this codebase to back it.
 }
 
 void SystemROSInterface::updateMsgDriversStates(

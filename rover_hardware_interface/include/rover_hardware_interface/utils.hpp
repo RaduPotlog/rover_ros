@@ -31,6 +31,7 @@ struct DrivetrainSettings
     float gearbox_efficiency;
     float encoder_resolution;
     float max_rpm_motor_speed;
+    unsigned driver_comm_timeout_ms;
 };
 
 struct ModbusSettings

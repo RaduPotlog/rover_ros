@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <chrono>
-#include <ctime>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -85,27 +84,31 @@ void PhidgetRoverDriver::activate()
 
 void PhidgetRoverDriver::updateCommunicationStatus()
 {
-    // TODO: Handle comm error
+    bool has_comm_error = false;
+
+    for (auto & [name, driver] : drivers_) {
+        if (driver->isCommunicationError()) {
+            has_comm_error = true;
+            break;
+        }
+    }
+
+    has_communication_error_ = has_comm_error;
 }
 
 void PhidgetRoverDriver::updateMotorsState()
 {
-    timespec current_time;
-    clock_gettime(CLOCK_MONOTONIC, &current_time);
-
     for (auto & [name, driver] : drivers_) {
-        const auto state = driver->getMotorDriver(MotorNames::DEFAULT)->readState();
-        setMotorsStates(data_.at(name), state, current_time);
+        auto motor_driver = driver->getMotorDriver(MotorNames::DEFAULT);
+        const auto state = motor_driver->readState();
+        setMotorsStates(data_.at(name), state, motor_driver->isCommunicationError());
     }
 }
 
 void PhidgetRoverDriver::updateDriversState()
 {
-    timespec current_time;
-    clock_gettime(CLOCK_MONOTONIC, &current_time);
-
     for (auto & [name, driver] : drivers_) {
-        setDriverState(data_.at(name), driver->readState(), current_time);
+        setDriverState(data_.at(name), driver->readState(), driver->isCommunicationError());
     }
 }
 
@@ -115,8 +118,8 @@ void PhidgetRoverDriver::attemptErrorFlagReset()
 }
 
 bool PhidgetRoverDriver::isCommunicationError()
-{  
-    return false;
+{
+    return has_communication_error_;
 }
 
 const DriverDataSnapshot & PhidgetRoverDriver::getData(const DriverNames name)
@@ -161,22 +164,16 @@ void PhidgetRoverDriver::initDrivers()
 void PhidgetRoverDriver::setMotorsStates(
     DriverDataSnapshot & data,
     const MotorDriverState & state,
-    const timespec & current_time)
+    const bool data_timed_out)
 {
-    (void)current_time;
-
-    const bool data_timed_out = false;
     data.setMotorsStates(state, data_timed_out);
 }
 
 void PhidgetRoverDriver::setDriverState(
     DriverDataSnapshot & data,
     const DriverState & state,
-    const timespec & current_time)
+    const bool data_timed_out)
 {
-    (void)current_time;
-    
-    const bool data_timed_out = false;
     data.setDriverState(state, data_timed_out);
 }
 

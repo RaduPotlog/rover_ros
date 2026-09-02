@@ -93,12 +93,10 @@ void RoverA1System::updateDriverStateMsg()
     system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_LEFT, 
         driver_front_left_data);
     
-    system_ros_interface_->updateMsgDriversStates(DriverNames::FRONT_RIGHT, 
+    system_ros_interface_->updateMsgDriversStates(DriverNames::FRONT_RIGHT,
         driver_front_right_data.getDriverState());
-    system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_RIGHT, 
+    system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_RIGHT,
         driver_front_right_data);
-    
-    // TODO: Handle communication error
 }
 
 void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper & status)
@@ -153,6 +151,8 @@ void RoverA1System::diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper &
 {
     unsigned char level{diagnostic_updater::DiagnosticStatusWrapper::OK};
     std::string message{"Rover A1 system status monitoring."};
+
+    status.add("Communication error", rover_driver_->isCommunicationError());
 
     const auto front_left_driver_state = rover_driver_->getData(DriverNames::FRONT_LEFT).getDriverState();
     const auto front_right_driver_state = rover_driver_->getData(DriverNames::FRONT_RIGHT).getDriverState();

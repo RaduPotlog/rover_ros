@@ -75,12 +75,12 @@ private:
     void setMotorsStates(
         DriverDataSnapshot & data,
         const MotorDriverState & state,
-        const timespec & current_time);
+        const bool data_timed_out);
 
     void setDriverState(
         DriverDataSnapshot & data,
         const DriverState & state,
-        const timespec & current_time);
+        const bool data_timed_out);
 
     bool initialized_ = false;
 
@@ -89,6 +89,11 @@ private:
     PhidgetVelocityCommandDataTransformer phidget_vel_cmd_converter_;
 
     const std::chrono::milliseconds activate_wait_time_;
+
+    // Cached once per RT cycle by updateCommunicationStatus(); isCommunicationError() is then a
+    // cheap getter. Both are always called from the same (RT) thread within RoverSystem::read(),
+    // so a plain bool is sufficient - no atomic/mutex needed here.
+    bool has_communication_error_ = false;
 };
 
 }  // namespace rover_hardware_interface

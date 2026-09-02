@@ -122,6 +122,8 @@ public:
 
     virtual std::shared_ptr<MotorDriverInterface> getMotorDriver(const MotorNames name) = 0;
 
+    virtual bool isCommunicationError() = 0;
+
     using SharedPtr = std::shared_ptr<DriverInterface>;
 };
 
@@ -129,12 +131,14 @@ class MotorDriverInterface
 {
 
 public:
-    
+
     virtual void initialize() = 0;
 
     virtual MotorDriverState readState() = 0;
 
     virtual void sendCmdVel(const float cmd) = 0;
+
+    virtual bool isCommunicationError() = 0;
 };
 
 }  // namespace rover_hardware_interface

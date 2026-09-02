@@ -230,6 +230,7 @@ std::vector<CommandInterface> RoverSystem::export_command_interfaces()
 return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration & /* period */)
 {
     updateMotorsState(time);
+    updateCommunicationStatus();
 
     if (time >= next_driver_state_update_time_) {
         updateDriverState();
@@ -365,6 +366,8 @@ void RoverSystem::readDrivetrainSettings()
         std::stof(info_.hardware_parameters["encoder_resolution"]);
     drivetrain_settings_.max_rpm_motor_speed =
         std::stof(info_.hardware_parameters["max_rpm_motor_speed"]);
+    drivetrain_settings_.driver_comm_timeout_ms =
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters["driver_comm_timeout_ms"]));
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()
@@ -489,6 +492,17 @@ void RoverSystem::updateDriverState()
     }
 }
 
+void RoverSystem::updateCommunicationStatus()
+{
+    try {
+        rover_driver_->updateCommunicationStatus();
+    } catch (const std::runtime_error & e) {
+        RCLCPP_ERROR_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "An exception occurred while updating communication status: " << e.what());
+    }
+}
+
 void RoverSystem::updateEStopState()
 {
     if (!e_stop_) {
@@ -518,15 +532,10 @@ void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_op
 
     try {
         write_operation();
-
-        // TODO: update error
-
     } catch (const std::runtime_error & e) {
         RCLCPP_WARN_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while writing commands: " << e.what());
-
-        // TODO: update error
     }
 }
 

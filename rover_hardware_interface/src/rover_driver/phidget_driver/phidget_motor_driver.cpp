@@ -60,9 +60,6 @@ std::future<void> PhidgetDriver::initialize()
 DriverState PhidgetDriver::readState()
 {
     DriverState driver_state;
-    
-    timespec current_time;
-    clock_gettime(CLOCK_MONOTONIC, &current_time);
 
     const auto motor_state = this->getMotorDriver(MotorNames::DEFAULT)->readState();
     driver_state.fault_flags = 0;
@@ -71,6 +68,11 @@ DriverState PhidgetDriver::readState()
     driver_state.temp = motor_state.temp;
 
     return driver_state;
+}
+
+bool PhidgetDriver::isCommunicationError()
+{
+    return getMotorDriver(MotorNames::DEFAULT)->isCommunicationError();
 }
 
 void PhidgetDriver::addMotorDriver(
@@ -107,6 +109,7 @@ PhidgetMotorDriver::PhidgetMotorDriver(
 , channel_(channel)
 , serial_number_(serial_number)
 , direction_reversed_(dir_reverse)
+, comm_timeout_(std::chrono::milliseconds(drivetrain_settings.driver_comm_timeout_ms))
 {
     encoder_resolution_ = drivetrain_settings.encoder_resolution;
 
@@ -274,27 +277,78 @@ void PhidgetMotorDriver::initialize()
 	ret = PhidgetCurrentInput_setOnCurrentChangeHandler(current_handle_, currentChangeHandler, this);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current callback for channel " + 
+        throw std::runtime_error("Failed to set current callback for channel " +
             std::to_string(channel_));
     }
 
     openWaitForAttachment(reinterpret_cast<PhidgetHandle>(current_handle_), -1, channel_, false, 0);
 
+    // Force the current channel to report on every data interval rather than only when the
+    // reading changes — this callback firing is also used as a communication-liveness signal
+    // (see last_update_time_ns_), and a stationary/steady-current robot must not look "stale".
+    uint32_t current_min_interval = 0;
+
+    ret = PhidgetCurrentInput_getMinDataInterval(current_handle_, &current_min_interval);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to get minimum data interval of the current input for motor channel " +
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetCurrentInput_setDataInterval(current_handle_, current_min_interval);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set minimum data interval of the current input for motor channel " +
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetCurrentInput_setCurrentChangeTrigger(current_handle_, 0.0);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set zero change trigger of the current input for motor channel " +
+            std::to_string(channel_));
+    }
+
     ret = PhidgetTemperatureSensor_create(&temperature_handle_);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to create Temperature handle for channel " +  
+        throw std::runtime_error("Failed to create Temperature handle for channel " +
             std::to_string(channel_));
     }
 
     ret = PhidgetTemperatureSensor_setOnTemperatureChangeHandler(temperature_handle_, temperatureChangeHandler, this);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set temperature callback for channel " + 
+        throw std::runtime_error("Failed to set temperature callback for channel " +
             std::to_string(channel_));
     }
 
     openWaitForAttachment(reinterpret_cast<PhidgetHandle>(temperature_handle_), -1, channel_, false, 0);
+
+    // Same rationale as the current channel above: force periodic reporting so it can serve as
+    // a communication-liveness signal even when the temperature reading is not changing.
+    uint32_t temperature_min_interval = 0;
+
+    ret = PhidgetTemperatureSensor_getMinDataInterval(temperature_handle_, &temperature_min_interval);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to get minimum data interval of the temperature sensor for motor channel " +
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetTemperatureSensor_setDataInterval(temperature_handle_, temperature_min_interval);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set minimum data interval of the temperature sensor for motor channel " +
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetTemperatureSensor_setTemperatureChangeTrigger(temperature_handle_, 0.0);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set zero change trigger of the temperature sensor for motor channel " +
+            std::to_string(channel_));
+    }
 }
 
 MotorDriverState PhidgetMotorDriver::readState()
@@ -315,6 +369,29 @@ double PhidgetMotorDriver::calculateRPM(int64_t delta_ticks, double dt, float pp
     return ((static_cast<double>(delta_ticks) / static_cast<double>(ppr)) * (60.0f / dt));
 }
 
+bool PhidgetMotorDriver::isCommunicationError()
+{
+    const auto last_update_ns = last_update_time_ns_.load(std::memory_order_relaxed);
+
+    if (last_update_ns == 0) {
+        // No telemetry callback has fired yet since construction - treat as a comm error.
+        return true;
+    }
+
+    const auto last_update = std::chrono::steady_clock::time_point(
+        std::chrono::nanoseconds(last_update_ns));
+
+    return isCommTimedOut(last_update, std::chrono::steady_clock::now(), comm_timeout_);
+}
+
+bool PhidgetMotorDriver::isCommTimedOut(
+    const std::chrono::steady_clock::time_point & last_update,
+    const std::chrono::steady_clock::time_point & now,
+    const std::chrono::nanoseconds & timeout)
+{
+    return (now - last_update) > timeout;
+}
+
 void CCONV PhidgetMotorDriver::positionChangeHandler(
     PhidgetEncoderHandle phid, 
     void *ctx, 
@@ -328,7 +405,11 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
     (void)indexTriggered;
     
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
-    
+
+    driver->last_update_time_ns_.store(
+        std::chrono::steady_clock::now().time_since_epoch().count(),
+        std::memory_order_relaxed);
+
     int64_t position;
 
 	PhidgetReturnCode ret = PhidgetEncoder_getPosition(phid, &position);
@@ -369,6 +450,10 @@ void CCONV PhidgetMotorDriver::currentChangeHandler(
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
+    driver->last_update_time_ns_.store(
+        std::chrono::steady_clock::now().time_since_epoch().count(),
+        std::memory_order_relaxed);
+
     {
         std::lock_guard<std::mutex> lck(driver->state_mtx_);
         driver->state_.current = static_cast<int16_t>(current * 1000.0);
@@ -384,6 +469,10 @@ void CCONV PhidgetMotorDriver::temperatureChangeHandler(
     (void)phid;
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
+
+    driver->last_update_time_ns_.store(
+        std::chrono::steady_clock::now().time_since_epoch().count(),
+        std::memory_order_relaxed);
 
     std::lock_guard<std::mutex> lck(driver->state_mtx_);
     driver->state_.temp = static_cast<float>(temperature);

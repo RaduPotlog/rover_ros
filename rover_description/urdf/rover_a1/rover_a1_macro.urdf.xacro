@@ -135,7 +135,13 @@
           <param name="driver_states_update_frequency">20.0</param>
           <param name="max_rover_driver_initialization_attempts">3.0</param>
           <param name="max_rover_driver_activation_attempts">3.0</param>
-          
+
+          <!-- Max time (ms) since the last Phidget SDK telemetry callback (position/current/
+               temperature) before a wheel driver is considered to have a communication error
+               (e.g. a USB disconnect). Tune against the measured minDataInterval on the real
+               boards if false positives/slow detection are observed. -->
+          <param name="driver_comm_timeout_ms">300</param>
+
           <!-- Motor parameters -->
           <param name="motor_torque_constant">0.11</param>
           <param name="max_rpm_motor_speed">2800</param>
