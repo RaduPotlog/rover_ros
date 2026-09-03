@@ -35,6 +35,7 @@
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 
 #include "rover_hardware_interface/rover_controller/rover_controller_e_stop_io.hpp"
+#include "rover_hardware_interface/rover_controller/rover_controller_gpio_adapter.hpp"
 #include "rover_hardware_interface/rover_driver/rover_a1_driver.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
@@ -194,6 +195,7 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
     }
 
     rover_controller_.reset();
+    rover_controller_impl_.reset();
     e_stop_.reset();
 
     return CallbackReturn::SUCCESS;
@@ -202,6 +204,7 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
 void RoverSystem::teardownRoverComponents()
 {
     rover_controller_.reset();
+    rover_controller_impl_.reset();
 
     if (rover_driver_) {
         rover_driver_->deinitialize();
@@ -436,10 +439,12 @@ void RoverSystem::readErrorFilterMaxErrorsCounts()
 void RoverSystem::configureRoverController()
 {
     rover_driver_write_mtx_ = std::make_shared<std::mutex>();
-    rover_controller_ = std::make_shared<RoverController>(
+    rover_controller_impl_ = std::make_shared<RoverController>(
         modbus_settings_.host, modbus_settings_.port,
         modbus_settings_.connection_retry_count,
         std::chrono::milliseconds(modbus_settings_.connection_retry_delay_ms));
+
+    rover_controller_ = std::make_shared<RoverControllerGpioAdapter>(rover_controller_impl_);
 
     rover_controller_->start();
     // TODO: Check if e-stop interface can be used
@@ -465,11 +470,11 @@ void RoverSystem::configureRoverDriver()
 
 void RoverSystem::configureEStop()
 {
-    if (!rover_controller_) {
+    if (!rover_controller_impl_) {
         throw std::runtime_error("Failed to configure E-Stop, make sure to setup entities first.");
     }
 
-    auto e_stop_io = std::make_shared<RoverControllerEStopIo>(rover_controller_);
+    auto e_stop_io = std::make_shared<RoverControllerEStopIo>(rover_controller_impl_);
 
     e_stop_ = std::make_shared<EmergencyStop>(
         e_stop_io, std::bind(&RoverSystem::areVelocityCommandsNearZero, this));

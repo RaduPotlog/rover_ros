@@ -37,6 +37,7 @@
 #include "rover_hardware_interface/rover_controller/rover_controller.hpp"
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
+#include "rover_hardware_interface/domain/rover_gpio_port.hpp"
 
 namespace rover_hardware_interface
 {
@@ -46,6 +47,24 @@ using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface
 using StateInterface = hardware_interface::StateInterface;
 using CommandInterface = hardware_interface::CommandInterface;
 
+// Real-time contract for read()/write() (see .claude/rules/ros2_control_architecture.md §5):
+//   - Driver feedback is a cached snapshot refreshed opportunistically under an uncontended lock
+//     (RoverDriverInterface::getData(), backed by PhidgetRoverDriver) - never blocks on the
+//     diagnostics thread.
+//   - GPIO/E-Stop IO reads (RoverGpioPort::queryControlInterfaceIOStates(),
+//     EmergencyStopInterface::readEStopState()/readEStopLatchState()) use try_lock and return the
+//     last-known-good value on contention rather than blocking, since the actual Modbus polling
+//     happens on a dedicated background thread (see ContactCoilHandler).
+//   - All read()-path publishing goes through realtime_tools::RealtimePublisher (see
+//     SystemROSInterface), never a plain rclcpp::Publisher::publish() call.
+//   - Motor commands in write() use the Phidget SDK's async call
+//     (PhidgetDCMotor_setTargetVelocity_async()) and drop the command rather than block if a
+//     prior async call hasn't completed yet.
+//   - handleRoverDriverWriteOperation() also uses try_lock and skips the write cycle on
+//     contention instead of blocking.
+//   - Accepted exception: RCLCPP_*_STREAM_THROTTLE calls on error/contention branches build a
+//     std::stringstream (allocates) but are throttled to at most once per 5s and only fire off
+//     the happy path - a deliberate tradeoff, not an oversight.
 class RoverSystem : public hardware_interface::SystemInterface
 {
 
@@ -135,8 +154,13 @@ protected:
 
     // Rover driver interface
     std::shared_ptr<RoverDriverInterface> rover_driver_;
-    // Rover safety controller interface
-    std::shared_ptr<RoverController> rover_controller_;
+    // Rover safety controller GPIO port (adapter over RoverController) - read()-path GPIO
+    // polling and initial arming go through this, not the concrete RoverController.
+    std::shared_ptr<RoverGpioPort> rover_controller_;
+    // Concrete Modbus-backed safety controller, kept only long enough to construct
+    // RoverControllerEStopIo (which needs isPinActive()/eStopLatchReset(), not part of
+    // RoverGpioPort) and RoverControllerGpioAdapter above.
+    std::shared_ptr<RoverController> rover_controller_impl_;
     // Rover emergency stop interface
     std::shared_ptr<EmergencyStopInterface> e_stop_;
     // Debounced/latched per-category error state (write cmds, read-motor-states,

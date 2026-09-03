@@ -75,6 +75,7 @@ add_library(
     src/rover_modbus/modbus.cpp
     src/rover_controller/rover_controller.cpp
     src/rover_controller/rover_controller_e_stop_io.cpp
+    src/rover_controller/rover_controller_gpio_adapter.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME} ${PACKAGE_DEPENDENCIES})

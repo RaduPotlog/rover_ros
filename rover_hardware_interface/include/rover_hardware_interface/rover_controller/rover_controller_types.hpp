@@ -18,31 +18,15 @@
 #include <map>
 #include <string>
 
+#include "rover_hardware_interface/domain/rover_gpio_types.hpp"
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 
 namespace rover_hardware_interface
 {
 
-enum class RoverControllerGpio
-{
-    GPIO_HW_E_STOP_USER_BTN             = 0,
-    GPIO_1                              = 1,
-    GPIO_2                              = 2,
-    GPIO_3                              = 3,
-    GPIO_4                              = 4,
-    GPIO_5                              = 5,
-    GPIO_6                              = 6,
-    GPIO_7                              = 7,
-    
-    GPIO_MOTOR_CONTACTOR_ENGAGED        = 8,
-    GPIO_SW_E_STOP_CPU_WDG_TRIGGER      = 9,  // sw_e_stop_cpu_wdg_trigger
-    GPIO_SW_E_STOP_USER_BUTTON          = 10, // sw_e_stop_user_button
-    GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT   = 11, // sw_e_stop_motor_driver_faults
-    GPIO_SW_E_STOP_LATCH_RESET          = 12, // sw_e_stop_latch_reset
-    GPIO_SW_E_STOP_LATCH_STATUS         = 13, // sw_e_stop_latch_status
-    GPIO_14                             = 14,
-    GPIO_15                             = 15,
-};
+// RoverControllerGpio itself now lives in domain/rover_gpio_types.hpp (RoverGpioPort needs it and
+// domain code may not include infrastructure headers); re-included here so existing call sites
+// that reach it via this header keep compiling unchanged.
 
 const std::map<RoverControllerGpio, std::string> gpio_names_
 {
