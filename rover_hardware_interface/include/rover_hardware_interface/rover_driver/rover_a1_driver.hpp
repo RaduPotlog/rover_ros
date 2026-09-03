@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_HARDWARE_INTERFACES_ROVER_DRIVER_ROVER_A1_DRIVER_HPP_
-#define ROVER_HARDWARE_INTERFACES_ROVER_DRIVER_ROVER_A1_DRIVER_HPP_
+#ifndef ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_ROVER_A1_DRIVER_HPP_
+#define ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_ROVER_A1_DRIVER_HPP_
 
 #include <chrono>
 #include <memory>
@@ -54,4 +54,4 @@ private:
 
 }  // namespace rover_hardware_interface
 
-#endif  // ROVER_HARDWARE_INTERFACES_ROVER_DRIVER_ROVER_A1_DRIVER_HPP_
+#endif  // ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_ROVER_A1_DRIVER_HPP_

@@ -27,6 +27,10 @@
   <depend>realtime_tools</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
+  <!-- Build-order only: imu_filter_madgwick's exported CMake target links against these; see
+       CMakeLists.txt for the full explanation. -->
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2_ros</depend>
 
   <!-- Rover messages and services -->
   <depend>rover_msgs</depend>

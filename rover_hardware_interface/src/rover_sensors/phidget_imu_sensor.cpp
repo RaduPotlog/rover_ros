@@ -228,10 +228,13 @@ void PhidgetImuSensor::checkInterfaces() const
 
 void PhidgetImuSensor::readObligatoryParams()
 {
-    params_.serial = std::stoi(info_.hardware_parameters.at("serial"));
-    params_.hub_port = std::stoi(info_.hardware_parameters.at("hub_port"));
-    params_.data_interval_ms = std::stoi(info_.hardware_parameters.at("data_interval_ms"));
-    params_.callback_delta_epsilon_ms = std::stoi(info_.hardware_parameters.at("callback_delta_epsilon_ms"));
+    // Despite the historical name, these all have documented defaults in
+    // phidgets_spatial_parameters.yaml and are applied here rather than thrown on absence -
+    // only genuinely required-with-no-sane-default configuration should ever throw from here.
+    params_.serial = readIntParamOrDefault("serial", -1);
+    params_.hub_port = readIntParamOrDefault("hub_port", 2);
+    params_.data_interval_ms = readIntParamOrDefault("data_interval_ms", 8);
+    params_.callback_delta_epsilon_ms = readIntParamOrDefault("callback_delta_epsilon_ms", 1);
 
     if (params_.callback_delta_epsilon_ms >= params_.data_interval_ms) {
         throw std::runtime_error("Invalid configuration: Callback epsilon is larger than the data interval.");
@@ -257,20 +260,26 @@ void PhidgetImuSensor::readCompassParams()
 
 void PhidgetImuSensor::readMadgwickFilterParams()
 {
-    params_.gain = hardware_interface::stod(info_.hardware_parameters.at("gain"));
-    params_.zeta = hardware_interface::stod(info_.hardware_parameters.at("zeta"));
-    params_.mag_bias_x = hardware_interface::stod(info_.hardware_parameters.at("mag_bias_x"));
-    params_.mag_bias_y = hardware_interface::stod(info_.hardware_parameters.at("mag_bias_y"));
-    params_.mag_bias_z = hardware_interface::stod(info_.hardware_parameters.at("mag_bias_z"));
-    params_.use_mag = hardware_interface::parse_bool(info_.hardware_parameters.at("use_mag"));
-    params_.stateless = hardware_interface::parse_bool(info_.hardware_parameters.at("stateless"));
-    params_.remove_gravity_vector = hardware_interface::parse_bool(info_.hardware_parameters.at("remove_gravity_vector"));
+    params_.gain = readDoubleParamOrDefault("gain", 0.1);
+    params_.zeta = readDoubleParamOrDefault("zeta", 0.1);
+    params_.mag_bias_x = readDoubleParamOrDefault("mag_bias_x", 0.0);
+    params_.mag_bias_y = readDoubleParamOrDefault("mag_bias_y", 0.0);
+    params_.mag_bias_z = readDoubleParamOrDefault("mag_bias_z", 0.0);
+    params_.use_mag = readBoolParamOrDefault("use_mag", false);
+    params_.stateless = readBoolParamOrDefault("stateless", false);
+    params_.remove_gravity_vector = readBoolParamOrDefault("remove_gravity_vector", false);
 
     checkMadgwickFilterWorldFrameParam();
 }
 
 void PhidgetImuSensor::checkMadgwickFilterWorldFrameParam()
 {
+    if (!isParamDefined("world_frame")) {
+        RCLCPP_INFO_STREAM(logger_, "Hardware parameter 'world_frame' not set, using default value: enu");
+        world_frame_ = WorldFrame::ENU;
+        return;
+    }
+
     const auto world_frame = info_.hardware_parameters.at("world_frame");
 
     if (world_frame == "ned") {
@@ -280,6 +289,7 @@ void PhidgetImuSensor::checkMadgwickFilterWorldFrameParam()
     } else if (world_frame == "enu") {
         world_frame_ = WorldFrame::ENU;
     } else {
+        world_frame_ = WorldFrame::ENU;
         RCLCPP_WARN_STREAM(logger_, "The parameter 'world_frame' was set to an invalid value (" 
             << world_frame
             << "). Valid values are ['enu', 'ned', 'nwu']. Setting to default value 'enu'.");
@@ -330,6 +340,39 @@ bool PhidgetImuSensor::areParamsDefined(const std::unordered_set<std::string> & 
     }
 
     return true;
+}
+
+int PhidgetImuSensor::readIntParamOrDefault(const std::string & param_name, const int default_value) const
+{
+    if (!isParamDefined(param_name)) {
+        RCLCPP_INFO_STREAM(logger_, "Hardware parameter '" << param_name
+            << "' not set, using default value: " << default_value);
+        return default_value;
+    }
+
+    return std::stoi(info_.hardware_parameters.at(param_name));
+}
+
+double PhidgetImuSensor::readDoubleParamOrDefault(const std::string & param_name, const double default_value) const
+{
+    if (!isParamDefined(param_name)) {
+        RCLCPP_INFO_STREAM(logger_, "Hardware parameter '" << param_name
+            << "' not set, using default value: " << default_value);
+        return default_value;
+    }
+
+    return hardware_interface::stod(info_.hardware_parameters.at(param_name));
+}
+
+bool PhidgetImuSensor::readBoolParamOrDefault(const std::string & param_name, const bool default_value) const
+{
+    if (!isParamDefined(param_name)) {
+        RCLCPP_INFO_STREAM(logger_, "Hardware parameter '" << param_name
+            << "' not set, using default value: " << (default_value ? "true" : "false"));
+        return default_value;
+    }
+
+    return hardware_interface::parse_bool(info_.hardware_parameters.at(param_name));
 }
 
 void PhidgetImuSensor::configureCompassParams()

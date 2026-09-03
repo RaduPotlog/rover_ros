@@ -87,6 +87,14 @@ protected:
     bool isParamDefined(const std::string & param_name) const;
     bool areParamsDefined(const std::unordered_set<std::string> & params_names) const;
 
+    // Fall back to `default_value` (matching phidgets_spatial_parameters.yaml's declared
+    // default_value for the same key) when the URDF hardware parameter is not present, instead of
+    // throwing via info_.hardware_parameters.at(). Logs at INFO so a missing-but-defaulted param
+    // is still visible, unlike a silent fallback.
+    int readIntParamOrDefault(const std::string & param_name, const int default_value) const;
+    double readDoubleParamOrDefault(const std::string & param_name, const double default_value) const;
+    bool readBoolParamOrDefault(const std::string & param_name, const bool default_value) const;
+
     void configureCompassParams();
     void configureHeating();
     void configureMadgwickFilter();
@@ -162,7 +170,9 @@ protected:
     std::unique_ptr<phidgets::Spatial> spatial_;
 
     std::unique_ptr<ImuFilter> filter_;
-    WorldFrame::WorldFrame world_frame_;
+    // Defaults to ENU to match checkMadgwickFilterWorldFrameParam()'s documented fallback when
+    // the 'world_frame' hardware parameter is missing/invalid - previously left uninitialized.
+    WorldFrame::WorldFrame world_frame_ = WorldFrame::ENU;
     std::atomic_bool imu_connected_{false};
 
     ImuCalibrationGate imu_calibration_gate_;

@@ -123,7 +123,12 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
         executor_->spin(); }
     );
 
-    driver_state_publisher_ = node_->create_publisher<RoverDriverStateMsg>("hardware_interface/rover_driver_state", 5);
+    // Periodic, non-latched telemetry: explicit reliable/volatile QoS (matches
+    // ros2_communication.md's "Commands"/high-frequency-state guidance) rather than relying on
+    // the create_publisher(size_t) default.
+    driver_state_publisher_ = node_->create_publisher<RoverDriverStateMsg>(
+        "hardware_interface/rover_driver_state",
+        rclcpp::QoS(rclcpp::KeepLast(5)).reliable().durability_volatile());
     realtime_driver_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<RoverDriverStateMsg>>(driver_state_publisher_);
 
     // Pre-populate all 4 driver-state slots up front so getDriverStateByName() never has to

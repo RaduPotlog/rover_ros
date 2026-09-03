@@ -104,26 +104,23 @@ bool ContactCoilHandler::isContactCoilHandlerEnabled() const
 // SW E-STOP USER BTN - sw_e_stop_user_button
 void ContactCoilHandler::eStopUserBtnTrigger(const bool state)
 {
-    write_to_modbus_mtx_.lock();
+    std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[2].coil_info, state);
-    write_to_modbus_mtx_.unlock();
 }
 
 // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
 void ContactCoilHandler::eStopMotorDriverFaultTrigger(const bool state)
 {
-    write_to_modbus_mtx_.lock();
+    std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[3].coil_info, state);
-    write_to_modbus_mtx_.unlock();
 }
 
 // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
 void ContactCoilHandler::eStopLatchReset()
 {
-    write_to_modbus_mtx_.lock();
+    std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[4].coil_info, true);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[4].coil_info, false);
-    write_to_modbus_mtx_.unlock();
 }
 
 void ContactCoilHandler::getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state)
@@ -179,12 +176,13 @@ void ContactCoilHandler::contactCoilHandlerThread()
     static bool wdg_state = false;
 
     while (contact_coil_handler_enabled_) {
-        // Trigger watchdog
-        write_to_modbus_mtx_.lock();
-        io_state_ = queryControlInterfaceIOStates();
-        rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[1].coil_info, wdg_state);
-        wdg_state = !wdg_state;
-        write_to_modbus_mtx_.unlock();  
+        {
+            // Trigger watchdog
+            std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
+            io_state_ = queryControlInterfaceIOStates();
+            rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[1].coil_info, wdg_state);
+            wdg_state = !wdg_state;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }

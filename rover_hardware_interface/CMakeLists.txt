@@ -12,9 +12,10 @@ set(PACKAGE_DEPENDENCIES
     generate_parameter_library
     geometry_msgs
     hardware_interface
-    # Must resolve before imu_filter_madgwick: that package's exported CMake target links
-    # against rclcpp_components::component, and ament's find_package(imu_filter_madgwick)
-    # expects that imported target to already exist.
+    # Not used directly by this package's code (no component registration here) - it is a pure
+    # build-order dependency: it must resolve before imu_filter_madgwick, because that package's
+    # exported CMake target links against rclcpp_components::component, and ament's
+    # find_package(imu_filter_madgwick) expects that imported target to already exist.
     rclcpp_components
     imu_filter_madgwick
     rover_msgs
@@ -25,6 +26,10 @@ set(PACKAGE_DEPENDENCIES
     realtime_tools
     std_msgs
     std_srvs
+    # Not used directly by this package's code either - same pure build-order rationale as
+    # rclcpp_components above: imu_filter_madgwick's exported CMake target links against
+    # tf2_geometry_msgs::tf2_geometry_msgs, so that imported target must already exist by the
+    # time find_package(imu_filter_madgwick) runs, or CMake configure fails.
     tf2_geometry_msgs
     tf2_ros
 )
@@ -132,6 +137,17 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_utils test/test_utils.cpp)
   target_link_libraries(test_utils ${PROJECT_NAME})
+
+  ament_add_gtest(
+    test_phidget_data_transformer test/rover_driver/test_phidget_data_transformer.cpp)
+  target_link_libraries(test_phidget_data_transformer ${PROJECT_NAME})
+
+  # Integration test: drives SystemROSInterface (services + publishers) over the real rclcpp
+  # graph - no Phidget/Modbus hardware involved (see test/infrastructure/test_system_ros_interface.cpp).
+  ament_add_gtest(
+    test_system_ros_interface test/infrastructure/test_system_ros_interface.cpp)
+  target_link_libraries(test_system_ros_interface ${PROJECT_NAME})
+  ament_target_dependencies(test_system_ros_interface rclcpp std_srvs)
 endif()
 
 ament_package()
