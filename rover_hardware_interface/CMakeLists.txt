@@ -61,14 +61,15 @@ add_library(
     src/domain/driver_data_snapshot.cpp
     src/domain/rover_error_filter.cpp
     src/domain/imu_calibration.cpp
+    src/domain/emergency_stop.cpp
     src/rover_driver/rover_a1_driver.cpp
     src/rover_system/rover_a1_system.cpp
     src/rover_system/rover_system.cpp
     src/system_ros_interface/system_ros_interface.cpp
-    src/system_e_stop/system_e_stop.cpp
     src/utils.cpp
     src/rover_modbus/modbus.cpp
     src/rover_controller/rover_controller.cpp
+    src/rover_controller/rover_controller_e_stop_io.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME} ${PACKAGE_DEPENDENCIES})
@@ -125,6 +126,9 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_imu_calibration test/domain/test_imu_calibration.cpp)
   target_link_libraries(test_imu_calibration ${PROJECT_NAME})
+
+  ament_add_gtest(test_emergency_stop test/domain/test_emergency_stop.cpp)
+  target_link_libraries(test_emergency_stop ${PROJECT_NAME})
 
   ament_add_gtest(test_utils test/test_utils.cpp)
   target_link_libraries(test_utils ${PROJECT_NAME})

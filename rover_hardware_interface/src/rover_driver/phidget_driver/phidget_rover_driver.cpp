@@ -50,6 +50,7 @@ void PhidgetRoverDriver::initialize()
         
         for (auto & [name, driver] : drivers_) {
             data_.emplace(name, DriverDataSnapshot(drivetrain_settings_));
+            last_known_data_.emplace(name, data_.at(name));
         }
 
         initDrivers();
@@ -164,13 +165,21 @@ bool PhidgetRoverDriver::isFlagError()
 
 DriverDataSnapshot PhidgetRoverDriver::getData(const DriverNames name)
 {
-    std::lock_guard<std::mutex> lck(data_mtx_);
-
-    if (data_.find(name) == data_.end()) {
+    // `last_known_data_` mirrors `data_`'s keys 1:1 (both seeded together in initialize(), never
+    // modified structurally afterwards), so this check doesn't need data_mtx_.
+    if (last_known_data_.find(name) == last_known_data_.end()) {
         throw std::runtime_error("Data with name '" + driverNamesToString(name) + "' does not exist.");
     }
 
-    return data_.at(name);
+    // Non-blocking: this may run on the RT thread (via RoverA1System::updateHwStates()), which
+    // must never block waiting on the diagnostics thread's own getData() call. On contention,
+    // return the last successfully-read snapshot instead - see last_known_data_'s comment.
+    std::unique_lock<std::mutex> lck(data_mtx_, std::try_to_lock);
+    if (lck.owns_lock()) {
+        last_known_data_.at(name) = data_.at(name);
+    }
+
+    return last_known_data_.at(name);
 }
 
 PhidgetVelocityCommandDataTransformer & PhidgetRoverDriver::getCmdVelConverter() 

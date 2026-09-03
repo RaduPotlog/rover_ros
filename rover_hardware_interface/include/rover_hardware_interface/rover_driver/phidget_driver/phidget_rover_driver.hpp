@@ -19,6 +19,7 @@
 #include <chrono>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "rover_hardware_interface/domain/driver.hpp"
@@ -99,6 +100,14 @@ private:
     // SystemROSInterface's own executor thread, not the RT thread).
     mutable std::mutex data_mtx_;
     std::unordered_map<DriverNames, DriverDataSnapshot> data_;
+
+    // getData() is itself on the RT path (called every read() cycle via
+    // RoverA1System::updateHwStates()), so unlike updateMotorsState()/updateDriversState() it must
+    // never block waiting on the diagnostics thread's own getData() call. Mirrors `data_`'s keys
+    // 1:1 (seeded alongside it in initialize(), never structurally modified afterwards) and is
+    // refreshed opportunistically in getData() on uncontended lock acquisition; on contention the
+    // last successfully-read snapshot is returned instead of blocking.
+    std::unordered_map<DriverNames, DriverDataSnapshot> last_known_data_;
 
     PhidgetVelocityCommandDataTransformer phidget_vel_cmd_converter_;
 

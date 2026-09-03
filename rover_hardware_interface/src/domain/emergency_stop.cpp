@@ -12,38 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <chrono>
-#include <cstdio>
-#include <memory>
-#include <string>
+#include "rover_hardware_interface/domain/emergency_stop.hpp"
 
-#include "rover_hardware_interface/system_e_stop/system_e_stop.hpp"
+#include <stdexcept>
+#include <string>
+#include <utility>
 
 namespace rover_hardware_interface
 {
 
 EmergencyStop::EmergencyStop(
-    std::shared_ptr<RoverController> rover_controller,
-    std::shared_ptr<RoverDriverInterface> rover_driver,
-    std::shared_ptr<std::mutex> rover_driver_write_mtx, 
+    std::shared_ptr<EmergencyStopIoPort> io,
     std::function<bool()> zero_velocity_check)
 : EmergencyStopInterface()
-, rover_controller_(rover_controller)
-, rover_driver_(rover_driver)
-, rover_driver_write_mtx_(rover_driver_write_mtx)
-, zeroVelocityCheck(zero_velocity_check) 
+, io_(std::move(io))
+, zeroVelocityCheck(std::move(zero_velocity_check))
 {
 
-};
+}
 
 bool EmergencyStop::readEStopState()
 {
-    // Polarity matches the write side (setEStop()/resetEStop() below): the coil reads back
-    // `true` when the E-Stop is triggered, `false` when clear — isPinActive() already *is*
+    // Polarity matches the write side (setEStop()/resetEStop() below): the port reports `true`
+    // when the E-Stop is triggered, `false` when clear — isUserButtonActive() already *is*
     // "is triggered," no negation.
     if (e_stop_manipulation_mtx_.try_lock()) {
         std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_, std::adopt_lock);
-        user_e_stop_triggered_ = rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON);
+        user_e_stop_triggered_ = io_->isUserButtonActive();
     }
 
     return user_e_stop_triggered_;
@@ -53,7 +48,7 @@ bool EmergencyStop::readEStopLatchState()
 {
     if (e_stop_manipulation_mtx_.try_lock()) {
         std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_, std::adopt_lock);
-        latch_triggered_ = rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS);
+        latch_triggered_ = io_->isLatchActive();
     }
 
     return latch_triggered_;
@@ -62,9 +57,9 @@ bool EmergencyStop::readEStopLatchState()
 void EmergencyStop::setEStop()
 {
     std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_);
-    
+
     try {
-        rover_controller_->eStopUserBtnTrigger(true);
+        io_->triggerUserButton(true);
     } catch (const std::runtime_error & e) {
         throw std::runtime_error("Setting User E-Stop failed: " + std::string(e.what()));
     }
@@ -80,7 +75,7 @@ void EmergencyStop::resetEStop()
     }
 
     try {
-        rover_controller_->eStopUserBtnTrigger(false);
+        io_->triggerUserButton(false);
     } catch (const std::runtime_error & e) {
         throw std::runtime_error("Error when trying to reset User E-Stop: " + std::string(e.what()));
     }
@@ -89,13 +84,12 @@ void EmergencyStop::resetEStop()
 void EmergencyStop::resetEStopLatch()
 {
     std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_);
-    
+
     try {
-        rover_controller_->eStopLatchReset();
+        io_->resetLatch();
     } catch (const std::runtime_error & e) {
         throw std::runtime_error("Error when trying to reset E-Stop Latch: " + std::string(e.what()));
     }
 }
 
 }  // namespace rover_hardware_interface
-

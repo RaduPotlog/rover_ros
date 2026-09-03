@@ -35,7 +35,7 @@
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
 #include "rover_hardware_interface/rover_controller/rover_controller.hpp"
-#include "rover_hardware_interface/system_e_stop/system_e_stop.hpp"
+#include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
 
 namespace rover_hardware_interface

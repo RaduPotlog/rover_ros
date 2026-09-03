@@ -23,11 +23,11 @@ namespace rover_hardware_interface
 FlagError::FlagError(
     const std::vector<std::string> & flag_names,
     const std::vector<std::string> & suppressed_flags_names)
-: flag_names_(flag_names)
+: flag_names_(&flag_names)
 {
     for (size_t i = 0; i < suppressed_flags_names.size(); ++i) {
-        for (size_t j = 0; j < flag_names_.size(); ++j) {
-            if (suppressed_flags_names[i] == flag_names_[j]) {
+        for (size_t j = 0; j < flag_names_->size(); ++j) {
+            if (suppressed_flags_names[i] == (*flag_names_)[j]) {
                 suppressed_flags_.set(j);
             }
         }
@@ -38,9 +38,9 @@ std::string FlagError::getErrorLog() const
 {
     std::string error_msg = "";
 
-    for (std::size_t i = 0; i < flag_names_.size(); i++) {
+    for (std::size_t i = 0; i < flag_names_->size(); i++) {
         if ((flags_ & (~suppressed_flags_)).test(i)) {
-            error_msg += flag_names_[i] + " ";
+            error_msg += (*flag_names_)[i] + " ";
         }
     }
 
@@ -62,8 +62,8 @@ std::map<std::string, bool> FaultFlag::getErrorMap() const
 {
     std::map<std::string, bool> error_map;
 
-    for (std::size_t i = 0; i < flag_names_.size(); i++) {
-        error_map["fault_flag." + flag_names_[i]] = flags_.test(i);
+    for (std::size_t i = 0; i < flag_names_->size(); i++) {
+        error_map["fault_flag." + (*flag_names_)[i]] = flags_.test(i);
     }
 
     return error_map;
@@ -87,8 +87,8 @@ std::map<std::string, bool> RuntimeError::getErrorMap() const
 {
     std::map<std::string, bool> error_map;
 
-    for (std::size_t i = 0; i < flag_names_.size(); i++) {
-        error_map["runtime_error." + flag_names_[i]] = flags_.test(i);
+    for (std::size_t i = 0; i < flag_names_->size(); i++) {
+        error_map["runtime_error." + (*flag_names_)[i]] = flags_.test(i);
     }
 
     return error_map;

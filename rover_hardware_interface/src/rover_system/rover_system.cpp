@@ -34,6 +34,7 @@
 #include <hardware_interface/system_interface.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 
+#include "rover_hardware_interface/rover_controller/rover_controller_e_stop_io.hpp"
 #include "rover_hardware_interface/rover_driver/rover_a1_driver.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
@@ -464,13 +465,14 @@ void RoverSystem::configureRoverDriver()
 
 void RoverSystem::configureEStop()
 {
-    if (!rover_controller_ || !rover_driver_ || !rover_driver_write_mtx_) {
+    if (!rover_controller_) {
         throw std::runtime_error("Failed to configure E-Stop, make sure to setup entities first.");
     }
 
+    auto e_stop_io = std::make_shared<RoverControllerEStopIo>(rover_controller_);
+
     e_stop_ = std::make_shared<EmergencyStop>(
-        rover_controller_, rover_driver_, rover_driver_write_mtx_,
-        std::bind(&RoverSystem::areVelocityCommandsNearZero, this));
+        e_stop_io, std::bind(&RoverSystem::areVelocityCommandsNearZero, this));
 
     RCLCPP_INFO(logger_, "Successfully configured SW User E-Stop");
 }
