@@ -54,19 +54,32 @@ RoverErrorFilter::RoverErrorFilter(
 
 bool RoverErrorFilter::isError() const
 {
+    std::lock_guard<std::mutex> lck(mtx_);
+
     return std::any_of(
         error_filters_.begin(), error_filters_.end(),
         [](const auto & entry) { return entry.second.isError(); });
 }
 
+bool RoverErrorFilter::isError(const ErrorsFilterIds id) const
+{
+    std::lock_guard<std::mutex> lck(mtx_);
+
+    return error_filters_.at(id).isError();
+}
+
 void RoverErrorFilter::updateError(const ErrorsFilterIds id, const bool current_error)
 {
+    std::lock_guard<std::mutex> lck(mtx_);
+
     clearErrorsIfFlagSet();
     error_filters_.at(id).updateError(current_error);
 }
 
 std::map<std::string, bool> RoverErrorFilter::getErrorMap() const
 {
+    std::lock_guard<std::mutex> lck(mtx_);
+
     std::map<std::string, bool> error_map;
 
     for (const auto & [id, filter] : error_filters_) {
@@ -76,6 +89,7 @@ std::map<std::string, bool> RoverErrorFilter::getErrorMap() const
     return error_map;
 }
 
+// Assumes mtx_ is already held by the caller (updateError()).
 void RoverErrorFilter::clearErrorsIfFlagSet()
 {
     if (clear_errors_) {

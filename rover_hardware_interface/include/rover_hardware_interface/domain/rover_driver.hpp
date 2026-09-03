@@ -42,7 +42,10 @@ public:
 
     virtual void updateDriversState() = 0;
 
-    virtual const DriverDataSnapshot & getData(const DriverNames name) = 0;
+    // Returned by value (a copy taken under lock by the implementation): getData() may be called
+    // from a thread other than the one that mutates the driver's state (e.g. diagnostics), so a
+    // reference into internal state would not be safe to hand out.
+    virtual DriverDataSnapshot getData(const DriverNames name) = 0;
 
     virtual void sendSpeedCmd(const std::vector<float> & speeds) = 0;
 

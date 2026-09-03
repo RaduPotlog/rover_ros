@@ -251,18 +251,4 @@ bool RoverController::isPinActive(const RoverControllerGpio pin)
     return it != io_state.end() && it->second;
 }
 
-bool RoverController::waitFor(std::chrono::milliseconds timeout)
-{
-    std::unique_lock<std::mutex> lck(e_stop_cv_mtx_);
-
-    should_abort_e_stop_reset_ = false;
-    
-    bool interrupted = e_stop_cv_.wait_for(
-        lck, timeout, [&]() { 
-            return should_abort_e_stop_reset_;
-    });
-
-    return !interrupted;
-}
-
 }  // namespace rover_hardware_interface

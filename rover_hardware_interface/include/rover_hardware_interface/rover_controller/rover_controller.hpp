@@ -17,7 +17,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -118,15 +117,7 @@ private:
 
     std::unique_ptr<ContactCoilHandler> contactCoilHandler_;
 
-    bool waitFor(std::chrono::milliseconds timeout);
-
     std::shared_ptr<RoverModbus> rover_modbus_;
-
-    std::mutex e_stop_cv_mtx_;
-
-    std::condition_variable e_stop_cv_;
-
-    volatile std::atomic_bool should_abort_e_stop_reset_ = false;
 
     // Reused across calls by queryControlInterfaceIOStates() to avoid allocating on the RT thread.
     std::unordered_map<RoverControllerGpio, bool> io_state_cache_;

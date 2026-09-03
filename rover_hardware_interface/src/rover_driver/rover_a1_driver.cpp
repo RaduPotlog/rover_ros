@@ -27,7 +27,7 @@ RoverA1Driver::RoverA1Driver(
     const std::chrono::milliseconds activate_wait_time)
 : PhidgetRoverDriver(drivetrain_settings, activate_wait_time)
 {
-    drivetrain_settings_ = drivetrain_settings;
+
 }
 
 void RoverA1Driver::sendSpeedCmd(const std::vector<float> & speeds)

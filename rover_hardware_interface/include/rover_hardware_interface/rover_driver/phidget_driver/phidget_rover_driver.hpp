@@ -15,7 +15,9 @@
 #ifndef ROVER_HARDWARE_INTERFACES_ROVER_DRIVER_PHIDGET_ROVER_DRIVER_PHIDGET_ROVER_DRIVER_HPP_
 #define ROVER_HARDWARE_INTERFACES_ROVER_DRIVER_PHIDGET_ROVER_DRIVER_PHIDGET_ROVER_DRIVER_HPP_
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -61,7 +63,7 @@ public:
 
     bool isFlagError() override;
 
-    const DriverDataSnapshot & getData(const DriverNames name) override;
+    DriverDataSnapshot getData(const DriverNames name) override;
 
 protected:
 
@@ -90,16 +92,21 @@ private:
 
     bool initialized_ = false;
 
+    // Guards `data_`'s values (not its structure - entries are only ever inserted once,
+    // single-threaded, in initialize()). Written from the RT thread (updateMotorsState()/
+    // updateDriversState()); read from getData(), which may be called from a different thread
+    // (e.g. RoverA1System::diagnoseErrors()/diagnoseStatus(), which run on
+    // SystemROSInterface's own executor thread, not the RT thread).
+    mutable std::mutex data_mtx_;
     std::unordered_map<DriverNames, DriverDataSnapshot> data_;
 
     PhidgetVelocityCommandDataTransformer phidget_vel_cmd_converter_;
 
     const std::chrono::milliseconds activate_wait_time_;
 
-    // Cached once per RT cycle by updateCommunicationStatus(); isCommunicationError() is then a
-    // cheap getter. Both are always called from the same (RT) thread within RoverSystem::read(),
-    // so a plain bool is sufficient - no atomic/mutex needed here.
-    bool has_communication_error_ = false;
+    // Written by updateCommunicationStatus() (RT thread), read by isCommunicationError() (may be
+    // called from a different thread - see data_mtx_ above for the same cross-thread rationale).
+    std::atomic_bool has_communication_error_{false};
 };
 
 }  // namespace rover_hardware_interface

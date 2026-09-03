@@ -41,10 +41,8 @@ public:
     void attemptErrorFlagReset();
 
 protected:
-  
-    void defineDrivers() override;
 
-    DrivetrainSettings drivetrain_settings_;
+    void defineDrivers() override;
 };
 
 }  // namespace rover_hardware_interface

@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <map>
+#include <mutex>
 #include <string>
 
 namespace rover_hardware_interface
@@ -60,10 +61,12 @@ const std::map<ErrorsFilterIds, std::string> kErrorFilterIdNames = {
     {ErrorsFilterIds::FAULT_FLAG,        "fault_flag_error"},
 };
 
-// Aggregates one ErrorFilter per ErrorsFilterIds category. updateError()/isError() must always be
-// called from the same thread (the RT control loop); setClearErrorsFlag() may be called from any
-// thread (e.g. a ROS service callback) - the actual clear is applied lazily on the next
-// updateError() call via `clear_errors_`, an atomic_bool.
+// Aggregates one ErrorFilter per ErrorsFilterIds category. `mtx_` guards `error_filters_` so
+// updateError() (written only from the RT control loop) and isError()/getErrorMap() (read from
+// diagnostic_updater's own executor thread) can safely race - see rover_hardware_interface's
+// RoverA1System::diagnoseErrors()/diagnoseStatus(), which run on that separate thread.
+// setClearErrorsFlag() may be called from any thread (e.g. a ROS service callback); the actual
+// clear is applied lazily on the next updateError() call via `clear_errors_`, an atomic_bool.
 class RoverErrorFilter
 {
 
@@ -77,7 +80,7 @@ public:
 
     bool isError() const;
 
-    bool isError(const ErrorsFilterIds id) const { return error_filters_.at(id).isError(); }
+    bool isError(const ErrorsFilterIds id) const;
 
     void updateError(const ErrorsFilterIds id, const bool current_error);
 
@@ -90,6 +93,7 @@ private:
     void clearErrorsIfFlagSet();
 
     std::atomic_bool clear_errors_ = false;
+    mutable std::mutex mtx_;
     std::map<ErrorsFilterIds, ErrorFilter> error_filters_;
 };
 

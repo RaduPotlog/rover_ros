@@ -101,14 +101,21 @@ void PhidgetRoverDriver::updateMotorsState()
     for (auto & [name, driver] : drivers_) {
         auto motor_driver = driver->getMotorDriver(MotorNames::DEFAULT);
         const auto state = motor_driver->readState();
-        setMotorsStates(data_.at(name), state, motor_driver->isCommunicationError());
+        const bool data_timed_out = motor_driver->isCommunicationError();
+
+        std::lock_guard<std::mutex> lck(data_mtx_);
+        setMotorsStates(data_.at(name), state, data_timed_out);
     }
 }
 
 void PhidgetRoverDriver::updateDriversState()
 {
     for (auto & [name, driver] : drivers_) {
-        setDriverState(data_.at(name), driver->readState(), driver->isCommunicationError());
+        const auto state = driver->readState();
+        const bool data_timed_out = driver->isCommunicationError();
+
+        std::lock_guard<std::mutex> lck(data_mtx_);
+        setDriverState(data_.at(name), state, data_timed_out);
     }
 }
 
@@ -155,8 +162,10 @@ bool PhidgetRoverDriver::isFlagError()
     return false;
 }
 
-const DriverDataSnapshot & PhidgetRoverDriver::getData(const DriverNames name)
+DriverDataSnapshot PhidgetRoverDriver::getData(const DriverNames name)
 {
+    std::lock_guard<std::mutex> lck(data_mtx_);
+
     if (data_.find(name) == data_.end()) {
         throw std::runtime_error("Data with name '" + driverNamesToString(name) + "' does not exist.");
     }
