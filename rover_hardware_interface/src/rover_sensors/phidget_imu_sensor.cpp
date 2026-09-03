@@ -350,7 +350,7 @@ void PhidgetImuSensor::configureCompassParams()
 void PhidgetImuSensor::configureHeating()
 {
     if (isParamDefined("heating_enabled")) {
-        params_.heating_enabled = hardware_interface::stod(info_.hardware_parameters["heating_enabled"]);
+        params_.heating_enabled = hardware_interface::parse_bool(info_.hardware_parameters.at("heating_enabled"));
         spatial_->setHeatingEnabled(params_.heating_enabled);
     } else {
         RCLCPP_INFO(logger_, "Heating configuration parameter not found. Skipping heating setup.");

@@ -70,7 +70,15 @@ bool RoverErrorFilter::isError(const ErrorsFilterIds id) const
 
 void RoverErrorFilter::updateError(const ErrorsFilterIds id, const bool current_error)
 {
-    std::lock_guard<std::mutex> lck(mtx_);
+    // Written from the RT thread (see header) - must never block waiting on isError()/
+    // getErrorMap() running on the diagnostics thread. On contention, skip this update: the next
+    // read()/write() cycle retries, and ErrorFilter's own consecutive-count debouncing means one
+    // skipped update doesn't change the eventual latched result.
+    std::unique_lock<std::mutex> lck(mtx_, std::try_to_lock);
+
+    if (!lck.owns_lock()) {
+        return;
+    }
 
     clearErrorsIfFlagSet();
     error_filters_.at(id).updateError(current_error);

@@ -20,13 +20,14 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
-#include <iostream>
 #include <thread>
 
 #include <modbusRequest.hpp>
 #include <modbusResponse.hpp>
 #include <modbusException.hpp>
 #include <modbusUtils.hpp>
+
+#include "rclcpp/rclcpp.hpp"
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 
@@ -61,6 +62,8 @@ private:
     MB::ModbusResponse sendRequest(const MB::ModbusRequest &request);
 
     std::unique_ptr<ModbusConnection> connection_;
+
+    rclcpp::Logger logger_{rclcpp::get_logger("RoverModbus")};
 };
 
 }  // namespace rover_hardware_interface

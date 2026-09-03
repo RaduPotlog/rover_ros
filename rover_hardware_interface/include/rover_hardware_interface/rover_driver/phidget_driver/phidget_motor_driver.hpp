@@ -58,6 +58,8 @@ private:
     std::promise<void> init_promise_;
 
     std::unordered_map<MotorNames, std::shared_ptr<MotorDriverInterface>> motor_drivers_;
+
+    rclcpp::Logger logger_{rclcpp::get_logger("PhidgetDriver")};
 };
 
 class PhidgetMotorDriver : public MotorDriverInterface

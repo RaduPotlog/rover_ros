@@ -30,8 +30,6 @@ class RoverA1System : public RoverSystem
 
 public:
 
-    RCLCPP_SHARED_PTR_DEFINITIONS(RoverA1System)
-
     RoverA1System();
 
     ~RoverA1System() = default;

@@ -21,6 +21,11 @@
 namespace rover_hardware_interface
 {
 
+// std::cerr (not RCLCPP_*) is deliberate here: utils.hpp is included by
+// domain/driver_data_snapshot.hpp (for DrivetrainSettings) and must stay transitively free of
+// rclcpp, or the domain layer's ROS-independence (enforced by scripts/check_domain_purity.sh for
+// direct includes) would be silently broken one include deeper than that script can check.
+
 bool operationWithAttempts(
     const std::function<void()> operation,
     const unsigned max_attempts,

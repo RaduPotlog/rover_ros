@@ -61,8 +61,6 @@ public:
     static constexpr double KImuMagneticFieldUnknownValue = 1e300;
     static constexpr float G = 9.80665;
 
-    RCLCPP_SHARED_PTR_DEFINITIONS(PhidgetImuSensor)
-
     CallbackReturn on_init(const hardware_interface::HardwareComponentInterfaceParams & params) override;
     CallbackReturn on_configure(const rclcpp_lifecycle::State & previous_state) override;
     CallbackReturn on_cleanup(const rclcpp_lifecycle::State & previous_state) override;

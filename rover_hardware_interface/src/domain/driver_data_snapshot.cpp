@@ -47,13 +47,13 @@ std::string FlagError::getErrorLog() const
     return error_msg;
 }
 
+const std::vector<std::string> FaultFlag::kFlagNames = {
+    "emergency_stop",
+    "motor_setup_fault",
+};
+
 FaultFlag::FaultFlag()
-: FlagError(
-    {
-        "emergency_stop",
-        "motor_setup_fault",
-    }
-)
+: FlagError(kFlagNames)
 {
 
 }
@@ -69,15 +69,16 @@ std::map<std::string, bool> FaultFlag::getErrorMap() const
     return error_map;
 }
 
+const std::vector<std::string> RuntimeError::kFlagNames = {
+    "safety_stop_active",
+};
+
+const std::vector<std::string> RuntimeError::kSuppressedFlagNames = {
+    "safety_stop_active",
+};
+
 RuntimeError::RuntimeError()
-: FlagError(
-    {
-      "safety_stop_active",
-    },
-    {
-      "safety_stop_active",
-    }
-)
+: FlagError(kFlagNames, kSuppressedFlagNames)
 {
 
 }

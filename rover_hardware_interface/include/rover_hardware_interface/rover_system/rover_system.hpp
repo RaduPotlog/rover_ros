@@ -51,8 +51,6 @@ class RoverSystem : public hardware_interface::SystemInterface
 
 public:
 
-    RCLCPP_SHARED_PTR_DEFINITIONS(RoverSystem)
-
     RoverSystem(const std::vector<std::string> & joint_order);
     
     virtual ~RoverSystem() = default;
@@ -87,6 +85,12 @@ protected:
     void configureRoverController();
     void configureRoverDriver();
     void configureEStop();
+
+    // Shared by on_cleanup()/on_shutdown(): both tear down the same set of owned components, and
+    // on_shutdown() in particular must tolerate being called from Unconfigured (rover_driver_ /
+    // rover_controller_ / e_stop_ / system_ros_interface_ still null - on_configure() was never
+    // reached), which the null check on rover_driver_ guards against.
+    void teardownRoverComponents();
 
     virtual void defineRoverDriver() = 0;
 

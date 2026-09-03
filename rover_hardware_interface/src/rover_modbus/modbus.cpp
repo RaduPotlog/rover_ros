@@ -68,7 +68,7 @@ uint16_t RoverModbus::readDiscreteContact(const ContactInfo &contact)
         MB::ModbusResponse resp = sendRequest(request);
         contact_value = resp.registerValues().front().isCoil() ? resp.registerValues().front().coil() : 255U;
     } catch (const MB::ModbusException &) {
-        std::cerr << "Failed to read contact" << std::endl;
+        RCLCPP_ERROR(logger_, "Failed to read contact");
         throw;
     }
 
@@ -85,7 +85,7 @@ uint16_t RoverModbus::readDiscreteCoil(const CoilInfo &coil)
         MB::ModbusResponse resp = sendRequest(request);
         coil_value = resp.registerValues().front().isCoil() ? resp.registerValues().front().coil() : 255U;
     } catch (const MB::ModbusException &){
-        std::cerr << "Failed to read coil" << std::endl;
+        RCLCPP_ERROR(logger_, "Failed to read coil");
         throw;
     }
 
@@ -95,7 +95,7 @@ uint16_t RoverModbus::readDiscreteCoil(const CoilInfo &coil)
 void RoverModbus::writeDiscreteCoil(const CoilInfo &coil, const bool coil_state)
 {
     if (!coil.is_coil_engage_allowed) {
-        std::cerr << "Coil engage is not allowed" << std::endl;
+        RCLCPP_ERROR(logger_, "Coil engage is not allowed");
         return;
     }
 
@@ -109,7 +109,7 @@ void RoverModbus::writeDiscreteCoil(const CoilInfo &coil, const bool coil_state)
         (void)sendRequest(req);
     }
     catch (const MB::ModbusException &) {
-        std::cerr << "Failed to set motor power enable" << std::endl;
+        RCLCPP_ERROR(logger_, "Failed to set motor power enable");
         throw;
     }
 }
@@ -120,7 +120,7 @@ MB::ModbusResponse RoverModbus::sendRequest(const MB::ModbusRequest &request)
         return connection_->sendRequest(request);
     }
     catch (const MB::ModbusException &ex) {
-        std::cerr << "Modbus exception: " << ex.what() << std::endl;
+        RCLCPP_ERROR_STREAM(logger_, "Modbus exception: " << ex.what());
         throw;
     }
 }

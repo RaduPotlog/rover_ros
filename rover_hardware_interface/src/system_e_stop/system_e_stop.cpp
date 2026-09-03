@@ -97,5 +97,5 @@ void EmergencyStop::resetEStopLatch()
     }
 }
 
-}  // namespace namespace rover_hardware_interface
+}  // namespace rover_hardware_interface
 

@@ -160,6 +160,9 @@ SystemROSInterface::~SystemROSInterface()
     realtime_driver_state_publisher_.reset();
     driver_state_publisher_.reset();
 
+    realtime_gpio_state_publisher_.reset();
+    gpio_state_publisher_.reset();
+
     service_wrappers_storage_.clear();
     node_.reset();
 }

@@ -113,7 +113,7 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
         message = "Error detected.";
 
         RoverA1System::addKeyValueIfTrue(
-            status, front_left_driver_data.getErrorMap(), "Front let driver error: ");
+            status, front_left_driver_data.getErrorMap(), "Front left driver error: ");
     }
     
     const auto front_right_driver_data = rover_driver_->getData(DriverNames::FRONT_RIGHT);

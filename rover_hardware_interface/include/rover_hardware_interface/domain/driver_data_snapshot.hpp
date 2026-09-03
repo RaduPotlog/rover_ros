@@ -65,7 +65,12 @@ public:
 
 protected:
 
-    const std::vector<std::string> flag_names_;
+    // Bound at construction to a `static const` table owned by the derived class (FaultFlag's /
+    // RuntimeError's own flag-name list never varies per instance), so copying a FlagError - and
+    // therefore a DriverDataSnapshot, which embeds one per driver and is returned by value from
+    // RoverDriverInterface::getData() on the RT read() path - never heap-allocates a fresh
+    // std::vector<std::string>. Only `flags_`/`suppressed_flags_` (plain bitsets) actually vary.
+    const std::vector<std::string> & flag_names_;
 
     std::bitset<8> suppressed_flags_ = 0;
     std::bitset<8> flags_ = 0;
@@ -88,6 +93,8 @@ class FaultFlag : public FlagError
 
 private:
 
+    static const std::vector<std::string> kFlagNames;
+
     static constexpr std::size_t kEmergencyStopBit = 0;
     static constexpr std::size_t kMotorSetupFaultBit = 1;
 };
@@ -105,6 +112,9 @@ public:
     std::map<std::string, bool> getErrorMap() const;
 
 private:
+
+    static const std::vector<std::string> kFlagNames;
+    static const std::vector<std::string> kSuppressedFlagNames;
 
     static constexpr std::size_t kSafetyStopActiveBit = 0;
 };

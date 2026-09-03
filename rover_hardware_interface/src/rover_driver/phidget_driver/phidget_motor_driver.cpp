@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
-
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_motor_driver.hpp"
 
 #include "rover_hardware_interface/domain/driver.hpp"
@@ -50,7 +48,7 @@ std::future<void> PhidgetDriver::initialize()
         init_promise_.set_value();
     } catch (const std::future_error & e) {
         if (e.code() == std::make_error_code(std::future_errc::promise_already_satisfied)) {
-            std::cerr << "An exception occurred while setting init promise: " << e.what() << std::endl;
+            RCLCPP_WARN_STREAM(logger_, "An exception occurred while setting init promise: " << e.what());
         }
     }
     
@@ -495,6 +493,11 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
 {
     if (auto driver = driver_.lock()) {
 
+        // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet
+        // (setTargetVelocityHandler() hasn't fired to clear set_speed_done_) - this command is
+        // dropped rather than queued. At the 100 Hz write() rate the next cycle's command
+        // supersedes it almost immediately, so this is intentional, not an oversight; it is not
+        // currently surfaced as an error/counter to the caller.
         if (set_speed_done_) return;
         
         float cmd_temp = 0.0f;

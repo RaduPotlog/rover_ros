@@ -8,16 +8,17 @@ endif()
 
 set(PACKAGE_DEPENDENCIES
     ament_cmake
-    ament_index_cpp
-    controller_interface
     diagnostic_updater
     generate_parameter_library
     geometry_msgs
     hardware_interface
+    # Must resolve before imu_filter_madgwick: that package's exported CMake target links
+    # against rclcpp_components::component, and ament's find_package(imu_filter_madgwick)
+    # expects that imported target to already exist.
+    rclcpp_components
     imu_filter_madgwick
     rover_msgs
     phidgets_api
-    PkgConfig
     pluginlib
     rclcpp
     rclcpp_lifecycle
@@ -31,6 +32,11 @@ set(PACKAGE_DEPENDENCIES
 foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
   find_package(${PACKAGE} REQUIRED)
 endforeach()
+
+# PkgConfig is a CMake-builtin module, not an ament package - kept out of PACKAGE_DEPENDENCIES so
+# it isn't fed to ament_target_dependencies()/ament_export_dependencies() below (neither is
+# meaningful for it, and it has no package.xml entry).
+find_package(PkgConfig REQUIRED)
 
 # Modbus_Core is a plain CMake package (not ament) from the sibling rover_modbus repo —
 # not colcon-discoverable, so it must be built and installed (cmake --install) to a prefix on
@@ -106,6 +112,22 @@ if(BUILD_TESTING)
     NAME domain_purity_check
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_domain_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
   )
+
+  # Behavioral unit tests for the pure, ROS-free domain layer (linked against ${PROJECT_NAME},
+  # which already compiles src/domain/*.cpp - see add_library() above).
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_rover_error_filter test/domain/test_rover_error_filter.cpp)
+  target_link_libraries(test_rover_error_filter ${PROJECT_NAME})
+
+  ament_add_gtest(test_driver_data_snapshot test/domain/test_driver_data_snapshot.cpp)
+  target_link_libraries(test_driver_data_snapshot ${PROJECT_NAME})
+
+  ament_add_gtest(test_imu_calibration test/domain/test_imu_calibration.cpp)
+  target_link_libraries(test_imu_calibration ${PROJECT_NAME})
+
+  ament_add_gtest(test_utils test/test_utils.cpp)
+  target_link_libraries(test_utils ${PROJECT_NAME})
 endif()
 
 ament_package()

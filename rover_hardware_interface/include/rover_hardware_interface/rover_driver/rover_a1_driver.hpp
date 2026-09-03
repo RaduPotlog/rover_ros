@@ -43,6 +43,13 @@ public:
 protected:
 
     void defineDrivers() override;
+
+private:
+
+    // Reused by attemptErrorFlagReset() so it never allocates a temporary std::vector on the RT
+    // path (RoverSystem::read() -> updateFlagErrors() -> attemptErrorFlagReset(), called every
+    // cycle while a fault flag is active).
+    std::vector<float> zero_speed_cmd_ = {0.0f, 0.0f, 0.0f, 0.0f};
 };
 
 }  // namespace rover_hardware_interface

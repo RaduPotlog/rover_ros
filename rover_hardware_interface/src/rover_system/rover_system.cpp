@@ -73,7 +73,10 @@ CallbackReturn RoverSystem::on_init(const hardware_interface::HardwareComponentI
         readDriverInitAndActivationAttempts();
         readModbusSettings();
         readErrorFilterMaxErrorsCounts();
-    } catch (const std::invalid_argument & e) {
+    } catch (const std::exception & e) {
+        // Widened from std::invalid_argument: std::stof/std::stoi can also throw
+        // std::out_of_range, and a missing key (operator[] replaced with .at() below) throws
+        // std::out_of_range too - both must fail on_init() cleanly instead of escaping uncaught.
         RCLCPP_ERROR_STREAM(logger_, "An exception occurred while reading the parameters: " << e.what());
         return CallbackReturn::ERROR;
     }
@@ -130,12 +133,8 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
 
 CallbackReturn RoverSystem::on_cleanup(const rclcpp_lifecycle::State &)
 {
-    rover_controller_.reset();
-    rover_driver_->deinitialize();
-    rover_driver_.reset();
-    e_stop_.reset();
-    system_ros_interface_.reset();
-    
+    teardownRoverComponents();
+
     return CallbackReturn::SUCCESS;
 }
 
@@ -161,12 +160,11 @@ CallbackReturn RoverSystem::on_deactivate(const rclcpp_lifecycle::State &)
 
 CallbackReturn RoverSystem::on_shutdown(const rclcpp_lifecycle::State &)
 {
-    rover_controller_.reset();
-    rover_driver_->deinitialize();
-    rover_driver_.reset();
-    e_stop_.reset();
-    system_ros_interface_.reset();
-    
+    // Valid from Unconfigured too (e.g. controller_manager shutting down a component whose
+    // on_configure() was never reached), where teardownRoverComponents()'s null check on
+    // rover_driver_ is what keeps this from null-derefing.
+    teardownRoverComponents();
+
     return CallbackReturn::SUCCESS;
 }
 
@@ -198,6 +196,19 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
     e_stop_.reset();
 
     return CallbackReturn::SUCCESS;
+}
+
+void RoverSystem::teardownRoverComponents()
+{
+    rover_controller_.reset();
+
+    if (rover_driver_) {
+        rover_driver_->deinitialize();
+        rover_driver_.reset();
+    }
+
+    e_stop_.reset();
+    system_ros_interface_.reset();
 }
 
 std::vector<StateInterface> RoverSystem::export_state_interfaces()
@@ -358,59 +369,59 @@ void RoverSystem::checkInterfaces() const
 void RoverSystem::readDrivetrainSettings()
 {
     drivetrain_settings_.motor_torque_constant =
-        std::stof(info_.hardware_parameters["motor_torque_constant"]);
+        std::stof(info_.hardware_parameters.at("motor_torque_constant"));
     drivetrain_settings_.gear_ratio =
-        std::stof(info_.hardware_parameters["gear_ratio"]);
+        std::stof(info_.hardware_parameters.at("gear_ratio"));
     drivetrain_settings_.gearbox_efficiency =
-        std::stof(info_.hardware_parameters["gearbox_efficiency"]);
+        std::stof(info_.hardware_parameters.at("gearbox_efficiency"));
     drivetrain_settings_.encoder_resolution =
-        std::stof(info_.hardware_parameters["encoder_resolution"]);
+        std::stof(info_.hardware_parameters.at("encoder_resolution"));
     drivetrain_settings_.max_rpm_motor_speed =
-        std::stof(info_.hardware_parameters["max_rpm_motor_speed"]);
+        std::stof(info_.hardware_parameters.at("max_rpm_motor_speed"));
     drivetrain_settings_.driver_comm_timeout_ms =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters["driver_comm_timeout_ms"]));
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("driver_comm_timeout_ms")));
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()
 {
-    const float driver_states_update_frequency = 
-        std::stof(info_.hardware_parameters["driver_states_update_frequency"]);
-    driver_states_update_period_ = 
+    const float driver_states_update_frequency =
+        std::stof(info_.hardware_parameters.at("driver_states_update_frequency"));
+    driver_states_update_period_ =
         rclcpp::Duration::from_seconds(1.0f / driver_states_update_frequency);
 }
 
 void RoverSystem::readDriverInitAndActivationAttempts()
 {
     max_rover_driver_initialization_attempts_ =
-        std::stoi(info_.hardware_parameters["max_rover_driver_initialization_attempts"]);
+        std::stoi(info_.hardware_parameters.at("max_rover_driver_initialization_attempts"));
     max_rover_driver_activation_attempts_ =
-        std::stoi(info_.hardware_parameters["max_rover_driver_activation_attempts"]);
+        std::stoi(info_.hardware_parameters.at("max_rover_driver_activation_attempts"));
 }
 
 void RoverSystem::readModbusSettings()
 {
-    modbus_settings_.host = info_.hardware_parameters["modbus_host"];
+    modbus_settings_.host = info_.hardware_parameters.at("modbus_host");
 
     if (modbus_settings_.host.empty()) {
         throw std::invalid_argument("Missing or empty 'modbus_host' hardware parameter.");
     }
 
-    modbus_settings_.port = std::stoi(info_.hardware_parameters["modbus_port"]);
+    modbus_settings_.port = std::stoi(info_.hardware_parameters.at("modbus_port"));
 
     modbus_settings_.connection_retry_count =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters["modbus_connection_retry_count"]));
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_count")));
     modbus_settings_.connection_retry_delay_ms =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters["modbus_connection_retry_delay_ms"]));
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_delay_ms")));
 }
 
 void RoverSystem::readErrorFilterMaxErrorsCounts()
 {
     const unsigned max_write_cmds_errors_count = static_cast<unsigned>(
-        std::stoi(info_.hardware_parameters["max_write_cmds_errors_count"]));
+        std::stoi(info_.hardware_parameters.at("max_write_cmds_errors_count")));
     const unsigned max_read_motor_states_errors_count = static_cast<unsigned>(
-        std::stoi(info_.hardware_parameters["max_read_motor_states_errors_count"]));
+        std::stoi(info_.hardware_parameters.at("max_read_motor_states_errors_count")));
     const unsigned max_read_driver_state_errors_count = static_cast<unsigned>(
-        std::stoi(info_.hardware_parameters["max_read_driver_state_errors_count"]));
+        std::stoi(info_.hardware_parameters.at("max_read_driver_state_errors_count")));
 
     // Not URDF-configurable, mirroring the reference Roboteq implementation's fault-flag
     // category: a single occurrence escalates immediately, with no debounce.
