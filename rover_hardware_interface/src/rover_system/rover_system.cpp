@@ -102,6 +102,11 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
     std::fill(hw_states_velocities_.begin(), hw_states_velocities_.end(), 0.0);
     std::fill(hw_states_efforts_.begin(), hw_states_efforts_.end(), 0.0);
 
+    // Force read() to re-seed next_driver_state_update_time_ from the first `time` it
+    // receives after this (re)configure, rather than comparing against a value seeded under
+    // a previous activation - see the member's declaration for why the clock type must match.
+    driver_state_update_time_initialized_ = false;
+
     system_ros_interface_ = std::make_unique<SystemROSInterface>("hardware_controller");
 
     system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
@@ -248,6 +253,15 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
     updateMotorsState(time);
     updateCommunicationStatus();
 
+    // Seed on the first cycle (or the first cycle after a (re)configure) from `time` itself,
+    // rather than a fixed clock type: `time` is whatever clock the resource manager is using
+    // (e.g. RCL_ROS_TIME), and rclcpp::Time comparisons throw std::runtime_error when the two
+    // operands were constructed with different clock types.
+    if (!driver_state_update_time_initialized_) {
+        next_driver_state_update_time_ = time;
+        driver_state_update_time_initialized_ = true;
+    }
+
     if (time >= next_driver_state_update_time_) {
         updateDriverState();
         updateFlagErrors();
@@ -268,7 +282,10 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
 
 return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Duration & /* period */)
 {
-    const auto lifecycle_state = this->get_lifecycle_state().id();
+    // get_lifecycle_state() is documented as not real-time safe and not for use in the
+    // control loop; get_lifecycle_id() is the cached, RT-safe equivalent (see
+    // hardware_interface::HardwareComponentInterface).
+    const auto lifecycle_state = this->get_lifecycle_id();
 
     if (lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
         if (e_stop_active_) {

@@ -191,7 +191,14 @@ protected:
     // Write operation lock
     std::shared_ptr<std::mutex> rover_driver_write_mtx_;
 
-    rclcpp::Time next_driver_state_update_time_{0, 0, RCL_STEADY_TIME};
+    // Lazily seeded from the first `time` argument read() receives (see
+    // RoverSystem::read()) rather than default-constructed with a fixed clock type: the
+    // controller_manager passes `time` using its own node clock (RCL_ROS_TIME by default),
+    // and rclcpp::Time comparisons throw std::runtime_error when the two operands use
+    // different clock types. Seeding from the actual `time` guarantees the clock types
+    // always match, regardless of what clock the caller happens to use.
+    bool driver_state_update_time_initialized_{false};
+    rclcpp::Time next_driver_state_update_time_{0, 0, RCL_ROS_TIME};
     rclcpp::Duration driver_states_update_period_{0, 0};
 };
 
