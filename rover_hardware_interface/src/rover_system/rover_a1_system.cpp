@@ -26,8 +26,8 @@
 namespace rover_hardware_interface
 {
 
-RoverA1System::RoverA1System() 
-: RoverSystem(joints_) 
+RoverA1System::RoverA1System()
+: RoverSystem(joints_)
 {
 
 }
@@ -78,21 +78,21 @@ void RoverA1System::updateDriverStateMsg()
     const auto driver_rear_left_data = rover_driver_->getData(DriverNames::REAR_LEFT);
     const auto driver_rear_right_data = rover_driver_->getData(DriverNames::REAR_RIGHT);
 
-    system_ros_interface_->updateMsgDriversStates(DriverNames::REAR_LEFT, 
+    system_ros_interface_->updateMsgDriversStates(DriverNames::REAR_LEFT,
         driver_rear_left_data.getDriverState());
-    system_ros_interface_->updateMsgErrorFlags(DriverNames::REAR_LEFT, 
+    system_ros_interface_->updateMsgErrorFlags(DriverNames::REAR_LEFT,
         driver_rear_left_data);
-    
-    system_ros_interface_->updateMsgDriversStates(DriverNames::REAR_RIGHT, 
+
+    system_ros_interface_->updateMsgDriversStates(DriverNames::REAR_RIGHT,
         driver_rear_right_data.getDriverState());
-    system_ros_interface_->updateMsgErrorFlags(DriverNames::REAR_RIGHT, 
+    system_ros_interface_->updateMsgErrorFlags(DriverNames::REAR_RIGHT,
         driver_rear_right_data);
-    
-    system_ros_interface_->updateMsgDriversStates(DriverNames::FRONT_LEFT, 
+
+    system_ros_interface_->updateMsgDriversStates(DriverNames::FRONT_LEFT,
         driver_front_left_data.getDriverState());
-    system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_LEFT, 
+    system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_LEFT,
         driver_front_left_data);
-    
+
     system_ros_interface_->updateMsgDriversStates(DriverNames::FRONT_RIGHT,
         driver_front_right_data.getDriverState());
     system_ros_interface_->updateMsgErrorFlags(DriverNames::FRONT_RIGHT,
@@ -107,7 +107,7 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
     std::string message{"No error detected."};
 
     const auto front_left_driver_data = rover_driver_->getData(DriverNames::FRONT_LEFT);
-    
+
     if (front_left_driver_data.isError()) {
         level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
         message = "Error detected.";
@@ -115,9 +115,9 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
         RoverA1System::addKeyValueIfTrue(
             status, front_left_driver_data.getErrorMap(), "Front left driver error: ");
     }
-    
+
     const auto front_right_driver_data = rover_driver_->getData(DriverNames::FRONT_RIGHT);
-    
+
     if (front_right_driver_data.isError()) {
         level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
         message = "Error detected.";
@@ -127,7 +127,7 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
     }
 
     const auto rear_left_driver_data = rover_driver_->getData(DriverNames::REAR_LEFT);
-    
+
     if (rear_left_driver_data.isError()) {
         level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
         message = "Error detected.";
@@ -137,7 +137,7 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
     }
 
     const auto rear_right_driver_data = rover_driver_->getData(DriverNames::REAR_RIGHT);
-    
+
     if (rear_right_driver_data.isError()) {
         level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
         message = "Error detected.";

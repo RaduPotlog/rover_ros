@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "imu_filter_madgwick/imu_filter.h"
@@ -42,8 +43,6 @@
 #include "rover_hardware_interface/domain/imu_calibration.hpp"
 #include "rover_hardware_interface/phidgets_spatial_parameters.hpp"
 
-using namespace std::placeholders;
-
 namespace rover_hardware_interface
 {
 
@@ -56,7 +55,7 @@ class PhidgetImuSensor : public hardware_interface::SensorInterface
 {
 
 public:
-    
+
     static constexpr size_t kImuInterfacesSize = 10;
     static constexpr double KImuMagneticFieldUnknownValue = 1e300;
     static constexpr float G = 9.80665;
@@ -74,7 +73,7 @@ public:
     return_type read(const rclcpp::Time & /* time */, const rclcpp::Duration & /* period */) override;
 
 protected:
-  
+
     void checkSensorName() const;
     void checkStatesSize() const;
 
@@ -100,9 +99,9 @@ protected:
     void configureMadgwickFilter();
 
     void spatialDataCallback(
-        const double acceleration[3], 
-        const double angular_rate[3], 
-        const double magnetic_field[3], 
+        const double acceleration[3],
+        const double angular_rate[3],
+        const double magnetic_field[3],
         const double timestamp);
     void spatialAttachCallback();
     void spatialDetachCallback();
@@ -112,7 +111,7 @@ protected:
     geometry_msgs::msg::Vector3 parseAcceleration(const double acceleration[3]);
 
     void initializeMadgwickAlgorithm(const geometry_msgs::msg::Vector3 & mag_compensated,
-                                     const geometry_msgs::msg::Vector3 & lin_acc, 
+                                     const geometry_msgs::msg::Vector3 & lin_acc,
                                      const rclcpp::Time & timestamp);
 
     void restartMadgwickAlgorithm();

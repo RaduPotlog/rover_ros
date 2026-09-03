@@ -47,14 +47,14 @@ void PhidgetRoverDriver::initialize()
 
     try {
         defineDrivers();
-        
+
         for (auto & [name, driver] : drivers_) {
             data_.emplace(name, DriverDataSnapshot(drivetrain_settings_));
             last_known_data_.emplace(name, data_.at(name));
         }
 
         initDrivers();
-        
+
     } catch (const std::runtime_error & e) {
         throw std::runtime_error("Failed to initialize robot driver: " + std::string(e.what()));
     }
@@ -75,7 +75,7 @@ void PhidgetRoverDriver::activate()
             driver->getMotorDriver(MotorNames::DEFAULT)->sendCmdVel(0);
         } catch (const std::runtime_error & e) {
             throw std::runtime_error(
-                "Send command exception on " + driverNamesToString(name) + 
+                "Send command exception on " + driverNamesToString(name) +
                 "driver : " + std::string(e.what()));
         }
     }
@@ -182,16 +182,16 @@ DriverDataSnapshot PhidgetRoverDriver::getData(const DriverNames name)
     return last_known_data_.at(name);
 }
 
-PhidgetVelocityCommandDataTransformer & PhidgetRoverDriver::getCmdVelConverter() 
-{ 
-    return phidget_vel_cmd_converter_; 
+PhidgetVelocityCommandDataTransformer & PhidgetRoverDriver::getCmdVelConverter()
+{
+    return phidget_vel_cmd_converter_;
 }
 
 void PhidgetRoverDriver::initDrivers()
 {
     for (auto & [name, driver] : drivers_) {
         const auto name_str = driverNamesToString(name);
-        
+
         try {
             auto driver_future = driver->initialize();
             auto driver_status = driver_future.wait_for(std::chrono::seconds(1));
@@ -228,4 +228,4 @@ void PhidgetRoverDriver::setDriverState(
     data.setDriverState(state, data_timed_out);
 }
 
-} // namespace rover_hardware_interface
+}  // namespace rover_hardware_interface

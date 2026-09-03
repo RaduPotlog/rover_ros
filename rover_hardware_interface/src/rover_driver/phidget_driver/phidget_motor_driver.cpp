@@ -29,7 +29,7 @@ std::future<void> PhidgetDriver::initialize()
 {
     std::lock_guard<std::mutex> lck(init_mtx_);
     init_promise_ = std::promise<void>();
-    
+
     std::future<void> future = init_promise_.get_future();
 
     for (auto & [name, motor_driver] : motor_drivers_) {
@@ -37,9 +37,9 @@ std::future<void> PhidgetDriver::initialize()
             motor_driver->initialize();
         } catch (const std::runtime_error & e) {
             throw std::runtime_error(
-                "Motor driver initilize exception on " + 
-                motorNamesToString(name) + 
-                " motor: " + 
+                "Motor driver initilize exception on " +
+                motorNamesToString(name) +
+                " motor: " +
                 std::string(e.what()));
         }
     }
@@ -51,7 +51,7 @@ std::future<void> PhidgetDriver::initialize()
             RCLCPP_WARN_STREAM(logger_, "An exception occurred while setting init promise: " << e.what());
         }
     }
-    
+
     return future;
 }
 
@@ -74,23 +74,23 @@ bool PhidgetDriver::isCommunicationError()
 }
 
 void PhidgetDriver::addMotorDriver(
-    const MotorNames name, 
+    const MotorNames name,
     std::shared_ptr<MotorDriverInterface> motor_driver)
 {
     if (std::dynamic_pointer_cast<PhidgetMotorDriver>(motor_driver) == nullptr) {
         throw std::runtime_error("Motor driver is not of type PhidgetMotorDriver");
     }
-  
+
     motor_drivers_.emplace(name, motor_driver);
 }
 
 std::shared_ptr<MotorDriverInterface> PhidgetDriver::getMotorDriver(const MotorNames name)
 {
     auto it = motor_drivers_.find(name);
-    
+
     if (it == motor_drivers_.end()) {
-        throw std::runtime_error("Motor driver with name '" + 
-            motorNamesToString(name) + 
+        throw std::runtime_error("Motor driver with name '" +
+            motorNamesToString(name) +
             "' does not exist");
     }
 
@@ -99,8 +99,8 @@ std::shared_ptr<MotorDriverInterface> PhidgetDriver::getMotorDriver(const MotorN
 
 PhidgetMotorDriver::PhidgetMotorDriver(
     const DrivetrainSettings & drivetrain_settings,
-    std::weak_ptr<PhidgetDriver> driver, 
-    const std::uint8_t channel, 
+    std::weak_ptr<PhidgetDriver> driver,
+    const std::uint8_t channel,
     const std::int32_t serial_number,
     const bool dir_reverse)
 : driver_(driver)
@@ -128,38 +128,38 @@ PhidgetMotorDriver::~PhidgetMotorDriver()
     closeAndDelete(&handle);
 
     handle = reinterpret_cast<PhidgetHandle>(temperature_handle_);
-    closeAndDelete(&handle);    
+    closeAndDelete(&handle);
 }
 
 void PhidgetMotorDriver::initialize()
 {
     PhidgetReturnCode ret = PhidgetDCMotor_create(&motor_handle_);
-    
+
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to create Motor handle for channel " + 
+        throw std::runtime_error("Failed to create Motor handle for channel " +
             std::to_string(channel_));
     }
 
     openWaitForAttachment(reinterpret_cast<PhidgetHandle>(motor_handle_), -1, channel_, false, 0);
-    
+
     if (serial_number_ == -1)
     {
         ret = Phidget_getDeviceSerialNumber(reinterpret_cast<PhidgetHandle>(motor_handle_), &serial_number_);
-        
+
         if (ret != EPHIDGET_OK) {
-            throw std::runtime_error("Failed to get serial number for motor channel " + 
+            throw std::runtime_error("Failed to get serial number for motor channel " +
                 std::to_string(channel_));
         }
     }
 
     // Try to reset fail safe
     (void)PhidgetDCMotor_resetFailsafe(motor_handle_);
-	
+
     // Set acceleration
     ret = PhidgetDCMotor_setAcceleration(motor_handle_, 2.0f);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set acceleration for motor channel " + 
+        throw std::runtime_error("Failed to set acceleration for motor channel " +
             std::to_string(channel_));
     }
 
@@ -167,7 +167,7 @@ void PhidgetMotorDriver::initialize()
     ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, 10.0);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current limit for motor channel " + 
+        throw std::runtime_error("Failed to set current limit for motor channel " +
             std::to_string(channel_));
     }
 
@@ -177,14 +177,14 @@ void PhidgetMotorDriver::initialize()
     ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, 20.0);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current regulator gain for motor channel " + 
+        throw std::runtime_error("Failed to set current regulator gain for motor channel " +
             std::to_string(channel_));
     }
 
     ret = PhidgetDCMotor_setTargetBrakingStrength(motor_handle_, 1.0f);
-	
+
     if (ret != EPHIDGET_OK) {
-	    throw std::runtime_error("Failed to set braking strength for motor channel " + 
+        throw std::runtime_error("Failed to set braking strength for motor channel " +
             std::to_string(channel_));
     }
 
@@ -192,87 +192,87 @@ void PhidgetMotorDriver::initialize()
     ret = PhidgetDCMotor_enableFailsafe(motor_handle_, 5000);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to enable fail safe mode for motor channel " + 
+        throw std::runtime_error("Failed to enable fail safe mode for motor channel " +
             std::to_string(channel_));
     }
-    
+
     int enabled = 0;
 
     ret = PhidgetEncoder_create(&encoder_handle_);
-    
+
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to create Motor encoder handle for channel " + 
+        throw std::runtime_error("Failed to create Motor encoder handle for channel " +
             std::to_string(channel_));
     }
 
     openWaitForAttachment(reinterpret_cast<PhidgetHandle>(encoder_handle_), -1, channel_, false, 0);
-    
+
     ret = PhidgetEncoder_getEnabled(encoder_handle_, &enabled);
-	
+
     if (ret != EPHIDGET_OK) {
-		throw std::runtime_error("Failed to get enable of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to get enable of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     if (enabled == 0) {
-		throw std::runtime_error("Encoder not enabled for motor channel " + 
+        throw std::runtime_error("Encoder not enabled for motor channel " +
             std::to_string(channel_));
     }
-    
+
     ret = PhidgetEncoder_setIOMode(encoder_handle_, ENCODER_IO_MODE_OPEN_COLLECTOR_10K);
-    
+
     if (ret != EPHIDGET_OK) {
-		throw std::runtime_error("Failed to set mode of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to set mode of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     double minDataRate = 0.0;
 
     ret = PhidgetEncoder_getMinDataRate(encoder_handle_, &minDataRate);
-	
+
     if (ret != EPHIDGET_OK) {
-		throw std::runtime_error("Failed to get minimum data rate of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to get minimum data rate of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     ret = PhidgetEncoder_setDataRate(encoder_handle_, minDataRate);
 
     if (ret != EPHIDGET_OK) {
-		throw std::runtime_error("Failed to set minimum data rate of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to set minimum data rate of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     uint32_t minDataInterval = 0;
 
     ret = PhidgetEncoder_getMinDataInterval(encoder_handle_, &minDataInterval);
-	
+
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to get minimum data interval of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to get minimum data interval of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     ret = PhidgetEncoder_setDataInterval(encoder_handle_, minDataInterval);
-	
+
     if (ret != EPHIDGET_OK) {
-		 throw std::runtime_error("Failed to set minimum data interval of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to set minimum data interval of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     ret = PhidgetEncoder_setOnPositionChangeHandler(encoder_handle_, positionChangeHandler, this);
 
     if (ret != EPHIDGET_OK) {
-		throw std::runtime_error("Failed to set position change handler of the encoder for motor channel " + 
+        throw std::runtime_error("Failed to set position change handler of the encoder for motor channel " +
             std::to_string(channel_));
     }
 
     ret = PhidgetCurrentInput_create(&current_handle_);
 
     if (ret != EPHIDGET_OK) {
-         throw std::runtime_error("Failed to create Current input handle for channel " + 
+         throw std::runtime_error("Failed to create Current input handle for channel " +
             std::to_string(channel_));
     }
 
-	ret = PhidgetCurrentInput_setOnCurrentChangeHandler(current_handle_, currentChangeHandler, this);
+    ret = PhidgetCurrentInput_setOnCurrentChangeHandler(current_handle_, currentChangeHandler, this);
 
     if (ret != EPHIDGET_OK) {
         throw std::runtime_error("Failed to set current callback for channel " +
@@ -391,17 +391,17 @@ bool PhidgetMotorDriver::isCommTimedOut(
 }
 
 void CCONV PhidgetMotorDriver::positionChangeHandler(
-    PhidgetEncoderHandle phid, 
-    void *ctx, 
-    int positionChange, 
-    double timeChange, 
+    PhidgetEncoderHandle phid,
+    void *ctx,
+    int positionChange,
+    double timeChange,
     int indexTriggered)
 {
     (void)positionChange;
     (void)phid;
     (void)timeChange;
     (void)indexTriggered;
-    
+
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
     driver->last_update_time_ns_.store(
@@ -410,14 +410,13 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
 
     int64_t position;
 
-	PhidgetReturnCode ret = PhidgetEncoder_getPosition(phid, &position);
+    PhidgetReturnCode ret = PhidgetEncoder_getPosition(phid, &position);
 
     if (ret == EPHIDGET_OK) {
-        
+
         if (driver->direction_reversed_ == true) {
-            driver->encoder_ticks_ = position * (-1);        
-        }
-        else {
+            driver->encoder_ticks_ = position * (-1);
+        } else {
             driver->encoder_ticks_ = position;
         }
 
@@ -477,9 +476,9 @@ void CCONV PhidgetMotorDriver::temperatureChangeHandler(
 }
 
 void CCONV PhidgetMotorDriver::setTargetVelocityHandler(
-    PhidgetHandle phid, 
-    void *ctx, 
-    PhidgetReturnCode res) 
+    PhidgetHandle phid,
+    void *ctx,
+    PhidgetReturnCode res)
 {
     (void)phid;
     (void)res;
@@ -499,7 +498,7 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
         // supersedes it almost immediately, so this is intentional, not an oversight; it is not
         // currently surfaced as an error/counter to the caller.
         if (set_speed_done_) return;
-        
+
         float cmd_temp = 0.0f;
 
         if (direction_reversed_) {
@@ -509,11 +508,11 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
         }
 
         PhidgetDCMotor_setTargetVelocity_async(
-            motor_handle_, 
-            cmd_temp, 
-            PhidgetMotorDriver::setTargetVelocityHandler, 
+            motor_handle_,
+            cmd_temp,
+            PhidgetMotorDriver::setTargetVelocityHandler,
             this);
-        
+
         set_speed_done_ = true;
     }
 }

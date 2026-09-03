@@ -158,7 +158,7 @@ class MotorStateReading
 
 public:
 
-    MotorStateReading(const DrivetrainSettings & drivetrain_settings);
+    explicit MotorStateReading(const DrivetrainSettings & drivetrain_settings);
 
     void setData(const MotorDriverState & motor_state);
 
@@ -180,7 +180,7 @@ class DriverDataSnapshot
 
 public:
 
-    DriverDataSnapshot(const DrivetrainSettings & drivetrain_settings);
+    explicit DriverDataSnapshot(const DrivetrainSettings & drivetrain_settings);
 
     void setMotorsStates(
         const MotorDriverState & state,
@@ -226,6 +226,6 @@ private:
     bool driver_state_data_timed_out_ = false;
 };
 
-} // namespace rover_hardware_interface
+}  // namespace rover_hardware_interface
 
 #endif  // ROVER_HARDWARE_INTERFACE_DOMAIN_DRIVER_DATA_SNAPSHOT_HPP_

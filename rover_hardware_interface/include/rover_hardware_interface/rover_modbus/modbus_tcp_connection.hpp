@@ -24,18 +24,18 @@
 namespace rover_hardware_interface
 {
 
-class ModbusTcpConnection : public ModbusConnection 
+class ModbusTcpConnection : public ModbusConnection
 {
 
 public:
-    
-    ModbusTcpConnection(const std::string &ip, int port) 
+
+    ModbusTcpConnection(const std::string &ip, int port)
     : connection(MB::TCP::Connection::with(ip, port))
     {
 
     }
 
-    MB::ModbusResponse sendRequest(const MB::ModbusRequest &req) override 
+    MB::ModbusResponse sendRequest(const MB::ModbusRequest &req) override
     {
         try {
             connection.sendRequest(req);
@@ -45,13 +45,13 @@ public:
         }
     }
 
-    void close() override 
+    void close() override
     {
         // Do nothing at the moment. Can explicitly close the connection if needed.
     }
 
 private:
-    
+
     MB::TCP::Connection connection;
 };
 

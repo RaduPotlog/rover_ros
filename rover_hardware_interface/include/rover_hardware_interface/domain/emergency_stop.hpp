@@ -74,7 +74,7 @@ public:
         std::shared_ptr<EmergencyStopIoPort> io,
         std::function<bool()> zero_velocity_check);
 
-    virtual ~EmergencyStop() override = default;
+    ~EmergencyStop() override = default;
 
     bool readEStopState() override;
 

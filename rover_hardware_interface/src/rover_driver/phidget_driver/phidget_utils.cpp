@@ -18,10 +18,10 @@ namespace rover_hardware_interface
 {
 
 void openWaitForAttachment(
-    PhidgetHandle handle, 
+    PhidgetHandle handle,
     int32_t serial_number,
-    int hub_port, 
-    bool is_hub_port_device, 
+    int hub_port,
+    bool is_hub_port_device,
     int channel)
 {
     PhidgetReturnCode ret;

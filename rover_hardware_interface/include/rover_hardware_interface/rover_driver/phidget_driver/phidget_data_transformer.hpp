@@ -31,7 +31,7 @@ class PhidgetVelocityCommandDataTransformer
 
 public:
 
-    PhidgetVelocityCommandDataTransformer(const DrivetrainSettings & drivetrain_settings);
+    explicit PhidgetVelocityCommandDataTransformer(const DrivetrainSettings & drivetrain_settings);
 
     float convert(const float cmd) const;
 
@@ -47,6 +47,6 @@ private:
     float radians_per_second_to_phidget_cmd_;
 };
 
-} // namespace rover_hardware_interface
+}  // namespace rover_hardware_interface
 
 #endif  // ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_DRIVER_PHIDGET_DATA_TRANSFORMER_HPP_

@@ -78,8 +78,9 @@ void ROSServiceWrapper<SrvT, CallbackT>::registerService(
     rclcpp::CallbackGroup::SharedPtr group, const rclcpp::QoS & qos)
 {
     service_ = node->create_service<SrvT>(
-        service_name, 
-        std::bind(&ROSServiceWrapper<SrvT, CallbackT>::callbackWrapper, this, _1, _2),
+        service_name,
+        std::bind(&ROSServiceWrapper<SrvT, CallbackT>::callbackWrapper, this,
+        std::placeholders::_1, std::placeholders::_2),
         qos, group);
 }
 
@@ -119,7 +120,7 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
     executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
     executor_->add_node(node_);
 
-    executor_thread_ = std::thread([this]() { 
+    executor_thread_ = std::thread([this]() {
         executor_->spin(); }
     );
 
@@ -144,9 +145,9 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
 
     gpio_state_publisher_ = node_->create_publisher<GpioStateMsg>("hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
     realtime_gpio_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<GpioStateMsg>>(gpio_state_publisher_);
-    
+
     diagnostic_updater_.setHardwareID("Rover System");
-    
+
     RCLCPP_INFO(rclcpp::get_logger("SystemROSInterface"), "Node constructed successfully.");
 }
 
@@ -267,18 +268,18 @@ rclcpp::CallbackGroup::SharedPtr SystemROSInterface::getOrCreateNodeCallbackGrou
     const unsigned group_id, rclcpp::CallbackGroupType callback_group_type)
 {
     if (group_id == 0) {
-        
+
         if (callback_group_type == rclcpp::CallbackGroupType::Reentrant) {
             throw std::runtime_error(
                 "Node callback group with id 0 (default group) cannot be of "
                 "rclcpp::CallbackGroupType::Reentrant type.");
         }
-    
+
         return nullptr;
     }
 
     const auto search = callback_groups_.find(group_id);
-  
+
     if (search != callback_groups_.end()) {
         if (search->second->type() != callback_group_type) {
             throw std::runtime_error("Requested node callback group has incorrect type.");
@@ -289,7 +290,7 @@ rclcpp::CallbackGroup::SharedPtr SystemROSInterface::getOrCreateNodeCallbackGrou
 
     auto callback_group = node_->create_callback_group(callback_group_type);
     callback_groups_[group_id] = callback_group;
-  
+
     return callback_group;
 }
 

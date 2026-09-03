@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cmath>
-
 #include <gtest/gtest.h>
+
+#include <cmath>
 
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_data_transformer.hpp"
 

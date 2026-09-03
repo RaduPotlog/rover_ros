@@ -17,12 +17,12 @@
 // on_configure()/read(), without requiring any Phidget/Modbus hardware - SystemROSInterface has
 // no dependency on either.
 
+#include <gtest/gtest.h>
+
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
-
-#include <gtest/gtest.h>
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_srvs/srv/trigger.hpp>

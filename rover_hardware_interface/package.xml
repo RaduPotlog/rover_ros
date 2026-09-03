@@ -37,10 +37,20 @@
     
   <!-- Phidgets API -->
   <depend>phidgets_api</depend>
-  
+
+  <!-- Modbus_Core (from the sibling rover_modbus repo) is a plain CMake package, not an ament
+       package, so it cannot be expressed as a depend here and rosdep/colcon cannot resolve or
+       order it. It must be built and installed (via CMake's install step) to a prefix on
+       CMAKE_PREFIX_PATH before this package is built - see CMakeLists.txt and
+       src/rover_modbus/README.md. -->
+
   <test_depend>ament_cmake_gtest</test_depend>
-  <test_depend>google-mock</test_depend>
-  <test_depend>ros_testing</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <!-- Pulls in cpplint/cppcheck/lint_cmake/xmllint/copyright/uncrustify; uncrustify is
+       explicitly excluded in CMakeLists.txt via AMENT_LINT_AUTO_EXCLUDE, since this repo
+       consistently uses 4-space indentation rather than uncrustify's default Google C++
+       style. -->
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

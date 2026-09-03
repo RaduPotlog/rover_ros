@@ -209,4 +209,4 @@ std::map<std::string, bool> DriverDataSnapshot::getErrorMap() const
     return error_map;
 }
 
-} // namespace rover_hardware_interface
+}  // namespace rover_hardware_interface

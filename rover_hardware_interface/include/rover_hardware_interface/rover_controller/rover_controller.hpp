@@ -37,7 +37,7 @@ class ContactCoilHandler
 
 public:
 
-    ContactCoilHandler(std::shared_ptr<RoverModbus> rover_modbus);
+    explicit ContactCoilHandler(std::shared_ptr<RoverModbus> rover_modbus);
 
     ~ContactCoilHandler();
 
@@ -47,10 +47,10 @@ public:
 
     // SW E-STOP USER BTN - sw_e_stop_user_button
     void eStopUserBtnTrigger(const bool state);
-    
+
     // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
     void eStopMotorDriverFaultTrigger(const bool state);
-    
+
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
 
@@ -60,9 +60,9 @@ public:
     void getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state);
 
 private:
-    
+
     void initCoils();
-    
+
     bool readDiscreteContact(const ContactInfo &contact);
 
     bool readDiscreteCoil(const CoilInfo &coil);
@@ -99,10 +99,10 @@ public:
 
     // SW E-STOP USER BTN - sw_e_stop_user_button
     void eStopUserBtnTrigger(const bool state);
-    
+
     // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
     void eStopMotorDriverFaultTrigger(const bool state);
-    
+
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
 

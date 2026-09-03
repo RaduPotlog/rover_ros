@@ -31,4 +31,4 @@ float PhidgetVelocityCommandDataTransformer::convert(const float cmd) const
     return clampVelCmd(cmd * radians_per_second_to_phidget_cmd_);
 }
 
-} // namespace rover_hardware_interface
+}  // namespace rover_hardware_interface

@@ -49,7 +49,7 @@ bool operationWithAttempts(
     const std::chrono::milliseconds delay_between_attempts = std::chrono::milliseconds(0));
 
 bool checkIfJointNameContainValidSequence(
-    const std::string & name, 
+    const std::string & name,
     const std::string & sequence);
 
 }  // namespace rover_hardware_interface

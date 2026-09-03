@@ -63,7 +63,7 @@ uint16_t RoverModbus::readDiscreteContact(const ContactInfo &contact)
     uint16_t contact_value = 255U;
 
     MB::ModbusRequest request(MODBUS_DEVICE_ID, MB::utils::ReadDiscreteInputContacts, static_cast<uint16_t>(contact.contact), 1);
-            
+
     try {
         MB::ModbusResponse resp = sendRequest(request);
         contact_value = resp.registerValues().front().isCoil() ? resp.registerValues().front().coil() : 255U;
@@ -78,7 +78,7 @@ uint16_t RoverModbus::readDiscreteContact(const ContactInfo &contact)
 uint16_t RoverModbus::readDiscreteCoil(const CoilInfo &coil)
 {
     uint16_t coil_value = 255U;
-    
+
     MB::ModbusRequest request(MODBUS_DEVICE_ID, MB::utils::ReadDiscreteOutputCoils, static_cast<uint16_t>(coil.coil), 1);
 
     try {
@@ -104,7 +104,7 @@ void RoverModbus::writeDiscreteCoil(const CoilInfo &coil, const bool coil_state)
     };
 
     MB::ModbusRequest req(MODBUS_DEVICE_ID, MB::utils::WriteSingleDiscreteOutputCoil, static_cast<uint16_t>(coil.coil), 1, value);
-    
+
     try {
         (void)sendRequest(req);
     }

@@ -41,20 +41,20 @@ class RoverModbus
 {
 
 public:
-    
+
     const uint8_t MODBUS_DEVICE_ID = 255U;
 
     RoverModbus(
         const std::string &ip, const int port,
         const unsigned max_connection_attempts,
         const std::chrono::milliseconds retry_delay);
-    
+
     ~RoverModbus();
 
     uint16_t readDiscreteContact(const ContactInfo &contact);
 
     uint16_t readDiscreteCoil(const CoilInfo &coil);
-    
+
     void writeDiscreteCoil(const CoilInfo &coil, const bool coil_state);
 
 private:

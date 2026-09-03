@@ -15,6 +15,8 @@
 #ifndef ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_MOTOR_DRIVER_PHIDGET_MOTOR_DRIVER_HPP_
 #define ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_MOTOR_DRIVER_PHIDGET_MOTOR_DRIVER_HPP_
 
+#include <libphidget22/phidget22.h>
+
 #include <functional>
 #include <vector>
 #include <atomic>
@@ -24,8 +26,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
-
-#include <libphidget22/phidget22.h>
+#include <unordered_map>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -37,7 +38,7 @@ namespace rover_hardware_interface
 
 class PhidgetDriver : public DriverInterface
 {
-    
+
 public:
 
     PhidgetDriver();
@@ -69,9 +70,9 @@ public:
 
     PhidgetMotorDriver(
         const DrivetrainSettings & drivetrain_settings,
-        std::weak_ptr<PhidgetDriver> driver, 
-        const std::uint8_t channel, 
-        const std::int32_t serial_number, 
+        std::weak_ptr<PhidgetDriver> driver,
+        const std::uint8_t channel,
+        const std::int32_t serial_number,
         const bool dir_reverse);
 
     ~PhidgetMotorDriver();
@@ -93,12 +94,12 @@ private:
         const std::chrono::nanoseconds & timeout);
 
     static void CCONV positionChangeHandler(
-        PhidgetEncoderHandle phid, 
-        void * ctx, 
-        int positionChange, 
-        double timeChange, 
+        PhidgetEncoderHandle phid,
+        void * ctx,
+        int positionChange,
+        double timeChange,
         int indexTriggered);
-    
+
     static void CCONV currentChangeHandler(
         PhidgetCurrentInputHandle phid,
         void * ctx,
@@ -112,9 +113,9 @@ private:
     );
 
     static void CCONV setTargetVelocityHandler(
-        PhidgetHandle phid, 
+        PhidgetHandle phid,
         void * ctx, PhidgetReturnCode res);
-    
+
     double calculateRPM(int64_t delta_ticks, double dt, float ppr);
 
     std::weak_ptr<PhidgetDriver> driver_;
@@ -160,6 +161,6 @@ private:
     rclcpp::Logger logger_{rclcpp::get_logger("PhidgetMotorDriver")};
 };
 
-} // namespace rover_hardware_interface
+}  // namespace rover_hardware_interface
 
 #endif  // ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_MOTOR_DRIVER_PHIDGET_MOTOR_DRIVER_HPP_

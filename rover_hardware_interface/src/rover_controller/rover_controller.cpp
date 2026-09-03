@@ -28,7 +28,7 @@ namespace rover_hardware_interface
 {
 
 const std::vector<RoverControllerContactInfo> ContactCoilHandler::contacts_config_info_storage_ = {
-    
+
     RoverControllerContactInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN},
         ContactInfo { Contact::CONTACT_0 },
@@ -37,34 +37,34 @@ const std::vector<RoverControllerContactInfo> ContactCoilHandler::contacts_confi
 
 const std::vector<RoverControllerCoilInfo> ContactCoilHandler::coils_config_info_storage_ = {
 
-    RoverControllerCoilInfo { 
+    RoverControllerCoilInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED},
-        CoilInfo { Coil::COIL_0, false, false},    
+        CoilInfo { Coil::COIL_0, false, false},
     },
 
-    RoverControllerCoilInfo { 
+    RoverControllerCoilInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_CPU_WDG_TRIGGER},
         CoilInfo { Coil::COIL_1, true, true},
     },
-    
-    RoverControllerCoilInfo { 
+
+    RoverControllerCoilInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON},
-        CoilInfo { Coil::COIL_2, true, true},    
+        CoilInfo { Coil::COIL_2, true, true},
     },
-    
-    RoverControllerCoilInfo { 
+
+    RoverControllerCoilInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT},
-        CoilInfo { Coil::COIL_3, true, true},    
+        CoilInfo { Coil::COIL_3, true, true},
     },
 
-    RoverControllerCoilInfo { 
+    RoverControllerCoilInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET},
-        CoilInfo { Coil::COIL_4, false, true},    
+        CoilInfo { Coil::COIL_4, false, true},
     },
 
-    RoverControllerCoilInfo { 
+    RoverControllerCoilInfo {
         RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS},
-        CoilInfo { Coil::COIL_5, false, false},    
+        CoilInfo { Coil::COIL_5, false, false},
     },
 };
 
@@ -75,7 +75,7 @@ ContactCoilHandler::ContactCoilHandler(std::shared_ptr<RoverModbus> rover_modbus
 }
 
 ContactCoilHandler::~ContactCoilHandler()
-{ 
+{
     if (isContactCoilHandlerEnabled()) {
         contact_coil_handler_enabled_ = false;
         contact_coil_handler_thread_.join();
@@ -87,7 +87,7 @@ bool ContactCoilHandler::start()
     if (isContactCoilHandlerEnabled()) {
         return true;
     }
-    
+
     initCoils();
 
     contact_coil_handler_enabled_ = true;
@@ -96,9 +96,9 @@ bool ContactCoilHandler::start()
     return isContactCoilHandlerEnabled();
 }
 
-bool ContactCoilHandler::isContactCoilHandlerEnabled() const 
-{ 
-    return contact_coil_handler_thread_.joinable(); 
+bool ContactCoilHandler::isContactCoilHandlerEnabled() const
+{
+    return contact_coil_handler_thread_.joinable();
 }
 
 // SW E-STOP USER BTN - sw_e_stop_user_button
@@ -143,14 +143,14 @@ void ContactCoilHandler::initCoils()
 bool ContactCoilHandler::readDiscreteContact(const ContactInfo &contact)
 {
     uint16_t contact_state = rover_modbus_->readDiscreteContact(contact);
-    
+
     return (contact_state == 255 ? false : (contact_state & 0xFFU));
 }
 
 bool ContactCoilHandler::readDiscreteCoil(const CoilInfo &coil)
 {
     uint16_t conil_state = rover_modbus_->readDiscreteCoil(coil);
-    
+
     return (conil_state == 255 ? false : (conil_state & 0xFFU));
 }
 

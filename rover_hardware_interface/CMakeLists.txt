@@ -51,7 +51,7 @@ find_package(Modbus_Core REQUIRED)
 include_directories(include)
 
 generate_parameter_library(phidgets_spatial_parameters
-                           src/phidgets_spatial_parameters.yaml)
+  src/phidgets_spatial_parameters.yaml)
 
 set(ENV{PKG_CONFIG_PATH}
     "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
@@ -106,10 +106,22 @@ ament_export_include_directories(include/${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
 pluginlib_export_plugin_description_file(hardware_interface
-                                         rover_hardware_interfaces.xml
+  rover_hardware_interfaces.xml
 )
 
 if(BUILD_TESTING)
+  # Standard ament style/lint gate (cpplint, cppcheck, lint_cmake, xmllint, copyright, ...),
+  # matching this template's usual convention (see .claude/rules/ros2_general.md). uncrustify is
+  # deliberately excluded: this repo consistently uses 4-space indentation, not
+  # ament_cmake_uncrustify's default Google C++ style, so enabling it would fail every file on
+  # indentation alone instead of surfacing real issues - AMENT_LINT_AUTO_EXCLUDE is the officially
+  # supported way to drop one linter from the auto-discovered set (see
+  # ament_lint_auto_package_hook.cmake). Kept separate from the domain-purity check below, which
+  # enforces an architectural rule ament's linters don't know about.
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_uncrustify)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+
   # Domain code (include/rover_hardware_interface/domain/, src/domain/) must stay free of
   # ROS/hardware_interface/vendor-SDK dependencies. This mechanically enforces that rule so a
   # future change can't silently reintroduce one. Plain CTest add_test (pass/fail via exit code)
@@ -149,6 +161,17 @@ if(BUILD_TESTING)
     test_system_ros_interface test/infrastructure/test_system_ros_interface.cpp)
   target_link_libraries(test_system_ros_interface ${PROJECT_NAME})
   ament_target_dependencies(test_system_ros_interface rclcpp std_srvs)
+
+  # Integration test: drives RoverA1System through the real hardware_interface plugin contract
+  # (on_init() + export_state_interfaces()/export_command_interfaces()) using hand-built
+  # HardwareInfo/HardwareComponentInterfaceParams, the same types ros2_control's ResourceManager
+  # populates from a parsed URDF. Deliberately does not exercise on_configure()/on_activate()/
+  # read()/write(), which require real Modbus/Phidget hardware - see the file-level comment in
+  # test/rover_system/test_rover_a1_system_on_init.cpp.
+  ament_add_gtest(
+    test_rover_a1_system_on_init test/rover_system/test_rover_a1_system_on_init.cpp)
+  target_link_libraries(test_rover_a1_system_on_init ${PROJECT_NAME})
+  ament_target_dependencies(test_rover_a1_system_on_init hardware_interface)
 endif()
 
 ament_package()

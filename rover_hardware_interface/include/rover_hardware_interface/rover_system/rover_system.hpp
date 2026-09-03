@@ -70,8 +70,8 @@ class RoverSystem : public hardware_interface::SystemInterface
 
 public:
 
-    RoverSystem(const std::vector<std::string> & joint_order);
-    
+    explicit RoverSystem(const std::vector<std::string> & joint_order);
+
     virtual ~RoverSystem() = default;
 
     CallbackReturn on_init(const hardware_interface::HardwareComponentInterfaceParams & params) override;
@@ -126,7 +126,7 @@ protected:
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 
     virtual void updateDriverStateMsg() = 0;
-  
+
     void handleRoverDriverWriteOperation(std::function<void()> write_operation);
 
     bool areVelocityCommandsNearZero();
@@ -178,7 +178,7 @@ protected:
     // Modbus TCP endpoint for the safety controller (E-Stop / GPIO), read from URDF
     ModbusSettings modbus_settings_;
 
-    // ROS hardware interface 
+    // ROS hardware interface
     std::unique_ptr<SystemROSInterface> system_ros_interface_;
 
     // Imported from URDF

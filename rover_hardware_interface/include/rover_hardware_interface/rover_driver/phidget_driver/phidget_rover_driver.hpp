@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -76,7 +77,7 @@ protected:
     DrivetrainSettings drivetrain_settings_;
 
     std::unordered_map<DriverNames, std::shared_ptr<DriverInterface>> drivers_;
-    
+
 private:
 
     void initDrivers();

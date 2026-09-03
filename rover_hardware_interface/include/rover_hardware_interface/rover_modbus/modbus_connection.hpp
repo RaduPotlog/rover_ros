@@ -28,11 +28,11 @@ class ModbusConnection
 {
 
 public:
-    
+
     ModbusConnection() = default;
-    
+
     virtual MB::ModbusResponse sendRequest(const MB::ModbusRequest &req) = 0;
-    
+
     virtual void close() = 0;
 };
 

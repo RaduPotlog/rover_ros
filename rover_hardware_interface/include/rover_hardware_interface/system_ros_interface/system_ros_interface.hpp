@@ -19,8 +19,10 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -39,8 +41,6 @@
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 #include "rover_hardware_interface/rover_controller/rover_controller_types.hpp"
-
-using namespace std::placeholders;
 
 namespace rover_hardware_interface
 {
@@ -65,7 +65,7 @@ public:
     using SrvRequestConstPtr = typename SrvT::Request::ConstSharedPtr;
     using SrvResponsePtr = typename SrvT::Response::SharedPtr;
 
-    ROSServiceWrapper(const CallbackT & callback) : callback_(callback) {}
+    explicit ROSServiceWrapper(const CallbackT & callback) : callback_(callback) {}
 
     void registerService(
         const rclcpp::Node::SharedPtr node, const std::string & service_name,
@@ -73,7 +73,7 @@ public:
         const rclcpp::QoS & qos = rclcpp::ServicesQoS());
 
 private:
-    
+
     void callbackWrapper(SrvRequestConstPtr request, SrvResponsePtr response);
     void proccessCallback(SrvRequestConstPtr request);
 
@@ -85,12 +85,12 @@ class SystemROSInterface
 {
 
 public:
-  
+
     SystemROSInterface(const std::string & node_name,
                        const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
-   
+
     ~SystemROSInterface();
-    
+
     template <class SrvT, class CallbackT>
     inline void addService(
         const std::string & service_name, const CallbackT & callback, const unsigned group_id = 0,
@@ -142,16 +142,16 @@ protected:
     rclcpp::CallbackGroup::SharedPtr getOrCreateNodeCallbackGroup(const unsigned group_id, rclcpp::CallbackGroupType callback_group_type);
 
     DriverStateNamedMsg & getDriverStateByName(
-        RoverDriverStateMsg & robot_driver_state, 
+        RoverDriverStateMsg & robot_driver_state,
         const DriverNames name);
-    
+
     rclcpp::Node::SharedPtr node_;
     std::unordered_map<unsigned, rclcpp::CallbackGroup::SharedPtr> callback_groups_;
     rclcpp::executors::MultiThreadedExecutor::UniquePtr executor_;
     std::thread executor_thread_;
 
     rclcpp::Publisher<RoverDriverStateMsg>::SharedPtr driver_state_publisher_;
-    std::unique_ptr<realtime_tools::RealtimePublisher<RoverDriverStateMsg>>realtime_driver_state_publisher_;
+    std::unique_ptr<realtime_tools::RealtimePublisher<RoverDriverStateMsg>> realtime_driver_state_publisher_;
 
     rclcpp::Publisher<GpioStateMsg>::SharedPtr gpio_state_publisher_;
     std::unique_ptr<realtime_tools::RealtimePublisher<GpioStateMsg>> realtime_gpio_state_publisher_;

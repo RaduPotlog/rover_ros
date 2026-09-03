@@ -15,6 +15,7 @@
 #ifndef ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_A1_SYSTEM_HPP_
 #define ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_A1_SYSTEM_HPP_
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -61,21 +62,19 @@ public:
     }
 
 protected:
-    
+
     void defineRoverDriver() override;
 
     void updateHwStates(const rclcpp::Time & time) override;
 
     void updateDriverStateMsg() override;
-    
+
     void getSpeedCmd(std::vector<float> & speed_cmd) const override;
 
     void diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper & status) override;
     void diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper & status) override;
 
     static const inline std::vector<std::string> joints_ = {"fl", "fr", "rl", "rr"};
-
-    rclcpp::Time last_time_{0, 0, RCL_STEADY_TIME};
 };
 
 }  // namespace rover_hardware_interface

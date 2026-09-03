@@ -86,7 +86,7 @@ CallbackReturn PhidgetImuSensor::on_configure(const rclcpp_lifecycle::State &)
     } catch (const std::exception & e) {
         RCLCPP_ERROR_STREAM(
         logger_, "An exception occurred while reading the obligatory parameters: " << e.what());
-    
+
         return CallbackReturn::ERROR;
     }
 
@@ -132,13 +132,14 @@ CallbackReturn PhidgetImuSensor::on_activate(const rclcpp_lifecycle::State &)
         if (!spatial_) {
             spatial_ = std::make_unique<phidgets::Spatial>(
             params_.serial, -1, false,
-            std::bind(&PhidgetImuSensor::spatialDataCallback, this, _1, _2, _3, _4), nullptr,
+            std::bind(&PhidgetImuSensor::spatialDataCallback, this, std::placeholders::_1,
+            std::placeholders::_2, std::placeholders::_3, std::placeholders::_4), nullptr,
             std::bind(&PhidgetImuSensor::spatialAttachCallback, this),
             std::bind(&PhidgetImuSensor::spatialDetachCallback, this));
         }
 
         imu_connected_ = true;
-    
+
         RCLCPP_DEBUG_STREAM(logger_, "Successfully connected to the IMU sensor with serial number: " << spatial_->getSerialNumber());
         calibrate();
 
@@ -216,7 +217,7 @@ void PhidgetImuSensor::checkInterfaces() const
     const auto names_start_iter = kImuInterfacesNames.begin();
     const auto names_end_iter = kImuInterfacesNames.end();
     const auto states_iter = info_.sensors.at(0).state_interfaces.begin();
-    
+
     auto compare_name_with_interface_info = [](const std::string & name, const hardware_interface::InterfaceInfo & interface_info) {
         return name == interface_info.name;
     };
@@ -290,7 +291,7 @@ void PhidgetImuSensor::checkMadgwickFilterWorldFrameParam()
         world_frame_ = WorldFrame::ENU;
     } else {
         world_frame_ = WorldFrame::ENU;
-        RCLCPP_WARN_STREAM(logger_, "The parameter 'world_frame' was set to an invalid value (" 
+        RCLCPP_WARN_STREAM(logger_, "The parameter 'world_frame' was set to an invalid value ("
             << world_frame
             << "). Valid values are ['enu', 'ned', 'nwu']. Setting to default value 'enu'.");
     }
@@ -432,7 +433,7 @@ geometry_msgs::msg::Vector3 PhidgetImuSensor::parseGyration(const double angular
     ang_vel.x = angular_rate[0] * (M_PI / 180.0);
     ang_vel.y = angular_rate[1] * (M_PI / 180.0);
     ang_vel.z = angular_rate[2] * (M_PI / 180.0);
-  
+
     return ang_vel;
 }
 
@@ -443,12 +444,12 @@ geometry_msgs::msg::Vector3 PhidgetImuSensor::parseAcceleration(const double acc
     lin_acc.x = -acceleration[0] * G;
     lin_acc.y = -acceleration[1] * G;
     lin_acc.z = -acceleration[2] * G;
-  
+
     return lin_acc;
 }
 
 void PhidgetImuSensor::initializeMadgwickAlgorithm(
-    const geometry_msgs::msg::Vector3 & mag_compensated, 
+    const geometry_msgs::msg::Vector3 & mag_compensated,
     const geometry_msgs::msg::Vector3 & lin_acc,
     const rclcpp::Time & timestamp)
 {
@@ -480,8 +481,8 @@ bool PhidgetImuSensor::isIMUCalibrated(const geometry_msgs::msg::Vector3 & mag_c
 }
 
 void PhidgetImuSensor::spatialDataCallback(
-    const double acceleration[3], 
-    const double angular_rate[3], 
+    const double acceleration[3],
+    const double angular_rate[3],
     const double magnetic_field[3],
     const double timestamp)
 {
@@ -506,7 +507,7 @@ void PhidgetImuSensor::spatialDataCallback(
     }
 
     if (!algorithm_initialized_ || params_.stateless) {
-    
+
         try {
             initializeMadgwickAlgorithm(mag_compensated, lin_acc, spatial_data_timestamp);
         } catch (const std::runtime_error & e) {
@@ -515,7 +516,7 @@ void PhidgetImuSensor::spatialDataCallback(
     }
 
     if (algorithm_initialized_ && !params_.stateless) {
-    
+
         if (dt == 0.0) {
             RCLCPP_WARN_THROTTLE(logger_, steady_clock_, 5000,
                 "Time difference between acquired IMU data is 0, Madgwick Filter will not update the orientation!");
@@ -557,9 +558,9 @@ void PhidgetImuSensor::spatialDetachCallback()
 }
 
 void PhidgetImuSensor::updateMadgwickAlgorithm(
-    const geometry_msgs::msg::Vector3 & ang_vel, 
+    const geometry_msgs::msg::Vector3 & ang_vel,
     const geometry_msgs::msg::Vector3 & lin_acc,
-    const geometry_msgs::msg::Vector3 & mag_compensated, 
+    const geometry_msgs::msg::Vector3 & mag_compensated,
     const double dt)
 {
     filter_->madgwickAHRSupdate(ang_vel.x, ang_vel.y, ang_vel.z, lin_acc.x, lin_acc.y, lin_acc.z, mag_compensated.x,
@@ -567,7 +568,7 @@ void PhidgetImuSensor::updateMadgwickAlgorithm(
 }
 
 void PhidgetImuSensor::updateMadgwickAlgorithmIMU(
-    const geometry_msgs::msg::Vector3 & ang_vel, 
+    const geometry_msgs::msg::Vector3 & ang_vel,
     const geometry_msgs::msg::Vector3 & lin_acc,
     const double dt)
 {

@@ -34,7 +34,7 @@ void RoverA1Driver::sendSpeedCmd(const std::vector<float> & speeds)
 {
     if (speeds.size() != 4) {
         throw std::runtime_error(
-            "Invalid speeds vector size. Expected 4, got " + 
+            "Invalid speeds vector size. Expected 4, got " +
             std::to_string(speeds.size()));
     }
 
@@ -45,11 +45,15 @@ void RoverA1Driver::sendSpeedCmd(const std::vector<float> & speeds)
     const auto speed_rear_right = this->getCmdVelConverter().convert(speeds.at(3));
 
     try {
+        // drivers_.at(...) throws std::out_of_range (a sibling of std::runtime_error, not caught
+        // by it) on a lookup miss, so this catches std::exception broadly rather than narrowly -
+        // the caller (RoverSystem::handleRoverDriverWriteOperation(), on the write() RT path)
+        // must never see anything other than the std::runtime_error re-thrown below.
         drivers_.at(DriverNames::REAR_LEFT)->getMotorDriver(MotorNames::DEFAULT)->sendCmdVel(speed_rear_left);
         drivers_.at(DriverNames::REAR_RIGHT)->getMotorDriver(MotorNames::DEFAULT)->sendCmdVel(speed_rear_right);
         drivers_.at(DriverNames::FRONT_LEFT)->getMotorDriver(MotorNames::DEFAULT)->sendCmdVel(speed_front_left);
         drivers_.at(DriverNames::FRONT_RIGHT)->getMotorDriver(MotorNames::DEFAULT)->sendCmdVel(speed_front_right);
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
         throw std::runtime_error("Driver send cmd failed: " + std::string(e.what()));
     }
 }
@@ -60,7 +64,7 @@ void RoverA1Driver::attemptErrorFlagReset()
 }
 
 void RoverA1Driver::defineDrivers()
-{  
+{
     auto rear_left_driver = std::make_shared<PhidgetDriver>();
     auto rear_right_driver = std::make_shared<PhidgetDriver>();
     auto front_left_driver = std::make_shared<PhidgetDriver>();
@@ -74,7 +78,7 @@ void RoverA1Driver::defineDrivers()
         std::dynamic_pointer_cast<PhidgetDriver>(front_left_driver), 0, -1, true);
     auto front_right_motor_driver = std::make_shared<PhidgetMotorDriver>(drivetrain_settings_,
         std::dynamic_pointer_cast<PhidgetDriver>(front_right_driver), 1, -1, false);
-    
+
     rear_left_driver->addMotorDriver(MotorNames::DEFAULT, rear_left_motor_driver);
     rear_right_driver->addMotorDriver(MotorNames::DEFAULT, rear_right_motor_driver);
     front_left_driver->addMotorDriver(MotorNames::DEFAULT, front_left_motor_driver);

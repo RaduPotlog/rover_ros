@@ -47,7 +47,7 @@ namespace rover_hardware_interface
 RoverSystem::RoverSystem(const std::vector<std::string> & joint_order)
 : SystemInterface()
 , joint_size_(joint_order.size())
-, joint_order_(joint_order) 
+, joint_order_(joint_order)
 , joints_names_sorted_(joint_size_)
 {
 
@@ -112,7 +112,7 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
     system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
         "hardware_interface/sw_user_e_stop_set", std::bind(&EmergencyStopInterface::setEStop, e_stop_), 1,
         rclcpp::CallbackGroupType::MutuallyExclusive);
-    
+
     auto e_stop_reset_qos = rclcpp::ServicesQoS();
     e_stop_reset_qos.keep_last(1);
     system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
@@ -124,7 +124,7 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
     system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
         "hardware_interface/sw_e_stop_latch_reset", std::bind(&RoverSystem::resetEStopLatch, this), 2,
         rclcpp::CallbackGroupType::MutuallyExclusive, e_stop_latch_reset_qos);
-    
+
     system_ros_interface_->addDiagnosticTask(
     std::string("system errors"), this, &RoverSystem::diagnoseErrors);
 
@@ -239,7 +239,7 @@ std::vector<StateInterface> RoverSystem::export_state_interfaces()
 std::vector<CommandInterface> RoverSystem::export_command_interfaces()
 {
     std::vector<CommandInterface> command_interfaces;
-    
+
     for (std::size_t i = 0; i < joint_size_; i++) {
         command_interfaces.emplace_back(hardware_interface::CommandInterface(
             joints_names_sorted_[i], hardware_interface::HW_IF_VELOCITY, &hw_commands_velocities_[i]));
@@ -267,7 +267,7 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
         updateFlagErrors();
         updateDriverStateMsg();
         system_ros_interface_->publishRobotDriverState();
-        
+
         const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
         system_ros_interface_->updateMsgGpioStates(gpio_state);
         system_ros_interface_->publishGpioStateMsg();
@@ -464,7 +464,7 @@ void RoverSystem::configureRoverController()
     rover_controller_ = std::make_shared<RoverControllerGpioAdapter>(rover_controller_impl_);
 
     rover_controller_->start();
-    // TODO: Check if e-stop interface can be used
+    // TODO(mechatronics-academy): Check if e-stop interface can be used
     rover_controller_->eStopUserBtnTrigger(false);
     rover_controller_->eStopMotorDriverFaultTrigger(false);
 
@@ -625,7 +625,12 @@ void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_op
     try {
         write_operation();
         rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, false);
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
+        // Widened from std::runtime_error: write_operation() ultimately calls down into
+        // std::unordered_map::at() (RoverA1Driver::sendSpeedCmd()), which throws
+        // std::out_of_range - a sibling of std::runtime_error, not caught by it - on a lookup
+        // miss. write() must never let an exception escape, so this boundary catches
+        // std::exception broadly, matching the same widening already applied in on_init().
         RCLCPP_WARN_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while writing commands: " << e.what());

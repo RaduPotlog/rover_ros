@@ -15,10 +15,10 @@
 #ifndef ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_DRIVER_PHIDGET_UTILS_HPP_
 #define ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_DRIVER_PHIDGET_UTILS_HPP_
 
+#include <libphidget22/phidget22.h>
+
 #include <stdexcept>
 #include <string>
-
-#include <libphidget22/phidget22.h>
 
 namespace rover_hardware_interface
 {
@@ -30,10 +30,10 @@ namespace rover_hardware_interface
     void operator=(Classname &&) = delete;
 
 void openWaitForAttachment(
-    PhidgetHandle handle, 
+    PhidgetHandle handle,
     int32_t serial_number,
-    int hub_port, 
-    bool is_hub_port_device, 
+    int hub_port,
+    bool is_hub_port_device,
     int channel);
 
 void closeAndDelete(PhidgetHandle * handle) noexcept;

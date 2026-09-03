@@ -27,7 +27,7 @@ namespace rover_hardware_interface
 {
 
 enum class MotorNames {
-    DEFAULT = 0, 
+    DEFAULT = 0,
 };
 
 enum class DriverNames {
