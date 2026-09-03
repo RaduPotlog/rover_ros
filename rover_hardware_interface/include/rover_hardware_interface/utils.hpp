@@ -42,11 +42,18 @@ struct ModbusSettings
     unsigned connection_retry_delay_ms;
 };
 
+// `log_warning`, if provided, receives each attempt-failure message instead of the default
+// std::cerr fallback - lets infrastructure callers (e.g. RoverSystem, which has an rclcpp::Logger)
+// route these through RCLCPP_WARN_STREAM instead. Left optional (default nullptr -> std::cerr)
+// rather than a hard rclcpp dependency here, since this header is transitively included from
+// domain/driver_data_snapshot.hpp and must stay ROS-free (see the comment in utils.cpp and
+// scripts/check_domain_purity.sh).
 bool operationWithAttempts(
     const std::function<void()> operation,
     const unsigned max_attempts,
     const std::function<void()> on_error = []() {},
-    const std::chrono::milliseconds delay_between_attempts = std::chrono::milliseconds(0));
+    const std::chrono::milliseconds delay_between_attempts = std::chrono::milliseconds(0),
+    const std::function<void(const std::string &)> & log_warning = nullptr);
 
 bool checkIfJointNameContainValidSequence(
     const std::string & name,

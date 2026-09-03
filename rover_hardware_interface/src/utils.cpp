@@ -21,29 +21,42 @@
 namespace rover_hardware_interface
 {
 
-// std::cerr (not RCLCPP_*) is deliberate here: utils.hpp is included by
-// domain/driver_data_snapshot.hpp (for DrivetrainSettings) and must stay transitively free of
+// std::cerr fallback (not a hard RCLCPP_* dependency) is deliberate here: utils.hpp is included
+// by domain/driver_data_snapshot.hpp (for DrivetrainSettings) and must stay transitively free of
 // rclcpp, or the domain layer's ROS-independence (enforced by scripts/check_domain_purity.sh for
 // direct includes) would be silently broken one include deeper than that script can check.
+// Infrastructure callers that do have a logger (e.g. RoverSystem) can pass `log_warning` to route
+// these messages through RCLCPP_WARN_STREAM instead - see the declaration in utils.hpp.
 
 bool operationWithAttempts(
     const std::function<void()> operation,
     const unsigned max_attempts,
     const std::function<void()> on_error,
-    const std::chrono::milliseconds delay_between_attempts)
+    const std::chrono::milliseconds delay_between_attempts,
+    const std::function<void(const std::string &)> & log_warning)
 {
+    const auto warn = [&log_warning](const std::string & message) {
+        if (log_warning) {
+            log_warning(message);
+        } else {
+            std::cerr << message << std::endl;
+        }
+    };
+
     for (unsigned i = 0; i < max_attempts; ++i) {
         try {
             operation();
             return true;
         } catch (const std::runtime_error & e) {
-            std::cerr << "An exception occurred while handling operation() function, attempt " << i + 1
-                      << " of " << max_attempts << ": " << e.what() << std::endl;
+            warn(
+                "An exception occurred while handling operation() function, attempt " +
+                std::to_string(i + 1) + " of " + std::to_string(max_attempts) + ": " + e.what());
             try {
                 on_error();
             } catch (const std::runtime_error & on_error_e) {
-                std::cerr << "An exception occurred while handling on_error() function: "
-                        << on_error_e.what() << std::endl;
+                warn(
+                    std::string("An exception occurred while handling on_error() function: ") +
+                    on_error_e.what());
                 return false;
             }
 

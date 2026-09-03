@@ -485,19 +485,18 @@ void CCONV PhidgetMotorDriver::setTargetVelocityHandler(
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
-    driver->set_speed_done_ = false;
+    driver->set_speed_pending_ = false;
 }
 
 void PhidgetMotorDriver::sendCmdVel(const float cmd)
 {
     if (auto driver = driver_.lock()) {
 
-        // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet
-        // (setTargetVelocityHandler() hasn't fired to clear set_speed_done_) - this command is
-        // dropped rather than queued. At the 100 Hz write() rate the next cycle's command
-        // supersedes it almost immediately, so this is intentional, not an oversight; it is not
-        // currently surfaced as an error/counter to the caller.
-        if (set_speed_done_) return;
+        // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet -
+        // this command is dropped rather than queued. At the 100 Hz write() rate the next cycle's
+        // command supersedes it almost immediately, so this is intentional, not an oversight; it
+        // is not currently surfaced as an error/counter to the caller.
+        if (set_speed_pending_) return;
 
         float cmd_temp = 0.0f;
 
@@ -513,7 +512,7 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
             PhidgetMotorDriver::setTargetVelocityHandler,
             this);
 
-        set_speed_done_ = true;
+        set_speed_pending_ = true;
     }
 }
 

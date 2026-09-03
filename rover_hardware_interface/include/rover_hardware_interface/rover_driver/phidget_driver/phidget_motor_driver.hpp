@@ -146,7 +146,9 @@ private:
 
     bool direction_reversed_;
 
-    std::atomic<bool> set_speed_done_{false};
+    // true while a PhidgetDCMotor_setTargetVelocity_async() call is in flight (cleared by
+    // setTargetVelocityHandler() once the SDK reports completion).
+    std::atomic<bool> set_speed_pending_{false};
 
     // Written from the Phidget SDK callback thread (position/current/temperature handlers) each
     // time a telemetry callback fires — the firing itself is the liveness signal, independent of

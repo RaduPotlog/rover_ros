@@ -150,8 +150,10 @@ CallbackReturn RoverSystem::on_activate(const rclcpp_lifecycle::State &)
     // Actually engaging the motors (sending a zero-velocity command to each driver and waiting
     // for them to arm) belongs here, not in on_configure() — a merely-configured component
     // should not yet be commanding hardware.
-    if (!operationWithAttempts(std::bind(&RoverDriverInterface::activate, rover_driver_),
-        max_rover_driver_activation_attempts_)) {
+    if (!operationWithAttempts(
+            std::bind(&RoverDriverInterface::activate, rover_driver_),
+            max_rover_driver_activation_attempts_, []() {}, std::chrono::milliseconds(0),
+            [this](const std::string & message) { RCLCPP_WARN_STREAM(logger_, message); })) {
         RCLCPP_ERROR_STREAM(logger_, "Failed to activate Rover System: Couldn't activate RoverDriver in "
                                      << max_rover_driver_activation_attempts_ << " attempts.");
         return CallbackReturn::ERROR;
@@ -478,7 +480,8 @@ void RoverSystem::configureRoverDriver()
     if (!operationWithAttempts(
             std::bind(&RoverDriverInterface::initialize, rover_driver_),
             max_rover_driver_initialization_attempts_,
-            std::bind(&RoverDriverInterface::deinitialize, rover_driver_))) {
+            std::bind(&RoverDriverInterface::deinitialize, rover_driver_), std::chrono::milliseconds(0),
+            [this](const std::string & message) { RCLCPP_WARN_STREAM(logger_, message); })) {
         throw std::runtime_error("Rover drivers initialization failed.");
     }
 
