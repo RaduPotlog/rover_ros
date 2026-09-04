@@ -40,7 +40,7 @@
 #include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
-#include "rover_hardware_interface/rover_controller/rover_controller_types.hpp"
+#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 
 namespace rover_hardware_interface
 {

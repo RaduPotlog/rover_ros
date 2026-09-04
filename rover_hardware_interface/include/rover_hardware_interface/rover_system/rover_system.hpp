@@ -34,7 +34,6 @@
 #include "rover_hardware_interface/domain/rover_driver.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
-#include "rover_hardware_interface/rover_controller/rover_controller.hpp"
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
 #include "rover_hardware_interface/domain/rover_gpio_port.hpp"
@@ -103,7 +102,6 @@ protected:
 
     void configureRoverController();
     void configureRoverDriver();
-    void configureEStop();
 
     // Shared by on_cleanup()/on_shutdown(): both tear down the same set of owned components, and
     // on_shutdown() in particular must tolerate being called from Unconfigured (rover_driver_ /
@@ -154,13 +152,11 @@ protected:
 
     // Rover driver interface
     std::shared_ptr<RoverDriverInterface> rover_driver_;
-    // Rover safety controller GPIO port (adapter over RoverController) - read()-path GPIO
-    // polling and initial arming go through this, not the concrete RoverController.
+    // Rover safety controller GPIO port (adapter over RoverSafetyController) - read()-path GPIO
+    // polling and initial arming go through this, not the concrete RoverSafetyController, which
+    // is constructed as a scoped local in configureRoverController() and never stored as a
+    // member, so nothing on the RT read()/write() path can reach it directly.
     std::shared_ptr<RoverGpioPort> rover_controller_;
-    // Concrete Modbus-backed safety controller, kept only long enough to construct
-    // RoverControllerEStopIo (which needs isPinActive()/eStopLatchReset(), not part of
-    // RoverGpioPort) and RoverControllerGpioAdapter above.
-    std::shared_ptr<RoverController> rover_controller_impl_;
     // Rover emergency stop interface
     std::shared_ptr<EmergencyStopInterface> e_stop_;
     // Debounced/latched per-category error state (write cmds, read-motor-states,

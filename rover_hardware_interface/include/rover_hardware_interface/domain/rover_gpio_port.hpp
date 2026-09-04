@@ -23,10 +23,11 @@ namespace rover_hardware_interface
 {
 
 // Port: the GPIO/safety-controller primitives RoverSystem needs to arm the controller and poll
-// its IO state, without depending on the concrete Modbus-backed RoverController directly.
-// Implemented by RoverControllerGpioAdapter (see rover_controller/rover_controller_gpio_adapter.hpp),
-// mirroring how EmergencyStopIoPort/RoverControllerEStopIo isolate EmergencyStop from the same
-// concrete type.
+// its IO state, without depending on the concrete Modbus-backed RoverSafetyController directly.
+// Implemented by RoverSafetyControllerGpioAdapter (see
+// rover_safety_controller/rover_safety_controller_gpio_adapter.hpp), mirroring how
+// EmergencyStopIoPort/RoverSafetyControllerEStopIo isolate EmergencyStop from the same concrete
+// type.
 class RoverGpioPort
 {
 
@@ -43,7 +44,7 @@ public:
     virtual void eStopMotorDriverFaultTrigger(const bool state) = 0;
 
     // Non-blocking; returns a reference to a cache owned by the implementation. Safe to call
-    // from the RT thread (see RoverController::queryControlInterfaceIOStates()).
+    // from the RT thread (see RoverSafetyController::queryControlInterfaceIOStates()).
     virtual const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() = 0;
 };
 

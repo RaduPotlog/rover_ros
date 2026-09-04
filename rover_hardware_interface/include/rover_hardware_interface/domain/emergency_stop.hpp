@@ -24,8 +24,8 @@ namespace rover_hardware_interface
 {
 
 // Port: the safety-IO primitives EmergencyStop needs from whatever actually talks to the E-Stop
-// hardware. Implemented by an infrastructure adapter (see RoverControllerEStopIo) so this domain
-// class never depends on RoverController/Modbus directly.
+// hardware. Implemented by an infrastructure adapter (see RoverSafetyControllerEStopIo) so this
+// domain class never depends on RoverSafetyController/Modbus directly.
 class EmergencyStopIoPort
 {
 

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_HARDWARE_INTERFACE_ROVER_CONTROLLER_ROVER_CONTROLLER_HPP_
-#define ROVER_HARDWARE_INTERFACE_ROVER_CONTROLLER_ROVER_CONTROLLER_HPP_
+#ifndef ROVER_HARDWARE_INTERFACE_ROVER_SAFETY_CONTROLLER_ROVER_SAFETY_CONTROLLER_HPP_
+#define ROVER_HARDWARE_INTERFACE_ROVER_SAFETY_CONTROLLER_ROVER_SAFETY_CONTROLLER_HPP_
 
 #include <atomic>
 #include <chrono>
@@ -25,7 +25,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "rover_hardware_interface/rover_controller/rover_controller_types.hpp"
+#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 #include "rover_hardware_interface/rover_modbus/modbus.hpp"
 #include "rover_hardware_interface/utils.hpp"
 
@@ -84,12 +84,12 @@ private:
     std::unordered_map<RoverControllerGpio, bool> io_state_;
 };
 
-class RoverController
+class RoverSafetyController
 {
 
 public:
 
-    RoverController(
+    RoverSafetyController(
         const std::string & modbus_host, const int modbus_port,
         const unsigned modbus_connection_retry_count,
         const std::chrono::milliseconds modbus_connection_retry_delay);
@@ -106,7 +106,7 @@ public:
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
 
-    // Non-blocking; returns a reference to a cache owned by this RoverController, refreshed
+    // Non-blocking; returns a reference to a cache owned by this RoverSafetyController, refreshed
     // in place on each call (best-effort — see ContactCoilHandler::getIoState()). Safe to call
     // from the RT thread; avoids allocating a new map on every call.
     const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates();
@@ -125,4 +125,4 @@ private:
 
 }  // namespace rover_hardware_interface
 
-#endif  // ROVER_HARDWARE_INTERFACE_ROVER_CONTROLLER_ROVER_CONTROLLER_HPP_
+#endif  // ROVER_HARDWARE_INTERFACE_ROVER_SAFETY_CONTROLLER_ROVER_SAFETY_CONTROLLER_HPP_

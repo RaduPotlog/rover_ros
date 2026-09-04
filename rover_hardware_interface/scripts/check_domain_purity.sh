@@ -33,7 +33,7 @@ DOMAIN_DIRS=(
 )
 
 # In-project (quoted) includes from domain/ files may only reach other domain/ headers or the
-# dependency-free utils.hpp - never rover_system/, rover_driver/, rover_controller/,
+# dependency-free utils.hpp - never rover_system/, rover_driver/, rover_safety_controller/,
 # rover_sensors/, rover_modbus/, or system_ros_interface/, all of which are infrastructure.
 ALLOWED_QUOTED_PATTERN='^rover_hardware_interface/(domain/[^/]+\.hpp$|utils\.hpp$)'
 

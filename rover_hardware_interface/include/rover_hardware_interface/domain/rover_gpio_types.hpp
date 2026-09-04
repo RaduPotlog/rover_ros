@@ -19,10 +19,10 @@ namespace rover_hardware_interface
 {
 
 // Identifies a GPIO/relay line on the safety controller. Kept in domain/ (rather than
-// rover_controller/rover_controller_types.hpp, where it used to live) because RoverGpioPort
-// needs it in its signature, and domain code may not include infrastructure headers - see
-// scripts/check_domain_purity.sh. rover_controller_types.hpp re-includes this header so existing
-// infrastructure call sites are unaffected.
+// rover_safety_controller/rover_safety_controller_types.hpp, where it used to live) because
+// RoverGpioPort needs it in its signature, and domain code may not include infrastructure
+// headers - see scripts/check_domain_purity.sh. rover_safety_controller_types.hpp re-includes
+// this header so existing infrastructure call sites are unaffected.
 enum class RoverControllerGpio
 {
     GPIO_HW_E_STOP_USER_BTN             = 0,

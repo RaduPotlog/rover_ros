@@ -12,37 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rover_hardware_interface/rover_controller/rover_controller_gpio_adapter.hpp"
+#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_gpio_adapter.hpp"
 
 #include <utility>
 
 namespace rover_hardware_interface
 {
 
-RoverControllerGpioAdapter::RoverControllerGpioAdapter(
-    std::shared_ptr<RoverController> rover_controller)
+RoverSafetyControllerGpioAdapter::RoverSafetyControllerGpioAdapter(
+    std::shared_ptr<RoverSafetyController> rover_controller)
 : rover_controller_(std::move(rover_controller))
 {
 
 }
 
-void RoverControllerGpioAdapter::start()
+void RoverSafetyControllerGpioAdapter::start()
 {
     rover_controller_->start();
 }
 
-void RoverControllerGpioAdapter::eStopUserBtnTrigger(const bool state)
+void RoverSafetyControllerGpioAdapter::eStopUserBtnTrigger(const bool state)
 {
     rover_controller_->eStopUserBtnTrigger(state);
 }
 
-void RoverControllerGpioAdapter::eStopMotorDriverFaultTrigger(const bool state)
+void RoverSafetyControllerGpioAdapter::eStopMotorDriverFaultTrigger(const bool state)
 {
     rover_controller_->eStopMotorDriverFaultTrigger(state);
 }
 
 const std::unordered_map<RoverControllerGpio, bool> &
-RoverControllerGpioAdapter::queryControlInterfaceIOStates()
+RoverSafetyControllerGpioAdapter::queryControlInterfaceIOStates()
 {
     return rover_controller_->queryControlInterfaceIOStates();
 }

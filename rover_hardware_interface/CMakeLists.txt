@@ -73,9 +73,9 @@ add_library(
     src/system_ros_interface/system_ros_interface.cpp
     src/utils.cpp
     src/rover_modbus/modbus.cpp
-    src/rover_controller/rover_controller.cpp
-    src/rover_controller/rover_controller_e_stop_io.cpp
-    src/rover_controller/rover_controller_gpio_adapter.cpp
+    src/rover_safety_controller/rover_safety_controller.cpp
+    src/rover_safety_controller/rover_safety_controller_e_stop_io.cpp
+    src/rover_safety_controller/rover_safety_controller_gpio_adapter.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME} ${PACKAGE_DEPENDENCIES})
@@ -130,6 +130,15 @@ if(BUILD_TESTING)
   add_test(
     NAME domain_purity_check
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_domain_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+  # RoverSystem::read()/write() run on controller_manager's RT thread and must never call a
+  # blocking Modbus/Phidget-SDK symbol directly (see .claude/rules/ros2_control_architecture.md
+  # §5). Mechanically enforces that so a future change can't silently reintroduce a blocking call
+  # on the RT path - see scripts/check_rt_path_purity.sh for the scan's scope and limits.
+  add_test(
+    NAME rt_path_purity_check
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_rt_path_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
   # Behavioral unit tests for the pure, ROS-free domain layer (linked against ${PROJECT_NAME},
