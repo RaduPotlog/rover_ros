@@ -181,6 +181,16 @@ if(BUILD_TESTING)
     test_rover_a1_system_on_init test/rover_system/test_rover_a1_system_on_init.cpp)
   target_link_libraries(test_rover_a1_system_on_init ${PROJECT_NAME})
   ament_target_dependencies(test_rover_a1_system_on_init hardware_interface)
+
+  # Integration test: drives PhidgetImuSensor through the real hardware_interface plugin contract
+  # (on_init() + export_state_interfaces()), the same pattern as
+  # test_rover_a1_system_on_init above. Deliberately does not exercise on_configure()/
+  # on_activate()/read(), which require real Phidget Spatial USB hardware - see the file-level
+  # comment in test/rover_sensors/test_phidget_imu_sensor_on_init.cpp.
+  ament_add_gtest(
+    test_phidget_imu_sensor_on_init test/rover_sensors/test_phidget_imu_sensor_on_init.cpp)
+  target_link_libraries(test_phidget_imu_sensor_on_init ${PROJECT_NAME})
+  ament_target_dependencies(test_phidget_imu_sensor_on_init hardware_interface)
 endif()
 
 ament_package()
