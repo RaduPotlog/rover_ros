@@ -119,6 +119,9 @@ CallbackReturn PhidgetImuSensor::on_configure(const rclcpp_lifecycle::State &)
 
 CallbackReturn PhidgetImuSensor::on_cleanup(const rclcpp_lifecycle::State &)
 {
+    // spatial_/filter_ are intentionally left alive across cleanup - re-activating is cheap
+    // (setDataInterval() etc. in on_configure() re-applies settings) and re-opening the Phidget
+    // USB connection on every reconfigure is not worth the extra churn.
     return CallbackReturn::SUCCESS;
 }
 
@@ -160,6 +163,7 @@ CallbackReturn PhidgetImuSensor::on_activate(const rclcpp_lifecycle::State &)
 
 CallbackReturn PhidgetImuSensor::on_deactivate(const rclcpp_lifecycle::State &)
 {
+    // See on_cleanup() below - spatial_/filter_ stay alive here too, for the same reason.
     return CallbackReturn::SUCCESS;
 }
 

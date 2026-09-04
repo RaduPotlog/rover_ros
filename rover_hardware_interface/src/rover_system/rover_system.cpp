@@ -16,6 +16,7 @@
 
 #include <array>
 #include <chrono>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -92,8 +93,15 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
         configureRoverController();
         configureRoverDriver();
         configureEStop();
-    } catch (const std::runtime_error & e) {
-        RCLCPP_ERROR_STREAM(logger_, "Failed to initialize motors controllers. Error: " << e.what());
+    } catch (const std::exception & e) {
+        // Widened from std::runtime_error: MB::ModbusException (thrown by RoverModbus during
+        // e.g. coil initialization in configureRoverController()) derives directly from
+        // std::exception, not std::runtime_error, and must not escape on_configure() uncaught.
+        RCLCPP_ERROR_STREAM(logger_, "Failed to configure Rover System. Error: " << e.what());
+        // configureRoverController() may have already started rover_controller_ (and its
+        // background poll thread) before a later step in this try block failed - tear it down
+        // rather than leaving it running past a failed configure.
+        teardownRoverComponents();
         return CallbackReturn::ERROR;
     }
 
@@ -182,7 +190,10 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
     if (e_stop_) {
         try {
             e_stop_->setEStop();
-        } catch (const std::runtime_error & e) {
+        } catch (const std::exception & e) {
+            // Widened from std::runtime_error: MB::ModbusException derives directly from
+            // std::exception, not std::runtime_error, and must not escape on_error() - the
+            // error-handling callback itself - uncaught.
             RCLCPP_ERROR_STREAM(logger_, "Handling error failed: " << e.what());
             return CallbackReturn::ERROR;
         }
@@ -192,18 +203,11 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
         system_ros_interface_->broadcastOnDiagnosticTasks(
             diagnostic_msgs::msg::DiagnosticStatus::ERROR,
             "An error has occurred during a node state transition.");
-
-        system_ros_interface_.reset();
     }
 
-    if (rover_driver_) {
-        rover_driver_->deinitialize();
-        rover_driver_.reset();
-    }
-
-    rover_controller_.reset();
-    rover_controller_impl_.reset();
-    e_stop_.reset();
+    // Delegate the common reset to teardownRoverComponents() so this path and on_cleanup()/
+    // on_shutdown() can't drift apart as owned resources are added/changed.
+    teardownRoverComponents();
 
     return CallbackReturn::SUCCESS;
 }

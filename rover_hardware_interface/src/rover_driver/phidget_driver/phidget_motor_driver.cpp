@@ -491,6 +491,8 @@ void CCONV PhidgetMotorDriver::setTargetVelocityHandler(
 void PhidgetMotorDriver::sendCmdVel(const float cmd)
 {
     if (auto driver = driver_.lock()) {
+        // `driver` is intentionally unused below - this is purely a lifetime guard, holding the
+        // driver alive for the duration of this call, not a handle we dereference.
 
         // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet -
         // this command is dropped rather than queued. At the 100 Hz write() rate the next cycle's

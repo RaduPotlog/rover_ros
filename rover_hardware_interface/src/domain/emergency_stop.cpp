@@ -14,6 +14,7 @@
 
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 
+#include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -60,7 +61,10 @@ void EmergencyStop::setEStop()
 
     try {
         io_->triggerUserButton(true);
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
+        // Widened from std::runtime_error: MB::ModbusException (surfaced through the Modbus IO
+        // chain) derives directly from std::exception, not std::runtime_error, and must be
+        // wrapped here like any other IO failure rather than passed through unwrapped.
         throw std::runtime_error("Setting User E-Stop failed: " + std::string(e.what()));
     }
 }
@@ -76,7 +80,8 @@ void EmergencyStop::resetEStop()
 
     try {
         io_->triggerUserButton(false);
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
+        // Widened from std::runtime_error: see setEStop() above.
         throw std::runtime_error("Error when trying to reset User E-Stop: " + std::string(e.what()));
     }
 }
@@ -87,7 +92,8 @@ void EmergencyStop::resetEStopLatch()
 
     try {
         io_->resetLatch();
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
+        // Widened from std::runtime_error: see setEStop() above.
         throw std::runtime_error("Error when trying to reset E-Stop Latch: " + std::string(e.what()));
     }
 }
