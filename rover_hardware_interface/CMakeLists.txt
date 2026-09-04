@@ -182,9 +182,12 @@ if(BUILD_TESTING)
   target_link_libraries(test_phidget_data_transformer ${PROJECT_NAME})
 
   # Integration test: drives SystemROSInterface (services + publishers) over the real rclcpp
-  # graph - no Phidget/Modbus hardware involved (see test/infrastructure/test_system_ros_interface.cpp).
+  # graph - no Phidget/Modbus hardware involved (see
+  # test/system_ros_interface/test_system_ros_interface.cpp). Filed under test/system_ros_interface/
+  # to mirror include/rover_hardware_interface/system_ros_interface/ - this package has no
+  # production infrastructure/ directory (see the note atop check_domain_purity.sh for why).
   ament_add_gtest(
-    test_system_ros_interface test/infrastructure/test_system_ros_interface.cpp)
+    test_system_ros_interface test/system_ros_interface/test_system_ros_interface.cpp)
   target_link_libraries(test_system_ros_interface ${PROJECT_NAME})
   ament_target_dependencies(test_system_ros_interface rclcpp std_srvs)
 

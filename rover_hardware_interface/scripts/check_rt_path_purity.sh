@@ -74,6 +74,13 @@ fi
 # writes to hardware on the RT path must instead go through the cached/try_lock ports
 # (RoverGpioPort, RoverDriverInterface) and the Phidget SDK's _async entry points - see the RT
 # contract comment on the RoverSystem class in rover_system.hpp.
+#
+# IMPORTANT for whoever adds a new safety-IO or driver backend (e.g. CAN instead of Modbus, a
+# different motor-controller SDK): the *_system.cpp file-glob above picks up a new rover variant
+# automatically, but THIS list does not. It is a fixed list of symbol names, not a pattern over
+# "whatever the current backend's blocking calls are" - a new backend's blocking entry points must
+# be added here by hand, or this script will silently pass while the new backend blocks on the RT
+# thread. Grep the new backend's synchronous/network-round-trip calls and add them below.
 FORBIDDEN_SYMBOLS=(
     awaitResponse
     sendRequest

@@ -19,6 +19,15 @@
 # code must stay pure, dependency-free C++ so it can be unit-tested without ROS running (see
 # .claude/rules/clean_architecture.md) — this mechanically enforces that rule so a future change
 # can't silently reintroduce a dependency. Invoked from CMakeLists.txt as a plain CTest add_test.
+#
+# Note on "infrastructure": this package has no single include/rover_hardware_interface/infrastructure/
+# directory. Everything outside domain/ and application/ IS the infrastructure layer, split into
+# subsystem-named directories instead (rover_system/, rover_driver/, rover_safety_controller/,
+# rover_sensors/, rover_modbus/, system_ros_interface/) - one per real hardware/ROS boundary. This
+# is a deliberate, reviewed choice (each directory maps 1:1 to a concrete adapter a reader needs to
+# reason about independently), not a naming oversight, so don't go looking for an infrastructure/
+# folder that doesn't exist, and don't add one purely to match the template's default shape - the
+# boundary this script enforces is the include graph below, which is naming-scheme-agnostic.
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then

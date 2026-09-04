@@ -27,6 +27,11 @@
 namespace rover_hardware_interface
 {
 
+// The concrete rover variant: RoverSystem (rover_system.hpp) plus the Phidget-motor-driver +
+// Modbus-safety-controller backend specifics. Everything generic to any rover variant lives in
+// RoverSystem - this class should only ever add backend wiring (defineRoverDriver()/
+// defineRoverController(), Modbus settings, diagnostics field names), never new domain rules or
+// use cases.
 class RoverA1System : public RoverSystem
 {
 

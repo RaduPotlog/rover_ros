@@ -19,9 +19,11 @@
 # other than domain/ or application/ itself. Per .claude/rules/clean_architecture.md, the
 # application layer may depend only on the domain layer (never on rclcpp/ROS/hardware_interface,
 # and never on infrastructure - rover_system/, rover_driver/, rover_safety_controller/,
-# rover_sensors/, rover_modbus/, system_ros_interface/) so it stays unit-testable with fake domain
-# ports, the same way domain/ itself is (see check_domain_purity.sh, which this mirrors). Invoked
-# from CMakeLists.txt as a plain CTest add_test.
+# rover_sensors/, rover_modbus/, system_ros_interface/, which is where the infrastructure layer
+# actually lives in this package - see the "Note on infrastructure" comment atop
+# check_domain_purity.sh) so it stays unit-testable with fake domain ports, the same way domain/
+# itself is (see check_domain_purity.sh, which this mirrors). Invoked from CMakeLists.txt as a
+# plain CTest add_test.
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then

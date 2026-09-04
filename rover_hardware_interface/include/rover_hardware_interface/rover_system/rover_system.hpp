@@ -47,6 +47,16 @@ using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface
 using StateInterface = hardware_interface::StateInterface;
 using CommandInterface = hardware_interface::CommandInterface;
 
+// RoverSystem is the generic hardware_interface::SystemInterface adapter: lifecycle, joint
+// bookkeeping, the RT read()/write() cycle, and the domain-port-only view of the driver/safety
+// controller (RoverDriverInterface, RoverGpioPort, EmergencyStopInterface). It has no knowledge of
+// any concrete rover variant's backend. A concrete rover (e.g. RoverA1System in rover_a1_system.hpp,
+// the Phidget+Modbus variant) derives from this class and implements only the pure-virtual
+// extension points below (defineRoverDriver(), defineRoverController(), updateHwStates(),
+// getSpeedCmd(), ...). If you're adding a new use case or domain rule, it belongs here or in
+// domain/application/ - not in a per-variant subclass; if you're adding rover-specific wiring
+// (a new backend, new URDF params), it belongs in the subclass instead.
+//
 // Real-time contract for read()/write() (see .claude/rules/ros2_control_architecture.md §5):
 //   - Driver feedback is a cached snapshot refreshed opportunistically under an uncontended lock
 //     (RoverDriverInterface::getData(), backed by PhidgetRoverDriver) - never blocks on the
