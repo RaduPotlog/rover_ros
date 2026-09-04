@@ -14,14 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Fails if RoverSystem::read()/write() (src/rover_system/rover_system.cpp) contain a call to a
-# known-blocking Modbus/Phidget-SDK symbol. read()/write() run on the RT control loop thread
-# ticked by controller_manager and must never block on network I/O or a synchronous SDK call
-# (see .claude/rules/ros2_control_architecture.md §5). This is a single-file substring scan of
-# the read()/write() bodies, NOT a real call-graph analysis: it catches a blocking call written
-# directly in read()/write(), but not one added several call-levels deep in a function they call.
-# It complements, and does not replace, careful review of any change touching the RT path.
-# Invoked from CMakeLists.txt as a plain CTest add_test, mirroring check_domain_purity.sh.
+# Fails if RoverSystem::read()/write() (src/rover_system/rover_system.cpp) or the RT-loop
+# decision logic they delegate to (src/application/rover_control_loop_use_case.cpp - see
+# RoverControlLoopUseCase) contain a call to a known-blocking Modbus/Phidget-SDK symbol.
+# read()/write() run on the RT control loop thread ticked by controller_manager and must never
+# block on network I/O or a synchronous SDK call (see .claude/rules/ros2_control_architecture.md
+# §5). This is a substring scan (of read()/write()'s bodies specifically, and of the
+# RoverControlLoopUseCase source file as a whole, since every method on it is reachable from the
+# RT path), NOT a real call-graph analysis: it catches a blocking call written directly in one of
+# the scanned bodies, but not one added several call-levels deep in a function they call. It
+# complements, and does not replace, careful review of any change touching the RT path. Invoked
+# from CMakeLists.txt as a plain CTest add_test, mirroring check_domain_purity.sh.
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -30,12 +33,15 @@ if [[ $# -ne 1 ]]; then
 fi
 
 PKG_DIR="$1"
-TARGET_FILE="${PKG_DIR}/src/rover_system/rover_system.cpp"
+ROVER_SYSTEM_FILE="${PKG_DIR}/src/rover_system/rover_system.cpp"
+CONTROL_LOOP_USE_CASE_FILE="${PKG_DIR}/src/application/rover_control_loop_use_case.cpp"
 
-if [[ ! -f "${TARGET_FILE}" ]]; then
-    echo "check_rt_path_purity: ${TARGET_FILE} not found" >&2
-    exit 1
-fi
+for target_file in "${ROVER_SYSTEM_FILE}" "${CONTROL_LOOP_USE_CASE_FILE}"; do
+    if [[ ! -f "${target_file}" ]]; then
+        echo "check_rt_path_purity: ${target_file} not found" >&2
+        exit 1
+    fi
+done
 
 # Known-blocking symbols: raw Modbus TCP round-trips and synchronous Phidget SDK calls. Reads/
 # writes to hardware on the RT path must instead go through the cached/try_lock ports
@@ -59,16 +65,18 @@ extract_body() {
         $0 ~ pat { found = 1 }
         found { print }
         found && /^}/ { exit }
-    ' "${TARGET_FILE}"
+    ' "${ROVER_SYSTEM_FILE}"
 }
 
 read_body=$(extract_body 'return_type RoverSystem::read')
 write_body=$(extract_body 'return_type RoverSystem::write')
 
 if [[ -z "${read_body}" || -z "${write_body}" ]]; then
-    echo "check_rt_path_purity: could not locate read()/write() in ${TARGET_FILE}" >&2
+    echo "check_rt_path_purity: could not locate read()/write() in ${ROVER_SYSTEM_FILE}" >&2
     exit 1
 fi
+
+control_loop_use_case_body=$(cat "${CONTROL_LOOP_USE_CASE_FILE}")
 
 status=0
 
@@ -79,6 +87,10 @@ for symbol in "${FORBIDDEN_SYMBOLS[@]}"; do
     fi
     if grep -qF -- "${symbol}" <<< "${write_body}"; then
         echo "RT PATH PURITY VIOLATION: RoverSystem::write() calls blocking symbol '${symbol}'" >&2
+        status=1
+    fi
+    if grep -qF -- "${symbol}" <<< "${control_loop_use_case_body}"; then
+        echo "RT PATH PURITY VIOLATION: RoverControlLoopUseCase calls blocking symbol '${symbol}'" >&2
         status=1
     fi
 done

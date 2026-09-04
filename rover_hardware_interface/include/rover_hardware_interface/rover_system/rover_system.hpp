@@ -34,6 +34,7 @@
 #include "rover_hardware_interface/domain/rover_driver.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
+#include "rover_hardware_interface/application/rover_control_loop_use_case.hpp"
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
 #include "rover_hardware_interface/domain/rover_gpio_port.hpp"
@@ -59,8 +60,9 @@ using CommandInterface = hardware_interface::CommandInterface;
 //   - Motor commands in write() use the Phidget SDK's async call
 //     (PhidgetDCMotor_setTargetVelocity_async()) and drop the command rather than block if a
 //     prior async call hasn't completed yet.
-//   - handleRoverDriverWriteOperation() also uses try_lock and skips the write cycle on
-//     contention instead of blocking.
+//   - handleRoverDriverWriteOperation() delegates the actual write attempt to
+//     RoverControlLoopUseCase::performWriteOperation(), which also uses try_lock and skips the
+//     write cycle on contention instead of blocking (see application/rover_control_loop_use_case.hpp).
 //   - Accepted exception: RCLCPP_*_STREAM_THROTTLE calls on error/contention branches build a
 //     std::stringstream (allocates) but are throttled to at most once per 5s and only fire off
 //     the happy path - a deliberate tradeoff, not an oversight.
@@ -127,6 +129,11 @@ protected:
 
     void handleRoverDriverWriteOperation(std::function<void()> write_operation);
 
+    // Logs the outcome of a RoverControlLoopUseCase::performWriteOperation() call at the same
+    // throttled WARN level and with the same messages this package used before the write-path
+    // decision logic moved into RoverControlLoopUseCase. A no-op on kSucceeded.
+    void logWriteOperationResult(const WriteOperationResult & result);
+
     bool areVelocityCommandsNearZero();
 
     // Fills the (already correctly-sized) `speed_cmd` buffer in place — no allocation, so it's
@@ -165,6 +172,13 @@ protected:
     // from URDF thresholds; unlike rover_driver_/rover_controller_/e_stop_ it owns no hardware
     // handles, so it is NOT reset in on_cleanup()/on_shutdown()/on_error().
     std::unique_ptr<RoverErrorFilter> rover_error_filter_;
+    // Owns the RT-loop decision logic (E-Stop state, fault-flag reset, write-command gating and
+    // serialization) that previously lived directly in RoverSystem's own methods - see
+    // application/rover_control_loop_use_case.hpp. Constructed once rover_driver_/e_stop_ are
+    // both ready (end of on_configure()) and reset alongside them in teardownRoverComponents(),
+    // so it always references the same live rover_driver_/e_stop_/rover_error_filter_ this
+    // RoverSystem instance owns.
+    std::unique_ptr<RoverControlLoopUseCase> control_loop_use_case_;
     // Cached result of the last updateEStopState() poll; gates write() while true.
     // Defaults to true (fail-safe: no motion commands until confirmed clear).
     std::atomic_bool e_stop_active_{true};
@@ -183,9 +197,6 @@ protected:
 
     rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
     rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
-
-    // Write operation lock
-    std::shared_ptr<std::mutex> rover_driver_write_mtx_;
 
     // Lazily seeded from the first `time` argument read() receives (see
     // RoverSystem::read()) rather than default-constructed with a fixed clock type: the

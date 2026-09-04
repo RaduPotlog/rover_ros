@@ -104,6 +104,12 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
         return CallbackReturn::ERROR;
     }
 
+    // Both rover_driver_ and e_stop_ are guaranteed set at this point - configureRoverController()
+    // and configureRoverDriver() above either both succeeded or on_configure() already returned
+    // ERROR from the catch block.
+    control_loop_use_case_ = std::make_unique<RoverControlLoopUseCase>(
+        rover_driver_, e_stop_, *rover_error_filter_);
+
     std::fill(hw_commands_velocities_.begin(), hw_commands_velocities_.end(), 0.0);
     std::fill(hw_states_positions_.begin(), hw_states_positions_.end(), 0.0);
     std::fill(hw_states_velocities_.begin(), hw_states_velocities_.end(), 0.0);
@@ -213,6 +219,7 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
 
 void RoverSystem::teardownRoverComponents()
 {
+    control_loop_use_case_.reset();
     rover_controller_.reset();
 
     if (rover_driver_) {
@@ -290,14 +297,11 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
     // control loop; get_lifecycle_id() is the cached, RT-safe equivalent (see
     // hardware_interface::HardwareComponentInterface).
     const auto lifecycle_state = this->get_lifecycle_id();
+    const bool lifecycle_active = (lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
-    if (lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
-        if (e_stop_active_) {
-            // E-Stop (user-triggered or latched) is active: do not command motion in software,
-            // regardless of what the hardware relay is doing.
-            return return_type::OK;
-        }
-
+    // Covers both "not active" and "E-Stop (user-triggered or latched) is active" - in the latter
+    // case, do not command motion in software regardless of what the hardware relay is doing.
+    if (RoverControlLoopUseCase::shouldCommandMotion(lifecycle_active, e_stop_active_)) {
         handleRoverDriverWriteOperation([this] {
             getSpeedCmd(speed_cmd_buffer_);
             rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
@@ -459,8 +463,6 @@ void RoverSystem::readErrorFilterMaxErrorsCounts()
 
 void RoverSystem::configureRoverController()
 {
-    rover_driver_write_mtx_ = std::make_shared<std::mutex>();
-
     // Scoped local: only needed long enough to construct the two port adapters below; never
     // stored as a RoverSystem member so nothing on the RT read()/write() path can reach the
     // concrete Modbus-backed type directly.
@@ -543,11 +545,7 @@ void RoverSystem::updateMotorsState(const rclcpp::Time & time)
 
 void RoverSystem::updateMotorsStateDataTimedOut()
 {
-    if (rover_driver_->isMotorStatesDataTimedOut()) {
-        rover_error_filter_->updateError(ErrorsFilterIds::READ_MOTOR_STATES, true);
-    } else {
-        rover_error_filter_->updateError(ErrorsFilterIds::READ_MOTOR_STATES, false);
-    }
+    control_loop_use_case_->updateMotorsStateTimeoutStatus();
 }
 
 void RoverSystem::updateDriverState()
@@ -565,20 +563,15 @@ void RoverSystem::updateDriverState()
 
 void RoverSystem::updateDriverStateDataTimedOut()
 {
-    if (rover_driver_->isDriverStateDataTimedOut()) {
-        rover_error_filter_->updateError(ErrorsFilterIds::READ_DRIVER_STATE, true);
-    } else {
-        rover_error_filter_->updateError(ErrorsFilterIds::READ_DRIVER_STATE, false);
-    }
+    control_loop_use_case_->updateDriverStateTimeoutStatus();
 }
 
 void RoverSystem::updateFlagErrors()
 {
-    if (rover_driver_->isFlagError()) {
-        rover_error_filter_->updateError(ErrorsFilterIds::FAULT_FLAG, true);
-        handleRoverDriverWriteOperation([this] { rover_driver_->attemptErrorFlagReset(); });
-    } else {
-        rover_error_filter_->updateError(ErrorsFilterIds::FAULT_FLAG, false);
+    const auto reset_result = control_loop_use_case_->updateFaultFlagStatus();
+
+    if (reset_result) {
+        logWriteOperationResult(*reset_result);
     }
 }
 
@@ -595,45 +588,36 @@ void RoverSystem::updateCommunicationStatus()
 
 void RoverSystem::updateEStopState()
 {
-    if (!e_stop_) {
-        e_stop_active_ = true;
-        return;
-    }
-
-    const bool user_e_stop_triggered = e_stop_->readEStopState();
-    const bool e_stop_latched = e_stop_->readEStopLatchState();
-
-    e_stop_active_ = user_e_stop_triggered || e_stop_latched;
+    e_stop_active_ = control_loop_use_case_->updateEStopActiveState();
 }
 
 void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_operation)
 {
-    std::unique_lock<std::mutex> driver_write_lck(*rover_driver_write_mtx_, std::defer_lock);
+    // write_operation() may ultimately call down into std::unordered_map::at()
+    // (RoverA1Driver::sendSpeedCmd()), which throws std::out_of_range - a sibling of
+    // std::runtime_error, not caught by it, on a lookup miss. RoverControlLoopUseCase::
+    // performWriteOperation() already catches std::exception broadly for exactly this reason, so
+    // nothing can escape write()/updateFlagErrors() here.
+    logWriteOperationResult(control_loop_use_case_->performWriteOperation(write_operation));
+}
 
-    if (!driver_write_lck.try_lock()) {
-        // Lock contention (e.g. a concurrent E-Stop reset/service call) is expected and
-        // recoverable — skip this write cycle rather than pay exception cost on every
-        // contended RT tick.
-        RCLCPP_WARN_STREAM_THROTTLE(
-            logger_, steady_clock_, 5000,
-            "Couldn't acquire mutex for writing commands; skipping this write cycle.");
-        rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, true);
-        return;
-    }
-
-    try {
-        write_operation();
-        rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, false);
-    } catch (const std::exception & e) {
-        // Widened from std::runtime_error: write_operation() ultimately calls down into
-        // std::unordered_map::at() (RoverA1Driver::sendSpeedCmd()), which throws
-        // std::out_of_range - a sibling of std::runtime_error, not caught by it - on a lookup
-        // miss. write() must never let an exception escape, so this boundary catches
-        // std::exception broadly, matching the same widening already applied in on_init().
-        RCLCPP_WARN_STREAM_THROTTLE(
-            logger_, steady_clock_, 5000,
-            "An exception occurred while writing commands: " << e.what());
-        rover_error_filter_->updateError(ErrorsFilterIds::WRITE_CMDS, true);
+void RoverSystem::logWriteOperationResult(const WriteOperationResult & result)
+{
+    switch (result.outcome) {
+        case WriteOperationOutcome::kLockContention:
+            // Lock contention is expected and recoverable — skip this write cycle rather than
+            // pay exception cost on every contended RT tick.
+            RCLCPP_WARN_STREAM_THROTTLE(
+                logger_, steady_clock_, 5000,
+                "Couldn't acquire mutex for writing commands; skipping this write cycle.");
+            break;
+        case WriteOperationOutcome::kExceptionThrown:
+            RCLCPP_WARN_STREAM_THROTTLE(
+                logger_, steady_clock_, 5000,
+                "An exception occurred while writing commands: " << result.error_message);
+            break;
+        case WriteOperationOutcome::kSucceeded:
+            break;
     }
 }
 
