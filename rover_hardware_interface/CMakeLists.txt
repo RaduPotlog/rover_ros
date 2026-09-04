@@ -133,6 +133,15 @@ if(BUILD_TESTING)
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_domain_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
+  # Application code (include/rover_hardware_interface/application/, src/application/) must stay
+  # free of ROS/hardware_interface/vendor-SDK dependencies and may depend only on domain/ (see
+  # .claude/rules/clean_architecture.md). Mirrors domain_purity_check above -
+  # see scripts/check_application_purity.sh.
+  add_test(
+    NAME application_purity_check
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_application_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
   # RoverSystem::read()/write() run on controller_manager's RT thread and must never call a
   # blocking Modbus/Phidget-SDK symbol directly (see .claude/rules/ros2_control_architecture.md
   # §5). Mechanically enforces that so a future change can't silently reintroduce a blocking call
