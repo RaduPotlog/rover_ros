@@ -56,6 +56,19 @@ struct CoilInfo
     const bool is_coil_engage_allowed;
 };
 
+// Modbus TCP connection settings for a RoverSafetyController-style safety-relay board. Lives here
+// (rather than utils.hpp, which is transitively domain-reachable - see the comment on that file)
+// because it is infrastructure/transport configuration, owned by whichever rover-variant System
+// implements defineRoverController() with a Modbus-backed safety controller (e.g. RoverA1System),
+// not by the domain layer.
+struct ModbusSettings
+{
+    std::string host;
+    int port;
+    unsigned connection_retry_count;      // 0 = retry forever
+    unsigned connection_retry_delay_ms;
+};
+
 }  // namespace rover_hardware_interface
 
 #endif  // ROVER_HARDWARE_INTERFACE_ROVER_CONTROLLER_MODBUS_TYPES_HPP_

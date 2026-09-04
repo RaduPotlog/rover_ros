@@ -168,9 +168,12 @@ public:
 
 private:
 
-    float phidget_pos_feedback_to_radians_;
-    float phidget_vel_feedback_to_radians_per_second_;
-    float phidget_current_feedback_to_newton_meters_;
+    // Vendor-neutral: derived from DrivetrainSettings, which itself carries
+    // raw_current_to_amps_scale to account for a specific driver backend's raw-current units
+    // (see utils.hpp) - nothing here is Phidget-specific.
+    float raw_pos_feedback_to_radians_;
+    float raw_vel_feedback_to_radians_per_second_;
+    float raw_current_feedback_to_newton_meters_;
 
     MotorDriverState motor_state_ = {0, 0, 0, 0.0};
 };

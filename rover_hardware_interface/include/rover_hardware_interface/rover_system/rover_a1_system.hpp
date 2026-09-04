@@ -21,6 +21,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
 #include "rover_hardware_interface/rover_system/rover_system.hpp"
 
 namespace rover_hardware_interface
@@ -65,6 +66,15 @@ protected:
 
     void defineRoverDriver() override;
 
+    // Reads the Modbus TCP endpoint (host/port/retry) that RoverA1System's safety controller
+    // uses - see rover_system.hpp's declaration for why this is per-variant rather than generic.
+    void readRoverControllerSettings() override;
+
+    // Constructs the Modbus-backed RoverSafetyController and the two domain-port adapters
+    // (RoverGpioPort, EmergencyStopIoPort) over it. A future rover variant using a different
+    // safety-IO transport would provide its own implementation instead.
+    void defineRoverController() override;
+
     void updateHwStates(const rclcpp::Time & time) override;
 
     void updateDriverStateMsg() override;
@@ -75,6 +85,11 @@ protected:
     void diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper & status) override;
 
     static const inline std::vector<std::string> joints_ = {"fl", "fr", "rl", "rr"};
+
+    // Modbus TCP endpoint for the safety controller (E-Stop / GPIO), read from URDF. Owned here
+    // (not by RoverSystem) because it is specific to this variant's Modbus-backed safety
+    // controller - see defineRoverController()/readRoverControllerSettings().
+    ModbusSettings modbus_settings_;
 };
 
 }  // namespace rover_hardware_interface

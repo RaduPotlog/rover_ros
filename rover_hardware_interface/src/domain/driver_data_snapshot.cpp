@@ -96,13 +96,14 @@ std::map<std::string, bool> RuntimeError::getErrorMap() const
 
 MotorStateReading::MotorStateReading(const DrivetrainSettings & drivetrain_settings)
 {
-    phidget_pos_feedback_to_radians_ = (2.0f * M_PI) / (drivetrain_settings.encoder_resolution * drivetrain_settings.gear_ratio);
+    raw_pos_feedback_to_radians_ = (2.0f * M_PI) / (drivetrain_settings.encoder_resolution * drivetrain_settings.gear_ratio);
 
-    phidget_vel_feedback_to_radians_per_second_ = (2.0f * M_PI) / 60.0f / drivetrain_settings.gear_ratio;
+    raw_vel_feedback_to_radians_per_second_ = (2.0f * M_PI) / 60.0f / drivetrain_settings.gear_ratio;
 
-    phidget_current_feedback_to_newton_meters_ = (1.0f / 10.0f) * drivetrain_settings.motor_torque_constant *
-                                                 drivetrain_settings.gear_ratio *
-                                                 drivetrain_settings.gearbox_efficiency;
+    raw_current_feedback_to_newton_meters_ = drivetrain_settings.raw_current_to_amps_scale *
+                                             drivetrain_settings.motor_torque_constant *
+                                             drivetrain_settings.gear_ratio *
+                                             drivetrain_settings.gearbox_efficiency;
 }
 
 void MotorStateReading::setData(const MotorDriverState & motor_state)
@@ -112,17 +113,17 @@ void MotorStateReading::setData(const MotorDriverState & motor_state)
 
 float MotorStateReading::getPosition() const
 {
-    return static_cast<float>(motor_state_.pos) * phidget_pos_feedback_to_radians_;
+    return static_cast<float>(motor_state_.pos) * raw_pos_feedback_to_radians_;
 }
 
 float MotorStateReading::getVelocity() const
 {
-    return static_cast<float>(motor_state_.vel) * phidget_vel_feedback_to_radians_per_second_;
+    return static_cast<float>(motor_state_.vel) * raw_vel_feedback_to_radians_per_second_;
 }
 
 float MotorStateReading::getTorque() const
 {
-    return static_cast<float>(motor_state_.current) * phidget_current_feedback_to_newton_meters_;
+    return static_cast<float>(motor_state_.current) * raw_current_feedback_to_newton_meters_;
 }
 
 DriverDataSnapshot::DriverDataSnapshot(const DrivetrainSettings & drivetrain_settings)

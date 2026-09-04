@@ -68,7 +68,7 @@ const std::vector<RoverControllerCoilInfo> ContactCoilHandler::coils_config_info
     },
 };
 
-ContactCoilHandler::ContactCoilHandler(std::shared_ptr<RoverModbus> rover_modbus)
+ContactCoilHandler::ContactCoilHandler(std::shared_ptr<RoverModbusInterface> rover_modbus)
 : rover_modbus_(rover_modbus)
 {
 
@@ -196,6 +196,12 @@ RoverSafetyController::RoverSafetyController(
         modbus_host, modbus_port, modbus_connection_retry_count, modbus_connection_retry_delay);
 }
 
+RoverSafetyController::RoverSafetyController(std::shared_ptr<RoverModbusInterface> rover_modbus)
+: rover_modbus_(std::move(rover_modbus))
+{
+
+}
+
 void RoverSafetyController::start()
 {
     contactCoilHandler_ = std::make_unique<ContactCoilHandler>(rover_modbus_);
@@ -205,7 +211,10 @@ void RoverSafetyController::start()
 // SW E-STOP USER BTN - sw_e_stop_user_button
 void RoverSafetyController::eStopUserBtnTrigger(const bool state)
 {
-    if (!contactCoilHandler_->isContactCoilHandlerEnabled()) {
+    // contactCoilHandler_ is null until start() is called - guard against that first (rather
+    // than dereferencing it to ask isContactCoilHandlerEnabled()) so calling this before start()
+    // is a safe no-op instead of a null-pointer dereference.
+    if (!contactCoilHandler_ || !contactCoilHandler_->isContactCoilHandlerEnabled()) {
         return;
     }
 
@@ -215,7 +224,7 @@ void RoverSafetyController::eStopUserBtnTrigger(const bool state)
 // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
 void RoverSafetyController::eStopMotorDriverFaultTrigger(const bool state)
 {
-    if (!contactCoilHandler_->isContactCoilHandlerEnabled()) {
+    if (!contactCoilHandler_ || !contactCoilHandler_->isContactCoilHandlerEnabled()) {
         return;
     }
 
@@ -225,7 +234,7 @@ void RoverSafetyController::eStopMotorDriverFaultTrigger(const bool state)
 // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
 void RoverSafetyController::eStopLatchReset()
 {
-    if (!contactCoilHandler_->isContactCoilHandlerEnabled()) {
+    if (!contactCoilHandler_ || !contactCoilHandler_->isContactCoilHandlerEnabled()) {
         return;
     }
 
@@ -234,7 +243,7 @@ void RoverSafetyController::eStopLatchReset()
 
 const std::unordered_map<RoverControllerGpio, bool> & RoverSafetyController::queryControlInterfaceIOStates()
 {
-    if (contactCoilHandler_->isContactCoilHandlerEnabled()) {
+    if (contactCoilHandler_ && contactCoilHandler_->isContactCoilHandlerEnabled()) {
         contactCoilHandler_->getIoState(io_state_cache_);
     }
 

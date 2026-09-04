@@ -27,17 +27,20 @@
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 #include "rover_hardware_interface/rover_modbus/modbus.hpp"
+#include "rover_hardware_interface/rover_modbus/rover_modbus_interface.hpp"
 #include "rover_hardware_interface/utils.hpp"
 
 namespace rover_hardware_interface
 {
 
+// Depends on RoverModbusInterface (not the concrete RoverModbus) so it can be unit-tested with a
+// fake - see rover_modbus/rover_modbus_interface.hpp and test/rover_safety_controller/.
 class ContactCoilHandler
 {
 
 public:
 
-    explicit ContactCoilHandler(std::shared_ptr<RoverModbus> rover_modbus);
+    explicit ContactCoilHandler(std::shared_ptr<RoverModbusInterface> rover_modbus);
 
     ~ContactCoilHandler();
 
@@ -74,7 +77,7 @@ private:
     std::thread contact_coil_handler_thread_;
     std::atomic_bool contact_coil_handler_enabled_ = false;
 
-    std::shared_ptr<RoverModbus> rover_modbus_;
+    std::shared_ptr<RoverModbusInterface> rover_modbus_;
 
     static const std::vector<RoverControllerContactInfo> contacts_config_info_storage_;
     static const std::vector<RoverControllerCoilInfo> coils_config_info_storage_;
@@ -93,6 +96,12 @@ public:
         const std::string & modbus_host, const int modbus_port,
         const unsigned modbus_connection_retry_count,
         const std::chrono::milliseconds modbus_connection_retry_delay);
+
+    // Test-only constructor: injects rover_modbus directly instead of dialing a real Modbus TCP
+    // endpoint, so RoverSafetyController's/ContactCoilHandler's coil-mapping and enabled-guard
+    // logic can be unit-tested against a fake RoverModbusInterface (see
+    // test/rover_safety_controller/). Production code always uses the constructor above.
+    explicit RoverSafetyController(std::shared_ptr<RoverModbusInterface> rover_modbus);
 
     // Start resources and ContactCoilHandler thread
     void start();
@@ -117,7 +126,7 @@ private:
 
     std::unique_ptr<ContactCoilHandler> contactCoilHandler_;
 
-    std::shared_ptr<RoverModbus> rover_modbus_;
+    std::shared_ptr<RoverModbusInterface> rover_modbus_;
 
     // Reused across calls by queryControlInterfaceIOStates() to avoid allocating on the RT thread.
     std::unordered_map<RoverControllerGpio, bool> io_state_cache_;

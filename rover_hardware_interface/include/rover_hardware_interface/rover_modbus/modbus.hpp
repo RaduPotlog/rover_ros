@@ -30,6 +30,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
+#include "rover_hardware_interface/rover_modbus/rover_modbus_interface.hpp"
 
 #include "rover_hardware_interface/rover_modbus/modbus_connection.hpp"
 #include "rover_hardware_interface/rover_modbus/modbus_tcp_connection.hpp"
@@ -37,7 +38,7 @@
 namespace rover_hardware_interface
 {
 
-class RoverModbus
+class RoverModbus : public RoverModbusInterface
 {
 
 public:
@@ -51,11 +52,11 @@ public:
 
     ~RoverModbus();
 
-    uint16_t readDiscreteContact(const ContactInfo &contact);
+    uint16_t readDiscreteContact(const ContactInfo &contact) override;
 
-    uint16_t readDiscreteCoil(const CoilInfo &coil);
+    uint16_t readDiscreteCoil(const CoilInfo &coil) override;
 
-    void writeDiscreteCoil(const CoilInfo &coil, const bool coil_state);
+    void writeDiscreteCoil(const CoilInfo &coil, const bool coil_state) override;
 
 private:
 

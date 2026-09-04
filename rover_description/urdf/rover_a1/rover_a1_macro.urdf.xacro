@@ -157,6 +157,11 @@
           <param name="max_rpm_motor_speed">2800</param>
           <param name="gear_ratio">23.3</param>
           <param name="gearbox_efficiency">0.70</param>
+          <!-- Phidget motor controllers report raw current feedback in deci-amps; this scales
+               it to amps before it's combined with motor_torque_constant/gear_ratio/
+               gearbox_efficiency to compute torque (see domain/driver_data_snapshot.cpp). A
+               different driver backend would supply its own raw-current unit scale here. -->
+          <param name="raw_current_to_amps_scale">0.1</param>
           <!-- Encoder parameters -->
           <param name="encoder_resolution">1024</param>
 

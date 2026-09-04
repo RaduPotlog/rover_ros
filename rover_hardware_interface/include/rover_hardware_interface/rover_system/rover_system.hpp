@@ -99,7 +99,6 @@ protected:
     void readDrivetrainSettings();
     void readDriverStatesUpdateFrequency();
     void readDriverInitAndActivationAttempts();
-    void readModbusSettings();
     void readErrorFilterMaxErrorsCounts();
 
     void configureRoverController();
@@ -112,6 +111,28 @@ protected:
     void teardownRoverComponents();
 
     virtual void defineRoverDriver() = 0;
+
+    // Reads whatever URDF hardware_parameters this rover variant's safety-controller backend
+    // needs (e.g. Modbus host/port for RoverA1System) into a member owned by the subclass. This
+    // is a pure virtual extension point rather than a concrete RoverSystem method (unlike
+    // readDrivetrainSettings() etc. above) because, unlike the drivetrain parameters, the
+    // safety-controller transport is backend-specific: RoverSystem itself has no business
+    // requiring a "modbus_host" parameter to exist. Called from on_init() inside the same
+    // try/catch as the other read*Settings() calls, so any std::exception it throws (e.g.
+    // std::invalid_argument for a missing/empty parameter) is handled uniformly. See
+    // defineRoverController() for the matching construction-time extension point.
+    virtual void readRoverControllerSettings() = 0;
+
+    // Pure virtual extension point (mirrors defineRoverDriver()): constructs and stores
+    // rover_controller_ (RoverGpioPort) and e_stop_ (EmergencyStopInterface) using whatever
+    // safety-IO backend this rover variant uses. RoverSystem only depends on these two domain
+    // ports here - never on a concrete backend type - so a rover variant using a different
+    // safety-IO transport (e.g. CAN or direct GPIO instead of Modbus) only has to provide a new
+    // implementation of this method, not modify RoverSystem. configureRoverController() (which
+    // calls this) then performs the generic start()/arm sequence common to every backend, purely
+    // through the RoverGpioPort interface. See RoverA1System::defineRoverController() for the
+    // reference (Modbus-backed) implementation.
+    virtual void defineRoverController() = 0;
 
     void resetEStop();
     void resetEStopLatch();
@@ -159,10 +180,11 @@ protected:
 
     // Rover driver interface
     std::shared_ptr<RoverDriverInterface> rover_driver_;
-    // Rover safety controller GPIO port (adapter over RoverSafetyController) - read()-path GPIO
-    // polling and initial arming go through this, not the concrete RoverSafetyController, which
-    // is constructed as a scoped local in configureRoverController() and never stored as a
-    // member, so nothing on the RT read()/write() path can reach it directly.
+    // Rover safety controller GPIO port. read()-path GPIO polling and initial arming go through
+    // this domain port, never a concrete backend type - defineRoverController() (implemented per
+    // rover variant, e.g. RoverA1System's Modbus-backed one) constructs the concrete adapter as a
+    // scoped local and never stores it as a member, so nothing on the RT read()/write() path can
+    // reach it directly.
     std::shared_ptr<RoverGpioPort> rover_controller_;
     // Rover emergency stop interface
     std::shared_ptr<EmergencyStopInterface> e_stop_;
@@ -185,8 +207,6 @@ protected:
 
     // Drive train system settings
     DrivetrainSettings drivetrain_settings_;
-    // Modbus TCP endpoint for the safety controller (E-Stop / GPIO), read from URDF
-    ModbusSettings modbus_settings_;
 
     // ROS hardware interface
     std::unique_ptr<SystemROSInterface> system_ros_interface_;

@@ -85,6 +85,7 @@ DrivetrainSettings makeDrivetrainSettings()
     settings.encoder_resolution = 4.0f;  // 4 ticks/rev before the /4.0 quadrature divide below
     settings.max_rpm_motor_speed = 100.0f;
     settings.driver_comm_timeout_ms = 500;
+    settings.raw_current_to_amps_scale = 1.0f;
     return settings;
 }
 

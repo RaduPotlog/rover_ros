@@ -208,6 +208,17 @@ if(BUILD_TESTING)
     test_phidget_imu_sensor_on_init test/rover_sensors/test_phidget_imu_sensor_on_init.cpp)
   target_link_libraries(test_phidget_imu_sensor_on_init ${PROJECT_NAME})
   ament_target_dependencies(test_phidget_imu_sensor_on_init hardware_interface)
+
+  # Unit tests for ContactCoilHandler/RoverSafetyController against FakeRoverModbus (test/
+  # rover_safety_controller/fake_rover_modbus.hpp) - no real Modbus TCP connection involved. These
+  # were previously the one infrastructure adapter in this package with no direct test coverage.
+  ament_add_gtest(
+    test_contact_coil_handler test/rover_safety_controller/test_contact_coil_handler.cpp)
+  target_link_libraries(test_contact_coil_handler ${PROJECT_NAME})
+
+  ament_add_gtest(
+    test_rover_safety_controller test/rover_safety_controller/test_rover_safety_controller.cpp)
+  target_link_libraries(test_rover_safety_controller ${PROJECT_NAME})
 endif()
 
 ament_package()

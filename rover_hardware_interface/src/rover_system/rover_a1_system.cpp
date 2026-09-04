@@ -14,7 +14,10 @@
 
 #include "rover_hardware_interface/rover_system/rover_a1_system.hpp"
 
+#include <chrono>
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -22,6 +25,8 @@
 #include "diagnostic_updater/diagnostic_status_wrapper.hpp"
 
 #include "rover_hardware_interface/rover_driver/rover_a1_driver.hpp"
+#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_e_stop_io.hpp"
+#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_gpio_adapter.hpp"
 
 namespace rover_hardware_interface
 {
@@ -35,6 +40,42 @@ RoverA1System::RoverA1System()
 void RoverA1System::defineRoverDriver()
 {
     rover_driver_ = std::make_shared<RoverA1Driver>(drivetrain_settings_);
+}
+
+void RoverA1System::readRoverControllerSettings()
+{
+    modbus_settings_.host = info_.hardware_parameters.at("modbus_host");
+
+    if (modbus_settings_.host.empty()) {
+        throw std::invalid_argument("Missing or empty 'modbus_host' hardware parameter.");
+    }
+
+    modbus_settings_.port = std::stoi(info_.hardware_parameters.at("modbus_port"));
+
+    modbus_settings_.connection_retry_count =
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_count")));
+    modbus_settings_.connection_retry_delay_ms =
+        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_delay_ms")));
+}
+
+void RoverA1System::defineRoverController()
+{
+    // Scoped local: only needed long enough to construct the two port adapters below; never
+    // stored as a member so nothing on the RT read()/write() path can reach the concrete
+    // Modbus-backed type directly (see rover_system.hpp's RoverGpioPort/EmergencyStopInterface
+    // member comments).
+    auto rover_safety_controller_impl = std::make_shared<RoverSafetyController>(
+        modbus_settings_.host, modbus_settings_.port,
+        modbus_settings_.connection_retry_count,
+        std::chrono::milliseconds(modbus_settings_.connection_retry_delay_ms));
+
+    rover_controller_ = std::make_shared<RoverSafetyControllerGpioAdapter>(rover_safety_controller_impl);
+
+    auto e_stop_io = std::make_shared<RoverSafetyControllerEStopIo>(rover_safety_controller_impl);
+    // Forming a pointer to a protected base-class member requires naming it through the derived
+    // class (this translation unit's own class), not the base - see [class.protected].
+    e_stop_ = std::make_shared<EmergencyStop>(
+        e_stop_io, std::bind(&RoverA1System::areVelocityCommandsNearZero, this));
 }
 
 void RoverA1System::updateHwStates(const rclcpp::Time & time)

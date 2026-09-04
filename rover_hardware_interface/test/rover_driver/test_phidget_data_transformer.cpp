@@ -33,6 +33,7 @@ DrivetrainSettings makeSettings(const float gear_ratio, const float max_rpm_moto
     settings.encoder_resolution = 1.0f;
     settings.max_rpm_motor_speed = max_rpm_motor_speed;
     settings.driver_comm_timeout_ms = 100u;
+    settings.raw_current_to_amps_scale = 1.0f;
     return settings;
 }
 

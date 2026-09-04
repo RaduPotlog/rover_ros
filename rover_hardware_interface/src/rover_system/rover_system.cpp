@@ -35,9 +35,6 @@
 #include <hardware_interface/system_interface.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 
-#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_e_stop_io.hpp"
-#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_gpio_adapter.hpp"
-#include "rover_hardware_interface/rover_driver/rover_a1_driver.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
 #include "rover_hardware_interface/utils.hpp"
@@ -74,7 +71,7 @@ CallbackReturn RoverSystem::on_init(const hardware_interface::HardwareComponentI
         readDrivetrainSettings();
         readDriverStatesUpdateFrequency();
         readDriverInitAndActivationAttempts();
-        readModbusSettings();
+        readRoverControllerSettings();
         readErrorFilterMaxErrorsCounts();
     } catch (const std::exception & e) {
         // Widened from std::invalid_argument: std::stof/std::stoi can also throw
@@ -409,6 +406,8 @@ void RoverSystem::readDrivetrainSettings()
         std::stof(info_.hardware_parameters.at("max_rpm_motor_speed"));
     drivetrain_settings_.driver_comm_timeout_ms =
         static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("driver_comm_timeout_ms")));
+    drivetrain_settings_.raw_current_to_amps_scale =
+        std::stof(info_.hardware_parameters.at("raw_current_to_amps_scale"));
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()
@@ -425,22 +424,6 @@ void RoverSystem::readDriverInitAndActivationAttempts()
         std::stoi(info_.hardware_parameters.at("max_rover_driver_initialization_attempts"));
     max_rover_driver_activation_attempts_ =
         std::stoi(info_.hardware_parameters.at("max_rover_driver_activation_attempts"));
-}
-
-void RoverSystem::readModbusSettings()
-{
-    modbus_settings_.host = info_.hardware_parameters.at("modbus_host");
-
-    if (modbus_settings_.host.empty()) {
-        throw std::invalid_argument("Missing or empty 'modbus_host' hardware parameter.");
-    }
-
-    modbus_settings_.port = std::stoi(info_.hardware_parameters.at("modbus_port"));
-
-    modbus_settings_.connection_retry_count =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_count")));
-    modbus_settings_.connection_retry_delay_ms =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_delay_ms")));
 }
 
 void RoverSystem::readErrorFilterMaxErrorsCounts()
@@ -463,24 +446,15 @@ void RoverSystem::readErrorFilterMaxErrorsCounts()
 
 void RoverSystem::configureRoverController()
 {
-    // Scoped local: only needed long enough to construct the two port adapters below; never
-    // stored as a RoverSystem member so nothing on the RT read()/write() path can reach the
-    // concrete Modbus-backed type directly.
-    auto rover_safety_controller_impl = std::make_shared<RoverSafetyController>(
-        modbus_settings_.host, modbus_settings_.port,
-        modbus_settings_.connection_retry_count,
-        std::chrono::milliseconds(modbus_settings_.connection_retry_delay_ms));
-
-    rover_controller_ = std::make_shared<RoverSafetyControllerGpioAdapter>(rover_safety_controller_impl);
+    // Delegates the backend-specific construction (Modbus, or whatever a future rover variant
+    // uses) to the subclass; this method only performs the generic start()/arm sequence, purely
+    // through the RoverGpioPort interface - see defineRoverController()'s declaration.
+    defineRoverController();
 
     rover_controller_->start();
     // TODO(mechatronics-academy): Check if e-stop interface can be used
     rover_controller_->eStopUserBtnTrigger(false);
     rover_controller_->eStopMotorDriverFaultTrigger(false);
-
-    auto e_stop_io = std::make_shared<RoverSafetyControllerEStopIo>(rover_safety_controller_impl);
-    e_stop_ = std::make_shared<EmergencyStop>(
-        e_stop_io, std::bind(&RoverSystem::areVelocityCommandsNearZero, this));
 
     RCLCPP_INFO(logger_, "Successfully configured rover controller and SW User E-Stop.");
 }

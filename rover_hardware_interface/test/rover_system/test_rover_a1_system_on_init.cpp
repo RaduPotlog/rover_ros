@@ -29,7 +29,8 @@
 // What IS exercised here never touches Modbus/Phidget: checkJointSize(), sortAndCheckJointNames(),
 // checkInterfaces(), setInitialValues(), and the on_init()-time hardware_parameters readers
 // (readDrivetrainSettings()/readDriverStatesUpdateFrequency()/
-// readDriverInitAndActivationAttempts()/readModbusSettings()/readErrorFilterMaxErrorsCounts()).
+// readDriverInitAndActivationAttempts()/RoverA1System::readRoverControllerSettings()/
+// readErrorFilterMaxErrorsCounts()).
 
 #include <gtest/gtest.h>
 
@@ -106,6 +107,7 @@ hardware_interface::HardwareInfo buildValidHardwareInfo()
         {"max_rpm_motor_speed", "2800"},
         {"gear_ratio", "23.3"},
         {"gearbox_efficiency", "0.70"},
+        {"raw_current_to_amps_scale", "0.1"},
         {"encoder_resolution", "1024"},
     };
 
