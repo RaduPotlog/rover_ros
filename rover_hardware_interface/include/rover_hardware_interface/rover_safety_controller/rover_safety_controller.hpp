@@ -82,9 +82,15 @@ private:
     static const std::vector<RoverControllerContactInfo> contacts_config_info_storage_;
     static const std::vector<RoverControllerCoilInfo> coils_config_info_storage_;
 
-    std::mutex write_to_modbus_mtx_;
+    std::mutex modbus_io_mtx_;
 
     std::unordered_map<RoverControllerGpio, bool> io_state_;
+
+    // Watchdog toggle for GPIO_SW_E_STOP_CPU_WDG_TRIGGER, flipped once per
+    // contactCoilHandlerThread() loop iteration. Instance state (not a function-local static) -
+    // guarded by modbus_io_mtx_ like the rest of that loop body, so multiple
+    // ContactCoilHandler instances/threads never share it.
+    bool wdg_state_ = false;
 };
 
 class RoverSafetyController

@@ -104,30 +104,38 @@ bool ContactCoilHandler::isContactCoilHandlerEnabled() const
 // SW E-STOP USER BTN - sw_e_stop_user_button
 void ContactCoilHandler::eStopUserBtnTrigger(const bool state)
 {
-    std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
+    std::lock_guard<std::mutex> lck(modbus_io_mtx_);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[2].coil_info, state);
 }
 
 // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
 void ContactCoilHandler::eStopMotorDriverFaultTrigger(const bool state)
 {
-    std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
+    std::lock_guard<std::mutex> lck(modbus_io_mtx_);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[3].coil_info, state);
 }
 
 // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
 void ContactCoilHandler::eStopLatchReset()
 {
-    std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
+    std::lock_guard<std::mutex> lck(modbus_io_mtx_);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[4].coil_info, true);
     rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[4].coil_info, false);
 }
 
 void ContactCoilHandler::getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state)
 {
-    if (write_to_modbus_mtx_.try_lock()) {
-        std::lock_guard<std::mutex> e_stop_lck(write_to_modbus_mtx_, std::adopt_lock);
-        io_state = io_state_;
+    if (modbus_io_mtx_.try_lock()) {
+        std::lock_guard<std::mutex> e_stop_lck(modbus_io_mtx_, std::adopt_lock);
+        // Update values in place instead of `io_state = io_state_` (a copy-assignment):
+        // std::unordered_map stores each element as a separately heap-allocated node, and a
+        // copy-assignment is not guaranteed allocation-free even at equal size. Once `io_state`
+        // already holds every key (true from the second call onward, since the key set is fixed),
+        // operator[] here only updates existing nodes and never allocates, keeping this call
+        // RT-safe on the read() path.
+        for (const auto & [pin, value] : io_state_) {
+            io_state[pin] = value;
+        }
     }
     // else: leave `io_state` as-is (the caller's last-known-good values) rather than clobber it
     // with an empty map on contention.
@@ -140,18 +148,22 @@ void ContactCoilHandler::initCoils()
     }
 }
 
+// Modbus reports an unknown/error discrete state as the sentinel value 255 (0xFF), distinct from
+// a legitimate 0/1 reading - treated as "not active" rather than propagated as true.
+constexpr uint16_t kUnknownDiscreteState = 255;
+
 bool ContactCoilHandler::readDiscreteContact(const ContactInfo &contact)
 {
     uint16_t contact_state = rover_modbus_->readDiscreteContact(contact);
 
-    return (contact_state == 255 ? false : (contact_state & 0xFFU));
+    return (contact_state == kUnknownDiscreteState ? false : (contact_state & 0xFFU));
 }
 
 bool ContactCoilHandler::readDiscreteCoil(const CoilInfo &coil)
 {
     uint16_t conil_state = rover_modbus_->readDiscreteCoil(coil);
 
-    return (conil_state == 255 ? false : (conil_state & 0xFFU));
+    return (conil_state == kUnknownDiscreteState ? false : (conil_state & 0xFFU));
 }
 
 std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::queryControlInterfaceIOStates()
@@ -173,15 +185,13 @@ std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::queryControlIn
 
 void ContactCoilHandler::contactCoilHandlerThread()
 {
-    static bool wdg_state = false;
-
     while (contact_coil_handler_enabled_) {
         {
             // Trigger watchdog
-            std::lock_guard<std::mutex> lck(write_to_modbus_mtx_);
+            std::lock_guard<std::mutex> lck(modbus_io_mtx_);
             io_state_ = queryControlInterfaceIOStates();
-            rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[1].coil_info, wdg_state);
-            wdg_state = !wdg_state;
+            rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[1].coil_info, wdg_state_);
+            wdg_state_ = !wdg_state_;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }

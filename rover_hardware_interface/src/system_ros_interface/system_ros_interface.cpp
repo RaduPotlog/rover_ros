@@ -126,7 +126,11 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
 
     // Periodic, non-latched telemetry: explicit reliable/volatile QoS (matches
     // ros2_communication.md's "Commands"/high-frequency-state guidance) rather than relying on
-    // the create_publisher(size_t) default.
+    // the create_publisher(size_t) default. Reliable (not best-effort sensor-style QoS) because
+    // this is low-rate, gated by driver_states_update_period_ (RoverSystem::read()) rather than
+    // ticking every RT cycle, so a dropped sample isn't self-correcting the way a high-frequency
+    // sensor stream is; depth 5 gives a late-joining subscriber (e.g. a UI reconnecting) a couple
+    // of cycles of buffered history without holding an unbounded backlog.
     driver_state_publisher_ = node_->create_publisher<RoverDriverStateMsg>(
         "hardware_interface/rover_driver_state",
         rclcpp::QoS(rclcpp::KeepLast(5)).reliable().durability_volatile());

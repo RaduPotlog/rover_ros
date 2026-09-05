@@ -104,46 +104,55 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
     // Both rover_driver_ and e_stop_ are guaranteed set at this point - configureRoverController()
     // and configureRoverDriver() above either both succeeded or on_configure() already returned
     // ERROR from the catch block.
-    control_loop_use_case_ = std::make_unique<RoverControlLoopUseCase>(
-        rover_driver_, e_stop_, *rover_error_filter_);
+    try {
+        control_loop_use_case_ = std::make_unique<RoverControlLoopUseCase>(
+            rover_driver_, e_stop_, *rover_error_filter_);
 
-    std::fill(hw_commands_velocities_.begin(), hw_commands_velocities_.end(), 0.0);
-    std::fill(hw_states_positions_.begin(), hw_states_positions_.end(), 0.0);
-    std::fill(hw_states_velocities_.begin(), hw_states_velocities_.end(), 0.0);
-    std::fill(hw_states_efforts_.begin(), hw_states_efforts_.end(), 0.0);
+        std::fill(hw_commands_velocities_.begin(), hw_commands_velocities_.end(), 0.0);
+        std::fill(hw_states_positions_.begin(), hw_states_positions_.end(), 0.0);
+        std::fill(hw_states_velocities_.begin(), hw_states_velocities_.end(), 0.0);
+        std::fill(hw_states_efforts_.begin(), hw_states_efforts_.end(), 0.0);
 
-    // Force read() to re-seed next_driver_state_update_time_ from the first `time` it
-    // receives after this (re)configure, rather than comparing against a value seeded under
-    // a previous activation - see the member's declaration for why the clock type must match.
-    driver_state_update_time_initialized_ = false;
+        // Force read() to re-seed next_driver_state_update_time_ from the first `time` it
+        // receives after this (re)configure, rather than comparing against a value seeded under
+        // a previous activation - see the member's declaration for why the clock type must match.
+        driver_state_update_time_initialized_ = false;
 
-    system_ros_interface_ = std::make_unique<SystemROSInterface>("hardware_controller");
+        system_ros_interface_ = std::make_unique<SystemROSInterface>("hardware_controller");
 
-    system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
-        "hardware_interface/sw_user_e_stop_set", std::bind(&EmergencyStopInterface::setEStop, e_stop_), 1,
-        rclcpp::CallbackGroupType::MutuallyExclusive);
+        system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
+            "hardware_interface/sw_user_e_stop_set", std::bind(&EmergencyStopInterface::setEStop, e_stop_), 1,
+            rclcpp::CallbackGroupType::MutuallyExclusive);
 
-    auto e_stop_reset_qos = rclcpp::ServicesQoS();
-    e_stop_reset_qos.keep_last(1);
-    system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
-        "hardware_interface/sw_user_e_stop_reset", std::bind(&RoverSystem::resetEStop, this), 2,
-        rclcpp::CallbackGroupType::MutuallyExclusive, e_stop_reset_qos);
+        auto e_stop_reset_qos = rclcpp::ServicesQoS();
+        e_stop_reset_qos.keep_last(1);
+        system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
+            "hardware_interface/sw_user_e_stop_reset", std::bind(&RoverSystem::resetEStop, this), 2,
+            rclcpp::CallbackGroupType::MutuallyExclusive, e_stop_reset_qos);
 
-    auto e_stop_latch_reset_qos = rclcpp::ServicesQoS();
-    e_stop_latch_reset_qos.keep_last(1);
-    system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
-        "hardware_interface/sw_e_stop_latch_reset", std::bind(&RoverSystem::resetEStopLatch, this), 2,
-        rclcpp::CallbackGroupType::MutuallyExclusive, e_stop_latch_reset_qos);
+        auto e_stop_latch_reset_qos = rclcpp::ServicesQoS();
+        e_stop_latch_reset_qos.keep_last(1);
+        system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
+            "hardware_interface/sw_e_stop_latch_reset", std::bind(&RoverSystem::resetEStopLatch, this), 2,
+            rclcpp::CallbackGroupType::MutuallyExclusive, e_stop_latch_reset_qos);
 
-    system_ros_interface_->addDiagnosticTask(
-    std::string("system errors"), this, &RoverSystem::diagnoseErrors);
+        system_ros_interface_->addDiagnosticTask(
+        std::string("system errors"), this, &RoverSystem::diagnoseErrors);
 
-    system_ros_interface_->addDiagnosticTask(
-    std::string("system status"), this, &RoverSystem::diagnoseStatus);
+        system_ros_interface_->addDiagnosticTask(
+        std::string("system status"), this, &RoverSystem::diagnoseStatus);
 
-    const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
-    system_ros_interface_->updateMsgGpioStates(gpio_state);
-    system_ros_interface_->publishGpioStateMsg();
+        const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
+        system_ros_interface_->updateMsgGpioStates(gpio_state);
+        system_ros_interface_->publishGpioStateMsg();
+    } catch (const std::exception & e) {
+        // SystemROSInterface's constructor and addService()/create_publisher() calls can throw
+        // (e.g. rclcpp::exceptions::* on an invalid name, bad_alloc) - must not escape
+        // on_configure() uncaught, matching the try/catch above for the same reason.
+        RCLCPP_ERROR_STREAM(logger_, "Failed to configure Rover System ROS interface. Error: " << e.what());
+        teardownRoverComponents();
+        return CallbackReturn::ERROR;
+    }
 
     return CallbackReturn::SUCCESS;
 }
@@ -414,6 +423,13 @@ void RoverSystem::readDriverStatesUpdateFrequency()
 {
     const float driver_states_update_frequency =
         std::stof(info_.hardware_parameters.at("driver_states_update_frequency"));
+
+    if (driver_states_update_frequency <= 0.0f) {
+        throw std::runtime_error(
+            "driver_states_update_frequency must be > 0, got " +
+            std::to_string(driver_states_update_frequency) + ".");
+    }
+
     driver_states_update_period_ =
         rclcpp::Duration::from_seconds(1.0f / driver_states_update_frequency);
 }

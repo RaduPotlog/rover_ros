@@ -90,7 +90,7 @@ protected:
 
     std::shared_ptr<EmergencyStopIoPort> io_;
 
-    std::function<bool()> zeroVelocityCheck;
+    std::function<bool()> zero_velocity_check_;
 
     std::mutex e_stop_manipulation_mtx_;
 

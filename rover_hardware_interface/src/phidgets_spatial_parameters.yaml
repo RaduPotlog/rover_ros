@@ -17,12 +17,6 @@ phidgets_spatial:
     default_value: true,
     description: "Use the internal heating element; Just available on MOT0109 onwards. Do not set this parameter for older versions."
   }
-  time_resynchronization_interval_ms: {
-    type: int,
-    default_value: 5000,
-    description: "The number of milliseconds to wait between resynchronizing the time on the Phidgets spatial with the local time.
-      Larger values have less 'jumps', but will have more timestamp drift. Setting this to 0 disables resynchronization. Defaults to 5000 ms."
-  }
   data_interval_ms: {
     type: int,
     default_value: 8,

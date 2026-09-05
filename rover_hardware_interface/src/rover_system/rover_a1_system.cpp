@@ -19,6 +19,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "rclcpp/logging.hpp"
@@ -42,20 +43,39 @@ void RoverA1System::defineRoverDriver()
     rover_driver_ = std::make_shared<RoverA1Driver>(drivetrain_settings_);
 }
 
+namespace
+{
+
+// .at() on a missing key throws std::out_of_range with a generic message that doesn't name the
+// key; this wraps it so a missing URDF hardware_parameter is reported by name.
+const std::string & getRequiredParam(
+    const std::unordered_map<std::string, std::string> & params, const std::string & key)
+{
+    const auto it = params.find(key);
+
+    if (it == params.end()) {
+        throw std::invalid_argument("Missing required '" + key + "' hardware parameter.");
+    }
+
+    return it->second;
+}
+
+}  // namespace
+
 void RoverA1System::readRoverControllerSettings()
 {
-    modbus_settings_.host = info_.hardware_parameters.at("modbus_host");
+    modbus_settings_.host = getRequiredParam(info_.hardware_parameters, "modbus_host");
 
     if (modbus_settings_.host.empty()) {
         throw std::invalid_argument("Missing or empty 'modbus_host' hardware parameter.");
     }
 
-    modbus_settings_.port = std::stoi(info_.hardware_parameters.at("modbus_port"));
+    modbus_settings_.port = std::stoi(getRequiredParam(info_.hardware_parameters, "modbus_port"));
 
-    modbus_settings_.connection_retry_count =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_count")));
-    modbus_settings_.connection_retry_delay_ms =
-        static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("modbus_connection_retry_delay_ms")));
+    modbus_settings_.connection_retry_count = static_cast<unsigned>(
+        std::stoi(getRequiredParam(info_.hardware_parameters, "modbus_connection_retry_count")));
+    modbus_settings_.connection_retry_delay_ms = static_cast<unsigned>(std::stoi(
+        getRequiredParam(info_.hardware_parameters, "modbus_connection_retry_delay_ms")));
 }
 
 void RoverA1System::defineRoverController()

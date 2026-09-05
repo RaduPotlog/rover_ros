@@ -27,7 +27,7 @@ EmergencyStop::EmergencyStop(
     std::function<bool()> zero_velocity_check)
 : EmergencyStopInterface()
 , io_(std::move(io))
-, zeroVelocityCheck(std::move(zero_velocity_check))
+, zero_velocity_check_(std::move(zero_velocity_check))
 {
 
 }
@@ -73,7 +73,7 @@ void EmergencyStop::resetEStop()
 {
     std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_);
 
-    if (zeroVelocityCheck && !zeroVelocityCheck()) {
+    if (zero_velocity_check_ && !zero_velocity_check_()) {
         throw std::runtime_error(
             "Can't reset User E-Stop: velocity commands are not zero.");
     }

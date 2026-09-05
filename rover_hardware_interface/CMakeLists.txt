@@ -222,6 +222,15 @@ if(BUILD_TESTING)
   ament_add_gtest(
     test_rover_safety_controller test/rover_safety_controller/test_rover_safety_controller.cpp)
   target_link_libraries(test_rover_safety_controller ${PROJECT_NAME})
+
+  # Integration test: drives RoverModbus - the one remaining infrastructure adapter with no
+  # coverage of its own (test_contact_coil_handler/test_rover_safety_controller above cover the
+  # rest of this stack, but only against FakeRoverModbus) - through its real constructor against
+  # the real Modbus_Core TCP client. No live Modbus server needed: only the connection-
+  # establishment/retry path is exercised, which fails fast and deterministically against a closed
+  # loopback port (see test/rover_modbus/test_rover_modbus.cpp's file comment).
+  ament_add_gtest(test_rover_modbus test/rover_modbus/test_rover_modbus.cpp)
+  target_link_libraries(test_rover_modbus ${PROJECT_NAME})
 endif()
 
 ament_package()
