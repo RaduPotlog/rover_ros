@@ -28,6 +28,7 @@ include_directories(include)
 add_executable(${PROJECT_NAME}_node
                src/rover_crfs_teleop_node.cpp 
                src/rover_crfs_teleop_controller.cpp
+               src/domain/stick_mapping.cpp
 )
 
 target_include_directories(${PROJECT_NAME}_node PUBLIC 
@@ -43,5 +44,17 @@ install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
+
+if(BUILD_TESTING)
+  # Behavioral unit tests for the pure, ROS-free stick -> twist mapping (src/domain/). Compiled
+  # directly into the test rather than linked, since this package builds an executable, not a
+  # library.
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_stick_mapping
+                  test/domain/test_stick_mapping.cpp
+                  src/domain/stick_mapping.cpp)
+  target_include_directories(test_stick_mapping PRIVATE include)
+endif()
 
 ament_package()

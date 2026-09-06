@@ -22,6 +22,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
@@ -86,6 +87,39 @@ TEST_F(SystemROSInterfaceTest, RegisteredTriggerServiceInvokesCallbackAndReports
     const auto response = future.get();
     EXPECT_TRUE(response->success);
     EXPECT_TRUE(called);
+}
+
+TEST_F(SystemROSInterfaceTest, ThrowingTriggerCallbackReportsFailureWithTheExceptionMessage)
+{
+    // The failure branch of ROSServiceWrapper::callbackWrapper(). This is the path every E-Stop
+    // service rejection takes (e.g. "Can't reset User E-Stop: velocity commands are not zero."):
+    // the exception must be turned into success=false plus the what() string, not escape into
+    // the executor.
+    SystemROSInterface ros_interface("test_system_ros_interface_srv_throw");
+
+    const std::string error_message = "deliberate failure from the service callback";
+
+    ros_interface.addService<TriggerSrv, std::function<void()>>(
+        "test_throwing_trigger_service",
+        std::function<void()>([&error_message]() { throw std::runtime_error(error_message); }));
+
+    auto client_node =
+        std::make_shared<rclcpp::Node>("test_system_ros_interface_srv_throw_client");
+    auto client =
+        client_node->create_client<std_srvs::srv::Trigger>("test_throwing_trigger_service");
+
+    ASSERT_TRUE(client->wait_for_service(std::chrono::seconds(5)));
+
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+    auto future = client->async_send_request(request);
+
+    ASSERT_EQ(
+        rclcpp::spin_until_future_complete(client_node, future, std::chrono::seconds(5)),
+        rclcpp::FutureReturnCode::SUCCESS);
+
+    const auto response = future.get();
+    EXPECT_FALSE(response->success);
+    EXPECT_EQ(response->message, error_message);
 }
 
 TEST_F(SystemROSInterfaceTest, PublishesDriverStateAfterUpdate)

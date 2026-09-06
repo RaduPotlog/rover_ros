@@ -22,6 +22,8 @@
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">crsf_receiver</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">crsf_receiver_msg</exec_depend>
 
+  <test_depend>ament_cmake_gtest</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_DIAG_MANAGER_SYSTEM_DIAG_SYSTEM_DIAG_NODE_HPP_
-#define ROVER_DIAG_MANAGER_SYSTEM_DIAG_SYSTEM_DIAG_NODE_HPP_
+#ifndef ROVER_CRFS_TELEOP_ROVER_CRFS_TELEOP_CONTROLLER_HPP_
+#define ROVER_CRFS_TELEOP_ROVER_CRFS_TELEOP_CONTROLLER_HPP_
 
 #include <stdio.h>
+#include <array>
 #include <chrono>
+#include <cstddef>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
@@ -35,6 +38,8 @@
 #include "crsf_receiver_msg/msg/crsf_link_info.hpp"
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
+#include "rover_crfs_teleop/domain/stick_mapping.hpp"
+
 namespace rover_crfs_telop
 {
 
@@ -43,25 +48,7 @@ class RoverCrfsTeleopController : public rclcpp::Node
 
 public:
 
-    struct RoverCrfsTeleopControllerChannels
-    {
-        unsigned ch1 : 11;
-        unsigned ch2 : 11;
-        unsigned ch3 : 11;
-        unsigned ch4 : 11;
-        unsigned ch5 : 11;
-        unsigned ch6 : 11;
-        unsigned ch7 : 11;
-        unsigned ch8 : 11;
-        unsigned ch9 : 11;
-        unsigned ch10 : 11;
-        unsigned ch11 : 11;
-        unsigned ch12 : 11;
-        unsigned ch13 : 11;
-        unsigned ch14 : 11;
-        unsigned ch15 : 11;
-        unsigned ch16 : 11;
-    } PACKED;
+    static constexpr std::size_t kChannelCount = 16;
 
     RoverCrfsTeleopController(const std::string & node_name);
 
@@ -72,6 +59,23 @@ private:
     void rssi_timer_callback();
 
     void restart_rssi__timer();
+
+    void declareAndReadParameters();
+
+    // Returns the raw value of the configured channel number (1-16) out of the last received
+    // frame, or 0 for an out-of-range channel number.
+    int channelValue(const int channel_number) const;
+
+    // Fires `client` if - and only if - it is ready. Deliberately non-blocking: this runs inside
+    // the 20 ms main timer, where the previous `while (!client->wait_for_service(1s))` loop
+    // stalled the whole executor (teleop included) for seconds at a time whenever a service was
+    // briefly unavailable.
+    void callTriggerService(
+        const rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr & client,
+        const std::string & description);
+
+    void handleEStopChannel();
+    void handleEStopLatchResetChannel();
 
     rclcpp::Subscription<crsf_receiver_msg::msg::CRSFChannels16>::SharedPtr chanel_subscriber_;
     rclcpp::Subscription<crsf_receiver_msg::msg::CRSFLinkInfo>::SharedPtr rc_link_subscriber_;
@@ -85,24 +89,36 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::TimerBase::SharedPtr rssi_timer_;
 
-    RoverCrfsTeleopControllerChannels channels_values_;
+    // Last received frame, indexed 0-based (channel N lives at index N-1). Replaces the previous
+    // 11-bit bitfield struct: the channels the node reads are ROS-configurable now, and
+    // rc/channels carries plain int32 values anyway.
+    std::array<int, kChannelCount> channels_values_{};
+    // Nothing is published until a real frame has arrived: the default-constructed array above
+    // would otherwise clamp to in_min, i.e. full negative deflection on both axes.
+    bool channels_received_{false};
 
-    unsigned int e_stop_old_value{0};
-    unsigned int e_stop_latch_reset_old_value{0};
+    int e_stop_old_value{0};
+    // Mirrors e_stop_latch_reset_init below: without it the very first frame received always
+    // looks like a channel edge against the initial 0, and the node fires a spurious E-Stop
+    // set-or-reset at startup purely from the switch's resting position.
+    bool e_stop_init{false};
+    unsigned int e_stop_init_counter{100};
+
+
+    int e_stop_latch_reset_old_value{0};
     bool e_stop_latch_reset_init{false};
     unsigned int e_stop_latch_reset_init_counter{100};
 
-    float twist_linear_x_in_min{0.0f};
-    float twist_linear_x_in_max{2000.0f};
-    
-    float twist_linear_x_out_min{-2.0f};
-    float twist_linear_x_out_max{2.0f};
-    
-    float twist_angular_z_in_min{2000.0f};
-    float twist_angular_z_in_max{0.0f};
+    // Stick -> twist mapping, built from ROS parameters in declareAndReadParameters(). See
+    // domain/stick_mapping.hpp for why this is defined about the channel midpoint.
+    AxisMapping linear_x_mapping_;
+    AxisMapping angular_z_mapping_;
 
-    float twist_angular_z_out_min{-5.0f};
-    float twist_angular_z_out_max{5.0f};
+    int linear_x_channel_{3};
+    int angular_z_channel_{1};
+    int e_stop_channel_{5};
+    int e_stop_latch_reset_channel_{4};
+    int channel_switch_threshold_{500};
 
     uint8_t uplink_rssi_ant1_{0};
     uint8_t uplink_rssi_ant2_{0};
@@ -112,4 +128,4 @@ private:
 
 }  // namespace rover_crfs_telop
 
-#endif  // ROVER_CRFS_TELEOP_HPP_
+#endif  // ROVER_CRFS_TELEOP_ROVER_CRFS_TELEOP_CONTROLLER_HPP_

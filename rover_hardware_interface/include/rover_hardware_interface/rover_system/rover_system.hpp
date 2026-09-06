@@ -38,6 +38,7 @@
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
 #include "rover_hardware_interface/domain/rover_gpio_port.hpp"
+#include "rover_hardware_interface/domain/velocity_command_guard.hpp"
 
 namespace rover_hardware_interface
 {
@@ -110,6 +111,7 @@ protected:
     void readDriverStatesUpdateFrequency();
     void readDriverInitAndActivationAttempts();
     void readErrorFilterMaxErrorsCounts();
+    void readEStopSettings();
 
     void configureRoverController();
     void configureRoverDriver();
@@ -165,7 +167,20 @@ protected:
     // decision logic moved into RoverControlLoopUseCase. A no-op on kSucceeded.
     void logWriteOperationResult(const WriteOperationResult & result);
 
+    // The E-Stop reset invariant, as seen by the service-callback thread. Returns the flag
+    // published by refreshVelocityCommandsZeroFlag() on the RT thread rather than inspecting
+    // hw_commands_velocities_ directly: the executor thread must not read that non-atomic
+    // std::vector<double> while controller_manager's RT thread is writing it.
     bool areVelocityCommandsNearZero();
+
+    // Recomputes commands_are_zero_ from the current hw_commands_velocities_. Called at the top
+    // of write() (i.e. on the RT thread, every cycle, whether or not motion is being commanded)
+    // so the flag the service thread reads is never more than one control period stale.
+    void refreshVelocityCommandsZeroFlag();
+
+    // Zeroes hw_commands_velocities_ and speed_cmd_buffer_. Both are pre-sized in
+    // setInitialValues(), so this allocates nothing and is safe to call from write().
+    void zeroVelocityCommands();
 
     // Fills the (already correctly-sized) `speed_cmd` buffer in place — no allocation, so it's
     // safe to call from write() every RT cycle.
@@ -214,6 +229,14 @@ protected:
     // Cached result of the last updateEStopState() poll; gates write() while true.
     // Defaults to true (fail-safe: no motion commands until confirmed clear).
     std::atomic_bool e_stop_active_{true};
+    // Largest |command| seen by the last refreshVelocityCommandsZeroFlag() pass, published so
+    // the refusal can name a number instead of just saying "not zero". Diagnostics only.
+    std::atomic<double> max_abs_velocity_command_{0.0};
+    // Cached result of the last refreshVelocityCommandsZeroFlag() pass; gates the E-Stop reset.
+    // Defaults to false (fail-safe: refuse the reset until an RT cycle has actually observed a
+    // zero command). resetEStop() already requires PRIMARY_STATE_ACTIVE, where write() ticks at
+    // the controller_manager's update_rate, so this is populated well before any reset can land.
+    std::atomic_bool commands_are_zero_{false};
 
     // Drive train system settings
     DrivetrainSettings drivetrain_settings_;
@@ -224,6 +247,10 @@ protected:
     // Imported from URDF
     unsigned max_rover_driver_initialization_attempts_;
     unsigned max_rover_driver_activation_attempts_;
+    // Deadband (rad/s at the wheel) under which a velocity command counts as zero for the E-Stop
+    // reset invariant. Optional in the URDF, unlike the parameters above - absent means
+    // kDefaultVelocityCommandZeroTolerance, so an existing URDF keeps working unchanged.
+    double velocity_command_zero_tolerance_{kDefaultVelocityCommandZeroTolerance};
 
     rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
     rclcpp::Clock steady_clock_{RCL_STEADY_TIME};

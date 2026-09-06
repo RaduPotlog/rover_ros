@@ -165,6 +165,15 @@
           <!-- Encoder parameters -->
           <param name="encoder_resolution">1024</param>
 
+          <!-- Deadband (rad/s at the wheel) below which a velocity command counts as zero for
+               the "can't clear the E-Stop while the rover is still being commanded to move"
+               invariant (see domain/emergency_stop.cpp). Optional: omitting it keeps the
+               compiled-in kDefaultVelocityCommandZeroTolerance. 0.01 rad/s is ~1.65 mm/s at the
+               A1's 0.1651 m wheel radius - well below anything that moves the rover, and well
+               above the floating-point residue a controller's kinematics leave behind. Raise it
+               only if a controller is known to idle with a larger steady-state output. -->
+          <param name="velocity_command_zero_tolerance">0.01</param>
+
         </xacro:unless>
       </hardware>
     </ros2_control>

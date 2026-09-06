@@ -67,6 +67,7 @@ add_library(
     src/domain/rover_error_filter.cpp
     src/domain/imu_calibration.cpp
     src/domain/emergency_stop.cpp
+    src/domain/velocity_command_guard.cpp
     src/application/rover_control_loop_use_case.cpp
     src/rover_driver/rover_a1_driver.cpp
     src/rover_system/rover_a1_system.cpp
@@ -166,6 +167,10 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_emergency_stop test/domain/test_emergency_stop.cpp)
   target_link_libraries(test_emergency_stop ${PROJECT_NAME})
+
+  ament_add_gtest(
+    test_velocity_command_guard test/domain/test_velocity_command_guard.cpp)
+  target_link_libraries(test_velocity_command_guard ${PROJECT_NAME})
 
   # Behavioral unit tests for the application-layer RT-loop decision logic (E-Stop state,
   # fault-flag reset, write-command gating/serialization), driven with fake domain ports the same

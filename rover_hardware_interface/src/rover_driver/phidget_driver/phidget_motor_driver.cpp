@@ -189,12 +189,12 @@ void PhidgetMotorDriver::initialize()
     }
 
     // Enable fail safe
-    ret = PhidgetDCMotor_enableFailsafe(motor_handle_, 5000);
+    // ret = PhidgetDCMotor_enableFailsafe(motor_handle_, 5000);
 
-    if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to enable fail safe mode for motor channel " +
-            std::to_string(channel_));
-    }
+    // if (ret != EPHIDGET_OK) {
+    //     throw std::runtime_error("Failed to enable fail safe mode for motor channel " +
+    //         std::to_string(channel_));
+    // }
 
     int enabled = 0;
 

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <string>
 #include <chrono>
 #include <iostream>
@@ -29,12 +30,28 @@ RoverCrfsTeleopController::RoverCrfsTeleopController(const std::string & node_na
 {
     RCLCPP_INFO(this->get_logger(), "RoverCrfsTeleopController node constructed");
 
+    declareAndReadParameters();
+
     auto topic_callback = [this](crsf_receiver_msg::msg::CRSFChannels16::UniquePtr msg) -> void {
 
-        channels_values_.ch1 = msg->ch1;
-        channels_values_.ch3 = msg->ch3;
-        channels_values_.ch4 = msg->ch4;
-        channels_values_.ch5 = msg->ch5;
+        channels_values_[0] = msg->ch1;
+        channels_values_[1] = msg->ch2;
+        channels_values_[2] = msg->ch3;
+        channels_values_[3] = msg->ch4;
+        channels_values_[4] = msg->ch5;
+        channels_values_[5] = msg->ch6;
+        channels_values_[6] = msg->ch7;
+        channels_values_[7] = msg->ch8;
+        channels_values_[8] = msg->ch9;
+        channels_values_[9] = msg->ch10;
+        channels_values_[10] = msg->ch11;
+        channels_values_[11] = msg->ch12;
+        channels_values_[12] = msg->ch13;
+        channels_values_[13] = msg->ch14;
+        channels_values_[14] = msg->ch15;
+        channels_values_[15] = msg->ch16;
+
+        channels_received_ = true;
     };
     
     auto rc_link_topic_callback = [this](crsf_receiver_msg::msg::CRSFLinkInfo::UniquePtr msg) -> void {
@@ -84,12 +101,164 @@ void RoverCrfsTeleopController::rssi_timer_callback()
     this->uplink_rssi_ant2_ = 0;
 }
 
+void RoverCrfsTeleopController::declareAndReadParameters()
+{
+    // Every parameter is declared, per .claude/rules/ros2_general.md - a silent get_parameter()
+    // on an undeclared name is a bug. Defaults are the raw CRSF endpoints from
+    // crsf_receiver/include/crsf_protocol.h, which is what rc/channels actually carries.
+    const int channel_in_min = this->declare_parameter<int>("channel_in_min", kDefaultCrsfChannelMin);
+    const int channel_in_mid = this->declare_parameter<int>("channel_in_mid", kDefaultCrsfChannelMid);
+    const int channel_in_max = this->declare_parameter<int>("channel_in_max", kDefaultCrsfChannelMax);
+    const int channel_deadband =
+        this->declare_parameter<int>("channel_deadband", kDefaultChannelDeadband);
+
+    linear_x_channel_ = this->declare_parameter<int>("linear_x_channel", 3);
+    angular_z_channel_ = this->declare_parameter<int>("angular_z_channel", 1);
+    e_stop_channel_ = this->declare_parameter<int>("e_stop_channel", 5);
+    e_stop_latch_reset_channel_ = this->declare_parameter<int>("e_stop_latch_reset_channel", 4);
+    channel_switch_threshold_ = this->declare_parameter<int>("channel_switch_threshold", 500);
+
+    linear_x_mapping_.in_min = channel_in_min;
+    linear_x_mapping_.in_mid = channel_in_mid;
+    linear_x_mapping_.in_max = channel_in_max;
+    linear_x_mapping_.deadband_counts = channel_deadband;
+    linear_x_mapping_.out_min = this->declare_parameter<double>("linear_x_out_min", -2.0);
+    linear_x_mapping_.out_max = this->declare_parameter<double>("linear_x_out_max", 2.0);
+    linear_x_mapping_.invert = this->declare_parameter<bool>("linear_x_invert", false);
+
+    angular_z_mapping_.in_min = channel_in_min;
+    angular_z_mapping_.in_mid = channel_in_mid;
+    angular_z_mapping_.in_max = channel_in_max;
+    angular_z_mapping_.deadband_counts = channel_deadband;
+    angular_z_mapping_.out_min = this->declare_parameter<double>("angular_z_out_min", -5.0);
+    angular_z_mapping_.out_max = this->declare_parameter<double>("angular_z_out_max", 5.0);
+    // The previous implementation inverted this axis by swapping in_min/in_max; the mapping is
+    // defined about the midpoint now, so the inversion is explicit.
+    angular_z_mapping_.invert = this->declare_parameter<bool>("angular_z_invert", true);
+
+    channels_values_.fill(channel_in_mid);
+
+    RCLCPP_INFO(
+        this->get_logger(),
+        "RC channel range [%d, %d] with midpoint %d and deadband %d counts.",
+        channel_in_min, channel_in_max, channel_in_mid, channel_deadband);
+}
+
+int RoverCrfsTeleopController::channelValue(const int channel_number) const
+{
+    if (channel_number < 1 || static_cast<std::size_t>(channel_number) > kChannelCount) {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 5000,
+            "Configured channel number %d is outside 1-%zu; treating it as 0.",
+            channel_number, kChannelCount);
+        return 0;
+    }
+
+    return channels_values_[static_cast<std::size_t>(channel_number - 1)];
+}
+
+void RoverCrfsTeleopController::callTriggerService(
+    const rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr & client,
+    const std::string & description)
+{
+    if (!client->service_is_ready()) {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 1000,
+            "Service for '%s' is not available; request dropped.", description.c_str());
+        return;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+
+    // The response used to be discarded, so a refused request (e.g. the hardware interface
+    // rejecting an E-Stop reset because the rover is still being commanded to move) was
+    // invisible to the operator - and, because the request only re-fires on a channel edge,
+    // there was no retry either. Report it.
+    client->async_send_request(
+        request,
+        [this, description](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+            const auto response = future.get();
+
+            if (response->success) {
+                RCLCPP_INFO(this->get_logger(), "%s succeeded.", description.c_str());
+            } else {
+                RCLCPP_WARN(
+                    this->get_logger(), "%s was refused: %s", description.c_str(),
+                    response->message.c_str());
+            }
+        });
+}
+
+void RoverCrfsTeleopController::handleEStopChannel()
+{
+    const int current_value = channelValue(e_stop_channel_);
+
+    // Latch the switch's resting position on the first frames instead of treating it as an edge,
+    // which would fire a spurious set-or-reset at startup. Mirrors the latch-reset channel below.
+    if (!e_stop_init) {
+        e_stop_old_value = current_value;
+
+        if (e_stop_init_counter > 0) {
+            e_stop_init_counter--;
+        } else {
+            e_stop_init = true;
+        }
+
+        return;
+    }
+
+    if (current_value == e_stop_old_value) {
+        return;
+    }
+
+    e_stop_old_value = current_value;
+
+    if (current_value < channel_switch_threshold_) {
+        callTriggerService(e_stop_set_set_, "SW User E-Stop set");
+    } else {
+        callTriggerService(e_stop_set_reset_, "SW User E-Stop reset");
+    }
+}
+
+void RoverCrfsTeleopController::handleEStopLatchResetChannel()
+{
+    const int current_value = channelValue(e_stop_latch_reset_channel_);
+
+    if (!e_stop_latch_reset_init) {
+        e_stop_latch_reset_old_value = current_value;
+
+        if (e_stop_latch_reset_init_counter > 0) {
+            e_stop_latch_reset_init_counter--;
+        } else {
+            e_stop_latch_reset_init = true;
+        }
+
+        return;
+    }
+
+    if (current_value == e_stop_latch_reset_old_value) {
+        return;
+    }
+
+    e_stop_latch_reset_old_value = current_value;
+
+    if (current_value < channel_switch_threshold_) {
+        callTriggerService(sw_e_stop_latch_reset_, "SW E-Stop latch reset");
+    }
+}
+
 void RoverCrfsTeleopController::main_timer_callback()
 {
+    if (!channels_received_) {
+        return;
+    }
+
+    if ((this->uplink_rssi_ant1_ <= 5) && (this->uplink_rssi_ant2_ < 5)) return;
+
+    const double twist_linear_x = mapAxis(channelValue(linear_x_channel_), linear_x_mapping_);
+    const double twist_angular_z = mapAxis(channelValue(angular_z_channel_), angular_z_mapping_);
+
     auto msg = geometry_msgs::msg::TwistStamped();
-    
-    float twist_linear_x = (static_cast<float>(channels_values_.ch3) - twist_linear_x_in_min) * (twist_linear_x_out_max - (twist_linear_x_out_min)) / (twist_linear_x_in_max - twist_linear_x_in_min) + (twist_linear_x_out_min); 
-    float twist_angular_z = (static_cast<float>(channels_values_.ch1) - twist_angular_z_in_min) * (twist_angular_z_out_max - (twist_angular_z_out_min)) / (twist_angular_z_in_max - twist_angular_z_in_min) + (twist_angular_z_out_min); 
 
     msg.header.stamp = this->now();
     msg.header.frame_id = "base_link";
@@ -100,9 +269,8 @@ void RoverCrfsTeleopController::main_timer_callback()
     msg.twist.angular.y = 0.0;
     msg.twist.angular.z = twist_angular_z;
 
-    if ((this->uplink_rssi_ant1_ <= 5) && (this->uplink_rssi_ant2_ < 5)) return;
-    
-    // Publish just onece the command in case of zero to not block mux
+    // Publish just once the command in case of zero to not block mux. This only works because a
+    // centred stick now maps to exactly 0.0 - see domain/stick_mapping.hpp.
     if (!twist_pub_just_once_) {
         cmd_vel_publisher_->publish(msg);
     }
@@ -114,86 +282,8 @@ void RoverCrfsTeleopController::main_timer_callback()
         twist_pub_just_once_ = false;
     }
 
-    unsigned int e_stop_current_value = channels_values_.ch5;
-    bool e_stop_triggered = false;
-
-    if (e_stop_current_value != e_stop_old_value) {
-        e_stop_old_value = e_stop_current_value;
-        e_stop_triggered = true;
-    }
-
-    if (e_stop_triggered) {
-        if (e_stop_current_value < 500) {
-            
-            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-            
-            while (!e_stop_set_set_->wait_for_service(1s)) {
-                if (!rclcpp::ok()) {
-                    return;
-                }
-                
-                RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
-            }
-
-            e_stop_set_set_->async_send_request(request, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
-                auto response = future.get();
-            });
-
-        } else {
-                
-            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-            
-            while (!e_stop_set_reset_->wait_for_service(1s)) {
-                if (!rclcpp::ok()) {
-                    return;
-                }
-                
-                RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
-            }
-
-            e_stop_set_reset_->async_send_request(request, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
-                auto response = future.get();
-            });
-        }
-    }
-    
-    unsigned int e_stop_latch_reset_current_value = channels_values_.ch4;
-    bool e_stop_latch_reset_triggered = false;
-
-    if (!e_stop_latch_reset_init) {
-        e_stop_latch_reset_old_value = e_stop_latch_reset_current_value;
-
-        if (e_stop_latch_reset_init_counter > 0) {
-            e_stop_latch_reset_init_counter--;
-        } else {
-            e_stop_latch_reset_init = true;
-        }
-    }
-
-    if (e_stop_latch_reset_current_value != e_stop_latch_reset_old_value) {
-        e_stop_latch_reset_old_value = e_stop_latch_reset_current_value;
-        e_stop_latch_reset_triggered = true;
-    }
-
-    if (e_stop_latch_reset_triggered) {
-        if (e_stop_latch_reset_current_value < 500) {
-            
-            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-            
-            while (!sw_e_stop_latch_reset_->wait_for_service(1s)) {
-                if (!rclcpp::ok()) {
-                    return;
-                }
-                
-                RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
-            }
-
-            sw_e_stop_latch_reset_->async_send_request(request, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
-                auto response = future.get();
-            });
-
-        }
-    }
+    handleEStopChannel();
+    handleEStopLatchResetChannel();
 }
 
 } // rover_crfs_telop

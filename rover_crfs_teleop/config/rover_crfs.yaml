@@ -1,0 +1,38 @@
+/**:
+  ros__parameters:
+
+    # Raw CRSF channel endpoints, exactly as crsf_receiver republishes them on rc/channels
+    # (see rover_crsf_receiver/crsf_receiver/include/crsf_protocol.h). The midpoint matters most:
+    # the stick -> twist mapping is defined about it, so a centred stick produces exactly 0.0.
+    # If `ros2 topic echo /rc/channels` shows a different resting value for this transmitter,
+    # set channel_in_mid to that value.
+    channel_in_min: 172
+    channel_in_mid: 992
+    channel_in_max: 1811
+
+    # Half-width, in raw counts, of the band around channel_in_mid that maps to exactly 0.0.
+    # Size this against where the sticks actually REST, not against frame noise: measured on this
+    # transmitter, ch3 rests at 1004 and ch1 at 987, i.e. 12 and 5 counts off the 992 midpoint.
+    # Anything narrower leaves a permanent creep command, which makes the hardware interface's
+    # E-Stop reset invariant unsatisfiable ("velocity commands are not zero").
+    # 30 counts is ~3.7 % of the 819-count half-throw and costs ~0.07 m/s of resolution at centre.
+    # To re-measure: `ros2 topic echo /rc/channels` with both sticks released.
+    channel_deadband: 30
+
+    # Stick axes
+    linear_x_channel: 3
+    linear_x_out_min: -2.0    # m/s
+    linear_x_out_max: 2.0     # m/s
+    linear_x_invert: false
+
+    angular_z_channel: 1
+    angular_z_out_min: -5.0   # rad/s
+    angular_z_out_max: 5.0    # rad/s
+    angular_z_invert: true
+
+    # Switch channels. A channel below channel_switch_threshold counts as "low": low on
+    # e_stop_channel sets the SW User E-Stop, high resets it; low on
+    # e_stop_latch_reset_channel resets the E-Stop latch.
+    e_stop_channel: 5
+    e_stop_latch_reset_channel: 4
+    channel_switch_threshold: 500

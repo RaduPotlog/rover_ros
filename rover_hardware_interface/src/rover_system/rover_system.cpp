@@ -14,7 +14,9 @@
 
 #include "rover_hardware_interface/rover_system/rover_system.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <chrono>
 #include <exception>
 #include <functional>
@@ -73,6 +75,7 @@ CallbackReturn RoverSystem::on_init(const hardware_interface::HardwareComponentI
         readDriverInitAndActivationAttempts();
         readRoverControllerSettings();
         readErrorFilterMaxErrorsCounts();
+        readEStopSettings();
     } catch (const std::exception & e) {
         // Widened from std::invalid_argument: std::stof/std::stoi can also throw
         // std::out_of_range, and a missing key (operator[] replaced with .at() below) throws
@@ -178,11 +181,21 @@ CallbackReturn RoverSystem::on_activate(const rclcpp_lifecycle::State &)
         return CallbackReturn::ERROR;
     }
 
+    // A command left over from a previous activation must never be the first thing written to
+    // the drivers once write() starts commanding motion again. on_configure() already does this,
+    // but a component can be re-activated without being re-configured.
+    zeroVelocityCommands();
+
     return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn RoverSystem::on_deactivate(const rclcpp_lifecycle::State &)
 {
+    // Symmetric with on_activate(): leave no stale command behind for the next activation, and
+    // make the E-Stop resettable from Inactive->Active without first having to centre the sticks
+    // (the reset itself still requires ACTIVE - see resetEStop()).
+    zeroVelocityCommands();
+
     return CallbackReturn::SUCCESS;
 }
 
@@ -305,6 +318,10 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
     const auto lifecycle_state = this->get_lifecycle_id();
     const bool lifecycle_active = (lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
+    // Snapshot what the controller just wrote, before the branch below can zero it, so the flag
+    // the E-Stop reset service reads reflects what is actually being commanded this cycle.
+    refreshVelocityCommandsZeroFlag();
+
     // Covers both "not active" and "E-Stop (user-triggered or latched) is active" - in the latter
     // case, do not command motion in software regardless of what the hardware relay is doing.
     if (RoverControlLoopUseCase::shouldCommandMotion(lifecycle_active, e_stop_active_)) {
@@ -312,6 +329,15 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
             getSpeedCmd(speed_cmd_buffer_);
             rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
         });
+    } else {
+        // Motion is inhibited, so nothing consumed this cycle's command - drop it rather than
+        // letting it sit in the buffer. Without this, the last command written before the E-Stop
+        // engaged would be dumped straight to the drivers the moment the relay closes again, and
+        // (because the same buffer backs the E-Stop reset invariant) a single stale non-zero
+        // value would make the E-Stop unresettable. If the operator is genuinely still commanding
+        // motion, the controller simply writes a non-zero value again next cycle and
+        // refreshVelocityCommandsZeroFlag() above still refuses the reset.
+        zeroVelocityCommands();
     }
 
     return return_type::OK;
@@ -458,6 +484,25 @@ void RoverSystem::readErrorFilterMaxErrorsCounts()
     rover_error_filter_ = std::make_unique<RoverErrorFilter>(
         max_write_cmds_errors_count, max_read_motor_states_errors_count,
         max_read_driver_state_errors_count, kMaxFaultFlagErrorsCount);
+}
+
+void RoverSystem::readEStopSettings()
+{
+    // Optional, unlike every parameter above: an existing URDF that predates this parameter keeps
+    // the compiled-in default rather than failing on_init().
+    if (info_.hardware_parameters.count("velocity_command_zero_tolerance") == 0) {
+        return;
+    }
+
+    const double tolerance =
+        std::stod(info_.hardware_parameters.at("velocity_command_zero_tolerance"));
+
+    if (!(tolerance > 0.0)) {
+        throw std::runtime_error(
+            "velocity_command_zero_tolerance must be > 0, got " + std::to_string(tolerance) + ".");
+    }
+
+    velocity_command_zero_tolerance_ = tolerance;
 }
 
 void RoverSystem::configureRoverController()
@@ -613,13 +658,54 @@ void RoverSystem::logWriteOperationResult(const WriteOperationResult & result)
 
 bool RoverSystem::areVelocityCommandsNearZero()
 {
-    for (const auto & cmd : hw_commands_velocities_) {
-        if (std::abs(cmd) > std::numeric_limits<double>::epsilon()) {
-            return false;
-        }
+    // Runs on the service-callback thread (see the declaration): read the flag the RT thread
+    // published instead of racing it on hw_commands_velocities_.
+    const bool commands_are_zero = commands_are_zero_.load(std::memory_order_relaxed);
+
+    if (!commands_are_zero) {
+        // Without this, "velocity commands are not zero" gives the operator nothing to act on -
+        // it can't distinguish a stick genuinely held off-centre from a few-count transmitter
+        // trim offset leaking through a too-narrow teleop deadband, which is what it turned out
+        // to be the first time this fired. Name the number and the threshold it missed.
+        RCLCPP_WARN_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "E-Stop reset refused: largest |velocity command| is "
+                << max_abs_velocity_command_.load(std::memory_order_relaxed)
+                << " rad/s, tolerance is " << velocity_command_zero_tolerance_
+                << " rad/s. Check that whatever is publishing cmd_vel is commanding a true zero "
+                   "(for RC teleop, that means the stick deadband must cover the sticks' resting "
+                   "offset).");
     }
 
-    return true;
+    return commands_are_zero;
+}
+
+void RoverSystem::refreshVelocityCommandsZeroFlag()
+{
+    double max_abs_command = 0.0;
+
+    for (const auto & command : hw_commands_velocities_) {
+        // A non-finite command is reported as such rather than folded into the max, which
+        // std::max would silently swallow.
+        if (!std::isfinite(command)) {
+            max_abs_command = command;
+            break;
+        }
+
+        max_abs_command = std::max(max_abs_command, std::abs(command));
+    }
+
+    max_abs_velocity_command_.store(max_abs_command, std::memory_order_relaxed);
+
+    commands_are_zero_.store(
+        areVelocitiesWithinTolerance(hw_commands_velocities_, velocity_command_zero_tolerance_),
+        std::memory_order_relaxed);
+}
+
+void RoverSystem::zeroVelocityCommands()
+{
+    std::fill(hw_commands_velocities_.begin(), hw_commands_velocities_.end(), 0.0);
+    std::fill(speed_cmd_buffer_.begin(), speed_cmd_buffer_.end(), 0.0f);
 }
 
 }  // namespace rover_hardware_interface
