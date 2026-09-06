@@ -26,7 +26,10 @@
 
   <!-- Rover foxglove bridge dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">foxglove_bridge</exec_depend>
-  
+
+  <!-- Rover rosbridge dependency -->
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rosbridge_server</exec_depend>
+
   <!-- Rover zenoh dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rmw_zenoh_cpp</exec_depend>
   
