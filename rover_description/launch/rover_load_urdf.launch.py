@@ -30,6 +30,7 @@ from launch.substitutions import (
 )
 
 from launch_ros.actions import Node, SetParameter
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
 
@@ -175,7 +176,9 @@ def generate_launch_description():
         ]
     )
 
-    robot_description = {"robot_description": robot_description_content}
+    robot_description = {
+        "robot_description": ParameterValue(robot_description_content, value_type=str)
+    }
 
     publish_robot_state = LaunchConfiguration("publish_robot_state")
     declare_publish_robot_state_arg = DeclareLaunchArgument(
