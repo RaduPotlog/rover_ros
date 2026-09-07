@@ -12,7 +12,7 @@ from launch.substitutions import (
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
-
+from launch_ros.actions.lifecycle_node import LifecycleNode
 
 def generate_launch_description():
     robot_model = LaunchConfiguration("robot_model")
@@ -121,6 +121,38 @@ def generate_launch_description():
         on_exit=Shutdown(),
     )
 
+    driver_udp_channel_1_config = PythonExpression(["'", robot_model, "_udp_led_channel_1.yaml'"])
+    driver_udp_channel_1_config_path = PathJoinSubstitution([rover_led_pkg, "config", driver_udp_channel_1_config])
+    
+    rover_udp_led_channel_1_sender_node = LifecycleNode(
+        package='udp_driver',
+        name="rover_udp_led_channel_1_sender_node",
+        namespace=namespace,
+        executable='udp_sender_node_exe',
+        parameters=[driver_udp_channel_1_config_path],
+        remappings=[
+            ('/udp_write', '/udp_write/led_channel_1')
+        ],
+        autostart=True,
+        emulate_tty=True,
+    )
+
+    driver_udp_channel_2_config = PythonExpression(["'", robot_model, "_udp_led_channel_2.yaml'"])
+    driver_udp_channel_2_config_path = PathJoinSubstitution([rover_led_pkg, "config", driver_udp_channel_2_config])
+    
+    rover_udp_led_channel_2_sender_node = LifecycleNode(
+        package='udp_driver',
+        name="rover_udp_led_channel_2_sender_node",
+        namespace=namespace,
+        executable='udp_sender_node_exe',
+        parameters=[driver_udp_channel_2_config_path],
+        remappings=[
+            ('/udp_write', '/udp_write/led_channel_2')
+        ],
+        autostart=True,
+        emulate_tty=True,
+    )
+
     actions = [
         declare_common_dir_path_arg,
         declare_robot_model_arg,  # robot_model is used by animations_config_path
@@ -128,6 +160,8 @@ def generate_launch_description():
         declare_log_level_arg,
         declare_namespace_arg,
         declare_use_sim_arg,
+        rover_udp_led_channel_1_sender_node,
+        rover_udp_led_channel_2_sender_node,
         led_container,
     ]
 

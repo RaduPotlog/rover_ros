@@ -127,9 +127,9 @@ private:
 
     udp_msgs::msg::UdpPacket channel_2_msg_;
 
-    std::string channel_1_ip_address_{"172.17.10.126"};
+    std::string channel_1_ip_address_{"192.168.1.201"};
 
-    std::string channel_2_ip_address_{"172.17.10.127"};
+    std::string channel_2_ip_address_{"192.168.1.201"};
 
     int channel_1_src_port_{3333};
     
