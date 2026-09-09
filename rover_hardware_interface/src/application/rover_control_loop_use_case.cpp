@@ -56,6 +56,17 @@ std::optional<WriteOperationResult> RoverControlLoopUseCase::updateFaultFlagStat
     return performWriteOperation([this] { rover_driver_->attemptErrorFlagReset(); });
 }
 
+void RoverControlLoopUseCase::updateMotorFailsafeTrippedStatus()
+{
+    error_filter_.updateError(
+        ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED, rover_driver_->isFailsafeTripped());
+}
+
+bool RoverControlLoopUseCase::isMotorFailsafeLatched() const
+{
+    return error_filter_.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED);
+}
+
 bool RoverControlLoopUseCase::updateEStopActiveState()
 {
     if (!e_stop_) {

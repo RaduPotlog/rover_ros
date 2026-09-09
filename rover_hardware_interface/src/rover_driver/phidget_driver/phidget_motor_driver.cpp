@@ -108,6 +108,7 @@ PhidgetMotorDriver::PhidgetMotorDriver(
 , serial_number_(serial_number)
 , direction_reversed_(dir_reverse)
 , comm_timeout_(std::chrono::milliseconds(drivetrain_settings.driver_comm_timeout_ms))
+, failsafe_timeout_ms_(drivetrain_settings.motor_failsafe_timeout_ms)
 {
     encoder_resolution_ = drivetrain_settings.encoder_resolution;
 
@@ -187,14 +188,6 @@ void PhidgetMotorDriver::initialize()
         throw std::runtime_error("Failed to set braking strength for motor channel " +
             std::to_string(channel_));
     }
-
-    // Enable fail safe
-    // ret = PhidgetDCMotor_enableFailsafe(motor_handle_, 5000);
-
-    // if (ret != EPHIDGET_OK) {
-    //     throw std::runtime_error("Failed to enable fail safe mode for motor channel " +
-    //         std::to_string(channel_));
-    // }
 
     int enabled = 0;
 
@@ -481,11 +474,60 @@ void CCONV PhidgetMotorDriver::setTargetVelocityHandler(
     PhidgetReturnCode res)
 {
     (void)phid;
-    (void)res;
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
     driver->set_speed_pending_ = false;
+
+    if (isFailsafeTrippedReturnCode(res)) {
+        // Written from the Phidget SDK's own callback thread, same cross-thread pattern as
+        // last_update_time_ns_ above - read (RT thread) via isFailsafeTripped(). Only cleared by
+        // resetFailsafe(), never automatically here, so a trip stays latched even once commands
+        // start succeeding again after a re-arm.
+        driver->failsafe_tripped_.store(true, std::memory_order_relaxed);
+    }
+}
+
+bool PhidgetMotorDriver::isFailsafeTrippedReturnCode(const PhidgetReturnCode res)
+{
+    return res == EPHIDGET_FAILSAFE;
+}
+
+void PhidgetMotorDriver::armFailsafe()
+{
+    const PhidgetReturnCode ret =
+        PhidgetDCMotor_enableFailsafe(motor_handle_, failsafe_timeout_ms_);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error(
+            "Failed to arm fail safe (timeout " + std::to_string(failsafe_timeout_ms_) +
+            "ms) for motor channel " + std::to_string(channel_));
+    }
+}
+
+void PhidgetMotorDriver::resetFailsafe()
+{
+    // PhidgetDCMotor_resetFailsafe() is documented to clear the watchdog timer/trip, but to fail
+    // if no failsafe timer was ever set on this channel - it is not documented to definitely
+    // un-stick an already-TRIPPED channel on its own. Try it first (the cheap, intended path); if
+    // it reports anything other than success, fall back to a full re-arm via armFailsafe(), which
+    // is unambiguously documented to (re-)establish a working timer regardless of prior state.
+    // This way a tripped channel is never left unrecoverable by this call.
+    const PhidgetReturnCode ret = PhidgetDCMotor_resetFailsafe(motor_handle_);
+
+    if (ret != EPHIDGET_OK) {
+        RCLCPP_WARN_STREAM(
+            logger_, "PhidgetDCMotor_resetFailsafe() returned " << ret << " for motor channel "
+                << static_cast<int>(channel_) << "; falling back to re-arming failsafe.");
+        armFailsafe();  // Throws std::runtime_error on failure, same as a direct call would.
+    }
+
+    failsafe_tripped_.store(false, std::memory_order_relaxed);
+}
+
+bool PhidgetMotorDriver::isFailsafeTripped()
+{
+    return failsafe_tripped_.load(std::memory_order_relaxed);
 }
 
 void PhidgetMotorDriver::sendCmdVel(const float cmd)

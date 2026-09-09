@@ -40,7 +40,14 @@ struct DrivetrainSettings
     // 0.1f here. A different driver backend reporting raw current in a different unit supplies
     // its own value instead of silently inheriting Phidget's convention.
     float raw_current_to_amps_scale;
+    // Timeout (ms) for the motor driver's own hardware watchdog (e.g. Phidget's
+    // PhidgetDCMotor_enableFailsafe()) - see MotorDriverInterface::armFailsafe() in domain/
+    // driver.hpp. Optional in the URDF; absent means kDefaultMotorFailsafeTimeoutMs, so an
+    // existing URDF keeps working unchanged.
+    unsigned motor_failsafe_timeout_ms;
 };
+
+constexpr unsigned kDefaultMotorFailsafeTimeoutMs = 500;
 
 // `log_warning`, if provided, receives each attempt-failure message instead of the default
 // std::cerr fallback - lets infrastructure callers (e.g. RoverSystem, which has an rclcpp::Logger)

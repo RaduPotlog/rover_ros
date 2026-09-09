@@ -139,6 +139,22 @@ public:
     virtual void sendCmdVel(const float cmd) = 0;
 
     virtual bool isCommunicationError() = 0;
+
+    // Arms (or re-arms) this motor's hardware watchdog with whatever timeout it was configured
+    // with. Idempotent - safe to call on an already-armed, non-tripped channel. Not RT-safe (may
+    // block on a synchronous SDK/transport call) - only call from on_activate() or a service
+    // callback, never from read()/write().
+    virtual void armFailsafe() = 0;
+
+    // Explicit, operator-acknowledged clear of a tripped watchdog, re-arming it for further use.
+    // Kept distinct from armFailsafe() so call sites (RoverSystem::on_activate() vs.
+    // RoverSystem::resetEStopLatch()) read as what they mean. Not RT-safe - see armFailsafe().
+    virtual void resetFailsafe() = 0;
+
+    // Non-blocking, RT-safe: whether the last command this driver tried to send was rejected
+    // because the hardware watchdog had tripped. Latched by the implementation until
+    // resetFailsafe() succeeds - never auto-clears on its own.
+    virtual bool isFailsafeTripped() = 0;
 };
 
 }  // namespace rover_hardware_interface

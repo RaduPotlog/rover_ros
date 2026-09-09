@@ -86,6 +86,7 @@ DrivetrainSettings makeDrivetrainSettings()
     settings.max_rpm_motor_speed = 100.0f;
     settings.driver_comm_timeout_ms = 500;
     settings.raw_current_to_amps_scale = 1.0f;
+    settings.motor_failsafe_timeout_ms = 500;
     return settings;
 }
 

@@ -85,6 +85,19 @@ public:
     // attempted).
     std::optional<WriteOperationResult> updateFaultFlagStatus();
 
+    // Reports RoverDriverInterface::isFailsafeTripped() to the MOTOR_FAILSAFE_TRIPPED
+    // error-filter category. Unlike updateFaultFlagStatus(), this makes NO reset attempt - a
+    // watchdog trip stays latched until an operator explicitly clears it via
+    // RoverSystem::resetEStopLatch(), mirroring how the E-Stop latch itself works. Call every
+    // read() cycle.
+    void updateMotorFailsafeTrippedStatus();
+
+    // Whether a latched MOTOR_FAILSAFE_TRIPPED fault should inhibit motion, on top of the
+    // ordinary E-Stop gate. Kept as an explicit, separate check (see RoverSystem::write()) rather
+    // than folded into updateEStopActiveState()/e_stop_active_, since that flag is sourced purely
+    // from EmergencyStopInterface and resetEStop()'s zero-velocity invariant is keyed off it.
+    bool isMotorFailsafeLatched() const;
+
     // Recomputes and returns whether the E-Stop (user-triggered or latched) is currently active.
     // Fail-safe: returns true when no EmergencyStopInterface was configured.
     bool updateEStopActiveState();

@@ -85,6 +85,17 @@ public:
 
     bool isCommunicationError() override;
 
+    void armFailsafe() override;
+
+    void resetFailsafe() override;
+
+    bool isFailsafeTripped() override;
+
+    // Pure logic, factored out so it's unit-testable without any Phidget SDK handles: whether a
+    // PhidgetReturnCode reported by the async setTargetVelocity completion means the hardware
+    // watchdog rejected the command.
+    static bool isFailsafeTrippedReturnCode(const PhidgetReturnCode res);
+
 private:
 
     // Pure logic, factored out so it's unit-testable without any Phidget SDK handles.
@@ -150,6 +161,13 @@ private:
     // setTargetVelocityHandler() once the SDK reports completion).
     std::atomic<bool> set_speed_pending_{false};
 
+    // Set by setTargetVelocityHandler() (Phidget SDK callback thread) when a command completion
+    // reports the watchdog has tripped; read via isFailsafeTripped() (RT thread). Only cleared by
+    // resetFailsafe() - an operator-driven action - so a trip stays latched here even if later
+    // commands' completions report success again (they won't, until resetFailsafe() runs, but the
+    // latch is intentional defense-in-depth regardless).
+    std::atomic<bool> failsafe_tripped_{false};
+
     // Written from the Phidget SDK callback thread (position/current/temperature handlers) each
     // time a telemetry callback fires — the firing itself is the liveness signal, independent of
     // the value carried. Read from the RT thread via isCommunicationError(). A plain
@@ -159,6 +177,11 @@ private:
     std::atomic<std::int64_t> last_update_time_ns_{0};
 
     const std::chrono::nanoseconds comm_timeout_;
+
+    // Timeout armFailsafe() arms PhidgetDCMotor_enableFailsafe() with. Kept as a member (rather
+    // than a call-site literal) so resetFailsafe()'s fallback re-arm (see phidget_motor_driver.cpp)
+    // uses the same configured value.
+    const std::uint32_t failsafe_timeout_ms_;
 
     rclcpp::Logger logger_{rclcpp::get_logger("PhidgetMotorDriver")};
 };

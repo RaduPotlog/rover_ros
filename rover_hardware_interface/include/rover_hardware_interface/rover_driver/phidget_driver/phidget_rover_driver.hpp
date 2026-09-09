@@ -65,6 +65,12 @@ public:
 
     bool isFlagError() override;
 
+    void armFailsafe() override;
+
+    void resetFailsafe() override;
+
+    bool isFailsafeTripped() override;
+
     DriverDataSnapshot getData(const DriverNames name) override;
 
 protected:

@@ -42,7 +42,8 @@ RoverErrorFilter::RoverErrorFilter(
     const unsigned max_write_cmds_errors_count,
     const unsigned max_read_motor_states_errors_count,
     const unsigned max_read_driver_state_errors_count,
-    const unsigned max_fault_flag_errors_count)
+    const unsigned max_fault_flag_errors_count,
+    const unsigned max_motor_failsafe_tripped_errors_count)
 {
     error_filters_.emplace(ErrorsFilterIds::WRITE_CMDS, ErrorFilter(max_write_cmds_errors_count));
     error_filters_.emplace(
@@ -50,6 +51,9 @@ RoverErrorFilter::RoverErrorFilter(
     error_filters_.emplace(
         ErrorsFilterIds::READ_DRIVER_STATE, ErrorFilter(max_read_driver_state_errors_count));
     error_filters_.emplace(ErrorsFilterIds::FAULT_FLAG, ErrorFilter(max_fault_flag_errors_count));
+    error_filters_.emplace(
+        ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED,
+        ErrorFilter(max_motor_failsafe_tripped_errors_count));
 }
 
 bool RoverErrorFilter::isError() const

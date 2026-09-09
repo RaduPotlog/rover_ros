@@ -163,6 +163,43 @@ bool PhidgetRoverDriver::isFlagError()
     return false;
 }
 
+void PhidgetRoverDriver::armFailsafe()
+{
+    for (auto & [name, driver] : drivers_) {
+        try {
+            driver->getMotorDriver(MotorNames::DEFAULT)->armFailsafe();
+        } catch (const std::runtime_error & e) {
+            throw std::runtime_error(
+                "Arm failsafe exception on " + driverNamesToString(name) +
+                " driver: " + std::string(e.what()));
+        }
+    }
+}
+
+void PhidgetRoverDriver::resetFailsafe()
+{
+    for (auto & [name, driver] : drivers_) {
+        try {
+            driver->getMotorDriver(MotorNames::DEFAULT)->resetFailsafe();
+        } catch (const std::runtime_error & e) {
+            throw std::runtime_error(
+                "Reset failsafe exception on " + driverNamesToString(name) +
+                " driver: " + std::string(e.what()));
+        }
+    }
+}
+
+bool PhidgetRoverDriver::isFailsafeTripped()
+{
+    for (auto & [name, driver] : drivers_) {
+        if (driver->getMotorDriver(MotorNames::DEFAULT)->isFailsafeTripped()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 DriverDataSnapshot PhidgetRoverDriver::getData(const DriverNames name)
 {
     // `last_known_data_` mirrors `data_`'s keys 1:1 (both seeded together in initialize(), never

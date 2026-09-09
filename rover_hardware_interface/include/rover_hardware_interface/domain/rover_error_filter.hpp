@@ -52,13 +52,20 @@ enum class ErrorsFilterIds
     READ_MOTOR_STATES,
     READ_DRIVER_STATE,
     FAULT_FLAG,
+    // A motor's hardware watchdog (Phidget failsafe or equivalent) rejected a command because it
+    // had tripped. Deliberately a separate category from FAULT_FLAG: FAULT_FLAG's consumer
+    // (RoverControlLoopUseCase::updateFaultFlagStatus()) auto-retries a reset every RT cycle while
+    // active, whereas a watchdog trip must stay latched until an operator explicitly clears it via
+    // resetEStopLatch() - see RoverControlLoopUseCase::updateMotorFailsafeTrippedStatus().
+    MOTOR_FAILSAFE_TRIPPED,
 };
 
 const std::map<ErrorsFilterIds, std::string> kErrorFilterIdNames = {
-    {ErrorsFilterIds::WRITE_CMDS,        "write_cmds_error"},
-    {ErrorsFilterIds::READ_MOTOR_STATES, "read_motor_states_error"},
-    {ErrorsFilterIds::READ_DRIVER_STATE, "read_driver_state_error"},
-    {ErrorsFilterIds::FAULT_FLAG,        "fault_flag_error"},
+    {ErrorsFilterIds::WRITE_CMDS,             "write_cmds_error"},
+    {ErrorsFilterIds::READ_MOTOR_STATES,      "read_motor_states_error"},
+    {ErrorsFilterIds::READ_DRIVER_STATE,      "read_driver_state_error"},
+    {ErrorsFilterIds::FAULT_FLAG,             "fault_flag_error"},
+    {ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED, "motor_failsafe_tripped_error"},
 };
 
 // Aggregates one ErrorFilter per ErrorsFilterIds category. `mtx_` guards `error_filters_` so
@@ -76,7 +83,8 @@ public:
         const unsigned max_write_cmds_errors_count,
         const unsigned max_read_motor_states_errors_count,
         const unsigned max_read_driver_state_errors_count,
-        const unsigned max_fault_flag_errors_count);
+        const unsigned max_fault_flag_errors_count,
+        const unsigned max_motor_failsafe_tripped_errors_count);
 
     bool isError() const;
 

@@ -58,6 +58,16 @@ public:
     virtual bool isDriverStateDataTimedOut() = 0;
 
     virtual bool isFlagError() = 0;
+
+    // Aggregate broadcasts of MotorDriverInterface's failsafe watchdog controls across every
+    // wheel driver - see MotorDriverInterface::armFailsafe()/resetFailsafe()/isFailsafeTripped()
+    // for the per-motor contract. armFailsafe()/resetFailsafe() are not RT-safe (may block) - only
+    // call from on_activate() or a service callback, never from read()/write().
+    virtual void armFailsafe() = 0;
+
+    virtual void resetFailsafe() = 0;
+
+    virtual bool isFailsafeTripped() = 0;
 };
 
 }  // namespace rover_hardware_interface

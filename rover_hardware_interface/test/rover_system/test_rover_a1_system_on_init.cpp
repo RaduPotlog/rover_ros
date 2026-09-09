@@ -195,4 +195,27 @@ TEST(RoverA1SystemOnInit, FailsWithEmptyModbusHost)
     EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
 }
 
+// motor_failsafe_timeout_ms is optional (see RoverSystem::readDrivetrainSettings()) -
+// buildValidHardwareInfo() omits it, so RoverA1SystemOnInit.SucceedsAndExportsInterfacesInFixedJointOrder
+// above already exercises the "absent -> compiled-in default" path. These two cover the
+// "present" path: a valid override still succeeds, and an unparsable value fails on_init()
+// cleanly rather than throwing out of it, mirroring the other hardware_parameters readers.
+TEST(RoverA1SystemOnInit, SucceedsWithMotorFailsafeTimeoutMsOverride)
+{
+    RoverA1System system;
+    auto info = buildValidHardwareInfo();
+    info.hardware_parameters["motor_failsafe_timeout_ms"] = "750";
+
+    EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::SUCCESS);
+}
+
+TEST(RoverA1SystemOnInit, FailsWithUnparsableMotorFailsafeTimeoutMs)
+{
+    RoverA1System system;
+    auto info = buildValidHardwareInfo();
+    info.hardware_parameters["motor_failsafe_timeout_ms"] = "not-a-number";
+
+    EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
+}
+
 }  // namespace rover_hardware_interface

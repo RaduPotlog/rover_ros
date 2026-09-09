@@ -62,11 +62,18 @@ public:
     bool isDriverStateDataTimedOut() override { return driver_state_data_timed_out; }
     bool isFlagError() override { return flag_error; }
 
+    void armFailsafe() override { ++arm_failsafe_calls; }
+    void resetFailsafe() override { ++reset_failsafe_calls; }
+    bool isFailsafeTripped() override { return failsafe_tripped; }
+
     bool motor_states_data_timed_out = false;
     bool driver_state_data_timed_out = false;
     bool flag_error = false;
     unsigned attempt_error_flag_reset_calls = 0;
     std::optional<std::string> attempt_error_flag_reset_throw_message;
+    bool failsafe_tripped = false;
+    unsigned arm_failsafe_calls = 0;
+    unsigned reset_failsafe_calls = 0;
 };
 
 class FakeEmergencyStop : public EmergencyStopInterface
@@ -89,7 +96,7 @@ class RoverControlLoopUseCaseTest : public ::testing::Test
 protected:
     std::shared_ptr<FakeRoverDriver> driver = std::make_shared<FakeRoverDriver>();
     std::shared_ptr<FakeEmergencyStop> e_stop = std::make_shared<FakeEmergencyStop>();
-    RoverErrorFilter error_filter{1, 1, 1, 1};
+    RoverErrorFilter error_filter{1, 1, 1, 1, 1};
     RoverControlLoopUseCase use_case{driver, e_stop, error_filter};
 };
 
@@ -148,6 +155,27 @@ TEST_F(RoverControlLoopUseCaseTest, UpdateFaultFlagStatusReportsExceptionFromRes
     EXPECT_EQ(result->outcome, WriteOperationOutcome::kExceptionThrown);
     EXPECT_EQ(result->error_message, "reset failed");
     EXPECT_TRUE(error_filter.isError(ErrorsFilterIds::WRITE_CMDS));
+}
+
+TEST_F(RoverControlLoopUseCaseTest, UpdateMotorFailsafeTrippedStatusLatchesAndNeverAttemptsReset)
+{
+    EXPECT_FALSE(error_filter.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED));
+    EXPECT_FALSE(use_case.isMotorFailsafeLatched());
+
+    driver->failsafe_tripped = true;
+    use_case.updateMotorFailsafeTrippedStatus();
+
+    EXPECT_TRUE(error_filter.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED));
+    EXPECT_TRUE(use_case.isMotorFailsafeLatched());
+    // Unlike updateFaultFlagStatus(), a trip must never trigger an automatic reset attempt - it
+    // stays latched until an operator explicitly clears it (see RoverSystem::resetEStopLatch()).
+    EXPECT_EQ(driver->arm_failsafe_calls, 0u);
+    EXPECT_EQ(driver->reset_failsafe_calls, 0u);
+
+    // And it must stay latched even once the driver reports clear again.
+    driver->failsafe_tripped = false;
+    use_case.updateMotorFailsafeTrippedStatus();
+    EXPECT_TRUE(use_case.isMotorFailsafeLatched());
 }
 
 TEST_F(RoverControlLoopUseCaseTest, UpdateEStopActiveStateReflectsUserTrigger)
@@ -228,7 +256,7 @@ TEST(RoverControlLoopUseCaseShouldCommandMotionTest, TrueOnlyWhenActiveAndEStopN
 TEST(RoverControlLoopUseCaseNoEStopTest, UpdateEStopActiveStateFailsSafeWithNoEStopConfigured)
 {
     auto driver = std::make_shared<FakeRoverDriver>();
-    RoverErrorFilter error_filter{1, 1, 1, 1};
+    RoverErrorFilter error_filter{1, 1, 1, 1, 1};
     RoverControlLoopUseCase use_case(driver, nullptr, error_filter);
 
     EXPECT_TRUE(use_case.updateEStopActiveState());

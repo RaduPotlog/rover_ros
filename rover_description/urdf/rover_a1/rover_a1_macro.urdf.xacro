@@ -152,6 +152,17 @@
                boards if false positives/slow detection are observed. -->
           <param name="driver_comm_timeout_ms">300</param>
 
+          <!-- Max time (ms) a PhidgetDCMotor_setTargetVelocity_async() command may go unsent/
+               unacknowledged before the Phidget board's own hardware watchdog disengages (brakes)
+               the motor, independent of software E-Stop state - a defense-in-depth backstop for
+               e.g. a hung RT loop. A trip is latched (motor_failsafe_tripped_error in
+               diagnostics) and only cleared by the hardware_interface/sw_e_stop_latch_reset
+               service. Optional - omitting it keeps the compiled-in
+               kDefaultMotorFailsafeTimeoutMs (500). Tune at bench test: short enough to be a
+               meaningful backstop, long enough that ordinary write() cycle jitter never trips
+               it. -->
+          <param name="motor_failsafe_timeout_ms">500</param>
+
           <!-- Motor parameters -->
           <param name="motor_torque_constant">0.11</param>
           <param name="max_rpm_motor_speed">2800</param>

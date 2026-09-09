@@ -82,7 +82,7 @@ TEST(ErrorFilterTest, ClearErrorResetsLatchAndCount)
 class RoverErrorFilterTest : public ::testing::Test
 {
 protected:
-    RoverErrorFilter filter_{1, 1, 1, 1};
+    RoverErrorFilter filter_{1, 1, 1, 1, 1};
 };
 
 TEST_F(RoverErrorFilterTest, StartsClear)
@@ -103,6 +103,23 @@ TEST_F(RoverErrorFilterTest, UpdateErrorSetsOnlyItsOwnCategory)
     EXPECT_FALSE(filter_.isError(ErrorsFilterIds::READ_MOTOR_STATES));
     EXPECT_FALSE(filter_.isError(ErrorsFilterIds::READ_DRIVER_STATE));
     EXPECT_FALSE(filter_.isError(ErrorsFilterIds::FAULT_FLAG));
+    EXPECT_FALSE(filter_.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED));
+}
+
+TEST_F(RoverErrorFilterTest, MotorFailsafeTrippedLatchesAndSurvivesAFalseUpdate)
+{
+    filter_.updateError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED, true);
+    ASSERT_TRUE(filter_.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED));
+
+    // A trip must stay latched even once the underlying condition reports clear again (e.g. after
+    // RoverSystem::on_activate() re-arms the watchdog) - only an explicit clear (below) may
+    // un-latch it.
+    filter_.updateError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED, false);
+    EXPECT_TRUE(filter_.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED));
+
+    filter_.setClearErrorsFlag();
+    filter_.updateError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED, false);
+    EXPECT_FALSE(filter_.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED));
 }
 
 TEST_F(RoverErrorFilterTest, GetErrorMapUsesFriendlyNamesAndReflectsState)
@@ -115,6 +132,7 @@ TEST_F(RoverErrorFilterTest, GetErrorMapUsesFriendlyNamesAndReflectsState)
     EXPECT_FALSE(error_map.at("write_cmds_error"));
     EXPECT_FALSE(error_map.at("read_motor_states_error"));
     EXPECT_FALSE(error_map.at("read_driver_state_error"));
+    EXPECT_FALSE(error_map.at("motor_failsafe_tripped_error"));
 }
 
 TEST_F(RoverErrorFilterTest, SetClearErrorsFlagClearsAllCategoriesOnNextUpdate)

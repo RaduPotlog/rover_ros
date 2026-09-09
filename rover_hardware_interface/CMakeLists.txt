@@ -186,6 +186,13 @@ if(BUILD_TESTING)
     test_phidget_data_transformer test/rover_driver/test_phidget_data_transformer.cpp)
   target_link_libraries(test_phidget_data_transformer ${PROJECT_NAME})
 
+  # Pure-logic unit test for PhidgetMotorDriver::isFailsafeTrippedReturnCode() - no live Phidget
+  # handle needed (see the failsafe-watchdog design note in domain/driver.hpp's
+  # MotorDriverInterface).
+  ament_add_gtest(
+    test_phidget_motor_driver test/rover_driver/test_phidget_motor_driver.cpp)
+  target_link_libraries(test_phidget_motor_driver ${PROJECT_NAME})
+
   # Integration test: drives SystemROSInterface (services + publishers) over the real rclcpp
   # graph - no Phidget/Modbus hardware involved (see
   # test/system_ros_interface/test_system_ros_interface.cpp). Filed under test/system_ros_interface/

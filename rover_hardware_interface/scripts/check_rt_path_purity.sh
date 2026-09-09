@@ -89,6 +89,12 @@ FORBIDDEN_SYMBOLS=(
     readDiscreteContact
     "RoverSafetyController("
     "RoverModbus("
+    # Synchronous Phidget SDK calls (unlike PhidgetDCMotor_setTargetVelocity_async) - confined by
+    # design to RoverSystem::on_activate() and resetEStopLatch() (see MotorDriverInterface::
+    # armFailsafe()/resetFailsafe() in domain/driver.hpp), neither of which this script scans
+    # today. Listed here anyway as a regression guard against a future accidental RT-path call.
+    PhidgetDCMotor_resetFailsafe
+    PhidgetDCMotor_enableFailsafe
 )
 
 extract_body() {

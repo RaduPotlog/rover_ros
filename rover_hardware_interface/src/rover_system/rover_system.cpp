@@ -181,6 +181,19 @@ CallbackReturn RoverSystem::on_activate(const rclcpp_lifecycle::State &)
         return CallbackReturn::ERROR;
     }
 
+    // Arms (re-arms, on a re-activation) every motor's hardware watchdog. This makes the raw
+    // Phidget-level trip bit observably clear again, but does NOT by itself clear a latched
+    // MOTOR_FAILSAFE_TRIPPED fault in RoverErrorFilter - only setClearErrorsFlag() (called from
+    // resetEStopLatch()) does that (see updateError()'s "does NOT un-latch" contract in
+    // rover_error_filter.hpp). So motion stays refused by write() until the operator explicitly
+    // acknowledges via resetEStopLatch(), even across a deactivate/reactivate cycle.
+    try {
+        rover_driver_->armFailsafe();
+    } catch (const std::exception & e) {
+        RCLCPP_ERROR_STREAM(logger_, "Failed to arm motor failsafe: " << e.what());
+        return CallbackReturn::ERROR;
+    }
+
     // A command left over from a previous activation must never be the first thing written to
     // the drivers once write() starts commanding motion again. on_configure() already does this,
     // but a component can be re-activated without being re-configured.
@@ -322,9 +335,12 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
     // the E-Stop reset service reads reflects what is actually being commanded this cycle.
     refreshVelocityCommandsZeroFlag();
 
-    // Covers both "not active" and "E-Stop (user-triggered or latched) is active" - in the latter
-    // case, do not command motion in software regardless of what the hardware relay is doing.
-    if (RoverControlLoopUseCase::shouldCommandMotion(lifecycle_active, e_stop_active_)) {
+    // Covers "not active", "E-Stop (user-triggered or latched) is active", and "a motor's
+    // hardware watchdog has tripped and the trip hasn't been explicitly acknowledged yet" (see
+    // RoverControlLoopUseCase::updateMotorFailsafeTrippedStatus()/isMotorFailsafeLatched()) - in
+    // every case, do not command motion in software.
+    if (RoverControlLoopUseCase::shouldCommandMotion(lifecycle_active, e_stop_active_) &&
+        !control_loop_use_case_->isMotorFailsafeLatched()) {
         handleRoverDriverWriteOperation([this] {
             getSpeedCmd(speed_cmd_buffer_);
             rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
@@ -443,6 +459,14 @@ void RoverSystem::readDrivetrainSettings()
         static_cast<unsigned>(std::stoi(info_.hardware_parameters.at("driver_comm_timeout_ms")));
     drivetrain_settings_.raw_current_to_amps_scale =
         std::stof(info_.hardware_parameters.at("raw_current_to_amps_scale"));
+
+    // Optional, unlike every parameter above: an existing URDF that predates this parameter keeps
+    // the compiled-in kDefaultMotorFailsafeTimeoutMs rather than failing on_init().
+    drivetrain_settings_.motor_failsafe_timeout_ms =
+        info_.hardware_parameters.count("motor_failsafe_timeout_ms") == 0
+            ? kDefaultMotorFailsafeTimeoutMs
+            : static_cast<unsigned>(
+                  std::stoi(info_.hardware_parameters.at("motor_failsafe_timeout_ms")));
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()
@@ -480,10 +504,15 @@ void RoverSystem::readErrorFilterMaxErrorsCounts()
     // Not URDF-configurable, mirroring the reference Roboteq implementation's fault-flag
     // category: a single occurrence escalates immediately, with no debounce.
     constexpr unsigned kMaxFaultFlagErrorsCount = 1;
+    // Likewise not URDF-configurable: a motor watchdog trip is a safety-latched fault (see
+    // RoverControlLoopUseCase::updateMotorFailsafeTrippedStatus()) and must escalate on the very
+    // first occurrence, with no debounce.
+    constexpr unsigned kMaxMotorFailsafeTrippedErrorsCount = 1;
 
     rover_error_filter_ = std::make_unique<RoverErrorFilter>(
         max_write_cmds_errors_count, max_read_motor_states_errors_count,
-        max_read_driver_state_errors_count, kMaxFaultFlagErrorsCount);
+        max_read_driver_state_errors_count, kMaxFaultFlagErrorsCount,
+        kMaxMotorFailsafeTrippedErrorsCount);
 }
 
 void RoverSystem::readEStopSettings()
@@ -562,6 +591,18 @@ void RoverSystem::resetEStopLatch()
     // fault has been addressed - clear all accumulated per-category error-filter state too, not
     // just the fault-flag category.
     rover_error_filter_->setClearErrorsFlag();
+
+    // This service callback runs on a non-RT, MutuallyExclusive callback-group thread (never the
+    // RT read()/write() path - see check_rt_path_purity.sh), so the blocking Phidget SDK calls
+    // inside resetFailsafe() are safe here. A single sw_e_stop_latch_reset call both clears the
+    // software MOTOR_FAILSAFE_TRIPPED latch above and re-arms the hardware watchdog that actually
+    // gated command delivery - see MotorDriverInterface::resetFailsafe(). If this throws (e.g. a
+    // wheel driver is unreachable), it propagates uncaught to the service response the same way
+    // e_stop_->resetEStopLatch() already does; the software latch stays cleared, but the very next
+    // read() cycle will observe isFailsafeTripped() is still true and re-latch
+    // MOTOR_FAILSAFE_TRIPPED, so a failed hardware reset never leaves the operator with a false
+    // all-clear.
+    rover_driver_->resetFailsafe();
 }
 
 void RoverSystem::updateMotorsState(const rclcpp::Time & time)
@@ -570,6 +611,7 @@ void RoverSystem::updateMotorsState(const rclcpp::Time & time)
         rover_driver_->updateMotorsState();
         updateHwStates(time);
         updateMotorsStateDataTimedOut();
+        control_loop_use_case_->updateMotorFailsafeTrippedStatus();
     } catch (const std::runtime_error & e) {
         RCLCPP_ERROR_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
