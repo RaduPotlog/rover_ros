@@ -27,5 +27,7 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_transport
     version: master
-    
- 
+  rover_network_monitor:
+    type: git
+    url: https://github.com/RaduPotlog/rover_network_monitor.git
+    version: master
