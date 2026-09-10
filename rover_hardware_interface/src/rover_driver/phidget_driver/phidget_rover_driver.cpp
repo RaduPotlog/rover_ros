@@ -104,7 +104,16 @@ void PhidgetRoverDriver::updateMotorsState()
         const auto state = motor_driver->readState();
         const bool data_timed_out = motor_driver->isCommunicationError();
 
-        std::lock_guard<std::mutex> lck(data_mtx_);
+        // Non-blocking: this runs on the RT thread (RoverSystem::read()), and data_mtx_ is also
+        // taken by getData() from the diagnostics executor thread - std::mutex has no priority
+        // inheritance, so a blocking lock here could stall the RT loop behind that thread. On
+        // contention, skip this driver's update; the next cycle refreshes it (readState() is a
+        // cached snapshot, so only one tick of freshness is lost). Mirrors getData() below.
+        std::unique_lock<std::mutex> lck(data_mtx_, std::try_to_lock);
+        if (!lck.owns_lock()) {
+            continue;
+        }
+
         setMotorsStates(data_.at(name), state, data_timed_out);
     }
 }
@@ -115,7 +124,12 @@ void PhidgetRoverDriver::updateDriversState()
         const auto state = driver->readState();
         const bool data_timed_out = driver->isCommunicationError();
 
-        std::lock_guard<std::mutex> lck(data_mtx_);
+        // Non-blocking, same RT rationale as updateMotorsState() above.
+        std::unique_lock<std::mutex> lck(data_mtx_, std::try_to_lock);
+        if (!lck.owns_lock()) {
+            continue;
+        }
+
         setDriverState(data_.at(name), state, data_timed_out);
     }
 }

@@ -56,6 +56,30 @@ generate_parameter_library(phidgets_spatial_parameters
 set(ENV{PKG_CONFIG_PATH}
     "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
+# ROS-free core: the domain + application layers (see .claude/rules/clean_architecture.md), plus
+# utils.cpp, which is std-only and which domain/driver_data_snapshot.hpp depends on. Deliberately
+# gets NO ament_target_dependencies()/vendor links, so a ROS, hardware_interface or vendor-SDK
+# include in domain/ or application/ now fails to compile, not just the purity scripts below.
+# STATIC + PIC so it can be linked into the SHARED plugin library.
+add_library(
+    ${PROJECT_NAME}_core STATIC
+    src/domain/driver_data_snapshot.cpp
+    src/domain/rover_error_filter.cpp
+    src/domain/imu_calibration.cpp
+    src/domain/emergency_stop.cpp
+    src/domain/velocity_command_guard.cpp
+    src/application/rover_control_loop_use_case.cpp
+    src/utils.cpp
+)
+
+set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_include_directories(
+    ${PROJECT_NAME}_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
 add_library(
     ${PROJECT_NAME} SHARED
     src/rover_sensors/phidget_imu_sensor.cpp
@@ -63,28 +87,32 @@ add_library(
     src/rover_driver/phidget_driver/phidget_motor_driver.cpp
     src/rover_driver/phidget_driver/phidget_rover_driver.cpp
     src/rover_driver/phidget_driver/phidget_data_transformer.cpp
-    src/domain/driver_data_snapshot.cpp
-    src/domain/rover_error_filter.cpp
-    src/domain/imu_calibration.cpp
-    src/domain/emergency_stop.cpp
-    src/domain/velocity_command_guard.cpp
-    src/application/rover_control_loop_use_case.cpp
     src/rover_driver/rover_a1_driver.cpp
     src/rover_system/rover_a1_system.cpp
     src/rover_system/rover_system.cpp
     src/system_ros_interface/system_ros_interface.cpp
-    src/utils.cpp
     src/rover_modbus/modbus.cpp
     src/rover_safety_controller/rover_safety_controller.cpp
     src/rover_safety_controller/rover_safety_controller_e_stop_io.cpp
     src/rover_safety_controller/rover_safety_controller_gpio_adapter.cpp
 )
 
-ament_target_dependencies(${PROJECT_NAME} ${PACKAGE_DEPENDENCIES})
+# Keyword signatures on both calls (CMake forbids mixing plain and keyword target_link_libraries
+# on one target). ${PROJECT_NAME}_core and phidgets_spatial_parameters are PUBLIC: public headers
+# include their headers (e.g. rover_system.hpp -> application/, phidget_imu_sensor.hpp ->
+# phidgets_spatial_parameters.hpp), and both are in this package's own export set, so exporting
+# them is safe. Modbus_Core::Modbus_Core is PRIVATE: it is not an ament_export_dependencies()
+# entry, so leaving it in the exported target's INTERFACE_LINK_LIBRARIES would break a downstream
+# find_package(rover_hardware_interface) consumer linking the exported target. The plugin's own
+# public headers (rover_a1_system.hpp) only reach the std-only rover_modbus/modbus_types.hpp;
+# code including rover_safety_controller.hpp or rover_modbus/modbus*.hpp needs Modbus_Core's
+# headers on its include path itself (today /usr/local/include, a default search path).
+ament_target_dependencies(${PROJECT_NAME} PUBLIC ${PACKAGE_DEPENDENCIES})
 
 target_link_libraries(
-    ${PROJECT_NAME} phidgets_spatial_parameters
-                    Modbus_Core::Modbus_Core
+    ${PROJECT_NAME}
+    PUBLIC ${PROJECT_NAME}_core phidgets_spatial_parameters
+    PRIVATE Modbus_Core::Modbus_Core
 )
 
 target_compile_definitions(
@@ -92,7 +120,7 @@ target_compile_definitions(
 )
 
 install(
-    TARGETS ${PROJECT_NAME} phidgets_spatial_parameters
+    TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_core phidgets_spatial_parameters
     EXPORT export_${PROJECT_NAME}
     RUNTIME DESTINATION bin
     ARCHIVE DESTINATION lib
@@ -152,35 +180,38 @@ if(BUILD_TESTING)
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_rt_path_purity.sh ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
-  # Behavioral unit tests for the pure, ROS-free domain layer (linked against ${PROJECT_NAME},
-  # which already compiles src/domain/*.cpp - see add_library() above).
+  # Behavioral unit tests for the pure, ROS-free domain + application layers - linked against
+  # ${PROJECT_NAME}_core only, so they build and run without any ROS/vendor library (see
+  # add_library() above).
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(test_rover_error_filter test/domain/test_rover_error_filter.cpp)
-  target_link_libraries(test_rover_error_filter ${PROJECT_NAME})
+  target_link_libraries(test_rover_error_filter ${PROJECT_NAME}_core)
 
   ament_add_gtest(test_driver_data_snapshot test/domain/test_driver_data_snapshot.cpp)
-  target_link_libraries(test_driver_data_snapshot ${PROJECT_NAME})
+  target_link_libraries(test_driver_data_snapshot ${PROJECT_NAME}_core)
 
   ament_add_gtest(test_imu_calibration test/domain/test_imu_calibration.cpp)
-  target_link_libraries(test_imu_calibration ${PROJECT_NAME})
+  target_link_libraries(test_imu_calibration ${PROJECT_NAME}_core)
 
   ament_add_gtest(test_emergency_stop test/domain/test_emergency_stop.cpp)
-  target_link_libraries(test_emergency_stop ${PROJECT_NAME})
+  target_link_libraries(test_emergency_stop ${PROJECT_NAME}_core)
 
   ament_add_gtest(
     test_velocity_command_guard test/domain/test_velocity_command_guard.cpp)
-  target_link_libraries(test_velocity_command_guard ${PROJECT_NAME})
+  target_link_libraries(test_velocity_command_guard ${PROJECT_NAME}_core)
 
   # Behavioral unit tests for the application-layer RT-loop decision logic (E-Stop state,
   # fault-flag reset, write-command gating/serialization), driven with fake domain ports the same
   # way test_emergency_stop above is - no ROS, no real hardware.
   ament_add_gtest(
     test_rover_control_loop_use_case test/application/test_rover_control_loop_use_case.cpp)
-  target_link_libraries(test_rover_control_loop_use_case ${PROJECT_NAME})
+  target_link_libraries(test_rover_control_loop_use_case ${PROJECT_NAME}_core)
+  # Shared test doubles (FakeRoverDriver/FakeEmergencyStop) live in test/fakes/.
+  target_include_directories(test_rover_control_loop_use_case PRIVATE test)
 
   ament_add_gtest(test_utils test/test_utils.cpp)
-  target_link_libraries(test_utils ${PROJECT_NAME})
+  target_link_libraries(test_utils ${PROJECT_NAME}_core)
 
   ament_add_gtest(
     test_phidget_data_transformer test/rover_driver/test_phidget_data_transformer.cpp)
@@ -213,6 +244,15 @@ if(BUILD_TESTING)
     test_rover_a1_system_on_init test/rover_system/test_rover_a1_system_on_init.cpp)
   target_link_libraries(test_rover_a1_system_on_init ${PROJECT_NAME})
   ament_target_dependencies(test_rover_a1_system_on_init hardware_interface)
+
+  # Drives RoverSystem::write() through on_init()/on_configure() on a RoverSystem subclass whose
+  # defineRoverDriver()/defineRoverController() return in-memory fakes - no Modbus/Phidget
+  # hardware, unlike test_rover_a1_system_on_init above (see the test's file-level comment).
+  ament_add_gtest(
+    test_rover_system_write test/rover_system/test_rover_system_write.cpp)
+  target_link_libraries(test_rover_system_write ${PROJECT_NAME})
+  target_include_directories(test_rover_system_write PRIVATE test)
+  ament_target_dependencies(test_rover_system_write hardware_interface rclcpp rclcpp_lifecycle)
 
   # Integration test: drives PhidgetImuSensor through the real hardware_interface plugin contract
   # (on_init() + export_state_interfaces()), the same pattern as

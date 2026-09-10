@@ -335,39 +335,36 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
     // the E-Stop reset service reads reflects what is actually being commanded this cycle.
     refreshVelocityCommandsZeroFlag();
 
-    // Covers "not active", "E-Stop (user-triggered or latched) is active", and "a motor's
-    // hardware watchdog has tripped and the trip hasn't been explicitly acknowledged yet" (see
-    // RoverControlLoopUseCase::updateMotorFailsafeTrippedStatus()/isMotorFailsafeLatched()) - in
-    // every case, do not command motion in software.
-    if (RoverControlLoopUseCase::shouldCommandMotion(lifecycle_active, e_stop_active_) &&
-        !control_loop_use_case_->isMotorFailsafeLatched()) {
+    // The motion / zero-to-feed-the-watchdog / nothing decision lives in the application layer -
+    // see RoverControlLoopUseCase::decideWriteCommand() for the rationale behind each mode.
+    const auto mode = RoverControlLoopUseCase::decideWriteCommand(
+        lifecycle_active,
+        lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE,
+        e_stop_active_,
+        control_loop_use_case_->isMotorFailsafeLatched());
+
+    if (mode == WriteCommandMode::kCommandMotion) {
         handleRoverDriverWriteOperation([this] {
             getSpeedCmd(speed_cmd_buffer_);
             rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
         });
-    } else {
-        // Motion is inhibited, so nothing consumed this cycle's command - drop it rather than
-        // letting it sit in the buffer. Without this, the last command written before the E-Stop
-        // engaged would be dumped straight to the drivers the moment the relay closes again, and
-        // (because the same buffer backs the E-Stop reset invariant) a single stale non-zero
-        // value would make the E-Stop unresettable. If the operator is genuinely still commanding
-        // motion, the controller simply writes a non-zero value again next cycle and
-        // refreshVelocityCommandsZeroFlag() above still refuses the reset.
-        zeroVelocityCommands();
+        return return_type::OK;
+    }
 
-        // Still actively command zero rather than going silent. The motors' hardware watchdog
-        // (motor_failsafe_timeout_ms) is only fed by commands actually reaching the drivers, so
-        // skipping the send here tripped it on every wheel whenever an E-Stop lasted longer than
-        // the timeout - and a tripped channel then had to be re-opened before the latch reset
-        // could succeed. Sending zeros keeps the watchdog meaningful as the backstop it's meant
-        // to be (it still trips if write() itself stops running) while braking the motors. Only
-        // once the drivers are configured (ACTIVE/INACTIVE); the buffer was zeroed just above.
-        if (lifecycle_active ||
-            lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
-            handleRoverDriverWriteOperation([this] {
-                rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
-            });
-        }
+    // Motion is inhibited, so nothing consumed this cycle's command - drop it rather than letting
+    // it sit in the buffer. Without this, the last command written before the E-Stop engaged would
+    // be dumped straight to the drivers the moment the relay closes again, and (because the same
+    // buffer backs the E-Stop reset invariant) a single stale non-zero value would make the E-Stop
+    // unresettable. If the operator is genuinely still commanding motion, the controller simply
+    // writes a non-zero value again next cycle and refreshVelocityCommandsZeroFlag() above still
+    // refuses the reset.
+    zeroVelocityCommands();
+
+    if (mode == WriteCommandMode::kCommandZero) {
+        // The buffer was zeroed just above.
+        handleRoverDriverWriteOperation([this] {
+            rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
+        });
     }
 
     return return_type::OK;
