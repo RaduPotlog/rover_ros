@@ -14,6 +14,9 @@
 
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_motor_driver.hpp"
 
+#include <cstdio>
+#include <string>
+
 #include "rover_hardware_interface/domain/driver.hpp"
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_utils.hpp"
 
@@ -156,38 +159,7 @@ void PhidgetMotorDriver::initialize()
     // Try to reset fail safe
     (void)PhidgetDCMotor_resetFailsafe(motor_handle_);
 
-    // Set acceleration
-    ret = PhidgetDCMotor_setAcceleration(motor_handle_, 2.0f);
-
-    if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set acceleration for motor channel " +
-            std::to_string(channel_));
-    }
-
-    // Set current limit
-    ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, 10.0);
-
-    if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current limit for motor channel " +
-            std::to_string(channel_));
-    }
-
-    /*
-     *  CurrentRegulatorGain = CurrentLimit * (Voltage / 12)
-     */
-    ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, 20.0);
-
-    if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current regulator gain for motor channel " +
-            std::to_string(channel_));
-    }
-
-    ret = PhidgetDCMotor_setTargetBrakingStrength(motor_handle_, 1.0f);
-
-    if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set braking strength for motor channel " +
-            std::to_string(channel_));
-    }
+    configureMotorChannel();
 
     int enabled = 0;
 
@@ -342,6 +314,89 @@ void PhidgetMotorDriver::initialize()
     }
 }
 
+void PhidgetMotorDriver::configureMotorChannel()
+{
+    // Set acceleration
+    PhidgetReturnCode ret = PhidgetDCMotor_setAcceleration(motor_handle_, 2.0f);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set acceleration for motor channel " +
+            std::to_string(channel_));
+    }
+
+    // Set current limit
+    ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, 10.0);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set current limit for motor channel " +
+            std::to_string(channel_));
+    }
+
+    /*
+     *  CurrentRegulatorGain = CurrentLimit * (Voltage / 12)
+     */
+    ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, 20.0);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set current regulator gain for motor channel " +
+            std::to_string(channel_));
+    }
+
+    ret = PhidgetDCMotor_setTargetBrakingStrength(motor_handle_, 1.0f);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set braking strength for motor channel " +
+            std::to_string(channel_));
+    }
+}
+
+void PhidgetMotorDriver::reopenMotorChannel()
+{
+    const PhidgetHandle handle = reinterpret_cast<PhidgetHandle>(motor_handle_);
+
+    // Closing also disables the failsafe - it can't be turned off any other way.
+    (void)Phidget_close(handle);
+    failsafe_enabled_ = false;
+
+    // Same addressing as initialize() (hub port = channel_), plus the serial number initialize()
+    // already resolved, so we re-attach to the very same board.
+    openWaitForAttachment(handle, serial_number_, channel_, false, 0);
+
+    configureMotorChannel();
+
+    // Any async command in flight on the old channel has been aborted by the close; don't let a
+    // lost completion callback gate sendCmdVel() forever.
+    set_speed_pending_ = false;
+}
+
+void PhidgetMotorDriver::enableFailsafe()
+{
+    const PhidgetReturnCode ret =
+        PhidgetDCMotor_enableFailsafe(motor_handle_, failsafe_timeout_ms_);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error(
+            "Failed to arm fail safe (timeout " + std::to_string(failsafe_timeout_ms_) +
+            "ms) for motor channel " + std::to_string(channel_) + ": " + returnCodeToString(ret));
+    }
+
+    failsafe_enabled_ = true;
+}
+
+std::string PhidgetMotorDriver::returnCodeToString(const PhidgetReturnCode ret)
+{
+    char hex[16];
+    std::snprintf(hex, sizeof(hex), "0x%02x", static_cast<unsigned>(ret));
+
+    const char * description = nullptr;
+
+    if (Phidget_getErrorDescription(ret, &description) == EPHIDGET_OK && description != nullptr) {
+        return std::string(hex) + " (" + description + ")";
+    }
+
+    return std::string(hex);
+}
+
 MotorDriverState PhidgetMotorDriver::readState()
 {
     // Non-blocking: never stall the RT control loop waiting on the SDK callback thread.
@@ -493,36 +548,59 @@ bool PhidgetMotorDriver::isFailsafeTrippedReturnCode(const PhidgetReturnCode res
     return res == EPHIDGET_FAILSAFE;
 }
 
+PhidgetMotorDriver::FailsafeAction PhidgetMotorDriver::selectFailsafeAction(
+    const bool enabled, const bool tripped)
+{
+    if (tripped) {
+        return FailsafeAction::kReopenAndEnable;
+    }
+
+    return enabled ? FailsafeAction::kFeed : FailsafeAction::kEnable;
+}
+
 void PhidgetMotorDriver::armFailsafe()
 {
-    const PhidgetReturnCode ret =
-        PhidgetDCMotor_enableFailsafe(motor_handle_, failsafe_timeout_ms_);
+    std::lock_guard<std::mutex> lck(failsafe_mtx_);
 
-    if (ret != EPHIDGET_OK) {
-        throw std::runtime_error(
-            "Failed to arm fail safe (timeout " + std::to_string(failsafe_timeout_ms_) +
-            "ms) for motor channel " + std::to_string(channel_));
+    switch (selectFailsafeAction(failsafe_enabled_, isFailsafeTripped())) {
+        case FailsafeAction::kEnable:
+            enableFailsafe();
+            break;
+
+        case FailsafeAction::kFeed: {
+            // Already armed (e.g. on_activate() after a deactivate): enabling again isn't allowed
+            // on an open channel, so just feed the timer. If that fails the channel has most
+            // likely tripped without a command noticing yet - recover it the same way.
+            const PhidgetReturnCode ret = PhidgetDCMotor_resetFailsafe(motor_handle_);
+
+            if (ret != EPHIDGET_OK) {
+                RCLCPP_WARN_STREAM(
+                    logger_, "PhidgetDCMotor_resetFailsafe() returned " << returnCodeToString(ret)
+                        << " for motor channel " << static_cast<int>(channel_)
+                        << "; re-opening the channel and re-arming failsafe.");
+                reopenMotorChannel();
+                enableFailsafe();
+            }
+            break;
+        }
+
+        case FailsafeAction::kReopenAndEnable:
+            reopenMotorChannel();
+            enableFailsafe();
+            break;
     }
+
+    failsafe_tripped_.store(false, std::memory_order_relaxed);
 }
 
 void PhidgetMotorDriver::resetFailsafe()
 {
-    // PhidgetDCMotor_resetFailsafe() is documented to clear the watchdog timer/trip, but to fail
-    // if no failsafe timer was ever set on this channel - it is not documented to definitely
-    // un-stick an already-TRIPPED channel on its own. Try it first (the cheap, intended path); if
-    // it reports anything other than success, fall back to a full re-arm via armFailsafe(), which
-    // is unambiguously documented to (re-)establish a working timer regardless of prior state.
-    // This way a tripped channel is never left unrecoverable by this call.
-    const PhidgetReturnCode ret = PhidgetDCMotor_resetFailsafe(motor_handle_);
-
-    if (ret != EPHIDGET_OK) {
-        RCLCPP_WARN_STREAM(
-            logger_, "PhidgetDCMotor_resetFailsafe() returned " << ret << " for motor channel "
-                << static_cast<int>(channel_) << "; falling back to re-arming failsafe.");
-        armFailsafe();  // Throws std::runtime_error on failure, same as a direct call would.
-    }
-
-    failsafe_tripped_.store(false, std::memory_order_relaxed);
+    // A tripped Phidget channel rejects every further call - PhidgetDCMotor_resetFailsafe() and
+    // PhidgetDCMotor_enableFailsafe() included - until it is closed and re-opened, so the only way
+    // to un-stick it is armFailsafe()'s re-open path. For a healthy channel, armFailsafe() just
+    // feeds the timer (or enables it, if it never was). Throws std::runtime_error on failure, in
+    // which case failsafe_tripped_ stays set and the caller keeps motion refused.
+    armFailsafe();
 }
 
 bool PhidgetMotorDriver::isFailsafeTripped()

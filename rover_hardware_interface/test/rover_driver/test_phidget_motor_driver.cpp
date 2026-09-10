@@ -31,4 +31,26 @@ TEST(PhidgetMotorDriverFailsafeTest, OtherReturnCodesAreNotTreatedAsTripped)
     EXPECT_FALSE(PhidgetMotorDriver::isFailsafeTrippedReturnCode(EPHIDGET_NOTATTACHED));
 }
 
+using FailsafeAction = PhidgetMotorDriver::FailsafeAction;
+
+TEST(PhidgetMotorDriverFailsafeTest, NeverEnabledChannelIsEnabled)
+{
+    EXPECT_EQ(PhidgetMotorDriver::selectFailsafeAction(false, false), FailsafeAction::kEnable);
+}
+
+TEST(PhidgetMotorDriverFailsafeTest, AlreadyEnabledHealthyChannelIsOnlyFed)
+{
+    // Re-enabling an already-enabled failsafe on an open channel is rejected by the SDK.
+    EXPECT_EQ(PhidgetMotorDriver::selectFailsafeAction(true, false), FailsafeAction::kFeed);
+}
+
+TEST(PhidgetMotorDriverFailsafeTest, TrippedChannelIsReopened)
+{
+    // A tripped channel rejects both resetFailsafe and enableFailsafe until it is re-opened.
+    EXPECT_EQ(
+        PhidgetMotorDriver::selectFailsafeAction(true, true), FailsafeAction::kReopenAndEnable);
+    EXPECT_EQ(
+        PhidgetMotorDriver::selectFailsafeAction(false, true), FailsafeAction::kReopenAndEnable);
+}
+
 }  // namespace rover_hardware_interface

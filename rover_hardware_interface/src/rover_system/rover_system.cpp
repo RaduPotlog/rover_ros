@@ -354,6 +354,20 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
         // motion, the controller simply writes a non-zero value again next cycle and
         // refreshVelocityCommandsZeroFlag() above still refuses the reset.
         zeroVelocityCommands();
+
+        // Still actively command zero rather than going silent. The motors' hardware watchdog
+        // (motor_failsafe_timeout_ms) is only fed by commands actually reaching the drivers, so
+        // skipping the send here tripped it on every wheel whenever an E-Stop lasted longer than
+        // the timeout - and a tripped channel then had to be re-opened before the latch reset
+        // could succeed. Sending zeros keeps the watchdog meaningful as the backstop it's meant
+        // to be (it still trips if write() itself stops running) while braking the motors. Only
+        // once the drivers are configured (ACTIVE/INACTIVE); the buffer was zeroed just above.
+        if (lifecycle_active ||
+            lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+            handleRoverDriverWriteOperation([this] {
+                rover_driver_->sendSpeedCmd(speed_cmd_buffer_);
+            });
+        }
     }
 
     return return_type::OK;
