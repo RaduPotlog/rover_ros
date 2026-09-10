@@ -147,7 +147,8 @@ public:
     virtual void armFailsafe() = 0;
 
     // Explicit, operator-acknowledged clear of a tripped watchdog, re-arming it for further use.
-    // Kept distinct from armFailsafe() so call sites (RoverSystem::on_activate() vs.
+    // Must genuinely recover a tripped channel (e.g. by re-opening it, if the hardware rejects
+    // everything until then) - merely feeding the timer is not enough. Kept distinct from armFailsafe() so call sites (RoverSystem::on_activate() vs.
     // RoverSystem::resetEStopLatch()) read as what they mean. Not RT-safe - see armFailsafe().
     virtual void resetFailsafe() = 0;
 

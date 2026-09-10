@@ -96,7 +96,38 @@ public:
     // watchdog rejected the command.
     static bool isFailsafeTrippedReturnCode(const PhidgetReturnCode res);
 
+    // What armFailsafe() has to do to leave the channel with a working, freshly-fed watchdog.
+    // A Phidget channel's failsafe can only be enabled once per open, and once it has tripped the
+    // channel rejects every further call until it is closed and re-opened (Phidget Failsafe
+    // Guide) - so neither PhidgetDCMotor_resetFailsafe() nor PhidgetDCMotor_enableFailsafe() can
+    // recover a tripped channel on their own.
+    enum class FailsafeAction
+    {
+        kEnable,           // Never enabled on this open channel - enable it.
+        kFeed,             // Already enabled and healthy - just reset (feed) the timer.
+        kReopenAndEnable,  // Tripped - close/re-open the channel, reconfigure, then enable.
+    };
+
+    // Pure logic, factored out so it's unit-testable without any Phidget SDK handles.
+    static FailsafeAction selectFailsafeAction(const bool enabled, const bool tripped);
+
 private:
+
+    // Applies the motor channel's settings (acceleration, current limit, regulator gain, braking)
+    // to the open motor_handle_. Used by initialize() and again after reopenMotorChannel(), since
+    // closing the channel drops them.
+    void configureMotorChannel();
+
+    // Closes and re-opens motor_handle_ (the same handle - never deleted, so a concurrent RT
+    // sendCmdVel() on it just fails, it never dangles) and re-applies configureMotorChannel().
+    // The only way out of a tripped failsafe state. Blocking - never call from the RT path.
+    void reopenMotorChannel();
+
+    // PhidgetDCMotor_enableFailsafe() with the configured timeout; throws on failure.
+    void enableFailsafe();
+
+    // "0x3b (Failsafe Triggered)"-style text for a PhidgetReturnCode, for exception messages.
+    static std::string returnCodeToString(const PhidgetReturnCode ret);
 
     // Pure logic, factored out so it's unit-testable without any Phidget SDK handles.
     static bool isCommTimedOut(
@@ -164,9 +195,17 @@ private:
     // Set by setTargetVelocityHandler() (Phidget SDK callback thread) when a command completion
     // reports the watchdog has tripped; read via isFailsafeTripped() (RT thread). Only cleared by
     // resetFailsafe() - an operator-driven action - so a trip stays latched here even if later
-    // commands' completions report success again (they won't, until resetFailsafe() runs, but the
-    // latch is intentional defense-in-depth regardless).
+    // commands' completions report success again (they won't, until resetFailsafe() re-opens the
+    // channel, but the latch is intentional defense-in-depth regardless).
     std::atomic<bool> failsafe_tripped_{false};
+
+    // Whether PhidgetDCMotor_enableFailsafe() has succeeded on the currently open motor channel.
+    // Cleared by reopenMotorChannel() (closing the channel disables the failsafe). Only touched
+    // from armFailsafe()/resetFailsafe(), serialized by failsafe_mtx_.
+    bool failsafe_enabled_{false};
+
+    // Serializes armFailsafe()/resetFailsafe() (on_activate() vs. the latch-reset service).
+    std::mutex failsafe_mtx_;
 
     // Written from the Phidget SDK callback thread (position/current/temperature handlers) each
     // time a telemetry callback fires — the firing itself is the liveness signal, independent of
@@ -179,8 +218,8 @@ private:
     const std::chrono::nanoseconds comm_timeout_;
 
     // Timeout armFailsafe() arms PhidgetDCMotor_enableFailsafe() with. Kept as a member (rather
-    // than a call-site literal) so resetFailsafe()'s fallback re-arm (see phidget_motor_driver.cpp)
-    // uses the same configured value.
+    // than a call-site literal) so resetFailsafe()'s re-open-and-re-arm recovery (see
+    // phidget_motor_driver.cpp) uses the same configured value.
     const std::uint32_t failsafe_timeout_ms_;
 
     rclcpp::Logger logger_{rclcpp::get_logger("PhidgetMotorDriver")};
