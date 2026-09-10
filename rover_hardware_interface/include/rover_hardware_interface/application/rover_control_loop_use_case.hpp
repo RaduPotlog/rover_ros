@@ -47,6 +47,18 @@ struct WriteOperationResult
     std::string error_message;
 };
 
+// What RoverSystem::write() should send to the drivers this cycle - see
+// RoverControlLoopUseCase::decideWriteCommand().
+enum class WriteCommandMode
+{
+    // Forward the controller's velocity commands to the drivers.
+    kCommandMotion,
+    // Motion is inhibited: drop the controller's commands and actively send zeros instead.
+    kCommandZero,
+    // Drivers aren't configured: drop the controller's commands and send nothing.
+    kSkip,
+};
+
 // Application layer: the safety- and error-filter-relevant decisions RoverSystem's RT
 // read()/write() cycle makes every tick (see rover_system.hpp), extracted so they're
 // unit-testable with fake ports the same way EmergencyStop/RoverErrorFilter already are (see
@@ -105,6 +117,26 @@ public:
     // Whether write() should command motion this cycle, given the hardware component's lifecycle
     // state and the last-computed E-Stop state. Pure decision, no I/O.
     static bool shouldCommandMotion(const bool lifecycle_active, const bool e_stop_active);
+
+    // What write() should send to the drivers this cycle. Pure decision, no I/O. Takes the
+    // lifecycle state as bools so this layer stays free of lifecycle_msgs.
+    //
+    // - kCommandMotion: shouldCommandMotion() holds AND no motor failsafe trip is latched.
+    // - kCommandZero: motion is inhibited (not active, E-Stop user-triggered or latched, or a
+    //   latched MOTOR_FAILSAFE_TRIPPED - see isMotorFailsafeLatched()) but the drivers are
+    //   configured (ACTIVE/INACTIVE). Zeros are still actively sent rather than going silent: the
+    //   motors' hardware watchdog (motor_failsafe_timeout_ms) is only fed by commands actually
+    //   reaching the drivers, so skipping the send tripped it on every wheel whenever an E-Stop
+    //   lasted longer than the timeout - and a tripped channel then had to be re-opened before the
+    //   latch reset could succeed. Sending zeros keeps the watchdog meaningful as the backstop it's
+    //   meant to be (it still trips if write() itself stops running) while braking the motors.
+    // - kSkip: motion is inhibited and the drivers aren't configured - send nothing.
+    //
+    // In both non-motion modes the caller must also drop the controller's pending command (see
+    // RoverSystem::write()).
+    static WriteCommandMode decideWriteCommand(
+        const bool lifecycle_active, const bool lifecycle_inactive, const bool e_stop_active,
+        const bool motor_failsafe_latched);
 
     // Serializes `write_operation` against concurrent callers via try_lock (never blocks - see
     // the RT-safety contract above) and reports the outcome to the WRITE_CMDS error-filter

@@ -84,6 +84,21 @@ bool RoverControlLoopUseCase::shouldCommandMotion(const bool lifecycle_active, c
     return lifecycle_active && !e_stop_active;
 }
 
+WriteCommandMode RoverControlLoopUseCase::decideWriteCommand(
+    const bool lifecycle_active, const bool lifecycle_inactive, const bool e_stop_active,
+    const bool motor_failsafe_latched)
+{
+    if (shouldCommandMotion(lifecycle_active, e_stop_active) && !motor_failsafe_latched) {
+        return WriteCommandMode::kCommandMotion;
+    }
+
+    if (lifecycle_active || lifecycle_inactive) {
+        return WriteCommandMode::kCommandZero;
+    }
+
+    return WriteCommandMode::kSkip;
+}
+
 WriteOperationResult RoverControlLoopUseCase::performWriteOperation(
     const std::function<void()> & write_operation)
 {

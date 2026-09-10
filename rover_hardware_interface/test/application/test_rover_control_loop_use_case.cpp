@@ -23,73 +23,10 @@
 #include <vector>
 
 #include "rover_hardware_interface/application/rover_control_loop_use_case.hpp"
+#include "fakes/fake_rover_driver.hpp"
 
 namespace rover_hardware_interface
 {
-
-class FakeRoverDriver : public RoverDriverInterface
-{
-
-public:
-
-    void initialize() override {}
-    void deinitialize() override {}
-    void activate() override {}
-    void updateCommunicationStatus() override {}
-    void updateMotorsState() override {}
-    void updateDriversState() override {}
-
-    DriverDataSnapshot getData(const DriverNames /* name */) override
-    {
-        // Not exercised by RoverControlLoopUseCase - it never calls getData() directly.
-        throw std::logic_error("FakeRoverDriver::getData() is not used by these tests");
-    }
-
-    void sendSpeedCmd(const std::vector<float> & /* speeds */) override {}
-
-    void attemptErrorFlagReset() override
-    {
-        ++attempt_error_flag_reset_calls;
-
-        if (attempt_error_flag_reset_throw_message) {
-            throw std::runtime_error(*attempt_error_flag_reset_throw_message);
-        }
-    }
-
-    bool isCommunicationError() override { return false; }
-
-    bool isMotorStatesDataTimedOut() override { return motor_states_data_timed_out; }
-    bool isDriverStateDataTimedOut() override { return driver_state_data_timed_out; }
-    bool isFlagError() override { return flag_error; }
-
-    void armFailsafe() override { ++arm_failsafe_calls; }
-    void resetFailsafe() override { ++reset_failsafe_calls; }
-    bool isFailsafeTripped() override { return failsafe_tripped; }
-
-    bool motor_states_data_timed_out = false;
-    bool driver_state_data_timed_out = false;
-    bool flag_error = false;
-    unsigned attempt_error_flag_reset_calls = 0;
-    std::optional<std::string> attempt_error_flag_reset_throw_message;
-    bool failsafe_tripped = false;
-    unsigned arm_failsafe_calls = 0;
-    unsigned reset_failsafe_calls = 0;
-};
-
-class FakeEmergencyStop : public EmergencyStopInterface
-{
-
-public:
-
-    bool readEStopState() override { return user_e_stop_triggered; }
-    bool readEStopLatchState() override { return latch_active; }
-    void setEStop() override {}
-    void resetEStop() override {}
-    void resetEStopLatch() override {}
-
-    bool user_e_stop_triggered = false;
-    bool latch_active = false;
-};
 
 class RoverControlLoopUseCaseTest : public ::testing::Test
 {
@@ -251,6 +188,65 @@ TEST(RoverControlLoopUseCaseShouldCommandMotionTest, TrueOnlyWhenActiveAndEStopN
     EXPECT_FALSE(RoverControlLoopUseCase::shouldCommandMotion(true, true));
     EXPECT_FALSE(RoverControlLoopUseCase::shouldCommandMotion(false, false));
     EXPECT_FALSE(RoverControlLoopUseCase::shouldCommandMotion(false, true));
+}
+
+TEST(RoverControlLoopUseCaseDecideWriteCommandTest, CommandsMotionOnlyWhenActiveAndNothingInhibits)
+{
+    EXPECT_EQ(
+        RoverControlLoopUseCase::decideWriteCommand(true, false, false, false),
+        WriteCommandMode::kCommandMotion);
+}
+
+TEST(RoverControlLoopUseCaseDecideWriteCommandTest, CommandsZeroOnEStopWhileActive)
+{
+    // Zeros keep the motors' hardware watchdog fed during a long E-Stop.
+    EXPECT_EQ(
+        RoverControlLoopUseCase::decideWriteCommand(true, false, true, false),
+        WriteCommandMode::kCommandZero);
+}
+
+TEST(RoverControlLoopUseCaseDecideWriteCommandTest, CommandsZeroOnLatchedFailsafeWhileActive)
+{
+    EXPECT_EQ(
+        RoverControlLoopUseCase::decideWriteCommand(true, false, false, true),
+        WriteCommandMode::kCommandZero);
+}
+
+TEST(RoverControlLoopUseCaseDecideWriteCommandTest, CommandsZeroWhileInactive)
+{
+    EXPECT_EQ(
+        RoverControlLoopUseCase::decideWriteCommand(false, true, false, false),
+        WriteCommandMode::kCommandZero);
+}
+
+TEST(RoverControlLoopUseCaseDecideWriteCommandTest, SkipsWhenDriversNotConfigured)
+{
+    // UNCONFIGURED / FINALIZED: neither ACTIVE nor INACTIVE.
+    EXPECT_EQ(
+        RoverControlLoopUseCase::decideWriteCommand(false, false, false, false),
+        WriteCommandMode::kSkip);
+}
+
+TEST(RoverControlLoopUseCaseDecideWriteCommandTest, MatchesRuleForEveryInputCombination)
+{
+    for (int bits = 0; bits < 16; ++bits) {
+        const bool active = bits & 0b0001;
+        const bool inactive = bits & 0b0010;
+        const bool e_stop = bits & 0b0100;
+        const bool latched = bits & 0b1000;
+
+        WriteCommandMode expected = WriteCommandMode::kSkip;
+        if (active && !e_stop && !latched) {
+            expected = WriteCommandMode::kCommandMotion;
+        } else if (active || inactive) {
+            expected = WriteCommandMode::kCommandZero;
+        }
+
+        EXPECT_EQ(
+            RoverControlLoopUseCase::decideWriteCommand(active, inactive, e_stop, latched), expected)
+            << "active=" << active << " inactive=" << inactive << " e_stop=" << e_stop
+            << " latched=" << latched;
+    }
 }
 
 TEST(RoverControlLoopUseCaseNoEStopTest, UpdateEStopActiveStateFailsSafeWithNoEStopConfigured)
