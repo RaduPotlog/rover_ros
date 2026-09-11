@@ -144,4 +144,15 @@ bool LedSegment::hasAnimation() const
     });
 }
 
+std::map<AnimationPriority, std::optional<LayerStatus>> LedSegment::getLayerStatuses() const
+{
+    std::map<AnimationPriority, std::optional<LayerStatus>> statuses;
+
+    for (const auto & [priority, layer] : layers_) {
+        statuses.emplace(priority, layer->getStatus());
+    }
+
+    return statuses;
+}
+
 }  // namespace rover_led

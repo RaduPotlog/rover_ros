@@ -10,3 +10,9 @@ led_controller:
     default_value: 50.0
     description: Frequency in Hz at which the lights controller node will process animations.
     validation: { gt<>: 0.0 }
+
+  state_publish_rate:
+    type: double
+    default_value: 5.0
+    description: Frequency in Hz at which the active animation of every layer is published on led/state.
+    validation: { gt<>: 0.0 }

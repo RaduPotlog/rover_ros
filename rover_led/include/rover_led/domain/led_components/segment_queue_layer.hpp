@@ -44,6 +44,8 @@ public:
 
 protected:
 
+    std::size_t getQueueSize() const override { return animations_queue_.size(); }
+
     std::deque<std::shared_ptr<Animation>> animations_queue_;
 };
 

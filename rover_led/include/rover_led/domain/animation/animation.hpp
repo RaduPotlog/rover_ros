@@ -21,6 +21,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "yaml-cpp/yaml.h"
@@ -29,6 +30,15 @@
 
 namespace rover_led
 {
+
+// Which catalog entry an animation instance was created for, so the layers
+// can report what they are playing.
+struct AnimationInfo
+{
+    std::size_t id = 0;
+    std::string name;
+    std::string param;
+};
 
 // Base class of every LED animation (loaded as a plugin by the
 // infrastructure layer). Pure domain: no ROS types. The animation
@@ -127,9 +137,19 @@ public:
         return num_led_; 
     }
     
-    float getProgress() const 
-    { 
-        return progress_; 
+    float getProgress() const
+    {
+        return progress_;
+    }
+
+    void setInfo(AnimationInfo info)
+    {
+        info_ = std::move(info);
+    }
+
+    const AnimationInfo & getInfo() const
+    {
+        return info_;
     }
 
     static constexpr std::size_t kRGBAColorLen = 4;
@@ -167,6 +187,8 @@ protected:
     std::vector<std::uint8_t> frame_;
 
 private:
+
+    AnimationInfo info_;
 
     std::size_t num_led_ = 0;
     std::size_t anim_len_ = 0;

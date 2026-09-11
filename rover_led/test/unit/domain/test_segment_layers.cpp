@@ -120,3 +120,62 @@ TEST(SegmentQueueLayer, RejectsAnimationsWhenTheQueueIsFull)
 
     EXPECT_FALSE(layer.setAnimation(makeStub(1), false));
 }
+
+TEST(SegmentLayer, StatusIsEmptyWithoutAnimation)
+{
+    SegmentLayer layer(1, false);
+
+    EXPECT_FALSE(layer.getStatus().has_value());
+}
+
+TEST(SegmentLayer, StatusReportsThePlayingAnimation)
+{
+    SegmentLayer layer(1, false);
+    auto animation = makeStub(1);
+    animation->setInfo({7, "BLINK", "0.5"});
+    layer.setAnimation(animation, true);
+    layer.updateAnimation();
+
+    const auto status = layer.getStatus();
+
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(status->info.id, 7u);
+    EXPECT_EQ(status->info.name, "BLINK");
+    EXPECT_EQ(status->info.param, "0.5");
+    EXPECT_TRUE(status->repeating);
+    EXPECT_FLOAT_EQ(status->progress, 0.1f);
+    EXPECT_EQ(status->queued, 0u);
+}
+
+TEST(SegmentLayer, StatusIsEmptyOnceAOneShotAnimationFinishes)
+{
+    SegmentLayer layer(1, false);
+    layer.setAnimation(makeStub(1, {0, 0, 0, 255}, 0.1f), false);
+
+    layer.updateAnimation();
+    EXPECT_TRUE(layer.getStatus().has_value());
+
+    layer.updateAnimation();
+    EXPECT_FALSE(layer.getStatus().has_value());
+}
+
+TEST(SegmentQueueLayer, StatusCountsQueuedAnimations)
+{
+    SegmentQueueLayer layer(1, false);
+    auto first = makeStub(1, {0, 0, 0, 255}, 0.1f);
+    first->setInfo({9, "FIRST", ""});
+    layer.setAnimation(first, true);
+    layer.setAnimation(makeStub(1, {0, 0, 0, 255}, 0.1f), false);
+    layer.setAnimation(makeStub(1, {0, 0, 0, 255}, 0.1f), false);
+
+    const auto status = layer.getStatus();
+
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(status->info.name, "FIRST");
+    EXPECT_FALSE(status->repeating);
+    EXPECT_EQ(status->queued, 2u);
+
+    layer.updateAnimation();
+    layer.updateAnimation();
+    EXPECT_EQ(layer.getStatus()->queued, 1u);
+}

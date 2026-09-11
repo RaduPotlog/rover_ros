@@ -14,6 +14,7 @@
 
 #include "rover_led/infrastructure/led_controller_node.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -28,6 +29,11 @@
 
 #include "sensor_msgs/msg/image.hpp"
 
+#include "rover_msgs/msg/led_animation_catalog.hpp"
+#include "rover_msgs/msg/led_animation_info.hpp"
+#include "rover_msgs/msg/led_layer_state.hpp"
+#include "rover_msgs/msg/led_segment_state.hpp"
+#include "rover_msgs/msg/led_state.hpp"
 #include "rover_msgs/srv/set_led_animation.hpp"
 
 #include "rover_led/application/led_types.hpp"
@@ -83,13 +89,24 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
         RCLCPP_WARN(this->get_logger(), "%s", warning.c_str());
     }
 
-    checkAnimationTypes(catalog->getAll());
+    const auto animations = catalog->getAll();
+    checkAnimationTypes(animations);
 
     RCLCPP_INFO(this->get_logger(), "Loaded default animations.");
 
     set_animation_use_case_ = std::make_unique<SetAnimationUseCase>(
         catalog, animation_factory_, segments, controller_freq);
     render_tick_use_case_ = std::make_unique<RenderTickUseCase>(segments, panels);
+    get_led_state_use_case_ = std::make_unique<GetLedStateUseCase>(segments);
+
+    // Latched, so late subscribers (e.g. rosbridge) get the last value.
+    const auto latched_qos = rclcpp::QoS(1).reliable().transient_local();
+
+    animation_catalog_publisher_ =
+        this->create_publisher<LedAnimationCatalogMsg>("led/animations", latched_qos);
+    state_publisher_ = this->create_publisher<LedStateMsg>("led/state", latched_qos);
+
+    publishAnimationCatalog(animations);
 
     set_led_animation_server_ = this->create_service<SetLedAnimationSrv>(
         "led/set_animation", std::bind(&LedControllerNode::setLedAnimationCallback, this, _1, _2));
@@ -97,6 +114,12 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     controller_timer_ = this->create_wall_timer(
         std::chrono::microseconds(static_cast<std::uint64_t>(1e6 / controller_freq)),
         std::bind(&LedControllerNode::controllerTimerCallback, this));
+
+    // Same (default, mutually exclusive) callback group as the render timer
+    // and the service, so the segments are never read while they change.
+    state_timer_ = this->create_wall_timer(
+        std::chrono::microseconds(static_cast<std::uint64_t>(1e6 / this->params_.state_publish_rate)),
+        std::bind(&LedControllerNode::stateTimerCallback, this));
 
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
 }
@@ -174,6 +197,60 @@ void LedControllerNode::controllerTimerCallback()
     for (auto & [channel, frame] : result.frames) {
         publishPanelFrame(channel, std::move(frame));
     }
+}
+
+void LedControllerNode::publishAnimationCatalog(const std::vector<LedAnimationDescription> & animations)
+{
+    LedAnimationCatalogMsg msg;
+
+    for (const auto & animation : animations) {
+        rover_msgs::msg::LedAnimationInfo info;
+        info.id = static_cast<std::uint16_t>(animation.id);
+        info.name = animation.name;
+        info.priority = animation.priority;
+        msg.animations.push_back(std::move(info));
+    }
+
+    std::sort(msg.animations.begin(), msg.animations.end(), [](const auto & a, const auto & b) {
+        return a.id < b.id;
+    });
+
+    animation_catalog_publisher_->publish(msg);
+}
+
+void LedControllerNode::stateTimerCallback()
+{
+    const auto snapshot = get_led_state_use_case_->execute();
+
+    LedStateMsg msg;
+    msg.header.stamp = this->get_clock()->now();
+
+    for (const auto & segment : snapshot.segments) {
+        rover_msgs::msg::LedSegmentState segment_msg;
+        segment_msg.name = segment.name;
+        segment_msg.channel = static_cast<std::uint16_t>(segment.channel);
+
+        for (const auto & layer : segment.layers) {
+            rover_msgs::msg::LedLayerState layer_msg;
+            layer_msg.priority = static_cast<std::uint8_t>(layer.priority);
+            layer_msg.active = layer.status.has_value();
+
+            if (layer.status) {
+                layer_msg.id = static_cast<std::uint16_t>(layer.status->info.id);
+                layer_msg.name = layer.status->info.name;
+                layer_msg.param = layer.status->info.param;
+                layer_msg.repeating = layer.status->repeating;
+                layer_msg.progress = layer.status->progress;
+                layer_msg.queued = static_cast<std::uint8_t>(layer.status->queued);
+            }
+
+            segment_msg.layers.push_back(std::move(layer_msg));
+        }
+
+        msg.segments.push_back(std::move(segment_msg));
+    }
+
+    state_publisher_->publish(msg);
 }
 
 }  // namespace rover_led

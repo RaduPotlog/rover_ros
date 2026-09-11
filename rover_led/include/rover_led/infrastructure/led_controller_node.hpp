@@ -24,8 +24,11 @@
 
 #include "sensor_msgs/msg/image.hpp"
 
+#include "rover_msgs/msg/led_animation_catalog.hpp"
+#include "rover_msgs/msg/led_state.hpp"
 #include "rover_msgs/srv/set_led_animation.hpp"
 
+#include "rover_led/application/get_led_state_use_case.hpp"
 #include "rover_led/application/render_tick_use_case.hpp"
 #include "rover_led/application/set_animation_use_case.hpp"
 #include "rover_led/infrastructure/pluginlib_animation_factory.hpp"
@@ -35,11 +38,15 @@ namespace rover_led
 {
 
 using ImageMsg = sensor_msgs::msg::Image;
+using LedAnimationCatalogMsg = rover_msgs::msg::LedAnimationCatalog;
+using LedStateMsg = rover_msgs::msg::LedState;
 using SetLedAnimationSrv = rover_msgs::srv::SetLedAnimation;
 
 // ROS adapter of the animation side: loads the LED configuration, serves
 // led/set_animation and publishes one RGBA8 frame per panel on
-// led/channel_<n>_frame at controller_frequency.
+// led/channel_<n>_frame at controller_frequency. Reports the loaded
+// animations once on led/animations and what every layer plays on led/state
+// at state_publish_rate (both latched).
 class LedControllerNode : public rclcpp::Node
 {
 
@@ -61,6 +68,10 @@ private:
 
     void controllerTimerCallback();
 
+    void stateTimerCallback();
+
+    void publishAnimationCatalog(const std::vector<LedAnimationDescription> & animations);
+
     // Declared first: animations created by the factory must be destroyed
     // before its class loader.
     std::shared_ptr<PluginlibAnimationFactory> animation_factory_;
@@ -71,6 +82,12 @@ private:
 
     std::unique_ptr<RenderTickUseCase> render_tick_use_case_;
 
+    std::unique_ptr<GetLedStateUseCase> get_led_state_use_case_;
+
+    rclcpp::Publisher<LedAnimationCatalogMsg>::SharedPtr animation_catalog_publisher_;
+
+    rclcpp::Publisher<LedStateMsg>::SharedPtr state_publisher_;
+
     std::shared_ptr<led_controller::ParamListener> param_listener_;
 
     led_controller::Params params_;
@@ -78,6 +95,8 @@ private:
     rclcpp::Service<SetLedAnimationSrv>::SharedPtr set_led_animation_server_;
 
     rclcpp::TimerBase::SharedPtr controller_timer_;
+
+    rclcpp::TimerBase::SharedPtr state_timer_;
 };
 
 }  // namespace rover_led
