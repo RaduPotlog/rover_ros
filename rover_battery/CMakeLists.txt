@@ -1,55 +1,66 @@
 cmake_minimum_required(VERSION 3.8)
 project(rover_battery)
 
-set_target_properties(${TARGET} PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED YES
-    CXX_EXTENSIONS NO
-)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_CXX_EXTENSIONS NO)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 set(PACKAGE_DEPENDENCIES
-    ament_cmake
-    ament_index_cpp
     rclcpp
-    rclcpp_lifecycle
-    realtime_tools
     diagnostic_updater
-    std_msgs
-    std_srvs
     sensor_msgs
     udp_msgs
-    geometry_msgs
     rover_msgs
 )
 
+find_package(ament_cmake REQUIRED)
 foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
   find_package(${PACKAGE} REQUIRED)
 endforeach()
 
-include_directories(include)
-
-add_executable(${PROJECT_NAME}_node
-               src/rover_battery.cpp 
-               src/rover_battery_node.cpp
-               src/battery_publisher/battery_publisher.cpp
-               src/battery_publisher/single_battery_publisher.cpp               
+# Domain + application: plain C++, no ROS dependencies.
+add_library(${PROJECT_NAME}_core STATIC
+            src/domain/battery_classifier.cpp
+            src/application/monitor_battery_use_case.cpp
+)
+target_include_directories(${PROJECT_NAME}_core PUBLIC
+                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_include_directories(${PROJECT_NAME}_node PUBLIC 
-                           ${CMAKE_INSTALL_PREFIX}/include
+# Infrastructure: ROS 2 adapters.
+add_library(${PROJECT_NAME}_ros STATIC
+            src/infrastructure/battery_msg_conversions.cpp
+            src/infrastructure/ros2_battery_state_publisher.cpp
+            src/infrastructure/rover_battery_node.cpp
 )
+target_link_libraries(${PROJECT_NAME}_ros ${PROJECT_NAME}_core)
+ament_target_dependencies(${PROJECT_NAME}_ros ${PACKAGE_DEPENDENCIES})
 
-ament_target_dependencies(${PROJECT_NAME}_node ${PACKAGE_DEPENDENCIES})
+add_executable(${PROJECT_NAME}_node src/rover_battery.cpp)
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
 install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_battery_classifier test/unit/test_battery_classifier.cpp)
+  target_link_libraries(test_battery_classifier ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_monitor_battery_use_case test/unit/test_monitor_battery_use_case.cpp)
+  target_link_libraries(test_monitor_battery_use_case ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_battery_msg_conversions test/unit/test_battery_msg_conversions.cpp)
+  target_link_libraries(test_battery_msg_conversions ${PROJECT_NAME}_ros)
+endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 

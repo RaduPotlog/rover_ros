@@ -9,16 +9,17 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>ament_index_cpp</depend>
   <depend>rclcpp</depend>
-  <depend>rclcpp_lifecycle</depend>
-  <depend>realtime_tools</depend>
-  <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
-  <depend>geometry_msgs</depend>
   <depend>diagnostic_updater</depend>
+  <depend>sensor_msgs</depend>
   <depend>rover_msgs</depend>
   <depend>udp_msgs</depend>
+
+  <!-- used by launch/rover_battery.launch.py -->
+  <exec_depend>rover_utils</exec_depend>
+  <exec_depend>udp_driver</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

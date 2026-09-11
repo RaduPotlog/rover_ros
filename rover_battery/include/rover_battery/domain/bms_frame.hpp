@@ -1,0 +1,161 @@
+// Copyright 2025 Mechatronics Academy
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef ROVER_BATTERY_DOMAIN_BMS_FRAME_HPP_
+#define ROVER_BATTERY_DOMAIN_BMS_FRAME_HPP_
+
+#include <cstddef>
+#include <cstdint>
+
+namespace rover_battery::domain
+{
+
+constexpr std::size_t kBmsMaxCells = 48;
+constexpr std::size_t kBmsMaxTempSensors = 16;
+
+/**
+ * @brief Raw BMS telemetry exactly as laid out in the UDP payload.
+ * @details The layout is a wire contract with the BMS bridge — do not reorder, resize or
+ *          add fields. Comments specify precision and units as documented by the BMS.
+ */
+struct __attribute__((packed)) BmsData
+{
+    // data from 0x90
+    float packVoltage; // Total pack voltage (0.1 V)
+    float packCurrent; // Current in (+) or out (-) of pack (0.1 A)
+    float packSOC;     // State Of Charge
+
+    // data from 0x91
+    float maxCellmV; // Maximum cell voltage (mV)
+    int maxCellVNum; // Number of cell with highest voltage
+    float minCellmV; // Minimum cell voltage (mV)
+    int minCellVNum; // Number of cell with lowest voltage
+    float cellDiff;  // Difference between min and max cell voltages
+
+    // data from 0x92
+    int tempMax;       // Maximum temperature sensor reading (°C)
+    int tempMin;       // Minimum temperature sensor reading (°C)
+    float tempAverage; // Average of temp sensors
+
+    // data from 0x93
+    int chargeDischargeStatus;    // charge/discharge status (0 stationary, 1 charge, 2 discharge)
+    bool chargeFetState;          // charging MOSFET status
+    bool disChargeFetState;       // discharge MOSFET state
+    int bmsHeartBeat;             // BMS life (0~255 cycles)?
+    int resCapacitymAh;           // residual capacity mAH
+
+    // data from 0x94
+    int numberOfCells;    // Cell count
+    int numOfTempSensors; // Temp sensor count
+    bool chargeState;     // charger status 0 = disconnected 1 = connected
+    bool loadState;       // Load Status 0=disconnected 1=connected
+    bool dIO[8];          // No information about this
+    int bmsCycles;        // charge / discharge cycles
+
+    // data from 0x95
+    float cellVmV[kBmsMaxCells]; // Store Cell Voltages (mV)
+
+    // data from 0x96
+    int cellTemperature[kBmsMaxTempSensors]; // array of cell Temperature sensors
+
+    // data from 0x97
+    bool cellBalanceState[kBmsMaxCells]; // bool array of cell balance states
+    bool cellBalanceActive;              // bool is cell balance active
+};
+
+/**
+ * @brief Alarm bitfield (aka errors/warnings) the BMS can report, as laid out in the UDP payload.
+ */
+struct __attribute__((packed)) BmsAlarms
+{
+    /* 0x00 */
+    uint8_t levelOneCellVoltageTooHigh   : 1;
+    uint8_t levelTwoCellVoltageTooHigh   : 1;
+    uint8_t levelOneCellVoltageTooLow    : 1;
+    uint8_t levelTwoCellVoltageTooLow    : 1;
+    uint8_t levelOnePackVoltageTooHigh   : 1;
+    uint8_t levelTwoPackVoltageTooHigh   : 1;
+    uint8_t levelOnePackVoltageTooLow    : 1;
+    uint8_t levelTwoPackVoltageTooLow    : 1;
+
+    /* 0x01 */
+    uint8_t levelOneChargeTempTooHigh    : 1;
+    uint8_t levelTwoChargeTempTooHigh    : 1;
+    uint8_t levelOneChargeTempTooLow     : 1;
+    uint8_t levelTwoChargeTempTooLow     : 1;
+    uint8_t levelOneDischargeTempTooHigh : 1;
+    uint8_t levelTwoDischargeTempTooHigh : 1;
+    uint8_t levelOneDischargeTempTooLow  : 1;
+    uint8_t levelTwoDischargeTempTooLow  : 1;
+
+    /* 0x02 */
+    uint8_t levelOneChargeCurrentTooHigh    : 1;
+    uint8_t levelTwoChargeCurrentTooHigh    : 1;
+    uint8_t levelOneDischargeCurrentTooHigh : 1;
+    uint8_t levelTwoDischargeCurrentTooHigh : 1;
+    uint8_t levelOneStateOfChargeTooHigh    : 1;
+    uint8_t levelTwoStateOfChargeTooHigh    : 1;
+    uint8_t levelOneStateOfChargeTooLow     : 1;
+    uint8_t levelTwoStateOfChargeTooLow     : 1;
+
+    /* 0x03 */
+    uint8_t levelOneCellVoltageDifferenceTooHigh : 1;
+    uint8_t levelTwoCellVoltageDifferenceTooHigh : 1;
+    uint8_t levelOneTempSensorDifferenceTooHigh  : 1;
+    uint8_t levelTwoTempSensorDifferenceTooHigh  : 1;
+    uint8_t : 4; // Padding bits to finish the 0x03 byte boundary
+
+    /* 0x04 */
+    uint8_t chargeFETTemperatureTooHigh            : 1;
+    uint8_t dischargeFETTemperatureTooHigh         : 1;
+    uint8_t failureOfChargeFETTemperatureSensor    : 1;
+    uint8_t failureOfDischargeFETTemperatureSensor : 1;
+    uint8_t failureOfChargeFETAdhesion             : 1;
+    uint8_t failureOfDischargeFETAdhesion          : 1;
+    uint8_t failureOfChargeFETTBreaker             : 1;
+    uint8_t failureOfDischargeFETBreaker           : 1;
+
+    /* 0x05 */
+    uint8_t failureOfAFEAcquisitionModule        : 1;
+    uint8_t failureOfVoltageSensorModule         : 1;
+    uint8_t failureOfTemperatureSensorModule     : 1;
+    uint8_t failureOfEEPROMStorageModule         : 1;
+    uint8_t failureOfRealtimeClockModule         : 1;
+    uint8_t failureOfPrechargeModule             : 1;
+    uint8_t failureOfVehicleCommunicationModule  : 1;
+    uint8_t failureOfIntranetCommunicationModule : 1;
+
+    /* 0x06 */
+    uint8_t failureOfCurrentSensorModule     : 1;
+    uint8_t failureOfMainVoltageSensorModule : 1;
+    uint8_t failureOfShortCircuitProtection  : 1;
+    uint8_t failureOfLowVoltageNoCharging    : 1;
+    uint8_t : 4; // Padding bits to finish the 0x06 byte boundary
+};
+
+// The UDP payload size check depends on these; a change here breaks the BMS bridge.
+static_assert(sizeof(BmsData) == 385, "BmsData must match the BMS UDP payload layout");
+static_assert(sizeof(BmsAlarms) == 7, "BmsAlarms must match the BMS UDP payload layout");
+
+struct BmsFrame
+{
+    BmsData data{};
+    BmsAlarms alarms{};
+};
+
+constexpr std::size_t kBmsPayloadSize = sizeof(BmsData) + sizeof(BmsAlarms);
+
+}  // namespace rover_battery::domain
+
+#endif  // ROVER_BATTERY_DOMAIN_BMS_FRAME_HPP_

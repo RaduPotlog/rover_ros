@@ -18,7 +18,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 
-#include "rover_battery/rover_battery_node.hpp"
+#include "rover_battery/infrastructure/rover_battery_node.hpp"
 
 int main(int argc, char ** argv)
 {
