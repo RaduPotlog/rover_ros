@@ -22,6 +22,7 @@ from launch.substitutions import (
     PathJoinSubstitution,
 )
 from launch_ros.actions import Node
+from launch_ros.actions.lifecycle_node import LifecycleNode
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
@@ -61,20 +62,22 @@ def generate_launch_description():
         namespace=namespace,
         parameters=[
             {'device': '/dev/ttyUSB0'},
-            {'baud_rate': '460800'},
+            {'baudrate': 460800},
             {'link_stats': True},
             {'receiver_rate': 50},
         ],
         emulate_tty=True,
     )
 
-    rover_crfs_node = Node(
+    # Lifecycle node, brought straight to active. A supervisor can later deactivate it to take RC
+    # teleop off the command path without killing the process.
+    rover_crfs_node = LifecycleNode(
         package="rover_crfs_teleop",
         executable="rover_crfs_teleop_node",
         name="rover_crfs_teleop_node",
         parameters=[rover_crfs_config_path],
         namespace=namespace,
-        remappings=[("/rover_crf_telop_cmd_vel_stamped", "rover_crf_telop_cmd_vel_stamped")],
+        autostart=True,
         arguments=[
             "--ros-args",
             "--log-level",

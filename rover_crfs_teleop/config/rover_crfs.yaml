@@ -36,3 +36,26 @@
     e_stop_channel: 5
     e_stop_latch_reset_channel: 4
     channel_switch_threshold: 500
+    # Control ticks (20 ms each) spent at startup learning where the switches rest, so their
+    # resting position doesn't fire a spurious E-Stop set/reset. 100 = 2 s.
+    switch_settle_frames: 100
+
+    # RC link failsafe. When the link is judged lost the node publishes ONE zero command and then
+    # goes silent, so the rover stops immediately and twist_mux falls through to its next source.
+    # The link is healthy only while all of these hold:
+    #   - an rc/channels frame arrived within channel_timeout_ms (receiver runs at 50 Hz, so 200 ms
+    #     is 10 missed frames);
+    #   - if require_link_stats: an rc/link report arrived within link_stats_timeout_ms, and the
+    #     uplink link quality (CRSF LQ, %) has not dropped below link_quality_lost_below since it
+    #     was last at or above link_quality_recovered_at (hysteresis, so it can't flap).
+    # Freshness alone can't catch a receiver in failsafe that keeps sending held channel values;
+    # link quality can. Only set require_link_stats: false if crsf_receiver runs without link_stats.
+    #
+    # INITIAL VALUES - tune on the rover: `ros2 topic hz /rc/link` for the stats rate (it follows
+    # the ELRS telemetry ratio), and `ros2 topic echo /rc/link` (uplink_status) while walking the
+    # transmitter out of range for the LQ thresholds.
+    channel_timeout_ms: 200
+    link_stats_timeout_ms: 1000
+    require_link_stats: true
+    link_quality_lost_below: 30
+    link_quality_recovered_at: 50

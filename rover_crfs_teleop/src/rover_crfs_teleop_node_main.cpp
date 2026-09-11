@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rover_crfs_teleop/rover_crfs_teleop_controller.hpp"
+#include <memory>
 
 #include "rclcpp/rclcpp.hpp"
 
-int main(int argc, char const *argv[])
+#include "rover_crfs_teleop/infrastructure/rover_crfs_teleop_node.hpp"
+
+int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<rover_crfs_telop::RoverCrfsTeleopController>("rover_crfs_teleop_node");
+    auto node = std::make_shared<rover_crfs_telop::RoverCrfsTeleopNode>();
 
-    rclcpp::spin(node);
-  
+    // Single-threaded on purpose - see RoverCrfsTeleopNode. The node starts unconfigured; the
+    // launch file (LifecycleNode, autostart) or a lifecycle manager drives it to active.
+    rclcpp::spin(node->get_node_base_interface());
+
     rclcpp::shutdown();
-  
+
     return 0;
 }
