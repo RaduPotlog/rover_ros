@@ -39,6 +39,8 @@ public:
 
 protected:
 
+    bool isRepeating() const override { return repeating_; }
+
     bool repeating_ = false;
 };
 

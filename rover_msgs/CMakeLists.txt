@@ -21,8 +21,13 @@ rosidl_generate_interfaces(
     "msg/GpioState.msg"
     "msg/ChargingStatus.msg"
     "msg/LedAnimation.msg"
+    "msg/LedAnimationCatalog.msg"
+    "msg/LedAnimationInfo.msg"
     "msg/LedAnimationQueue.msg"
     "msg/LedImageAnimation.msg"
+    "msg/LedLayerState.msg"
+    "msg/LedSegmentState.msg"
+    "msg/LedState.msg"
 
     "srv/SetLedBrightness.srv"
     "srv/SetLedAnimation.srv"

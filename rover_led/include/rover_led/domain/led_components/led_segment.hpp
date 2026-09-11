@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "rover_led/domain/animation/animation.hpp"
@@ -84,6 +85,9 @@ public:
     bool layerHasAnimation(AnimationPriority layer) const;
 
     bool hasAnimation() const;
+
+    // One entry per layer, ordered ERROR to STATE; empty where nothing plays.
+    std::map<AnimationPriority, std::optional<LayerStatus>> getLayerStatuses() const;
 
 protected:
 

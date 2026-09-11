@@ -56,6 +56,7 @@ target_link_libraries(rover_led_domain png yaml-cpp)
 
 add_library(rover_led_application SHARED
     src/application/encode_frame_use_case.cpp
+    src/application/get_led_state_use_case.cpp
     src/application/render_tick_use_case.cpp
     src/application/set_animation_use_case.cpp
     src/application/set_brightness_use_case.cpp
@@ -173,6 +174,8 @@ if(BUILD_TESTING)
                      test/unit/application/test_encode_frame_use_case.cpp rover_led_application)
   rover_led_add_test(test_set_brightness_use_case
                      test/unit/application/test_set_brightness_use_case.cpp rover_led_application)
+  rover_led_add_test(test_get_led_state_use_case
+                     test/unit/application/test_get_led_state_use_case.cpp rover_led_application)
 
   rover_led_add_test(test_yaml_led_config
                      test/unit/infrastructure/test_yaml_led_config.cpp led_controller_node_component)

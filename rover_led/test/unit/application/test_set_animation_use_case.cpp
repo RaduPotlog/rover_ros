@@ -224,3 +224,16 @@ TEST_F(SetAnimationUseCaseTest, ReportsSegmentsWhoseAlertQueueIsFull)
 
     EXPECT_EQ(result.rejected_segments, (std::vector<std::string>{"front"}));
 }
+
+TEST_F(SetAnimationUseCaseTest, TagsEveryAnimationWithItsCatalogEntry)
+{
+    use_case_->execute({1, "0.5", false});
+
+    ASSERT_EQ(factory_->created.size(), 2u);
+
+    for (const auto & animation : factory_->created) {
+        EXPECT_EQ(animation->getInfo().id, 1u);
+        EXPECT_EQ(animation->getInfo().name, "BLINK");
+        EXPECT_EQ(animation->getInfo().param, "0.5");
+    }
+}
