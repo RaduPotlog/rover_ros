@@ -23,7 +23,7 @@
 
 #include "rover_crfs_teleop/domain/ports.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // Publishes teleop velocity commands as TwistStamped for twist_mux. Lifecycle-managed: it only
@@ -50,6 +50,6 @@ private:
     rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::TwistStamped>::SharedPtr publisher_;
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_INFRASTRUCTURE_ROS2_VELOCITY_COMMAND_PUBLISHER_HPP_

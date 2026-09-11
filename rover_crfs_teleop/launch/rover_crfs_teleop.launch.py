@@ -26,7 +26,7 @@ from launch_ros.actions.lifecycle_node import LifecycleNode
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
-    
+
     log_level = LaunchConfiguration("log_level")
     declare_log_level_arg = DeclareLaunchArgument(
         "log_level",

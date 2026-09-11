@@ -16,7 +16,7 @@
 
 #include <utility>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 TeleopUseCase::TeleopUseCase(
@@ -108,4 +108,4 @@ void TeleopUseCase::evaluateSwitches()
     }
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

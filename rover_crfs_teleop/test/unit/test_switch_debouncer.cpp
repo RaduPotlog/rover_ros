@@ -16,7 +16,7 @@
 
 #include "rover_crfs_teleop/domain/switch_debouncer.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 namespace
 {
@@ -86,4 +86,4 @@ TEST(SwitchDebouncerTest, ThresholdItselfCountsAsHigh)
     EXPECT_EQ(debouncer.update(kThreshold - 1), SwitchPosition::kLow);
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

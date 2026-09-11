@@ -18,7 +18,7 @@
 
 #include "rover_crfs_teleop/domain/link_monitor.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 namespace
 {
@@ -134,4 +134,4 @@ TEST(LinkMonitorTest, LinkQualityHysteresisKeepsThePreviousState)
     EXPECT_FALSE(monitor.isHealthy(kT0));
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

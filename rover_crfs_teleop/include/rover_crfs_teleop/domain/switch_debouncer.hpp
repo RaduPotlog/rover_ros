@@ -17,7 +17,7 @@
 
 #include <optional>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 constexpr unsigned int kDefaultSwitchSettleFrames = 100;
@@ -59,6 +59,6 @@ private:
     std::optional<SwitchPosition> position_;
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_DOMAIN_SWITCH_DEBOUNCER_HPP_

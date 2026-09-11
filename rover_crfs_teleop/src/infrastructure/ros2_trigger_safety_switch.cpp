@@ -16,7 +16,7 @@
 
 #include <memory>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 Ros2TriggerSafetySwitch::Ros2TriggerSafetySwitch(rclcpp_lifecycle::LifecycleNode & node)
@@ -75,4 +75,4 @@ void Ros2TriggerSafetySwitch::callTriggerService(
         });
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

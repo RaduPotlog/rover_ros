@@ -14,10 +14,12 @@
 
 #include "rover_crfs_teleop/infrastructure/rover_crfs_teleop_node.hpp"
 
+#include <array>
 #include <chrono>
 #include <cstdint>
+#include <utility>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 using namespace std::chrono_literals;
@@ -97,6 +99,11 @@ std::optional<TeleopConfig> RoverCrfsTeleopNode::readConfig()
     const int channel_in_max = get_parameter("channel_in_max").as_int();
     const int channel_deadband = get_parameter("channel_deadband").as_int();
 
+    if (channel_deadband < 0) {
+        RCLCPP_ERROR(get_logger(), "channel_deadband must be >= 0 (got %d).", channel_deadband);
+        return std::nullopt;
+    }
+
     for (AxisMapping * mapping : {&config.linear_x_mapping, &config.angular_z_mapping}) {
         mapping->in_min = channel_in_min;
         mapping->in_mid = channel_in_mid;
@@ -122,17 +129,29 @@ std::optional<TeleopConfig> RoverCrfsTeleopNode::readConfig()
 
     // Fail configure on a bad channel number instead of the previous behaviour of reading it as
     // 0 - which the stick mapping clamps to full negative deflection.
-    for (const auto & [name, channel] : {
-            std::pair<const char *, int>{"linear_x_channel", config.linear_x_channel},
-            {"angular_z_channel", config.angular_z_channel},
-            {"e_stop_channel", config.e_stop_channel},
-            {"e_stop_latch_reset_channel", config.e_stop_latch_reset_channel}})
-    {
+    const std::array<std::pair<const char *, int>, 4> channel_roles{{
+        {"linear_x_channel", config.linear_x_channel},
+        {"angular_z_channel", config.angular_z_channel},
+        {"e_stop_channel", config.e_stop_channel},
+        {"e_stop_latch_reset_channel", config.e_stop_latch_reset_channel}}};
+    for (const auto & [name, channel] : channel_roles) {
         if (!isValidChannel(channel)) {
             RCLCPP_ERROR(
                 get_logger(), "Parameter %s = %d is outside 1-%zu.", name, channel,
                 RcFrame::kChannelCount);
             return std::nullopt;
+        }
+    }
+
+    // Two roles on one channel would drive e.g. the E-Stop from a stick, so fail configure.
+    for (std::size_t i = 0; i < channel_roles.size(); ++i) {
+        for (std::size_t j = i + 1; j < channel_roles.size(); ++j) {
+            if (channel_roles[i].second == channel_roles[j].second) {
+                RCLCPP_ERROR(
+                    get_logger(), "Parameters %s and %s both use channel %d.",
+                    channel_roles[i].first, channel_roles[j].first, channel_roles[i].second);
+                return std::nullopt;
+            }
         }
     }
 
@@ -284,4 +303,4 @@ void RoverCrfsTeleopNode::controlTimerCallback()
     last_tick_status_ = status;
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

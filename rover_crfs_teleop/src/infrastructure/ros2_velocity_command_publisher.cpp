@@ -14,7 +14,7 @@
 
 #include "rover_crfs_teleop/infrastructure/ros2_velocity_command_publisher.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 Ros2VelocityCommandPublisher::Ros2VelocityCommandPublisher(
@@ -48,4 +48,4 @@ void Ros2VelocityCommandPublisher::on_deactivate()
     publisher_->on_deactivate();
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

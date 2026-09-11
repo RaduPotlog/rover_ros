@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // Monotonic, so the watchdog neither jumps with wall-clock corrections nor follows use_sim_time.
@@ -80,6 +80,6 @@ private:
     bool link_quality_ok_{false};
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_DOMAIN_LINK_MONITOR_HPP_

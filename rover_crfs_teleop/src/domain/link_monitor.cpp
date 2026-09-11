@@ -14,7 +14,7 @@
 
 #include "rover_crfs_teleop/domain/link_monitor.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 namespace
@@ -64,4 +64,4 @@ bool LinkMonitor::isHealthy(const SteadyTime now) const
     return isFresh(last_link_stats_, now, config_.link_stats_timeout) && link_quality_ok_;
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

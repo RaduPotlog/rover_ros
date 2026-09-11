@@ -22,7 +22,7 @@ int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<rover_crfs_telop::RoverCrfsTeleopNode>();
+    auto node = std::make_shared<rover_crfs_teleop::RoverCrfsTeleopNode>();
 
     // Single-threaded on purpose - see RoverCrfsTeleopNode. The node starts unconfigured; the
     // launch file (LifecycleNode, autostart) or a lifecycle manager drives it to active.

@@ -25,7 +25,7 @@
 #include "rover_crfs_teleop/domain/stick_mapping.hpp"
 #include "rover_crfs_teleop/domain/switch_debouncer.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 struct TeleopConfig
@@ -113,6 +113,6 @@ private:
     bool zero_sent_{false};
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_APPLICATION_TELEOP_USE_CASE_HPP_

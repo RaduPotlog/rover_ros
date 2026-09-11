@@ -14,7 +14,7 @@
 
 #include "rover_crfs_teleop/domain/switch_debouncer.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 SwitchDebouncer::SwitchDebouncer(const int threshold, const unsigned int settle_frames)
@@ -51,4 +51,4 @@ std::optional<SwitchPosition> SwitchDebouncer::update(const int raw_value)
     return current;
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

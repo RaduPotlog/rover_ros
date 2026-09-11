@@ -20,7 +20,7 @@
 
 #include "rover_crfs_teleop/application/teleop_use_case.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 class FakeVelocityCommandPort : public VelocityCommandPort
@@ -271,4 +271,4 @@ TEST_F(TeleopUseCaseTest, InvalidAxisChannelCommandsNothingOnThatAxis)
     EXPECT_DOUBLE_EQ(velocity_->published[0].linear_x, 0.0);
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

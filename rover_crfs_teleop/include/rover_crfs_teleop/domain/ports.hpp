@@ -15,7 +15,7 @@
 #ifndef ROVER_CRFS_TELEOP_DOMAIN_PORTS_HPP_
 #define ROVER_CRFS_TELEOP_DOMAIN_PORTS_HPP_
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // Planar velocity command in the robot frame: m/s and rad/s.
@@ -56,6 +56,6 @@ public:
     virtual void requestLatchReset() = 0;
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_DOMAIN_PORTS_HPP_

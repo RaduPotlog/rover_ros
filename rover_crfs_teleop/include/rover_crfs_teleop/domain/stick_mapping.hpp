@@ -15,7 +15,7 @@
 #ifndef ROVER_CRFS_TELEOP_DOMAIN_STICK_MAPPING_HPP_
 #define ROVER_CRFS_TELEOP_DOMAIN_STICK_MAPPING_HPP_
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // Raw CRSF channel range, as decoded by crsf_receiver and republished unscaled on rc/channels
@@ -71,6 +71,6 @@ struct AxisMapping
 //     returns 0.0 rather than dividing by zero.
 double mapAxis(const int raw_value, const AxisMapping & mapping);
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_DOMAIN_STICK_MAPPING_HPP_

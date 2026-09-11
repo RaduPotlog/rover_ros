@@ -38,7 +38,7 @@
 #include "rover_crfs_teleop/domain/stick_mapping.hpp"
 #include "rover_crfs_teleop/infrastructure/rover_crfs_teleop_node.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 namespace
 {
@@ -299,4 +299,22 @@ TEST_F(TeleopNodeTest, ConfigureRejectsAnInvalidChannel)
     EXPECT_EQ(node->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
 }
 
-}  // namespace rover_crfs_telop
+TEST_F(TeleopNodeTest, ConfigureRejectsDuplicateChannels)
+{
+    rclcpp::NodeOptions options;
+    options.parameter_overrides({rclcpp::Parameter("e_stop_channel", 3)});  // linear_x_channel
+    auto node = std::make_shared<RoverCrfsTeleopNode>("rover_crfs_teleop_dup_channel", options);
+
+    EXPECT_EQ(node->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
+}
+
+TEST_F(TeleopNodeTest, ConfigureRejectsNegativeDeadband)
+{
+    rclcpp::NodeOptions options;
+    options.parameter_overrides({rclcpp::Parameter("channel_deadband", -1)});
+    auto node = std::make_shared<RoverCrfsTeleopNode>("rover_crfs_teleop_bad_deadband", options);
+
+    EXPECT_EQ(node->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
+}
+
+}  // namespace rover_crfs_teleop

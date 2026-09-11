@@ -19,7 +19,7 @@
 #include <cstddef>
 #include <optional>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // One decoded CRSF frame: the raw values of all 16 RC channels, exactly as crsf_receiver
@@ -45,6 +45,6 @@ struct RcFrame
     }
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_DOMAIN_RC_FRAME_HPP_

@@ -29,7 +29,7 @@ add_library(${PROJECT_NAME}_core STATIC
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                           $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+                           $<INSTALL_INTERFACE:include>
 )
 set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -45,7 +45,7 @@ ament_target_dependencies(${PROJECT_NAME}_ros PUBLIC ${PACKAGE_DEPENDENCIES})
 add_executable(${PROJECT_NAME}_node src/rover_crfs_teleop_node_main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
 
-install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
+install(DIRECTORY include/ DESTINATION include)
 
 install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
 
@@ -56,6 +56,7 @@ ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(launch_testing_ament_cmake REQUIRED)
+  find_package(lifecycle_msgs REQUIRED)
 
   # Unit: pure domain / application, no ROS (test/unit/).
   foreach(TEST_NAME IN ITEMS
@@ -70,6 +71,7 @@ if(BUILD_TESTING)
   # Integration: the lifecycle node against real ROS topics and services (test/integration/).
   ament_add_gtest(test_teleop_node test/integration/test_teleop_node.cpp TIMEOUT 60)
   target_link_libraries(test_teleop_node ${PROJECT_NAME}_ros)
+  ament_target_dependencies(test_teleop_node lifecycle_msgs)
 
   # E2E: the node started from its launch description (test/e2e/).
   add_launch_test(test/e2e/test_teleop_launch.py TIMEOUT 60)

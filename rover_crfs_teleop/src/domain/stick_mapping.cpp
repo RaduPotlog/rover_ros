@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <cstdlib>
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 double mapAxis(const int raw_value, const AxisMapping & mapping)
@@ -51,4 +51,4 @@ double mapAxis(const int raw_value, const AxisMapping & mapping)
     return (normalized >= 0.0) ? (normalized * mapping.out_max) : (-normalized * mapping.out_min);
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

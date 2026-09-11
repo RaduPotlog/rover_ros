@@ -16,7 +16,7 @@
 
 #include "rover_crfs_teleop/domain/stick_mapping.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 namespace
 {
@@ -154,4 +154,4 @@ TEST(StickMappingTest, DegenerateMappingReturnsZeroInsteadOfDividingByZero)
     EXPECT_EQ(mapAxis(kDefaultCrsfChannelMin, mapping), 0.0);
 }
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop

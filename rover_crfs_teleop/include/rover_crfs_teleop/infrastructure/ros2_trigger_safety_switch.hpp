@@ -22,7 +22,7 @@
 
 #include "rover_crfs_teleop/domain/ports.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // Drives the hardware interface's software E-Stop through its std_srvs/Trigger services.
@@ -57,6 +57,6 @@ private:
     TriggerClient::SharedPtr e_stop_latch_reset_;
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_INFRASTRUCTURE_ROS2_TRIGGER_SAFETY_SWITCH_HPP_

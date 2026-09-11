@@ -29,7 +29,7 @@
 #include "rover_crfs_teleop/infrastructure/ros2_trigger_safety_switch.hpp"
 #include "rover_crfs_teleop/infrastructure/ros2_velocity_command_publisher.hpp"
 
-namespace rover_crfs_telop
+namespace rover_crfs_teleop
 {
 
 // ROS adapter for TeleopUseCase: rc/channels + rc/link in, teleop_elrs_cmd_vel_stamped and the
@@ -89,6 +89,6 @@ private:
     std::optional<TickStatus> last_tick_status_;
 };
 
-}  // namespace rover_crfs_telop
+}  // namespace rover_crfs_teleop
 
 #endif  // ROVER_CRFS_TELEOP_INFRASTRUCTURE_ROVER_CRFS_TELEOP_NODE_HPP_
