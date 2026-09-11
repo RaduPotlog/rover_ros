@@ -63,14 +63,26 @@ led_animations:
           duration: 1
           repeat: 1
 
+  # Shown while the robot is driven. Same steady glow as READY, tinted blue.
+  - id: 4
+    name: MANUAL_ACTION
+    priority: 3
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: all
+        animation:
+          image: $(find rover_led)/animations/rover_a1/ready.png
+          duration: 6
+          color: 0x0080FF
+
   - id: 5
     name: LOW_BATTERY
     priority: 2
     animations:
-      - type: husarion_ugv_lights::MovingImageAnimation
+      - type: rover_led::MovingImageAnimation
         segments: all
         animation:
-          image: $(find husarion_ugv_lights)/animations/panther/low_battery.png
+          image: $(find rover_led)/animations/rover_a1/low_battery.png
           duration: 10
           repeat: 1
           center_offset: 24
@@ -81,10 +93,10 @@ led_animations:
     name: CRITICAL_BATTERY
     priority: 2
     animations:
-      - type: husarion_ugv_lights::MovingImageAnimation
+      - type: rover_led::MovingImageAnimation
         segments: all
         animation:
-          image: $(find husarion_ugv_lights)/animations/panther/critical_battery.png
+          image: $(find rover_led)/animations/rover_a1/critical_battery.png
           duration: 10
           repeat: 1
           center_offset: 24
@@ -95,10 +107,10 @@ led_animations:
     name: CHARGING_BATTERY
     priority: 2
     animations:
-      - type: husarion_ugv_lights::MovingImageAnimation
+      - type: rover_led::MovingImageAnimation
         segments: all
         animation:
-          image: $(find husarion_ugv_lights)/animations/panther/charging_battery.png
+          image: $(find rover_led)/animations/rover_a1/charging_battery.png
           duration: 10
           repeat: 1
           center_offset: 38
@@ -109,10 +121,10 @@ led_animations:
     name: BATTERY_CHARGED
     priority: 2
     animations:
-      - type: husarion_ugv_lights::MovingImageAnimation
+      - type: rover_led::MovingImageAnimation
         segments: all
         animation:
-          image: $(find husarion_ugv_lights)/animations/panther/battery_charged.png
+          image: $(find rover_led)/animations/rover_a1/battery_charged.png
           duration: 10
           repeat: 1
           center_offset: 38
@@ -123,19 +135,19 @@ led_animations:
     name: CHARGER_INSERTED
     priority: 1
     animations:
-      - type: husarion_ugv_lights::ImageAnimation
+      - type: rover_led::ImageAnimation
         segments: all
         animation:
-          image: $(find husarion_ugv_lights)/animations/panther/charger_inserted.png
+          image: $(find rover_led)/animations/rover_a1/charger_inserted.png
           duration: 8
 
   - id: 10
     name: BATTERY_NOMINAL
     priority: 2
     animations:
-      - type: husarion_ugv_lights::ImageAnimation
+      - type: rover_led::ImageAnimation
         segments: all
         animation:
-          image: $(find husarion_ugv_lights)/animations/panther/empty.png
+          image: $(find rover_led)/animations/rover_a1/empty.png
           duration: 1
           repeat: 1

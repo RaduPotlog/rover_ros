@@ -1,0 +1,63 @@
+// Copyright 2025 Mechatronics Academy
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "rover_led/domain/led_components/segment_layer.hpp"
+
+#include <memory>
+#include <stdexcept>
+#include <string>
+
+namespace rover_led
+{
+
+SegmentLayer::SegmentLayer(const std::size_t num_led, const bool invert_led_order)
+: SegmentLayerInterface(num_led, invert_led_order)
+{
+
+}
+
+bool SegmentLayer::setAnimation(
+    const std::shared_ptr<Animation> & animation,
+    const bool repeating)
+{
+    animation_ = animation;
+    animation_finished_ = false;
+    repeating_ = repeating;
+
+    return true;
+}
+
+void SegmentLayer::updateAnimation()
+{
+    if (!animation_) {
+        throw std::runtime_error("Segment animation not defined.");
+    }
+
+    if (animation_->isFinished()) {
+        animation_finished_ = true;
+    }
+
+    if (animation_finished_ && animation_ && repeating_) {
+        animation_->reset();
+        animation_finished_ = false;
+    }
+
+    try {
+        animation_->update();
+    } catch (const std::runtime_error & e) {
+        throw std::runtime_error("Failed to update animation: " + std::string(e.what()));
+    }
+}
+
+}  // namespace rover_led
