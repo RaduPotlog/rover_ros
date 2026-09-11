@@ -1,36 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4">
+  <!-- battery_verdict is computed by rover_safety::domain::evaluateBatterySafety. -->
   <BehaviorTree ID="RoverSafety">
     <Sequence>
-      <Sequence name="BatteryOverheatSequence"
-                _skipIf="battery_health != POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE">
+      <Sequence name="BatteryTripEStopSequence"
+                _skipIf="battery_verdict != VERDICT_TRIP_E_STOP">
         <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
                             _skipIf="sw_e_stop_state"/>
       </Sequence>
-      <Sequence name="BatteryOverheatSequence"
-                _skipIf="battery_health != POWER_SUPPLY_HEALTH_OVERHEAT">
-        <Sequence name="FatalBatTempSequence"
-                  _skipIf="bat_temp &lt;= FATAL_BAT_TEMP">
-          <SignalShutdown reason="Fatal battery temperature"/>
-        </Sequence>
-        <Sequence name="HighBatTempSequence"
-                  _skipIf="bat_temp &gt; FATAL_BAT_TEMP">
-          <Sequence name="CriticalBatTempSequence"
-                    _skipIf="bat_temp &lt;= CRITICAL_BAT_TEMP">
-            <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
-                                _skipIf="sw_e_stop_state"/>
-          </Sequence>
-        </Sequence>
-      </Sequence>
-      <Sequence name="BatteryDeadSequence"
-                _skipIf="battery_health != POWER_SUPPLY_HEALTH_DEAD">
-        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
-                            _skipIf="sw_e_stop_state"/>
-      </Sequence>
-      <Sequence name="BatteryOvervoltageSequence"
-                _skipIf="battery_health != POWER_SUPPLY_HEALTH_OVERVOLTAGE">
-        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
-                            _skipIf="sw_e_stop_state"/>
+      <Sequence name="BatteryShutdownSequence"
+                _skipIf="battery_verdict != VERDICT_SHUTDOWN">
+        <SignalShutdown reason="{battery_verdict_reason}"/>
       </Sequence>
     </Sequence>
   </BehaviorTree>
@@ -40,6 +20,7 @@
     <Action ID="CallTriggerService"
             editable="true">
       <input_port name="service_name">ROS service name</input_port>
+      <input_port name="server_timeout">time in ms to wait for the response</input_port>
     </Action>
     <Action ID="SignalShutdown"
             editable="true">

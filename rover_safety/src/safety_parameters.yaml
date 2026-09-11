@@ -1,6 +1,20 @@
 safety:
   battery:
     temp:
+      critical:
+        type: double
+        default_value: 50.0
+        description: Battery temperature in degrees Celsius above which an overheating battery trips the e-stop. Must be lower than fatal.
+        read_only: true
+        validation: { bounds<>: [-20.0, 100.0] }
+
+      fatal:
+        type: double
+        default_value: 60.0
+        description: Battery temperature in degrees Celsius above which an overheating battery shuts the robot down.
+        read_only: true
+        validation: { bounds<>: [-20.0, 100.0] }
+
       window_len:
         type: int
         default_value: 6

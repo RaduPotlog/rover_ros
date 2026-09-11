@@ -30,6 +30,14 @@ endforeach()
 
 include_directories(include)
 
+# Domain: plain C++, no ROS dependencies.
+add_library(${PROJECT_NAME}_core STATIC
+    src/domain/battery_safety_policy.cpp
+)
+target_include_directories(${PROJECT_NAME}_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
 # ------------------------------------- Plugins -------------------------------------- #
 add_library(call_set_bool_service_bt_node SHARED
     src/plugins/action/call_set_bool_service_node.cpp)
@@ -82,9 +90,10 @@ generate_parameter_library(safety_parameters
     src/safety_parameters.yaml
 )
 
-target_link_libraries(${PROJECT_NAME}_node 
+target_link_libraries(${PROJECT_NAME}_node
     ${plugin_libs}
     safety_parameters
+    ${PROJECT_NAME}_core
 )
 
 add_executable(led_safety_node src/led_safety_main.cpp
@@ -125,6 +134,19 @@ install(DIRECTORY behavior_trees config launch
 install(DIRECTORY include/ 
     DESTINATION include/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+
+    ament_add_gtest(test_battery_safety_policy test/unit/test_battery_safety_policy.cpp)
+    target_link_libraries(test_battery_safety_policy ${PROJECT_NAME}_core)
+
+    ament_add_gtest(test_call_trigger_service test/integration/test_call_trigger_service.cpp
+                    TIMEOUT 60)
+    target_link_libraries(test_call_trigger_service call_trigger_service_bt_node)
+    ament_target_dependencies(test_call_trigger_service
+        behaviortree_cpp nav2_behavior_tree rclcpp std_srvs)
+endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 ament_export_include_directories(include/${PROJECT_NAME})

@@ -31,6 +31,7 @@
 #include "rover_msgs/msg/system_status.hpp"
 
 #include "rover_safety/behavior_tree.hpp"
+#include "rover_safety/domain/battery_safety_policy.hpp"
 #include "rover_safety/safety_parameters.hpp"
 
 namespace rover_safety
@@ -72,9 +73,7 @@ protected:
     safety::Params params_;
 
 private:
-    
-    static constexpr float kCriticalBatteryTemp = 50.0;
-    static constexpr float kFatalBatteryTemp = 60.0;
+
     static constexpr char kShutdownLocalhostCommand[] =
         "dbus-send --system --print-reply --dest=org.freedesktop.login1 /org/freedesktop/login1 "
         "org.freedesktop.login1.Manager.PowerOff boolean:true";
@@ -92,6 +91,7 @@ private:
     rclcpp::Subscription<SystemStatusMsg>::SharedPtr system_status_sub_;
     rclcpp::TimerBase::SharedPtr safety_tree_timer_;
 
+    domain::BatteryThresholds battery_thresholds_;
     double battery_temp_{0.0};
     double cpu_temp_{0.0};
 };

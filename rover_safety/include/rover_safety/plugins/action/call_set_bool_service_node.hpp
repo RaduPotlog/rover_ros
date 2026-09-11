@@ -26,25 +26,25 @@
 namespace rover_safety
 {
 
+/**
+ * Calls a std_srvs/SetBool service with the `data` port. RUNNING while waiting for the response,
+ * SUCCESS only when the server answers success=true, FAILURE on success=false or server_timeout.
+ */
 class CallSetBoolService : public nav2_behavior_tree::BtServiceNode<std_srvs::srv::SetBool>
 {
 
 public:
 
     CallSetBoolService(
-        const std::string& name, 
+        const std::string& name,
         const BT::NodeConfig & config,
         const std::string & service_name = "");
 
     static BT::PortsList providedPorts();
 
-    BT::NodeStatus tick() override;
+    void on_tick() override;
 
-private:
-
-    std::string service_name_;
-
-    rclcpp::Node::SharedPtr node_;
+    BT::NodeStatus on_completion(std::shared_ptr<std_srvs::srv::SetBool::Response> response) override;
 };
 
 }  // namespace rover_safety

@@ -26,22 +26,31 @@ CallSetBoolService::CallSetBoolService(
     if (!getInput<std::string>("service_name", service_name_)) {
         throw BT::RuntimeError("Missing required input [service_name]");
     }
-
-    node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");
 }
 
-BT::PortsList CallSetBoolService::providedPorts() 
+BT::PortsList CallSetBoolService::providedPorts()
 {
-    return { 
-        BT::InputPort<std::string>("service_name", "/default/set_bool"),
-        BT::InputPort<bool>("data")
-    };
+    return providedBasicPorts({ BT::InputPort<bool>("data") });
 }
 
-BT::NodeStatus CallSetBoolService::tick()
+void CallSetBoolService::on_tick()
 {
-    service_client_->async_send_request(request_);
-    
+    if (!getInput<bool>("data", request_->data)) {
+        RCLCPP_ERROR(node_->get_logger(), "Missing required input [data] for %s", service_name_.c_str());
+        should_send_request_ = false;
+    }
+}
+
+BT::NodeStatus CallSetBoolService::on_completion(
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+    if (!response->success) {
+        RCLCPP_ERROR(
+            node_->get_logger(), "Service %s returned failure: %s",
+            service_name_.c_str(), response->message.c_str());
+        return BT::NodeStatus::FAILURE;
+    }
+
     return BT::NodeStatus::SUCCESS;
 }
 
