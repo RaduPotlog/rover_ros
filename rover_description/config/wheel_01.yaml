@@ -7,3 +7,5 @@ inertia_y_offset: 0.0
 mesh_package: rover_description
 folder_path: meshes/wheel_01
 mecanum: False
+wheelbase: 0.2542
+wheel_separation: 0.62602

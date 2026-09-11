@@ -120,6 +120,9 @@ def generate_launch_description():
             "namespace": namespace,
             "robot_model": robot_model,
             "log_level": log_level,
+            "use_sim": use_sim,
+            "wheel_type": wheel_type,
+            "controller_config_path": controller_config_path,
         }.items(),
     )
 

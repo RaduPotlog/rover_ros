@@ -95,7 +95,8 @@
       right_wheel_names: ["rr_wheel_base_to_rr_wheel_joint", "fr_wheel_base_to_fr_wheel_joint"]
 
       wheels_per_side: 2
-      wheel_separation: 0.626
+      # Must match rover_description/config/wheel_01.yaml (enforced by test/test_wheel_geometry.py)
+      wheel_separation: 0.62602
       wheel_radius: 0.1651
 
       wheel_separation_multiplier: 1.5

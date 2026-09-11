@@ -36,49 +36,13 @@ from nav2_common.launch import ReplaceString
 
 def generate_launch_description():
     
-    common_dir_path = LaunchConfiguration("common_dir_path")
-    declare_common_dir_path_arg = DeclareLaunchArgument(
-        "common_dir_path",
-        default_value="",
-        description="Path to the common configuration directory.",
-    )
-
-    description_pkg = FindPackageShare("rover_description")
-    description_common_dir = PythonExpression(
-        [
-            "'",
-            common_dir_path,
-            "/rover_description",
-            "' if '",
-            common_dir_path,
-            "' else '",
-            description_pkg,
-            "'",
-        ]
-    )
-
-    components_config_path = LaunchConfiguration("components_config_path")
-    declare_components_config_path_arg = DeclareLaunchArgument(
-        "components_config_path",
-        default_value=PathJoinSubstitution([description_common_dir, "config", "components.yaml"]),
-        description=(
-            "Specify file which contains components. These components will be included in URDF."
-        ),
-    )
-
     wheel_type = LaunchConfiguration("wheel_type")
     controller_config_path = LaunchConfiguration("controller_config_path")
     declare_controller_config_path_arg = DeclareLaunchArgument(
         "controller_config_path",
-        default_value=PathJoinSubstitution(
-            [
-                FindPackageShare("rover_controller"),
-                "config",
-                PythonExpression(["'", wheel_type, "_controller.yaml'"]),
-            ]
-        ),
         description=(
-            "Path to controller configuration file. It is located in rover_controller/config/{wheel_type}_controller.yaml."
+            "Path to the controller configuration file, embedded in the URDF for gz_ros2_control. "
+            "Owned and supplied by the caller (e.g. rover_controller)."
         ),
     )
 
@@ -171,8 +135,6 @@ def generate_launch_description():
             f"'{lidar_rot_r} {lidar_rot_p} {lidar_rot_y}'",
             " namespace:=",
             namespace,
-            " components_config_path:=",
-            components_config_path,
         ]
     )
 
@@ -202,8 +164,6 @@ def generate_launch_description():
     )
  
     actions = [
-        declare_common_dir_path_arg,
-        declare_components_config_path_arg,
         declare_robot_model_arg,
         declare_wheel_type_arg,
         declare_publish_robot_state_arg,

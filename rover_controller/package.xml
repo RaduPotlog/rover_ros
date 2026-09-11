@@ -27,7 +27,11 @@
   
   <!-- Rover real hardware dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_hardware_interface</exec_depend>
-  
+
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_index_python</test_depend>
+  <test_depend>python3-yaml</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

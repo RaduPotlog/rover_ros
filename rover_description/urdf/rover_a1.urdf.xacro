@@ -8,7 +8,8 @@
   <xacro:arg name="lidar_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="wheel_config_file" default="$(find rover_description)/config/wheel_01.yaml" />
   <xacro:arg name="battery_config_file" default="$(find rover_description)/config/battery.yaml" />
-  <xacro:arg name="controller_config_file" default="$(find rover_controller)/config/wheel_01_controller.yaml" />
+  <!-- Only used by the gz_ros2_control plugin (use_sim:=true); the caller must supply it. -->
+  <xacro:arg name="controller_config_file" default="" />
   <xacro:arg name="namespace" default="" />
 
   <xacro:include filename="$(find rover_description)/urdf/rover_a1/rover_a1_macro.urdf.xacro" ns="rover" />

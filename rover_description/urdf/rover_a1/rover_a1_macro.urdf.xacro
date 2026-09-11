@@ -22,8 +22,8 @@
 
     <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
     <xacro:property name="wheel_config" value="${xacro.load_yaml(wheel_config_file)}" />
-    <xacro:property name="wheelbase" value="0.2542" />
-    <xacro:property name="wheel_mount_point_y" value="0.31301" />
+    <xacro:property name="wheelbase" value="${wheel_config['wheelbase']}" />
+    <xacro:property name="wheel_mount_point_y" value="${wheel_config['wheel_separation'] / 2.0}" />
 
     <!-- Rover base macros -->
     <xacro:include filename="$(find rover_description)/urdf/rover_a1/base.urdf.xacro" ns="body" />
