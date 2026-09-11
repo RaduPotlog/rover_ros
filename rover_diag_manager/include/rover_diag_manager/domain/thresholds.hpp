@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_DIAG_MANAGER_SYSTEM_DIAG_TYPES_HPP_
-#define ROVER_DIAG_MANAGER_SYSTEM_DIAG_TYPES_HPP_
+#ifndef ROVER_DIAG_MANAGER_DOMAIN_THRESHOLDS_HPP_
+#define ROVER_DIAG_MANAGER_DOMAIN_THRESHOLDS_HPP_
 
-#include <vector>
-
-namespace rover_diag_manager
+namespace rover_diag_manager::domain
 {
 
-    struct SystemStatus
-    {
-        std::vector<float> core_usages;
-        float cpu_mean_usage;
-        float cpu_temperature;
-        float ram_usage;
-        float disk_usage;
-    };
+/** @brief Warning thresholds; a metric strictly above its threshold is a warning. */
+struct SystemHealthThresholds
+{
+    double cpu_usage{95.0};         // [%]
+    double cpu_temperature{80.0};   // [°C]
+    double ram_usage{90.0};         // [%]
+    double disk_usage{90.0};        // [%]
+};
 
-}  // namespace rover_diag_manager
+}  // namespace rover_diag_manager::domain
 
-#endif  // ROVER_DIAG_MANAGER_SYSTEM_DIAG_TYPES_HPP_
+#endif  // ROVER_DIAG_MANAGER_DOMAIN_THRESHOLDS_HPP_

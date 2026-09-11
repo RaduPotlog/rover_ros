@@ -12,25 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_DIAG_MANAGER_SYSTEM_DIAG_FILESYSTEM_HPP_
-#define ROVER_DIAG_MANAGER_SYSTEM_DIAG_FILESYSTEM_HPP_
+#ifndef ROVER_DIAG_MANAGER_INFRASTRUCTURE_FILESYSTEM_HPP_
+#define ROVER_DIAG_MANAGER_INFRASTRUCTURE_FILESYSTEM_HPP_
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
-namespace rover_diag_manager
+namespace rover_diag_manager::infrastructure
 {
 
+/** @brief Thin OS seam used by LinuxSystemMetricsSource; faked in tests. */
 class FilesystemInterface
 {
-
 public:
-
     virtual ~FilesystemInterface() = default;
 
-    virtual uintmax_t getSpaceCapacity(const std::string & filesystem_path) const = 0;
+    virtual std::uintmax_t getSpaceCapacity(const std::string & filesystem_path) const = 0;
 
-    virtual uintmax_t getSpaceAvailable(const std::string & filesystem_path) const = 0;
+    virtual std::uintmax_t getSpaceAvailable(const std::string & filesystem_path) const = 0;
 
     virtual std::string readFile(const std::string & file_path) const = 0;
 
@@ -40,21 +44,14 @@ public:
 class Filesystem : public FilesystemInterface
 {
 public:
-
-    inline uintmax_t getSpaceCapacity(const std::string & filesystem_path) const override
+    std::uintmax_t getSpaceCapacity(const std::string & filesystem_path) const override
     {
-        const auto path = std::filesystem::path(filesystem_path);
-        const auto space_info = std::filesystem::space(path);
-
-        return space_info.capacity;
+        return std::filesystem::space(std::filesystem::path(filesystem_path)).capacity;
     }
 
-    inline uintmax_t getSpaceAvailable(const std::string & filesystem_path) const override
+    std::uintmax_t getSpaceAvailable(const std::string & filesystem_path) const override
     {
-        const auto path = std::filesystem::path(filesystem_path);
-        const auto space_info = std::filesystem::space(path);
-
-        return space_info.available;
+        return std::filesystem::space(std::filesystem::path(filesystem_path)).available;
     }
 
     std::string readFile(const std::string & file_path) const override
@@ -66,7 +63,7 @@ public:
         }
 
         std::ifstream file(path);
-        
+
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open, given path " + path.string());
         }
@@ -74,12 +71,10 @@ public:
         std::stringstream buffer;
         buffer << file.rdbuf();
 
-        file.close();
-        
         return buffer.str();
     }
 };
 
-}  // namespace rover_diag_manager
+}  // namespace rover_diag_manager::infrastructure
 
-#endif  // ROVER_DIAG_MANAGER_SYSTEM_DIAG_FILESYSTEM_HPP_
+#endif  // ROVER_DIAG_MANAGER_INFRASTRUCTURE_FILESYSTEM_HPP_
