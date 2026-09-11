@@ -51,11 +51,14 @@ private:
     domain::BatteryIdentity identity_;
     std::chrono::milliseconds watchdog_timeout_;
 
-    std::shared_ptr<diagnostic_updater::Updater> diagnostic_updater_;
     std::unique_ptr<application::MonitorBatteryUseCase> monitor_battery_;
 
     rclcpp::Subscription<udp_msgs::msg::UdpPacket>::SharedPtr battery_subscriber_;
     rclcpp::TimerBase::SharedPtr battery_read_timeout_;
+
+    // Declared last so it is destroyed first: it holds raw pointers to the publisher's
+    // diagnostic callbacks, and the publisher is owned by monitor_battery_.
+    std::shared_ptr<diagnostic_updater::Updater> diagnostic_updater_;
 };
 
 }  // namespace rover_battery

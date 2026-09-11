@@ -60,6 +60,10 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_battery_msg_conversions test/unit/test_battery_msg_conversions.cpp)
   target_link_libraries(test_battery_msg_conversions ${PROJECT_NAME}_ros)
+
+  ament_add_gtest(test_rover_battery_node test/integration/test_rover_battery_node.cpp
+                  TIMEOUT 60)
+  target_link_libraries(test_rover_battery_node ${PROJECT_NAME}_ros)
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})

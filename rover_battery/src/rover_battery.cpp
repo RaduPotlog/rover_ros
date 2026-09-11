@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
+#include <exception>
 #include <memory>
-#include <stdexcept>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -24,20 +23,25 @@ int main(int argc, char ** argv)
 {
     rclcpp::init(argc, argv);
 
-    auto rover_battery_node =
-        std::make_shared<rover_battery::RoverBatteryNode>("rover_battery_node");
+    const auto logger = rclcpp::get_logger("rover_battery");
+    int exit_code = 0;
 
-    rover_battery_node->init();
-    
     try {
+        // Construction can throw on an invalid parameter override.
+        auto rover_battery_node =
+            std::make_shared<rover_battery::RoverBatteryNode>("rover_battery_node");
+
+        rover_battery_node->init();
+
         rclcpp::spin(rover_battery_node);
-    } catch (const std::runtime_error & e) {
-        std::cerr << "[rover_battery] Caught exception: " << e.what() << std::endl;
+    } catch (const std::exception & e) {
+        RCLCPP_FATAL(logger, "Caught exception: %s", e.what());
+        exit_code = 1;
     }
 
-    std::cout << "[rover_battery] Shutting down" << std::endl;
-    
+    RCLCPP_INFO(logger, "Shutting down");
+
     rclcpp::shutdown();
 
-    return 0;
+    return exit_code;
 }

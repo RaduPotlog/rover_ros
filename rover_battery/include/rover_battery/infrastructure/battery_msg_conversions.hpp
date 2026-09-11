@@ -15,6 +15,7 @@
 #ifndef ROVER_BATTERY_INFRASTRUCTURE_BATTERY_MSG_CONVERSIONS_HPP_
 #define ROVER_BATTERY_INFRASTRUCTURE_BATTERY_MSG_CONVERSIONS_HPP_
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

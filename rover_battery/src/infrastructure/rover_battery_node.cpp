@@ -52,9 +52,12 @@ RoverBatteryNode::RoverBatteryNode(
 {
     const domain::BatteryIdentity defaults;
 
+    auto capacity_descriptor = describe("Design capacity of the pack [Ah].");
+    capacity_descriptor.floating_point_range.resize(1);
+    capacity_descriptor.floating_point_range[0].from_value = 0.1;
+    capacity_descriptor.floating_point_range[0].to_value = 1000.0;
     identity_.design_capacity = static_cast<float>(declare_parameter(
-        "design_capacity", static_cast<double>(defaults.design_capacity),
-        describe("Design capacity of the pack [Ah].")));
+        "design_capacity", static_cast<double>(defaults.design_capacity), capacity_descriptor));
 
     identity_.serial_number = declare_parameter(
         "serial_number", defaults.serial_number,
@@ -77,13 +80,14 @@ void RoverBatteryNode::init()
         std::make_shared<infrastructure::Ros2BatteryStatePublisher>(*this, diagnostic_updater_),
         identity_);
 
-    battery_subscriber_ = create_subscription<udp_msgs::msg::UdpPacket>(
-        "/rover_battery_udp_data", 100,
-        std::bind(&RoverBatteryNode::batteryUdpDataCallback, this, _1));
-
+    // Timer first: the subscription callback resets it.
     battery_read_timeout_ = create_wall_timer(
         watchdog_timeout_,
         std::bind(&RoverBatteryNode::batteryUdpDataSubscriberTimeoutCallback, this));
+
+    battery_subscriber_ = create_subscription<udp_msgs::msg::UdpPacket>(
+        "/rover_battery_udp_data", 100,
+        std::bind(&RoverBatteryNode::batteryUdpDataCallback, this, _1));
 }
 
 void RoverBatteryNode::batteryUdpDataCallback(const udp_msgs::msg::UdpPacket::SharedPtr msg)

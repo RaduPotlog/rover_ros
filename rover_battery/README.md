@@ -33,7 +33,9 @@ infrastructure/  RoverBatteryNode (composition root, UDP decode, watchdog timer)
 ```
 
 Unit tests (`test/unit/`) cover the domain, the use case, and the message mapping without a
-running ROS graph: `colcon test --packages-select rover_battery`.
+running ROS graph. `test/integration/test_rover_battery_node.cpp` runs the real node in-process:
+valid and wrong-size packets, the watchdog, and parameter range validation.
+Run everything with `colcon test --packages-select rover_battery` (configure with `-DBUILD_TESTING=ON`).
 
 ## Known issues (not yet fixed — need BMS documentation / rover_safety review)
 
