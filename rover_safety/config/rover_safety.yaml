@@ -5,6 +5,8 @@
       bt_server_port: 6666
       battery:
         temp:
+          critical: 50.0
+          fatal: 60.0
           window_len: 6
       cpu:
         temp:

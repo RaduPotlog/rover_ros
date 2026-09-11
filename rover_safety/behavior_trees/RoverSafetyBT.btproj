@@ -9,6 +9,7 @@
         </Action>
         <Action ID="CallTriggerService" editable="true">
             <input_port name="service_name">ROS service name</input_port>
+            <input_port name="server_timeout">time in ms to wait for the response</input_port>
         </Action>
         <Action ID="ExecuteCommand" editable="true">
             <input_port name="command">command to execute</input_port>

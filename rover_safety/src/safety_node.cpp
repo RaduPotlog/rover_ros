@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <any>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -40,17 +41,38 @@ namespace rover_safety
 
 using namespace std::chrono_literals;
 
+namespace
+{
+
+domain::BatteryHealth toBatteryHealth(std::uint8_t power_supply_health)
+{
+    using domain::BatteryHealth;
+
+    switch (power_supply_health) {
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD: return BatteryHealth::Good;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT: return BatteryHealth::Overheat;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_DEAD: return BatteryHealth::Dead;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERVOLTAGE: return BatteryHealth::Overvoltage;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_UNSPEC_FAILURE: return BatteryHealth::UnspecFailure;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_COLD: return BatteryHealth::Cold;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE:
+            return BatteryHealth::WatchdogTimerExpire;
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE:
+            return BatteryHealth::SafetyTimerExpire;
+        default: return BatteryHealth::Unknown;
+    }
+}
+
+}  // namespace
+
 SafetyNode::SafetyNode(
-    const std::string & node_name, 
+    const std::string & node_name,
     const rclcpp::NodeOptions & options)
 : Node(node_name, options)
+, param_listener_(std::make_shared<safety::ParamListener>(this->get_node_parameters_interface()))
+, params_(param_listener_->get_params())
+, battery_thresholds_(params_.battery.temp.critical, params_.battery.temp.fatal)
 {
-    RCLCPP_INFO(this->get_logger(), "Constructing node.");
-
-    this->param_listener_ =
-        std::make_shared<safety::ParamListener>(this->get_node_parameters_interface());
-    this->params_ = this->param_listener_->get_params();
-
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
 }
 
@@ -73,8 +95,12 @@ void SafetyNode::init()
     
     using namespace std::placeholders;
 
+    // Only the latest reading matters for the safety decision. Publishers are volatile,
+    // so transient_local here would be QoS-incompatible.
+    const auto latest_state_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
+
     battery_sub_ = this->create_subscription<BatteryStateMsg>(
-        "rover_battery/battery_status", 10, 
+        "rover_battery/battery_status", latest_state_qos,
         std::bind(&SafetyNode::batteryStateSubscriberCallback, this, _1));
     driver_state_sub_ = this->create_subscription<RoverDriverStateMsg>(
         "hardware_interface/rover_driver_state", 10, 
@@ -83,7 +109,7 @@ void SafetyNode::init()
         "hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
         std::bind(&SafetyNode::ioStateSubscriberCallback, this, _1));
     system_status_sub_ = this->create_subscription<SystemStatusMsg>(
-        "system_status", 10, 
+        "system_status", latest_state_qos,
         std::bind(&SafetyNode::systemStatusSubscriberCallback, this, _1));
 
     const double timer_freq = this->params_.timer_frequency;
@@ -115,20 +141,17 @@ void SafetyNode::registerBehaviorTree()
 
 std::map<std::string, std::any> SafetyNode::createSafetyInitialBlackboard()
 {
+    const auto server_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double>(params_.ros_communication_timeout.response));
+
     const std::map<std::string, std::any> safety_initial_bb = {
-        {"CRITICAL_BAT_TEMP", kCriticalBatteryTemp},
-        {"FATAL_BAT_TEMP", kFatalBatteryTemp},
-        {"POWER_SUPPLY_HEALTH_UNKNOWN", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_UNKNOWN)},
-        {"POWER_SUPPLY_HEALTH_GOOD", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD)},
-        {"POWER_SUPPLY_HEALTH_OVERHEAT", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT)},
-        {"POWER_SUPPLY_HEALTH_DEAD", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_DEAD)},
-        {"POWER_SUPPLY_HEALTH_OVERVOLTAGE", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERVOLTAGE)},
-        {"POWER_SUPPLY_HEALTH_UNSPEC_FAILURE", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_UNSPEC_FAILURE)},
-        {"POWER_SUPPLY_HEALTH_COLD", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_COLD)},
-        {"POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE)},
-        {"POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE)},
+        {"VERDICT_NONE", unsigned(domain::SafetyVerdict::None)},
+        {"VERDICT_TRIP_E_STOP", unsigned(domain::SafetyVerdict::TripEStop)},
+        {"VERDICT_SHUTDOWN", unsigned(domain::SafetyVerdict::Shutdown)},
         {"battery_status", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN)},
-        {"default_server_timeout", std::chrono::milliseconds(100)},
+        // Read by nav2_behavior_tree::BtServiceNode; must exceed the tick period so a
+        // response arriving between ticks is still collected.
+        {"server_timeout", server_timeout},
         {"bt_loop_duration", std::chrono::milliseconds(10)},
         {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
     };
@@ -152,6 +175,12 @@ void SafetyNode::batteryStateSubscriberCallback(const BatteryStateMsg::SharedPtr
     }
 
     safety_tree_->getBlackboard()->set<float>("bat_temp", battery_temp_);
+
+    const auto decision = domain::evaluateBatterySafety(
+        toBatteryHealth(battery_health), battery_temp_, battery_thresholds_);
+
+    safety_tree_->getBlackboard()->set<unsigned>("battery_verdict", unsigned(decision.verdict));
+    safety_tree_->getBlackboard()->set<std::string>("battery_verdict_reason", decision.reason);
 }
 
 void SafetyNode::driverStateSubscriberCallback(const RoverDriverStateMsg::SharedPtr driver_state)
@@ -181,9 +210,8 @@ void SafetyNode::systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr
 
 bool SafetyNode::systemReady()
 {
-    if (!safety_tree_->getBlackboard()->getEntry("battery_health")  ||  \
+    if (!safety_tree_->getBlackboard()->getEntry("battery_verdict") ||  \
         !safety_tree_->getBlackboard()->getEntry("battery_status")  ||  \
-        !safety_tree_->getBlackboard()->getEntry("bat_temp")        ||  \
         !safety_tree_->getBlackboard()->getEntry("cpu_temp")        ||  \
         !safety_tree_->getBlackboard()->getEntry("sw_e_stop_state")) {
 

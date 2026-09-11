@@ -26,19 +26,23 @@ CallTriggerService::CallTriggerService(
     if (!getInput<std::string>("service_name", service_name_)) {
         throw BT::RuntimeError("Missing required input [service_name]");
     }
-
-    node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");
 }
 
-BT::PortsList CallTriggerService::providedPorts() 
+BT::PortsList CallTriggerService::providedPorts()
 {
-    return { BT::InputPort<std::string>("service_name", "/default/trigger") };
+    return providedBasicPorts({});
 }
 
-BT::NodeStatus CallTriggerService::tick()
+BT::NodeStatus CallTriggerService::on_completion(
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
-    service_client_->async_send_request(request_);
-    
+    if (!response->success) {
+        RCLCPP_ERROR(
+            node_->get_logger(), "Service %s returned failure: %s",
+            service_name_.c_str(), response->message.c_str());
+        return BT::NodeStatus::FAILURE;
+    }
+
     return BT::NodeStatus::SUCCESS;
 }
 
