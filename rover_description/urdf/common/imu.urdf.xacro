@@ -109,7 +109,11 @@
           <param name="mag_bias_x">0.0</param>
           <param name="mag_bias_y">0.0</param>
           <param name="mag_bias_z">0.0</param>
-          <param name="use_mag">true</param>
+          <!-- Magnetometer disabled: the MOT0110 datasheet warns against uncalibrated
+               compass use near motors / high-current conductors, and mag_bias_* were
+               never measured. IMU-only Madgwick keeps accel-corrected roll/pitch and
+               a gyro-integrated yaw. -->
+          <param name="use_mag">false</param>
           <param name="stateless">false</param>
           <param name="remove_gravity_vector">false</param>
           <param name="world_frame">enu</param>

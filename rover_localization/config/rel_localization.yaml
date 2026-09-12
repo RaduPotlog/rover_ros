@@ -2,7 +2,7 @@
   rover_ekf_node:
     ros__parameters:
       frequency: 50.0
-      sensor_timeout: 0.05
+      sensor_timeout: 0.1
       two_d_mode: true
 
       transform_time_offset: 0.0
@@ -16,11 +16,16 @@
       publish_acceleration: false
 
       odom0: "odometry/wheels"
-      odom0_config: [ true,true,false, 
-                      false,false,false, 
-                      true,true,false, 
-                      false,false,false, 
-                      false,false,false
+      # Wheel odometry contributes body velocities only. Its absolute X/Y is
+      # integrated along diff_drive_controller's own yaw (skewed by
+      # wheel_separation_multiplier) and would fight the IMU-derived heading.
+      # vy is kept deliberately: the controller publishes vy = 0, which acts as a
+      # nonholonomic constraint.
+      odom0_config: [ false, false, false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      true,  true,  false,   # vx, vy, vz
+                      false, false, false,   # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
                     ]
       odom0_queue_size: 3
       odom0_nodelay: true
@@ -28,17 +33,21 @@
       odom0_relative: false
 
       imu0: "imu/data"
-      imu0_config: [  false, false, false,
-                      true,  true,  true,
-                      false, false, false,
-                      false, false, true,
-                      true,  true,  false
+      # Yaw RATE only. Absolute orientation is magnetometer-influenced and is not
+      # trustworthy near the drive motors; fusing yaw and its own derivative from
+      # the same sensor is also correlated. Accelerations are not fused because the
+      # driver publishes gravity-inclusive linear acceleration.
+      imu0_config: [  false, false, false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      false, false, false,   # vx, vy, vz
+                      false, false, true,    # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
                     ]
       imu0_queue_size: 3
       imu0_nodelay: true
       imu0_differential: false
-      imu0_relative: true
-      imu0_remove_gravitational_acceleration: false
+      imu0_relative: false
+      imu0_remove_gravitational_acceleration: true
 
       use_control: false
       stamped_control: false
