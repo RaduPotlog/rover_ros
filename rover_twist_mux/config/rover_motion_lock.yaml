@@ -1,0 +1,15 @@
+/**/motion_lock_node:
+  ros__parameters:
+    publish_frequency: 10.0
+    gpio_timeout: 1.0
+
+    # Active-high stop conditions. Any one of them asserts the lock.
+    use_hw_e_stop_user_button: true
+    use_sw_e_stop_user_button: true
+    use_sw_e_stop_cpu_wdg_trigger: true
+    use_sw_e_stop_motor_driver_fault: true
+    use_sw_e_stop_latch_status: true
+
+    # Inverted sense (not engaged => inhibit) and unverified on hardware; see
+    # domain/motion_lock_policy.hpp before enabling.
+    require_motor_contactor_engaged: false

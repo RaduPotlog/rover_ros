@@ -8,8 +8,17 @@
   <license>Apache License 2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
- 
+
+  <depend>generate_parameter_library</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+
+  <!-- Rover dependency -->
+  <depend>rover_msgs</depend>
+
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">twist_mux</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

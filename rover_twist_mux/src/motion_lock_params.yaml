@@ -1,0 +1,41 @@
+motion_lock:
+  publish_frequency:
+    type: double
+    default_value: 10.0
+    description: >
+      Rate [Hz] at which the lock state is republished. Must stay comfortably above
+      1 / (twist_mux lock timeout), because twist_mux treats a stale lock topic as LOCKED.
+    validation: { bounds<>: [1.0, 100.0] }
+  gpio_timeout:
+    type: double
+    default_value: 1.0
+    description: >
+      How long [s] a received gpio_state stays trusted. If nothing arrives within this window the
+      hardware interface is presumed dead and the lock is asserted.
+    validation: { bounds<>: [0.1, 10.0] }
+  use_hw_e_stop_user_button:
+    type: bool
+    default_value: true
+    description: Inhibit motion while the hardware E-Stop button is pressed.
+  use_sw_e_stop_user_button:
+    type: bool
+    default_value: true
+    description: Inhibit motion while the software E-Stop user button is triggered.
+  use_sw_e_stop_cpu_wdg_trigger:
+    type: bool
+    default_value: true
+    description: Inhibit motion while the CPU watchdog stop is tripped.
+  use_sw_e_stop_motor_driver_fault:
+    type: bool
+    default_value: true
+    description: Inhibit motion while a motor-driver fault stop is active.
+  use_sw_e_stop_latch_status:
+    type: bool
+    default_value: true
+    description: Inhibit motion while the safety latch is held.
+  require_motor_contactor_engaged:
+    type: bool
+    default_value: false
+    description: >
+      Also inhibit motion while the motor contactor is NOT engaged. Inverted sense relative to
+      every other pin, and unverified on hardware - opt in deliberately.

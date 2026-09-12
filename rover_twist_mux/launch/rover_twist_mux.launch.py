@@ -54,6 +54,31 @@ def generate_launch_description():
         description="Specify the path to the twist mux configuration file.",
     )
 
+    motion_lock_config_path = LaunchConfiguration("motion_lock_config_path")
+    declare_motion_lock_config_path_arg = DeclareLaunchArgument(
+        "motion_lock_config_path",
+        default_value=PathJoinSubstitution(
+            [
+                FindPackageShare("rover_twist_mux"),
+                "config",
+                "rover_motion_lock.yaml",
+            ]
+        ),
+        description="Specify the path to the motion lock configuration file.",
+    )
+
+    # Feeds the twist_mux `locks` entry. Started alongside the mux on purpose: the lock is
+    # fail-safe on staleness, so a mux running without this node would refuse every command.
+    motion_lock_node = Node(
+        package="rover_twist_mux",
+        executable="motion_lock_node",
+        name="motion_lock_node",
+        namespace=namespace,
+        output="screen",
+        parameters=[motion_lock_config_path],
+        arguments=["--ros-args", "--log-level", log_level],
+    )
+
     rover_twist_mux_node = Node(
         package='twist_mux',
         executable='twist_mux',
@@ -68,6 +93,8 @@ def generate_launch_description():
         declare_log_level_arg,
         declare_namespace_arg,
         declare_twist_mux_config_path_arg,
+        declare_motion_lock_config_path_arg,
+        motion_lock_node,
         rover_twist_mux_node,
     ]
 
