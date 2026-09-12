@@ -97,9 +97,11 @@ def generate_launch_description():
     ns = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
     ns_controller_config_path = ReplaceString(controller_config_path, {"<namespace>/": ns})
 
-    imu_pos_x = os.environ.get("ROBOT_IMU_LOCALIZATION_X", "0.0")
+    # IMU mount pose relative to body_link (x forward, y left, z up):
+    # centerline, 90 mm to the rear, 200 mm up.
+    imu_pos_x = os.environ.get("ROBOT_IMU_LOCALIZATION_X", "-0.09")
     imu_pos_y = os.environ.get("ROBOT_IMU_LOCALIZATION_Y", "0.0")
-    imu_pos_z = os.environ.get("ROBOT_IMU_LOCALIZATION_Z", "0.0")
+    imu_pos_z = os.environ.get("ROBOT_IMU_LOCALIZATION_Z", "0.2")
     imu_rot_r = os.environ.get("ROBOT_IMU_ORIENTATION_R", "0.0")
     imu_rot_p = os.environ.get("ROBOT_IMU_ORIENTATION_P", "0.0")
     imu_rot_y = os.environ.get("ROBOT_IMU_ORIENTATION_Y", "0.0")
