@@ -6,7 +6,6 @@
     # Active-high stop conditions. Any one of them asserts the lock.
     use_hw_e_stop_user_button: true
     use_sw_e_stop_user_button: true
-    use_sw_e_stop_cpu_wdg_trigger: true
     use_sw_e_stop_motor_driver_fault: true
     use_sw_e_stop_latch_status: true
 

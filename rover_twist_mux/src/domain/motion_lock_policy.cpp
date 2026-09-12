@@ -28,10 +28,6 @@ bool isMotionInhibited(const SafetyIoFlags & flags, const MotionLockPolicy & pol
         return true;
     }
 
-    if (policy.use_sw_e_stop_cpu_wdg_trigger && flags.sw_e_stop_cpu_wdg_trigger) {
-        return true;
-    }
-
     if (policy.use_sw_e_stop_motor_driver_fault && flags.sw_e_stop_motor_driver_fault) {
         return true;
     }

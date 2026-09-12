@@ -33,6 +33,14 @@ the safety IO could not gate the mux at all.
 - no `gpio_state` has been received yet (startup), or
 - `gpio_state` has gone stale beyond `gpio_timeout` (the hardware interface died).
 
+Two `gpio_state` fields are deliberately *not* lock conditions:
+
+- `gpio_pin_sw_e_stop_latch_reset` — a command pulse that clears the latch, not a state.
+- `gpio_pin_cpu_wdg_heartbeat` — an output the safety controller toggles roughly once a second to
+  feed the relay's CPU watchdog. It is a liveness square wave, not a fault flag; gating on it made
+  `motion_lock` oscillate at the heartbeat rate. A stalled heartbeat is caught by the safety relay,
+  which latches the E-Stop, and that *is* a lock condition (`use_sw_e_stop_latch_status`).
+
 `twist_mux` itself treats a *stale lock topic* as locked, so if `motion_lock_node` dies the mux
 closes rather than opens. The node therefore republishes at `publish_frequency` (10 Hz) to stay
 well inside the lock's 0.5 s timeout, and is launched alongside the mux.

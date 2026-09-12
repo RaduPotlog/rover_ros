@@ -246,8 +246,9 @@ bool SystemROSInterface::updateGpioStateMsg(const RoverControllerGpio pin, const
         case RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED:
             pin_state_msg.gpio_pin_motor_contactor_engaged = pin_value;
             break;
-        case RoverControllerGpio::GPIO_SW_E_STOP_CPU_WDG_TRIGGER:
-            pin_state_msg.gpio_pin_sw_e_stop_cpu_wdg_trigger = pin_value;
+        case RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT:
+            // Liveness heartbeat, not a stop condition - see ContactCoilHandler's watchdog kick.
+            pin_state_msg.gpio_pin_cpu_wdg_heartbeat = pin_value;
             break;
         case RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON:
             pin_state_msg.gpio_pin_sw_e_stop_user_button = pin_value;

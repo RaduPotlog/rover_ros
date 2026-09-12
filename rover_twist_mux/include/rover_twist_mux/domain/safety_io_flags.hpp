@@ -27,6 +27,12 @@ namespace rover_twist_mux::domain
  *          when the E-Stop is triggered"). `motor_contactor_engaged` is the one inverted signal:
  *          `true` means the contactor is CLOSED, i.e. the drive is live.
  *
+ *          Deliberately absent: the CPU watchdog line (GpioState.gpio_pin_cpu_wdg_heartbeat).
+ *          It is a liveness heartbeat the safety controller drives as a square wave, not a fault
+ *          flag, so neither level says anything about whether motion is safe. A stalled heartbeat
+ *          is caught by the safety relay, which latches the e-stop — covered here by
+ *          `sw_e_stop_latch_status`.
+ *
  *          Defaults are the worst case on purpose: a default-constructed value denies motion, so
  *          a field that is never populated fails safe rather than opening the command path.
  */
@@ -37,9 +43,6 @@ struct SafetyIoFlags
 
     /// Software E-Stop user button. `true` = triggered.
     bool sw_e_stop_user_button = true;
-
-    /// CPU watchdog stop. `true` = tripped.
-    bool sw_e_stop_cpu_wdg_trigger = true;
 
     /// Motor-driver fault stop. `true` = faulted.
     bool sw_e_stop_motor_driver_fault = true;

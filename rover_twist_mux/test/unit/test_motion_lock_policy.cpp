@@ -28,7 +28,6 @@ SafetyIoFlags allClear()
 
     flags.hw_e_stop_user_button = false;
     flags.sw_e_stop_user_button = false;
-    flags.sw_e_stop_cpu_wdg_trigger = false;
     flags.sw_e_stop_motor_driver_fault = false;
     flags.sw_e_stop_latch_status = false;
     flags.motor_contactor_engaged = true;
@@ -61,14 +60,6 @@ TEST(MotionLockPolicy, SoftwareEStopInhibits)
 {
     auto flags = allClear();
     flags.sw_e_stop_user_button = true;
-
-    EXPECT_TRUE(isMotionInhibited(flags, MotionLockPolicy{}));
-}
-
-TEST(MotionLockPolicy, CpuWatchdogInhibits)
-{
-    auto flags = allClear();
-    flags.sw_e_stop_cpu_wdg_trigger = true;
 
     EXPECT_TRUE(isMotionInhibited(flags, MotionLockPolicy{}));
 }
@@ -133,7 +124,6 @@ TEST(MotionLockPolicy, NoPinEnabledNeverInhibits)
     MotionLockPolicy policy;
     policy.use_hw_e_stop_user_button = false;
     policy.use_sw_e_stop_user_button = false;
-    policy.use_sw_e_stop_cpu_wdg_trigger = false;
     policy.use_sw_e_stop_motor_driver_fault = false;
     policy.use_sw_e_stop_latch_status = false;
 
@@ -143,18 +133,32 @@ TEST(MotionLockPolicy, NoPinEnabledNeverInhibits)
 TEST(MotionLockPolicy, AnySingleActiveStopIsEnough)
 {
     // Independence: each condition inhibits on its own, none shadows another.
-    for (int pin = 0; pin < 5; ++pin) {
+    for (int pin = 0; pin < 4; ++pin) {
         auto flags = allClear();
 
         switch (pin) {
             case 0: flags.hw_e_stop_user_button = true; break;
             case 1: flags.sw_e_stop_user_button = true; break;
-            case 2: flags.sw_e_stop_cpu_wdg_trigger = true; break;
-            case 3: flags.sw_e_stop_motor_driver_fault = true; break;
-            case 4: flags.sw_e_stop_latch_status = true; break;
+            case 2: flags.sw_e_stop_motor_driver_fault = true; break;
+            case 3: flags.sw_e_stop_latch_status = true; break;
             default: FAIL() << "unreachable";
         }
 
         EXPECT_TRUE(isMotionInhibited(flags, MotionLockPolicy{})) << "pin index " << pin;
     }
+}
+
+TEST(MotionLockPolicy, CpuWatchdogHeartbeatIsNotAStopCondition)
+{
+    // Regression: GpioState.gpio_pin_cpu_wdg_heartbeat is a ~1 Hz square wave the safety
+    // controller drives to feed the relay's watchdog. It used to be wired in as an active-high
+    // stop, which made the published motion lock oscillate with it. SafetyIoFlags deliberately has
+    // no member for it, so this is a compile-time guarantee - the test pins the intent: with every
+    // real stop clear, motion stays permitted no matter what the heartbeat is doing.
+    EXPECT_FALSE(isMotionInhibited(allClear(), MotionLockPolicy{}));
+
+    MotionLockPolicy all_enabled;
+    all_enabled.require_motor_contactor_engaged = true;
+
+    EXPECT_FALSE(isMotionInhibited(allClear(), all_enabled));
 }

@@ -15,6 +15,7 @@
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller.hpp"
 
 #include <chrono>
+#include <cstddef>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -43,7 +44,7 @@ const std::vector<RoverControllerCoilInfo> ContactCoilHandler::coils_config_info
     },
 
     RoverControllerCoilInfo {
-        RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_CPU_WDG_TRIGGER},
+        RoverControllerGpio {RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT},
         CoilInfo { Coil::COIL_1, true, true},
     },
 
@@ -67,6 +68,14 @@ const std::vector<RoverControllerCoilInfo> ContactCoilHandler::coils_config_info
         CoilInfo { Coil::COIL_5, false, false},
     },
 };
+
+// Indices into coils_config_info_storage_ for the coils addressed by name below. Spelled out
+// rather than used as bare literals: the watchdog coil in particular is a heartbeat output, not a
+// stop condition, and an unlabelled `[1]` hides that.
+constexpr std::size_t kCpuWdgHeartbeatCoilIdx = 1;
+constexpr std::size_t kEStopUserBtnCoilIdx = 2;
+constexpr std::size_t kEStopMotorDriverFaultCoilIdx = 3;
+constexpr std::size_t kEStopLatchResetCoilIdx = 4;
 
 ContactCoilHandler::ContactCoilHandler(std::shared_ptr<RoverModbusInterface> rover_modbus)
 : rover_modbus_(rover_modbus)
@@ -105,22 +114,22 @@ bool ContactCoilHandler::isContactCoilHandlerEnabled() const
 void ContactCoilHandler::eStopUserBtnTrigger(const bool state)
 {
     std::lock_guard<std::mutex> lck(modbus_io_mtx_);
-    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[2].coil_info, state);
+    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[kEStopUserBtnCoilIdx].coil_info, state);
 }
 
 // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
 void ContactCoilHandler::eStopMotorDriverFaultTrigger(const bool state)
 {
     std::lock_guard<std::mutex> lck(modbus_io_mtx_);
-    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[3].coil_info, state);
+    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[kEStopMotorDriverFaultCoilIdx].coil_info, state);
 }
 
 // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
 void ContactCoilHandler::eStopLatchReset()
 {
     std::lock_guard<std::mutex> lck(modbus_io_mtx_);
-    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[4].coil_info, true);
-    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[4].coil_info, false);
+    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[kEStopLatchResetCoilIdx].coil_info, true);
+    rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[kEStopLatchResetCoilIdx].coil_info, false);
 }
 
 void ContactCoilHandler::getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state)
@@ -187,10 +196,15 @@ void ContactCoilHandler::contactCoilHandlerThread()
 {
     while (contact_coil_handler_enabled_) {
         {
-            // Trigger watchdog
+            // Kick the safety relay's CPU watchdog. The relay watches for a *changing* level, so
+            // this coil is driven as a square wave: it is a liveness heartbeat, never a fault
+            // flag. Anything downstream that reads it back (see GpioState.gpio_pin_cpu_wdg_heartbeat)
+            // must not treat either level as a stop condition - a stalled heartbeat is caught by
+            // the relay itself, which latches the e-stop (sw_e_stop_latch_status).
             std::lock_guard<std::mutex> lck(modbus_io_mtx_);
             io_state_ = queryControlInterfaceIOStates();
-            rover_modbus_->writeDiscreteCoil(coils_config_info_storage_[1].coil_info, wdg_state_);
+            rover_modbus_->writeDiscreteCoil(
+                coils_config_info_storage_[kCpuWdgHeartbeatCoilIdx].coil_info, wdg_state_);
             wdg_state_ = !wdg_state_;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));

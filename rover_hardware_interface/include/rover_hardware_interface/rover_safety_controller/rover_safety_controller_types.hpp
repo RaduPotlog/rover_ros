@@ -32,7 +32,7 @@ const std::map<RoverControllerGpio, std::string> gpio_names_
 {
     { RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN,             "GPIO_HW_E_STOP_USER_BTN"               },
     { RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED,        "GPIO_MOTOR_CONTACTOR_ENGAGED"          },
-    { RoverControllerGpio::GPIO_SW_E_STOP_CPU_WDG_TRIGGER,      "GPIO_SW_E_STOP_CPU_WDG_TRIGGER"        },
+    { RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT,              "GPIO_CPU_WDG_HEARTBEAT"                },
     { RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON,          "GPIO_SW_E_STOP_USER_BUTTON"            },
     { RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT,   "GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT"     },
     { RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET,          "GPIO_SW_E_STOP_LATCH_RESET"            },

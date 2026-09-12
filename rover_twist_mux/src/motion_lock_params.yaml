@@ -21,10 +21,6 @@ motion_lock:
     type: bool
     default_value: true
     description: Inhibit motion while the software E-Stop user button is triggered.
-  use_sw_e_stop_cpu_wdg_trigger:
-    type: bool
-    default_value: true
-    description: Inhibit motion while the CPU watchdog stop is tripped.
   use_sw_e_stop_motor_driver_fault:
     type: bool
     default_value: true

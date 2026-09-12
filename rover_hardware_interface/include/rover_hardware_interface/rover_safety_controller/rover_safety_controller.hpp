@@ -86,7 +86,7 @@ private:
 
     std::unordered_map<RoverControllerGpio, bool> io_state_;
 
-    // Watchdog toggle for GPIO_SW_E_STOP_CPU_WDG_TRIGGER, flipped once per
+    // Heartbeat level for GPIO_CPU_WDG_HEARTBEAT, flipped once per
     // contactCoilHandlerThread() loop iteration. Instance state (not a function-local static) -
     // guarded by modbus_io_mtx_ like the rest of that loop body, so multiple
     // ContactCoilHandler instances/threads never share it.

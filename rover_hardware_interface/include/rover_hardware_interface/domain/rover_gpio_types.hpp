@@ -35,7 +35,7 @@ enum class RoverControllerGpio
     GPIO_7                              = 7,
 
     GPIO_MOTOR_CONTACTOR_ENGAGED        = 8,
-    GPIO_SW_E_STOP_CPU_WDG_TRIGGER      = 9,  // sw_e_stop_cpu_wdg_trigger
+    GPIO_CPU_WDG_HEARTBEAT              = 9,  // cpu_wdg_heartbeat (periodic toggle, not a fault)
     GPIO_SW_E_STOP_USER_BUTTON          = 10,  // sw_e_stop_user_button
     GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT   = 11,  // sw_e_stop_motor_driver_faults
     GPIO_SW_E_STOP_LATCH_RESET          = 12,  // sw_e_stop_latch_reset

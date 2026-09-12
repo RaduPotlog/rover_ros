@@ -33,7 +33,6 @@ domain::SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::GpioState & msg)
 
     flags.hw_e_stop_user_button = msg.gpio_pin_hw_e_stop_user_button;
     flags.sw_e_stop_user_button = msg.gpio_pin_sw_e_stop_user_button;
-    flags.sw_e_stop_cpu_wdg_trigger = msg.gpio_pin_sw_e_stop_cpu_wdg_trigger;
     flags.sw_e_stop_motor_driver_fault = msg.gpio_pin_sw_e_stop_motor_driver_fault;
     flags.sw_e_stop_latch_status = msg.gpio_pin_sw_e_stop_latch_status;
     flags.motor_contactor_engaged = msg.gpio_pin_motor_contactor_engaged;
@@ -47,7 +46,6 @@ domain::MotionLockPolicy toPolicy(const motion_lock::Params & params)
 
     policy.use_hw_e_stop_user_button = params.use_hw_e_stop_user_button;
     policy.use_sw_e_stop_user_button = params.use_sw_e_stop_user_button;
-    policy.use_sw_e_stop_cpu_wdg_trigger = params.use_sw_e_stop_cpu_wdg_trigger;
     policy.use_sw_e_stop_motor_driver_fault = params.use_sw_e_stop_motor_driver_fault;
     policy.use_sw_e_stop_latch_status = params.use_sw_e_stop_latch_status;
     policy.require_motor_contactor_engaged = params.require_motor_contactor_engaged;
