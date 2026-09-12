@@ -22,8 +22,12 @@
 
     <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
     <xacro:property name="wheel_config" value="${xacro.load_yaml(wheel_config_file)}" />
-    <xacro:property name="wheelbase" value="${wheel_config['wheelbase']}" />
+    <!-- wheelbase and wheel_separation are full centre-to-centre distances, so each
+         mount point sits at half of them (REP-103: +x forward, +y left, +z up). -->
+    <xacro:property name="wheel_mount_point_x" value="${wheel_config['wheelbase'] / 2.0}" />
     <xacro:property name="wheel_mount_point_y" value="${wheel_config['wheel_separation'] / 2.0}" />
+    <!-- Height of the wheel axis above body_link; also fixes the ground plane. -->
+    <xacro:property name="wheel_mount_point_z" value="0.033" />
 
     <!-- Rover base macros -->
     <xacro:include filename="$(find rover_description)/urdf/rover_a1/base.urdf.xacro" ns="body" />
@@ -45,6 +49,7 @@
     <!-- Rover body -->
     <xacro:body.body
       wheel_radius="${wheel_config['wheel_radius']}"
+      wheel_mount_point_z="${wheel_mount_point_z}"
       imu_xyz="${imu_xyz}"
       imu_rpy="${imu_rpy}"
       lidar_xyz="${lidar_xyz}"
@@ -53,29 +58,33 @@
     <!-- Rover wheel -->
     <xacro:wheel.wheel
       config="${wheel_config}"
-      mount_point_x="${wheelbase}"
+      mount_point_x="${wheel_mount_point_x}"
       mount_point_y="${wheel_mount_point_y}"
+      mount_point_z="${wheel_mount_point_z}"
       prefix="fl" />
 
     <!-- Rover wheel -->
     <xacro:wheel.wheel
       config="${wheel_config}"
-      mount_point_x="${wheelbase}"
+      mount_point_x="${wheel_mount_point_x}"
       mount_point_y="${wheel_mount_point_y}"
+      mount_point_z="${wheel_mount_point_z}"
       prefix="fr" />
 
     <!-- Rover wheel -->
     <xacro:wheel.wheel
       config="${wheel_config}"
-      mount_point_x="${wheelbase}"
+      mount_point_x="${wheel_mount_point_x}"
       mount_point_y="${wheel_mount_point_y}"
+      mount_point_z="${wheel_mount_point_z}"
       prefix="rl" />
 
     <!-- Rover wheel -->
     <xacro:wheel.wheel
       config="${wheel_config}"
-      mount_point_x="${wheelbase}"
+      mount_point_x="${wheel_mount_point_x}"
       mount_point_y="${wheel_mount_point_y}"
+      mount_point_z="${wheel_mount_point_z}"
       prefix="rr" />
 
     <!-- ROS2 Controller -->

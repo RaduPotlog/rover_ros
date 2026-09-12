@@ -1,44 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <robot xmlns:xacro="http://wiki.ros.org/xacro">
 
-  <xacro:macro name="wheel" params="config prefix mount_point_x mount_point_y">
+  <!-- REP-103 frame: +x forward, +y left, +z up.
+       fl = (+x,+y)  fr = (+x,-y)  rl = (-x,+y)  rr = (-x,-y)
+       All four wheels spin about +y, so a positive joint velocity drives forward. -->
+  <xacro:macro name="wheel" params="config prefix mount_point_x mount_point_y mount_point_z">
 
     <xacro:if value="${prefix == 'fl'}">
       <xacro:property name="x" value="${mount_point_x}" />
       <xacro:property name="y" value="${mount_point_y}" />
-      <xacro:property name="mount_point_offset" value="${config['mount_point_offset']}" />
       <xacro:property name="inertia_y_offset" value="${config['inertia_y_offset']}" />
-      <xacro:property name="fdir" value="1 -1 0" />
     </xacro:if>
 
     <xacro:if value="${prefix == 'fr'}">
       <xacro:property name="x" value="${mount_point_x}" />
       <xacro:property name="y" value="-${mount_point_y}" />
-      <xacro:property name="mount_point_offset" value="-${config['mount_point_offset']}" />
       <xacro:property name="inertia_y_offset" value="${-config['inertia_y_offset']}" />
-      <xacro:property name="fdir" value="1 1 0" />
     </xacro:if>
     
     <xacro:if value="${prefix == 'rl'}">
       <xacro:property name="x" value="-${mount_point_x}" />
       <xacro:property name="y" value="${mount_point_y}" />
-      <xacro:property name="mount_point_offset" value="${config['mount_point_offset']}" />
       <xacro:property name="inertia_y_offset" value="${config['inertia_y_offset']}" />
-      <xacro:property name="fdir" value="1 1 0" />
     </xacro:if>
     
     <xacro:if value="${prefix == 'rr'}">
       <xacro:property name="x" value="-${mount_point_x}" />
       <xacro:property name="y" value="-${mount_point_y}" />
-      <xacro:property name="mount_point_offset" value="-${config['mount_point_offset']}" />
       <xacro:property name="inertia_y_offset" value="${-config['inertia_y_offset']}" />
-      <xacro:property name="fdir" value="1 -1 0" />
     </xacro:if>
 
     <joint name="body_to_${prefix}_wheel_base_joint" type="fixed">
       <parent link="body_link" />
       <child link="${prefix}_wheel_base_link" />
-      <origin xyz="${x} ${y} 0.033" rpy="0.0 0.0 0.0" />
+      <origin xyz="${x} ${y} ${mount_point_z}" rpy="0.0 0.0 0.0" />
     </joint>
 
     <link name="${prefix}_wheel_base_link" />

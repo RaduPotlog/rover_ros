@@ -3,7 +3,8 @@
 
   <xacro:macro
     name="body"
-    params="wheel_radius 
+    params="wheel_radius
+            wheel_mount_point_z
             imu_xyz 
             imu_rpy
             lidar_xyz
@@ -48,8 +49,9 @@
 
     <link name="lidar_link" />
 
+    <!-- Ground projection of body_link: the wheel axis height minus the wheel radius. -->
     <joint name="body_to_footprint_joint" type="fixed">
-      <origin xyz="0.0 0.0 -0.1359" rpy="0.0 0.0 0.0" />
+      <origin xyz="0.0 0.0 ${wheel_mount_point_z - wheel_radius}" rpy="0.0 0.0 0.0" />
       <parent link="body_link" />
       <child link="base_footprint" />
     </joint>
