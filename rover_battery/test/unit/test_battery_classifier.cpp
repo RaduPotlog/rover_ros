@@ -158,9 +158,10 @@ TEST(ToChargingInfo, MapsBmsStatus)
     EXPECT_FLOAT_EQ(charging.current, -3.5f);
     EXPECT_FLOAT_EQ(charging.battery_current, -3.5f);
 
+    // Discharging means no charger is attached, so the type must not claim one.
     const auto discharging = toChargingInfo(makeFrame(50.0f, 2).data);
     EXPECT_FALSE(discharging.charging);
-    EXPECT_EQ(discharging.charger_type, ChargerType::Wired);
+    EXPECT_EQ(discharging.charger_type, ChargerType::Unknown);
 
     EXPECT_EQ(toChargingInfo(makeFrame(50.0f, 0).data).charger_type, ChargerType::Unknown);
     EXPECT_EQ(toChargingInfo(makeFrame(50.0f, 7).data).charger_type, ChargerType::Unknown);
@@ -208,7 +209,7 @@ TEST(BuildBatteryReport, CombinesReadingChargingAndErrors)
 
     const auto report = buildBatteryReport(frame, BatteryIdentity{});
     EXPECT_EQ(report.reading.health, BatteryHealth::Dead);
-    EXPECT_EQ(report.charging.charger_type, ChargerType::Wired);
+    EXPECT_EQ(report.charging.charger_type, ChargerType::Unknown);
     EXPECT_EQ(report.errors, std::vector<std::string>{"levelOneStateOfChargeTooLow"});
 }
 

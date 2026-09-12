@@ -159,7 +159,7 @@ ChargingInfo toChargingInfo(const BmsData & data)
     info.charging = data.chargeDischargeStatus == 1;
     info.current = data.packCurrent;
     info.battery_current = data.packCurrent;
-    info.charger_type = (data.chargeDischargeStatus == 1 || data.chargeDischargeStatus == 2) ?
+    info.charger_type = (data.chargeDischargeStatus == 1) ?
                         ChargerType::Wired : ChargerType::Unknown;
     return info;
 }
