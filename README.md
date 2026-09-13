@@ -47,7 +47,7 @@ rosdep install --from-paths src -y -i
 
 ```bash
 cd src/rover_cppuprofile
-cmake -Bbuild . -DPROFILE_ENABLED=OFF
+cmake -Bbuild . -DPROFILE_ENABLED=ON
 cmake --build build
 cd build
 sudo make install
