@@ -22,6 +22,7 @@
 #include <behaviortree_cpp/behavior_tree.h>
 #include <behaviortree_cpp/bt_factory.h>
 #include <rclcpp/rclcpp.hpp>
+#include <nav2_ros_common/lifecycle_node.hpp>
 
 #include <std_srvs/srv/set_bool.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
@@ -43,7 +44,7 @@ using RoverDriverStateMsg = rover_msgs::msg::RoverDriverState;
 using IOStateMsg = rover_msgs::msg::GpioState;
 using SystemStatusMsg = rover_msgs::msg::SystemStatus;
 
-class SafetyNode : public rclcpp::Node
+class SafetyNode : public nav2::LifecycleNode
 {
 
 public:
@@ -57,6 +58,8 @@ public:
     void init();
 
 protected:
+
+    nav2::CallbackReturn on_configure(const rclcpp_lifecycle::State & previous_state) override;
 
     void declareParameters();
     

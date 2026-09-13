@@ -68,12 +68,19 @@ domain::BatteryHealth toBatteryHealth(std::uint8_t power_supply_health)
 SafetyNode::SafetyNode(
     const std::string & node_name,
     const rclcpp::NodeOptions & options)
-: Node(node_name, options)
+: nav2::LifecycleNode(node_name, options)
 , param_listener_(std::make_shared<safety::ParamListener>(this->get_node_parameters_interface()))
 , params_(param_listener_->get_params())
 , battery_thresholds_(params_.battery.temp.critical, params_.battery.temp.fatal)
 {
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
+}
+
+nav2::CallbackReturn SafetyNode::on_configure(const rclcpp_lifecycle::State & previous_state)
+{
+    (void)previous_state;
+    init();
+    return nav2::CallbackReturn::SUCCESS;
 }
 
 SafetyNode::~SafetyNode()
@@ -99,16 +106,17 @@ void SafetyNode::init()
     // so transient_local here would be QoS-incompatible.
     const auto latest_state_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
 
-    battery_sub_ = this->create_subscription<BatteryStateMsg>(
+    battery_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<BatteryStateMsg>(
         "rover_battery/battery_status", latest_state_qos,
         std::bind(&SafetyNode::batteryStateSubscriberCallback, this, _1));
-    driver_state_sub_ = this->create_subscription<RoverDriverStateMsg>(
-        "hardware_interface/rover_driver_state", 10, 
+    driver_state_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<RoverDriverStateMsg>(
+        "hardware_interface/rover_driver_state", 10,
         std::bind(&SafetyNode::driverStateSubscriberCallback, this, _1));
-    io_state_sub_ = this->create_subscription<IOStateMsg>(
-        "hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+    io_state_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<IOStateMsg>(
+        "hardware_interface/gpio_state",
+        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
         std::bind(&SafetyNode::ioStateSubscriberCallback, this, _1));
-    system_status_sub_ = this->create_subscription<SystemStatusMsg>(
+    system_status_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<SystemStatusMsg>(
         "system_status", latest_state_qos,
         std::bind(&SafetyNode::systemStatusSubscriberCallback, this, _1));
 

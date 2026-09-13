@@ -22,6 +22,7 @@
 #include <behaviortree_cpp/behavior_tree.h>
 #include "behaviortree_cpp/bt_factory.h"
 #include "rclcpp/rclcpp.hpp"
+#include <nav2_ros_common/lifecycle_node.hpp>
 
 #include "sensor_msgs/msg/battery_state.hpp"
 #include "sensor_msgs/msg/joy.hpp"
@@ -42,7 +43,7 @@ using LedAnimationMsg = rover_msgs::msg::LedAnimation;
 using JoyMsg = sensor_msgs::msg::Joy;
 using GpioMsg = rover_msgs::msg::GpioState; 
 
-class LedSafetyNode : public rclcpp::Node
+class LedSafetyNode : public nav2::LifecycleNode
 {
 
 public:
@@ -59,6 +60,8 @@ public:
     void init();
 
 protected:
+
+    nav2::CallbackReturn on_configure(const rclcpp_lifecycle::State & previous_state) override;
 
     void declareParameters();
 

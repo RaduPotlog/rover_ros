@@ -21,6 +21,7 @@
 #include <thread>
 
 #include <behaviortree_cpp/bt_factory.h>
+#include <nav2_ros_common/lifecycle_node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
@@ -42,7 +43,7 @@ protected:
 
     void SetUp() override
     {
-        bt_node_ = std::make_shared<rclcpp::Node>("bt_node");
+        bt_node_ = std::make_shared<nav2::LifecycleNode>("bt_node");
         server_node_ = std::make_shared<rclcpp::Node>("server_node");
         executor_.add_node(server_node_);
         spin_thread_ = std::thread([this]() { executor_.spin(); });
@@ -73,7 +74,7 @@ protected:
     BT::NodeStatus tickUntilDone()
     {
         auto blackboard = BT::Blackboard::create();
-        blackboard->set<rclcpp::Node::SharedPtr>("node", bt_node_);
+        blackboard->set<nav2::LifecycleNode::SharedPtr>("node", bt_node_);
         blackboard->set<std::chrono::milliseconds>("bt_loop_duration", 10ms);
         blackboard->set<std::chrono::milliseconds>("wait_for_service_timeout", 2000ms);
         blackboard->set<std::chrono::milliseconds>("server_timeout", 300ms);
@@ -92,7 +93,7 @@ protected:
         return status;
     }
 
-    rclcpp::Node::SharedPtr bt_node_;
+    nav2::LifecycleNode::SharedPtr bt_node_;
     rclcpp::Node::SharedPtr server_node_;
     rclcpp::executors::SingleThreadedExecutor executor_;
     std::thread spin_thread_;

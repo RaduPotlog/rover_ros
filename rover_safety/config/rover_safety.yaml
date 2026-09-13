@@ -3,6 +3,7 @@
     ros__parameters:
       timer_frequency: 10.0
       bt_server_port: 6666
+      autostart_node: true
       battery:
         temp:
           critical: 50.0

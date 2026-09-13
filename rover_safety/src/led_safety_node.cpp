@@ -40,7 +40,7 @@ namespace rover_safety
 
 LedSafetyNode::LedSafetyNode(
     const std::string & node_name, const rclcpp::NodeOptions & options)
-: Node(node_name, options)
+: nav2::LifecycleNode(node_name, options)
 {
     RCLCPP_INFO(this->get_logger(), "Constructing node.");
 
@@ -50,6 +50,13 @@ LedSafetyNode::LedSafetyNode(
     battery_percent_ = 0.0;
 
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
+}
+
+nav2::CallbackReturn LedSafetyNode::on_configure(const rclcpp_lifecycle::State & previous_state)
+{
+    (void)previous_state;
+    init();
+    return nav2::CallbackReturn::SUCCESS;
 }
 
 void LedSafetyNode::init()
@@ -66,14 +73,16 @@ void LedSafetyNode::init()
 
     using namespace std::placeholders;
 
-    battery_sub_ = this->create_subscription<BatteryStateMsg>(
-        "rover_battery/battery_status", 10, std::bind(&LedSafetyNode::batteryCallback, this, _1));
+    battery_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<BatteryStateMsg>(
+        "rover_battery/battery_status", 10,
+        std::bind(&LedSafetyNode::batteryCallback, this, _1));
     
-    gpio_sub_ = this->create_subscription<GpioMsg>(
-        "hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+    gpio_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<GpioMsg>(
+        "hardware_interface/gpio_state",
+        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
         std::bind(&LedSafetyNode::gpioCallback, this, _1));
     
-    joy_sub_ = this->create_subscription<JoyMsg>(
+    joy_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<JoyMsg>(
         "joy", 10, std::bind(&LedSafetyNode::joyCallback, this, _1));
 
     const double timer_freq = this->params_.timer_frequency;

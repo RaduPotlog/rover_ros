@@ -27,7 +27,7 @@ CallSetLedAnimationService::CallSetLedAnimationService(
         throw BT::RuntimeError("Missing required input [service_name]");
     }
 
-    node_ = config.blackboard->get<rclcpp::Node::SharedPtr>("node");
+    node_ = config.blackboard->get<nav2::LifecycleNode::SharedPtr>("node");
 }
 
 BT::PortsList CallSetLedAnimationService::providedPorts() 

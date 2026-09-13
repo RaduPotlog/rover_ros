@@ -22,6 +22,7 @@
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
+#include <nav2_ros_common/lifecycle_node.hpp>
 
 #include "behaviortree_cpp/bt_factory.h"
 #include "behaviortree_cpp/loggers/groot2_publisher.h"
@@ -39,7 +40,7 @@ class BehaviorTreeSafety
 public:
   
     BehaviorTreeSafety(
-        const rclcpp::Node::SharedPtr & node,
+        const nav2::LifecycleNode::SharedPtr & node,
         const std::string & tree_name, 
         const std::map<std::string, std::any> & initial_blackboard,
         const unsigned groot_port = 1667)
@@ -133,7 +134,7 @@ protected:
             throw BT::RuntimeError("No rclcpp::Node available");
         }
 
-        config.blackboard->set<rclcpp::Node::SharedPtr>("node", node_);
+        config.blackboard->set<nav2::LifecycleNode::SharedPtr>("node", node_);
         
         for (auto & [name, value] : bb_values) {
             
@@ -168,7 +169,7 @@ protected:
 
 private:
 
-    rclcpp::Node::SharedPtr node_;
+    nav2::LifecycleNode::SharedPtr node_;
     
     const std::string tree_name_;
     const std::map<std::string, std::any> initial_blackboard_;

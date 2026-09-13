@@ -25,10 +25,8 @@ int main(int argc, char ** argv)
     auto safety_node =
         std::make_shared<rover_safety::SafetyNode>("safety");
     
-    safety_node->init();
-
     try {
-        rclcpp::spin(safety_node);
+        rclcpp::spin(safety_node->get_node_base_interface());
     } catch (const std::runtime_error & err) {
         std::cerr << "[safety] Caught exception: " << err.what() << std::endl;
     }

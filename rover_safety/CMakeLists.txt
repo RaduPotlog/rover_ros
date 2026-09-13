@@ -22,6 +22,7 @@ set(PACKAGE_DEPENDENCIES
     tf2_geometry_msgs
     yaml-cpp
     nav2_behavior_tree
+    nav2_ros_common
 )
 
 foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
@@ -90,6 +91,7 @@ add_executable(${PROJECT_NAME}_node src/safety_main.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}_node
+    nav2_ros_common::nav2_ros_common
     ${behaviortree_cpp_TARGETS}
     ${geometry_msgs_TARGETS}
     ${rover_msgs_TARGETS}
@@ -115,6 +117,7 @@ add_executable(led_safety_node src/led_safety_main.cpp
                                    src/led_safety_node.cpp)
 
 target_link_libraries(led_safety_node
+    nav2_ros_common::nav2_ros_common
     ${behaviortree_cpp_TARGETS}
     ${geometry_msgs_TARGETS}
     ${rover_msgs_TARGETS}

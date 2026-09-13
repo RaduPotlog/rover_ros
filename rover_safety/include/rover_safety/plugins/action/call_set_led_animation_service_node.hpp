@@ -44,7 +44,7 @@ private:
 
     std::string service_name_;
 
-    rclcpp::Node::SharedPtr node_;
+    nav2::LifecycleNode::SharedPtr node_;
 };
 
 }  // namespace rover_safety
