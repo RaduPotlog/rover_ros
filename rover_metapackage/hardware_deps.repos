@@ -10,7 +10,7 @@ repositories:
   rover_crsf_receiver:
     type: git
     url: https://github.com/RaduPotlog/rover_crsf_receiver
-    version: migration-to-ros-serial-driver
+    version: lyrical
   rover_arch:
     type: git
     url: https://github.com/RaduPotlog/rover_arch
@@ -22,7 +22,7 @@ repositories:
   rover_transport:
     type: git
     url: https://github.com/RaduPotlog/rover_transport
-    version: master
+    version: lyrical
   rover_network_monitor:
     type: git
     url: https://github.com/RaduPotlog/rover_network_monitor.git
