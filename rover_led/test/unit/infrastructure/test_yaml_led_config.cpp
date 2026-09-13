@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#include "ament_index_cpp/get_package_share_directory.hpp"
+#include "ament_index_cpp/get_package_share_path.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yaml-cpp/yaml.h"
@@ -110,7 +110,7 @@ TEST(ParseLedLayout, RejectsDuplicatesAndBadRanges)
 
 TEST(ResolvePackageSubstitution, ResolvesFindToTheShareDirectory)
 {
-    const auto share = ament_index_cpp::get_package_share_directory("ament_index_cpp");
+    const auto share = ament_index_cpp::get_package_share_path("ament_index_cpp").string();
 
     EXPECT_EQ(rover_led::resolvePackageSubstitution("$(find ament_index_cpp)/a/b.png"), share + "/a/b.png");
     EXPECT_EQ(rover_led::resolvePackageSubstitution("$(find  ament_index_cpp )/x"), share + "/x");
@@ -149,7 +149,7 @@ TEST(YamlAnimationCatalog, LoadsEntriesWithDefaults)
     ASSERT_EQ(defaults->animations.size(), 1u);
     EXPECT_EQ(defaults->animations[0].segments, (std::vector<std::string>{"front_1"}));
 
-    const auto share = ament_index_cpp::get_package_share_directory("ament_index_cpp");
+    const auto share = ament_index_cpp::get_package_share_path("ament_index_cpp").string();
     EXPECT_EQ(defaults->animations[0].animation["image"].as<std::string>(), share + "/img.png");
     EXPECT_EQ(defaults->animations[0].animation["frames"][0].as<std::string>(), share);
     EXPECT_EQ(defaults->animations[0].animation["duration"].as<int>(), 2);

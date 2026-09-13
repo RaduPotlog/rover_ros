@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "ament_index_cpp/get_package_prefix.hpp"
-#include "ament_index_cpp/get_package_share_directory.hpp"
+#include "ament_index_cpp/get_package_share_path.hpp"
 #include "yaml-cpp/yaml.h"
 
 #include "rover_utils/yaml_utils.hpp"
@@ -132,7 +132,7 @@ std::optional<std::string> resolvePackageSubstitution(const std::string & value)
     const auto package = trim(value.substr(prefix.size(), closing - prefix.size()));
 
     try {
-        return ament_index_cpp::get_package_share_directory(package) + value.substr(closing + 1);
+        return ament_index_cpp::get_package_share_path(package).string() + value.substr(closing + 1);
     } catch (const ament_index_cpp::PackageNotFoundError & /*e*/) {
         return std::nullopt;
     }
