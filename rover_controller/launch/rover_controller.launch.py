@@ -32,18 +32,18 @@ from nav2_common.launch import ReplaceString
 
 def generate_launch_description():
     
-    controller_dir_path = LaunchConfiguration("controller_dir_path")
+    common_dir_path = LaunchConfiguration("common_dir_path")
     declare_common_dir_path_arg = DeclareLaunchArgument(
-        "controller_dir_path",
+        "common_dir_path",
         default_value="",
         description="Path to the common configuration directory.",
     )
     rover_controller_dir = PythonExpression(
         [
             "'",
-            controller_dir_path,
+            common_dir_path,
             "/rover_controller' if '",
-            controller_dir_path,
+            common_dir_path,
             "' else '",
             FindPackageShare("rover_controller"),
             "'",
@@ -204,6 +204,8 @@ def generate_launch_description():
             "controller_manager",
             "--controller-manager-timeout",
             "10",
+            "--param-file",
+            ns_controller_config_path,
             "--ros-args",
             "--log-level",
             log_level,
@@ -237,6 +239,8 @@ def generate_launch_description():
             "controller_manager",
             "--controller-manager-timeout",
             "10",
+            "--param-file",
+            ns_controller_config_path,
             "--ros-args",
             "--log-level",
             log_level,
