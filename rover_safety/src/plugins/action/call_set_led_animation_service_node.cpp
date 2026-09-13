@@ -58,7 +58,7 @@ BT::NodeStatus CallSetLedAnimationService::tick()
         return BT::NodeStatus::FAILURE;
     }
 
-    service_client_->async_send_request(request_);
+    service_client_->async_call(request_);
     
     return BT::NodeStatus::SUCCESS;
 }

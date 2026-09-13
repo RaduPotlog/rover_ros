@@ -150,6 +150,10 @@ protected:
     rclcpp::executors::MultiThreadedExecutor::UniquePtr executor_;
     std::thread executor_thread_;
 
+    // Staging messages owned by the update thread; try_publish copies them under its lock.
+    RoverDriverStateMsg driver_state_msg_;
+    GpioStateMsg gpio_state_msg_;
+
     rclcpp::Publisher<RoverDriverStateMsg>::SharedPtr driver_state_publisher_;
     std::unique_ptr<realtime_tools::RealtimePublisher<RoverDriverStateMsg>> realtime_driver_state_publisher_;
 

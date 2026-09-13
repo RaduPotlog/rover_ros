@@ -148,6 +148,37 @@ TEST_F(SystemROSInterfaceTest, PublishesDriverStateAfterUpdate)
 
     ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
     EXPECT_TRUE(received.error);
+    EXPECT_EQ(received.driver_states.size(), 4u);
+}
+
+TEST_F(SystemROSInterfaceTest, PublishesGpioStateAfterUpdate)
+{
+    SystemROSInterface ros_interface("test_system_ros_interface_gpio");
+    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_gpio_client");
+
+    GpioStateMsg received;
+    std::atomic_bool got_msg{false};
+    auto subscription = client_node->create_subscription<GpioStateMsg>(
+        "hardware_interface/gpio_state",
+        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        [&](const GpioStateMsg::SharedPtr msg) {
+            received = *msg;
+            got_msg = true;
+        });
+
+    ASSERT_TRUE(spinUntil(
+        client_node, [&]() { return subscription->get_publisher_count() > 0; },
+        std::chrono::seconds(5)));
+
+    ros_interface.updateMsgGpioStates({
+        {RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN, true},
+        {RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED, false},
+    });
+    ros_interface.publishGpioStateMsg();
+
+    ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
+    EXPECT_TRUE(received.gpio_pin_hw_e_stop_user_button);
+    EXPECT_FALSE(received.gpio_pin_motor_contactor_engaged);
 }
 
 }  // namespace rover_hardware_interface

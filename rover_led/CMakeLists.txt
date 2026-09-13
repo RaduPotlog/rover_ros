@@ -48,7 +48,7 @@ target_include_directories(rover_led_domain PUBLIC
 )
 
 # rover_utils is only used for its header-only YAML helpers.
-ament_target_dependencies(rover_led_domain rover_utils)
+target_include_directories(rover_led_domain PUBLIC ${rover_utils_INCLUDE_DIRS})
 
 target_link_libraries(rover_led_domain png yaml-cpp)
 
@@ -70,7 +70,9 @@ pluginlib_export_plugin_description_file(${PROJECT_NAME} plugins.xml)
 
 add_library(animation_plugins SHARED src/infrastructure/animation_plugins.cpp)
 
-ament_target_dependencies(animation_plugins pluginlib)
+target_link_libraries(animation_plugins
+    ${pluginlib_TARGETS}
+)
 
 target_link_libraries(animation_plugins rover_led_domain)
 
@@ -82,17 +84,16 @@ add_library(led_driver_node_component SHARED
     src/infrastructure/led_driver_node.cpp
 )
 
-ament_target_dependencies(
-    led_driver_node_component
-    diagnostic_updater
-    lifecycle_msgs
-    udp_msgs
-    rover_msgs
-    rclcpp
-    rclcpp_components
-    rclcpp_lifecycle
-    sensor_msgs
-    std_srvs
+target_link_libraries(led_driver_node_component
+    ${diagnostic_updater_TARGETS}
+    ${lifecycle_msgs_TARGETS}
+    ${udp_msgs_TARGETS}
+    ${rover_msgs_TARGETS}
+    ${rclcpp_TARGETS}
+    ${rclcpp_components_TARGETS}
+    ${rclcpp_lifecycle_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${std_srvs_TARGETS}
 )
 
 target_link_libraries(led_driver_node_component
@@ -110,16 +111,15 @@ add_library(
     src/infrastructure/yaml_led_config.cpp
 )
 
-ament_target_dependencies(
-    led_controller_node_component
-    ament_index_cpp
-    rover_msgs
-    rover_utils
-    pluginlib
-    rclcpp
-    rclcpp_components
-    sensor_msgs
+target_link_libraries(led_controller_node_component
+    ${ament_index_cpp_TARGETS}
+    ${rover_msgs_TARGETS}
+    ${pluginlib_TARGETS}
+    ${rclcpp_TARGETS}
+    ${rclcpp_components_TARGETS}
+    ${sensor_msgs_TARGETS}
 )
+target_include_directories(led_controller_node_component PUBLIC ${rover_utils_INCLUDE_DIRS})
 
 target_link_libraries(led_controller_node_component
                       rover_led_application

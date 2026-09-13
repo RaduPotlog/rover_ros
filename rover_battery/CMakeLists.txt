@@ -38,7 +38,13 @@ add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/rover_battery_node.cpp
 )
 target_link_libraries(${PROJECT_NAME}_ros ${PROJECT_NAME}_core)
-ament_target_dependencies(${PROJECT_NAME}_ros ${PACKAGE_DEPENDENCIES})
+target_link_libraries(${PROJECT_NAME}_ros
+    ${rclcpp_TARGETS}
+    ${diagnostic_updater_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${udp_msgs_TARGETS}
+    ${rover_msgs_TARGETS}
+)
 
 add_executable(${PROJECT_NAME}_node src/rover_battery.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)

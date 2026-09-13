@@ -41,7 +41,11 @@ target_link_libraries(${PROJECT_NAME}_ros
                       ${PROJECT_NAME}_core
                       motion_lock_params
 )
-ament_target_dependencies(${PROJECT_NAME}_ros ${PACKAGE_DEPENDENCIES})
+target_link_libraries(${PROJECT_NAME}_ros
+    ${rclcpp_TARGETS}
+    ${rover_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+)
 
 add_executable(motion_lock_node src/motion_lock.cpp)
 target_link_libraries(motion_lock_node ${PROJECT_NAME}_ros)

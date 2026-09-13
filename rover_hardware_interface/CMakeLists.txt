@@ -39,8 +39,7 @@ foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
 endforeach()
 
 # PkgConfig is a CMake-builtin module, not an ament package - kept out of PACKAGE_DEPENDENCIES so
-# it isn't fed to ament_target_dependencies()/ament_export_dependencies() below (neither is
-# meaningful for it, and it has no package.xml entry).
+# it isn't exported as an ament dependency (it has no package.xml entry).
 find_package(PkgConfig REQUIRED)
 
 # Modbus_Core is a plain CMake package (not ament) from the sibling rover_modbus repo —
@@ -58,7 +57,7 @@ set(ENV{PKG_CONFIG_PATH}
 
 # ROS-free core: the domain + application layers (see .claude/rules/clean_architecture.md), plus
 # utils.cpp, which is std-only and which domain/driver_data_snapshot.hpp depends on. Deliberately
-# gets NO ament_target_dependencies()/vendor links, so a ROS, hardware_interface or vendor-SDK
+# gets no ROS/vendor links, so a ROS, hardware_interface or vendor-SDK
 # include in domain/ or application/ now fails to compile, not just the purity scripts below.
 # STATIC + PIC so it can be linked into the SHARED plugin library.
 add_library(
@@ -107,7 +106,23 @@ add_library(
 # public headers (rover_a1_system.hpp) only reach the std-only rover_modbus/modbus_types.hpp;
 # code including rover_safety_controller.hpp or rover_modbus/modbus*.hpp needs Modbus_Core's
 # headers on its include path itself (today /usr/local/include, a default search path).
-ament_target_dependencies(${PROJECT_NAME} PUBLIC ${PACKAGE_DEPENDENCIES})
+target_link_libraries(${PROJECT_NAME} PUBLIC
+    ${diagnostic_updater_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${hardware_interface_TARGETS}
+    ${rclcpp_components_TARGETS}
+    ${imu_filter_madgwick_TARGETS}
+    ${rover_msgs_TARGETS}
+    ${phidgets_api_TARGETS}
+    ${pluginlib_TARGETS}
+    ${rclcpp_TARGETS}
+    ${rclcpp_lifecycle_TARGETS}
+    ${realtime_tools_TARGETS}
+    ${std_msgs_TARGETS}
+    ${std_srvs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+    ${tf2_ros_TARGETS}
+)
 
 target_link_libraries(
     ${PROJECT_NAME}
@@ -232,7 +247,10 @@ if(BUILD_TESTING)
   ament_add_gtest(
     test_system_ros_interface test/system_ros_interface/test_system_ros_interface.cpp)
   target_link_libraries(test_system_ros_interface ${PROJECT_NAME})
-  ament_target_dependencies(test_system_ros_interface rclcpp std_srvs)
+  target_link_libraries(test_system_ros_interface
+      ${rclcpp_TARGETS}
+      ${std_srvs_TARGETS}
+  )
 
   # Integration test: drives RoverA1System through the real hardware_interface plugin contract
   # (on_init() + export_state_interfaces()/export_command_interfaces()) using hand-built
@@ -243,7 +261,9 @@ if(BUILD_TESTING)
   ament_add_gtest(
     test_rover_a1_system_on_init test/rover_system/test_rover_a1_system_on_init.cpp)
   target_link_libraries(test_rover_a1_system_on_init ${PROJECT_NAME})
-  ament_target_dependencies(test_rover_a1_system_on_init hardware_interface)
+  target_link_libraries(test_rover_a1_system_on_init
+      ${hardware_interface_TARGETS}
+  )
 
   # Drives RoverSystem::write() through on_init()/on_configure() on a RoverSystem subclass whose
   # defineRoverDriver()/defineRoverController() return in-memory fakes - no Modbus/Phidget
@@ -252,7 +272,11 @@ if(BUILD_TESTING)
     test_rover_system_write test/rover_system/test_rover_system_write.cpp)
   target_link_libraries(test_rover_system_write ${PROJECT_NAME})
   target_include_directories(test_rover_system_write PRIVATE test)
-  ament_target_dependencies(test_rover_system_write hardware_interface rclcpp rclcpp_lifecycle)
+  target_link_libraries(test_rover_system_write
+      ${hardware_interface_TARGETS}
+      ${rclcpp_TARGETS}
+      ${rclcpp_lifecycle_TARGETS}
+  )
 
   # Integration test: drives PhidgetImuSensor through the real hardware_interface plugin contract
   # (on_init() + export_state_interfaces()), the same pattern as
@@ -262,7 +286,9 @@ if(BUILD_TESTING)
   ament_add_gtest(
     test_phidget_imu_sensor_on_init test/rover_sensors/test_phidget_imu_sensor_on_init.cpp)
   target_link_libraries(test_phidget_imu_sensor_on_init ${PROJECT_NAME})
-  ament_target_dependencies(test_phidget_imu_sensor_on_init hardware_interface)
+  target_link_libraries(test_phidget_imu_sensor_on_init
+      ${hardware_interface_TARGETS}
+  )
 
   # Unit tests for ContactCoilHandler/RoverSafetyController against FakeRoverModbus (test/
   # rover_safety_controller/fake_rover_modbus.hpp) - no real Modbus TCP connection involved. These

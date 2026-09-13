@@ -53,7 +53,12 @@ target_link_libraries(${PROJECT_NAME}_ros
                       system_diag_params
                       PkgConfig::CPPUPROFILE
 )
-ament_target_dependencies(${PROJECT_NAME}_ros ${PACKAGE_DEPENDENCIES})
+target_link_libraries(${PROJECT_NAME}_ros
+    ${diagnostic_msgs_TARGETS}
+    ${diagnostic_updater_TARGETS}
+    ${rclcpp_TARGETS}
+    ${rover_msgs_TARGETS}
+)
 
 add_executable(${PROJECT_NAME}_node src/rover_diag_manager.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)

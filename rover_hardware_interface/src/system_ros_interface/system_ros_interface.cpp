@@ -144,7 +144,7 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
           DriverNames::FRONT_RIGHT}) {
         DriverStateNamedMsg driver_state_named;
         driver_state_named.name = cachedDriverName(name);
-        realtime_driver_state_publisher_->msg_.driver_states.push_back(driver_state_named);
+        driver_state_msg_.driver_states.push_back(driver_state_named);
     }
 
     gpio_state_publisher_ = node_->create_publisher<GpioStateMsg>("hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
@@ -181,7 +181,7 @@ void SystemROSInterface::updateMsgErrorFlags(
     const DriverNames name,
     const DriverDataSnapshot & data)
 {
-    auto & driver_state = realtime_driver_state_publisher_->msg_;
+    auto & driver_state = driver_state_msg_;
     auto & driver_state_named = getDriverStateByName(driver_state, name);
 
     driver_state.header.stamp = node_->get_clock()->now();
@@ -201,7 +201,7 @@ void SystemROSInterface::updateMsgDriversStates(
     const DriverNames name,
     const DriverStateReading & state)
 {
-    auto & driver_state = realtime_driver_state_publisher_->msg_;
+    auto & driver_state = driver_state_msg_;
     auto & driver_state_named = getDriverStateByName(driver_state, name);
 
     driver_state_named.state.current = state.getDriverCurrent();
@@ -210,14 +210,12 @@ void SystemROSInterface::updateMsgDriversStates(
 
 void SystemROSInterface::updateMsgError(const bool error)
 {
-    realtime_driver_state_publisher_->msg_.error = error;
+    driver_state_msg_.error = error;
 }
 
 void SystemROSInterface::publishRobotDriverState()
 {
-    if (realtime_driver_state_publisher_->trylock()) {
-        realtime_driver_state_publisher_->unlockAndPublish();
-    }
+    realtime_driver_state_publisher_->try_publish(driver_state_msg_);
 }
 
 void SystemROSInterface::updateMsgGpioStates(
@@ -230,14 +228,12 @@ void SystemROSInterface::updateMsgGpioStates(
 
 void SystemROSInterface::publishGpioStateMsg()
 {
-    if (realtime_gpio_state_publisher_->trylock()) {
-        realtime_gpio_state_publisher_->unlockAndPublish();
-    }
+    realtime_gpio_state_publisher_->try_publish(gpio_state_msg_);
 }
 
 bool SystemROSInterface::updateGpioStateMsg(const RoverControllerGpio pin, const bool pin_value)
 {
-    auto & pin_state_msg = realtime_gpio_state_publisher_->msg_;
+    auto & pin_state_msg = gpio_state_msg_;
 
     switch (pin) {
         case RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN:

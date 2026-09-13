@@ -40,7 +40,13 @@ add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/rover_crfs_teleop_node.cpp
 )
 target_link_libraries(${PROJECT_NAME}_ros PUBLIC ${PROJECT_NAME}_core)
-ament_target_dependencies(${PROJECT_NAME}_ros PUBLIC ${PACKAGE_DEPENDENCIES})
+target_link_libraries(${PROJECT_NAME}_ros PUBLIC
+    ${rclcpp_TARGETS}
+    ${rclcpp_lifecycle_TARGETS}
+    ${std_srvs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${crsf_receiver_msg_TARGETS}
+)
 
 add_executable(${PROJECT_NAME}_node src/rover_crfs_teleop_node_main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
@@ -71,7 +77,9 @@ if(BUILD_TESTING)
   # Integration: the lifecycle node against real ROS topics and services (test/integration/).
   ament_add_gtest(test_teleop_node test/integration/test_teleop_node.cpp TIMEOUT 60)
   target_link_libraries(test_teleop_node ${PROJECT_NAME}_ros)
-  ament_target_dependencies(test_teleop_node lifecycle_msgs)
+  target_link_libraries(test_teleop_node
+      ${lifecycle_msgs_TARGETS}
+  )
 
   # E2E: the node started from its launch description (test/e2e/).
   add_launch_test(test/e2e/test_teleop_launch.py TIMEOUT 60)

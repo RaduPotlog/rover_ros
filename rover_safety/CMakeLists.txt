@@ -66,25 +66,40 @@ list(APPEND plugin_libs tick_after_timeout_bt_node)
 
 foreach(bt_plugin ${plugin_libs})
     target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)
-    ament_target_dependencies(${bt_plugin} ${PACKAGE_DEPENDENCIES})
+    target_link_libraries(${bt_plugin}
+        ${ament_index_cpp_TARGETS}
+        ${behaviortree_cpp_TARGETS}
+        ${geometry_msgs_TARGETS}
+        ${rover_msgs_TARGETS}
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        ${rclcpp_TARGETS}
+        ${rclcpp_action_TARGETS}
+        ${sensor_msgs_TARGETS}
+        ${std_msgs_TARGETS}
+        ${std_srvs_TARGETS}
+        ${tf2_geometry_msgs_TARGETS}
+        yaml-cpp
+        ${nav2_behavior_tree_TARGETS}
+    )
+    target_include_directories(${bt_plugin} PUBLIC ${rover_utils_INCLUDE_DIRS})
 endforeach()
 
 add_executable(${PROJECT_NAME}_node src/safety_main.cpp
     src/safety_node.cpp
 )
 
-ament_target_dependencies(
-    ${PROJECT_NAME}_node
-    behaviortree_cpp
-    geometry_msgs
-    rover_msgs
-    rover_utils
-    rclcpp
-    sensor_msgs
-    std_msgs
-    tf2_geometry_msgs
-    nav2_behavior_tree
+target_link_libraries(${PROJECT_NAME}_node
+    ${behaviortree_cpp_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${rover_msgs_TARGETS}
+    ${rclcpp_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+    ${nav2_behavior_tree_TARGETS}
 )
+target_include_directories(${PROJECT_NAME}_node PUBLIC ${rover_utils_INCLUDE_DIRS})
 
 generate_parameter_library(safety_parameters
     src/safety_parameters.yaml
@@ -99,18 +114,17 @@ target_link_libraries(${PROJECT_NAME}_node
 add_executable(led_safety_node src/led_safety_main.cpp
                                    src/led_safety_node.cpp)
 
-ament_target_dependencies(
-    led_safety_node
-    behaviortree_cpp
-    geometry_msgs
-    rover_msgs
-    rover_utils
-    rclcpp
-    sensor_msgs
-    std_msgs
-    tf2_geometry_msgs
-    nav2_behavior_tree
+target_link_libraries(led_safety_node
+    ${behaviortree_cpp_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${rover_msgs_TARGETS}
+    ${rclcpp_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+    ${nav2_behavior_tree_TARGETS}
 )
+target_include_directories(led_safety_node PUBLIC ${rover_utils_INCLUDE_DIRS})
 
 generate_parameter_library(led_safety_parameters
                            src/led_safety_parameters.yaml
@@ -144,8 +158,12 @@ if(BUILD_TESTING)
     ament_add_gtest(test_call_trigger_service test/integration/test_call_trigger_service.cpp
                     TIMEOUT 60)
     target_link_libraries(test_call_trigger_service call_trigger_service_bt_node)
-    ament_target_dependencies(test_call_trigger_service
-        behaviortree_cpp nav2_behavior_tree rclcpp std_srvs)
+    target_link_libraries(test_call_trigger_service
+        ${behaviortree_cpp_TARGETS}
+        ${nav2_behavior_tree_TARGETS}
+        ${rclcpp_TARGETS}
+        ${std_srvs_TARGETS}
+    )
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
