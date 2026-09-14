@@ -9,4 +9,9 @@ install(DIRECTORY config launch meshes rviz urdf
 
 ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/setup_envs.sh.in")
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_wheel_geometry test/test_wheel_geometry.py)
+endif()
+
 ament_package()

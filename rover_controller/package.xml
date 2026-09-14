@@ -11,19 +11,18 @@
   
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>pid_controller</exec_depend>
-  <exec_depend>chained_filter_controller</exec_depend>
   <exec_depend>diff_drive_controller</exec_depend>
   <exec_depend>imu_sensor_broadcaster</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
-  <exec_depend>mecanum_drive_controller</exec_depend>
   <exec_depend>nav2_common</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>xacro</exec_depend>
 
   <!-- Rover dependency -->
   <exec_depend>rover_description</exec_depend>
+  <exec_depend>rover_utils</exec_depend>
   
   <!-- Rover real hardware dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_hardware_interface</exec_depend>
@@ -31,7 +30,6 @@
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_index_python</test_depend>
   <test_depend>python3-yaml</test_depend>
-  <test_depend>xacro</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

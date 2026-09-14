@@ -1,3 +1,6 @@
+# Wheel PID controllers below are experimental and are NOT spawned.
+# Activation requires deliberate reference-interface chaining to avoid competing
+# with drive_controller for physical wheel velocity command interfaces.
 /**:
   controller_manager:
     ros__parameters:

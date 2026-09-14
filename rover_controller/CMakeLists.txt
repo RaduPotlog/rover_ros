@@ -10,6 +10,7 @@ install(DIRECTORY config launch
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_wheel_geometry test/test_wheel_geometry.py)
+  ament_add_pytest_test(test_controller_launch test/test_controller_launch.py TIMEOUT 60)
 endif()
 
 ament_package()

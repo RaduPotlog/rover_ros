@@ -16,8 +16,11 @@
 
 from rover_utils.logging import limit_log_level_to_info
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Shutdown, RegisterEventHandler, TimerAction
-from launch.conditions import IfCondition, UnlessCondition
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription, LogError,
+    RegisterEventHandler, SetLaunchConfiguration, Shutdown,
+)
+from launch.conditions import UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -25,14 +28,26 @@ from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
     PythonExpression,
-    PathSubstitution,
 )
 from launch_ros.actions import Node, SetParameter
 from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
 
+def spawner_exit_handler(controller_name, next_action=None):
+    """Continue only after successful activation of a mandatory controller."""
+    def on_exit(event, context):
+        if context.is_shutdown:
+            return []
+        if event.returncode != 0:
+            reason = f"{controller_name} spawner failed with exit code {event.returncode}"
+            return [LogError(msg=reason), Shutdown(reason=reason)]
+        return [next_action] if next_action is not None else []
+
+    return on_exit
+
+
 def generate_launch_description():
-    
+
     common_dir_path = LaunchConfiguration("common_dir_path")
     declare_common_dir_path_arg = DeclareLaunchArgument(
         "common_dir_path",
@@ -108,12 +123,19 @@ def generate_launch_description():
         choices=["wheel_01"],
     )
 
+    ns = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
+    resolved_config = LaunchConfiguration("rover_controller_resolved_config")
+    resolve_config = SetLaunchConfiguration(
+        "rover_controller_resolved_config",
+        ReplaceString(controller_config_path, {"<namespace>/": ns}),
+    )
+
     load_urdf = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [
-                    FindPackageShare("rover_description"), 
-                    "launch", 
+                    FindPackageShare("rover_description"),
+                    "launch",
                     "rover_load_urdf.launch.py"]
             )
         ),
@@ -123,13 +145,10 @@ def generate_launch_description():
             "log_level": log_level,
             "use_sim": use_sim,
             "wheel_type": wheel_type,
-            "controller_config_path": controller_config_path,
+            "controller_config_path": resolved_config,
         }.items(),
     )
 
-    ns = PythonExpression(["'", namespace, "' + '/' if '", namespace, "' else ''"])
-    ns_controller_config_path = ReplaceString(controller_config_path, {"<namespace>/": ns})
-    
     joint_state_broadcaster_log_unit = PythonExpression(
         [
             "'",
@@ -152,12 +171,7 @@ def generate_launch_description():
     rover_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[
-            "--param-file",
-            PathSubstitution(FindPackageShare("rover_controller"))
-            / 'config'
-            / 'wheel_01_controller.yaml',
-        ],
+        parameters=[resolved_config],
         namespace=namespace,
         remappings=[
             ("drive_controller/cmd_vel", "cmd_vel"),
@@ -185,35 +199,17 @@ def generate_launch_description():
         on_exit=Shutdown(),
     )
 
-    rover_spawner_common_args = [
-        "--controller-manager",
-        "controller_manager",
-        "--controller-manager-timeout",
-        "10",
-        "--ros-args",
-        "--log-level",
-        log_level,
-        "--log-level",
-        limit_log_level_to_info("rcl", log_level), 
-    ]
-    
-    rover_pid_controllers_spawner = Node(
+    drive_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
-            # "pid_controller_rl_wheel_base_to_rl_wheel_joint",
-            # "pid_controller_rr_wheel_base_to_rr_wheel_joint",
-            # "pid_controller_fl_wheel_base_to_fl_wheel_joint",
-            # "pid_controller_fr_wheel_base_to_fr_wheel_joint",
             "drive_controller",
             "--controller-manager",
             "controller_manager",
             "--controller-manager-timeout",
             "10",
             "--param-file",
-            PathSubstitution(FindPackageShare("rover_controller"))
-            / "config"
-            / "wheel_01_controller.yaml",
+            resolved_config,
             "--ros-args",
             "--log-level",
             log_level,
@@ -233,6 +229,8 @@ def generate_launch_description():
             "controller_manager",
             "--controller-manager-timeout",
             "10",
+            "--param-file",
+            resolved_config,
         ],
         namespace=namespace,
         emulate_tty=True,
@@ -248,9 +246,7 @@ def generate_launch_description():
             "--controller-manager-timeout",
             "10",
             "--param-file",
-            PathSubstitution(FindPackageShare("rover_controller"))
-            / 'config'
-            / 'wheel_01_controller.yaml',
+            resolved_config,
             "--ros-args",
             "--log-level",
             log_level,
@@ -264,15 +260,22 @@ def generate_launch_description():
     delay_drive_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
-            on_exit=[rover_pid_controllers_spawner],
+            on_exit=spawner_exit_handler("joint_state_broadcaster", drive_controller_spawner),
         )
     )
 
     delay_imu_broadcaster_spawner_after_drive_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=rover_pid_controllers_spawner,
-            on_exit=[imu_broadcaster_spawner],
+            target_action=drive_controller_spawner,
+            on_exit=spawner_exit_handler("drive_controller", imu_broadcaster_spawner),
         ),
+    )
+
+    check_imu_spawner = RegisterEventHandler(
+        OnProcessExit(
+            target_action=imu_broadcaster_spawner,
+            on_exit=spawner_exit_handler("imu_broadcaster"),
+        )
     )
 
     actions = [
@@ -284,11 +287,13 @@ def generate_launch_description():
         declare_use_sim_arg,
         declare_log_level_arg,
         SetParameter(name="use_sim_time", value=use_sim),
+        resolve_config,
         load_urdf,
         rover_control_node,
-        joint_state_broadcaster_spawner,
         delay_drive_controller_spawner_after_joint_state_broadcaster_spawner,
         delay_imu_broadcaster_spawner_after_drive_controller_spawner,
+        check_imu_spawner,
+        joint_state_broadcaster_spawner,
     ]
 
     return LaunchDescription(actions)
