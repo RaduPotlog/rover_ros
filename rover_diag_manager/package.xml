@@ -16,6 +16,8 @@
   <depend>generate_parameter_library</depend>
   <depend>rclcpp</depend>
 
+  <exec_depend>diagnostic_aggregator</exec_depend>
+
   <!-- Rover dependency -->
   <depend>rover_msgs</depend>
 

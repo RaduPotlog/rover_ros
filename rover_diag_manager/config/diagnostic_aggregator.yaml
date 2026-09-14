@@ -1,0 +1,31 @@
+# Groups the raw /diagnostics statuses into the /diagnostics_agg tree consumed by the
+# Cockpit "ROS 2 diagnostics" page (rover_docker/rover_cockpit).
+#
+# Status names are "<node name>: <task name>" (diagnostic_updater, namespace not included).
+# find_and_remove_prefix claims every status starting with the node name and strips it,
+# so the tree reads "Battery/Battery status" rather than repeating the node name.
+# Statuses no analyzer claims still appear under the aggregator's automatic "Other"
+# group - add the node here when that happens.
+#
+# `/**:` rather than the node name: aggregator_node's parameters must reach it whatever
+# name the launch file gives it.
+/**:
+  ros__parameters:
+    path: Rover
+    pub_rate: 1.0
+    computer:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Computer
+      find_and_remove_prefix: [ 'rover_diag_manager_node: ' ]
+    drive:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Drive
+      find_and_remove_prefix: [ 'hardware_controller: ' ]
+    battery:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Battery
+      find_and_remove_prefix: [ 'rover_battery_node: ' ]
+    lighting:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Lighting
+      find_and_remove_prefix: [ 'led_driver: ' ]

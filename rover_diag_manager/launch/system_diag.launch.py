@@ -69,11 +69,47 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
+    diagnostic_aggregator_config_path = LaunchConfiguration("diagnostic_aggregator_config_path")
+    declare_diagnostic_aggregator_config_path_arg = DeclareLaunchArgument(
+        "diagnostic_aggregator_config_path",
+        default_value=PathJoinSubstitution(
+            [
+                FindPackageShare("rover_diag_manager"),
+                "config",
+                "diagnostic_aggregator.yaml",
+            ]
+        ),
+        description="Specify the path to the diagnostic aggregator analyzers configuration file.",
+    )
+
+    # Aggregates every node's diagnostics into diagnostics_agg, the topic the Cockpit
+    # ROS 2 diagnostics page subscribes to. Relative remaps keep it inside the namespace.
+    diagnostic_aggregator_node = Node(
+        package="diagnostic_aggregator",
+        executable="aggregator_node",
+        name="diagnostic_aggregator",
+        parameters=[diagnostic_aggregator_config_path],
+        namespace=namespace,
+        remappings=[
+            ("/diagnostics", "diagnostics"),
+            ("/diagnostics_agg", "diagnostics_agg"),
+            ("/diagnostics_toplevel_state", "diagnostics_toplevel_state"),
+        ],
+        arguments=[
+            "--ros-args",
+            "--log-level",
+            log_level,
+        ],
+        emulate_tty=True,
+    )
+
     actions = [
         declare_log_level_arg,
         declare_namespace_arg,
         declare_system_diag_config_path_arg,
+        declare_diagnostic_aggregator_config_path_arg,
         rover_diag_manager_node,
+        diagnostic_aggregator_node,
     ]
 
     return LaunchDescription(actions)
