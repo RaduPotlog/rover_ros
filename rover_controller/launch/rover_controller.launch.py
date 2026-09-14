@@ -18,7 +18,7 @@ from rover_utils.logging import limit_log_level_to_info
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, IncludeLaunchDescription, LogError,
-    RegisterEventHandler, SetLaunchConfiguration, Shutdown,
+    OpaqueFunction, RegisterEventHandler, SetLaunchConfiguration, Shutdown,
 )
 from launch.conditions import UnlessCondition
 from launch.event_handlers import OnProcessExit
@@ -199,84 +199,79 @@ def generate_launch_description():
         on_exit=Shutdown(),
     )
 
-    drive_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "drive_controller",
-            "--controller-manager",
-            "controller_manager",
-            "--controller-manager-timeout",
-            "10",
-            "--param-file",
-            resolved_config,
-            "--ros-args",
-            "--log-level",
-            log_level,
-            "--log-level",
-            limit_log_level_to_info("rcl", log_level),
-        ],
-        namespace=namespace,
-        emulate_tty=True,
-    )
+    def configure_spawners(context):
+        # Process-exit callbacks run after an included launch description's
+        # scoped configurations have been restored. Resolve values used by
+        # delayed spawners now, while this launch's arguments are in scope.
+        config_path = resolved_config.perform(context)
+        namespace_value = namespace.perform(context)
+        log_level_value = log_level.perform(context)
+        rcl_log_level = limit_log_level_to_info(
+            'rcl', log_level
+        ).perform(context)
 
-    joint_state_broadcaster_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "--controller-manager",
-            "controller_manager",
-            "--controller-manager-timeout",
-            "10",
-            "--param-file",
-            resolved_config,
-        ],
-        namespace=namespace,
-        emulate_tty=True,
-    )
+        def make_spawner(controller_name, include_log_args=False):
+            arguments = [
+                controller_name,
+                '--controller-manager',
+                'controller_manager',
+                '--controller-manager-timeout',
+                '10',
+                '--param-file',
+                config_path,
+            ]
+            if include_log_args:
+                arguments.extend([
+                    '--ros-args',
+                    '--log-level',
+                    log_level_value,
+                    '--log-level',
+                    rcl_log_level,
+                ])
+            return Node(
+                package='controller_manager',
+                executable='spawner',
+                arguments=arguments,
+                namespace=namespace_value,
+                emulate_tty=True,
+            )
 
-    imu_broadcaster_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "imu_broadcaster",
-            "--controller-manager",
-            "controller_manager",
-            "--controller-manager-timeout",
-            "10",
-            "--param-file",
-            resolved_config,
-            "--ros-args",
-            "--log-level",
-            log_level,
-            "--log-level",
-            limit_log_level_to_info("rcl", log_level),
-        ],
-        namespace=namespace,
-        emulate_tty=True,
-    )
-
-    delay_drive_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_spawner,
-            on_exit=spawner_exit_handler("joint_state_broadcaster", drive_controller_spawner),
+        drive_controller_spawner = make_spawner(
+            'drive_controller', include_log_args=True
         )
-    )
-
-    delay_imu_broadcaster_spawner_after_drive_controller_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=drive_controller_spawner,
-            on_exit=spawner_exit_handler("drive_controller", imu_broadcaster_spawner),
-        ),
-    )
-
-    check_imu_spawner = RegisterEventHandler(
-        OnProcessExit(
-            target_action=imu_broadcaster_spawner,
-            on_exit=spawner_exit_handler("imu_broadcaster"),
+        joint_state_broadcaster_spawner = make_spawner(
+            'joint_state_broadcaster'
         )
-    )
+        imu_broadcaster_spawner = make_spawner(
+            'imu_broadcaster', include_log_args=True
+        )
+
+        return [
+            RegisterEventHandler(
+                event_handler=OnProcessExit(
+                    target_action=joint_state_broadcaster_spawner,
+                    on_exit=spawner_exit_handler(
+                        'joint_state_broadcaster',
+                        drive_controller_spawner,
+                    ),
+                )
+            ),
+            RegisterEventHandler(
+                event_handler=OnProcessExit(
+                    target_action=drive_controller_spawner,
+                    on_exit=spawner_exit_handler(
+                        'drive_controller', imu_broadcaster_spawner
+                    ),
+                ),
+            ),
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=imu_broadcaster_spawner,
+                    on_exit=spawner_exit_handler('imu_broadcaster'),
+                )
+            ),
+            joint_state_broadcaster_spawner,
+        ]
 
     actions = [
         declare_common_dir_path_arg,
@@ -290,10 +285,7 @@ def generate_launch_description():
         resolve_config,
         load_urdf,
         rover_control_node,
-        delay_drive_controller_spawner_after_joint_state_broadcaster_spawner,
-        delay_imu_broadcaster_spawner_after_drive_controller_spawner,
-        check_imu_spawner,
-        joint_state_broadcaster_spawner,
+        OpaqueFunction(function=configure_spawners),
     ]
 
     return LaunchDescription(actions)

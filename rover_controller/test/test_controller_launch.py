@@ -14,10 +14,10 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_prefix, get_package_share_directory
 
-from launch import LaunchContext, LaunchService
+from launch import LaunchContext, LaunchDescription, LaunchService
 from launch.actions import (
-    DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, RegisterEventHandler,
-    SetLaunchConfiguration,
+    DeclareLaunchArgument, ExecuteProcess, GroupAction, OpaqueFunction,
+    RegisterEventHandler, SetLaunchConfiguration,
 )
 from launch.event_handlers import OnShutdown
 from launch.utilities import normalize_to_list_of_substitutions, perform_substitutions
@@ -91,6 +91,8 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     for action in description.entities:
         if isinstance(action, (DeclareLaunchArgument, SetLaunchConfiguration)):
             action.execute(context)
+        elif isinstance(action, OpaqueFunction):
+            action.execute(context)
 
     manager = next((node, args) for node, args in nodes
                    if args['executable'] == 'ros2_control_node')
@@ -134,9 +136,15 @@ def test_spawner_sequence(controller_launch, monkeypatch, tmp_path, failed):
     service = LaunchService()
     service.context.launch_configurations.update(namespace='', robot_model='rover_a1')
     reasons = []
-    description = controller_launch.generate_launch_description()
-    description.add_action(RegisterEventHandler(
-        OnShutdown(on_shutdown=lambda event, context: reasons.append(event.reason))))
+    controller_actions = controller_launch.generate_launch_description().entities
+    description = LaunchDescription([
+        GroupAction(scoped=True, actions=controller_actions),
+        RegisterEventHandler(
+            OnShutdown(
+                on_shutdown=lambda event, context: reasons.append(event.reason)
+            ),
+        ),
+    ])
     service.include_launch_description(description)
     service.run()
     expected = controllers if failed is None else controllers[:controllers.index(failed) + 1]
@@ -203,6 +211,8 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
     description = controller_launch.generate_launch_description()
     for action in description.entities:
         if isinstance(action, (DeclareLaunchArgument, SetLaunchConfiguration)):
+            action.execute(launch_context)
+        elif isinstance(action, OpaqueFunction):
             action.execute(launch_context)
     manager = next(args for args in captured if args['executable'] == 'ros2_control_node')
     spawner = next(args for args in captured if args['executable'] == 'spawner' and
