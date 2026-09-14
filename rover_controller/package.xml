@@ -30,6 +30,12 @@
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_index_python</test_depend>
   <test_depend>python3-yaml</test_depend>
+  <test_depend>rclpy</test_depend>
+  <test_depend>rmw_zenoh_cpp</test_depend>
+  <test_depend>rcl_interfaces</test_depend>
+  <test_depend>std_msgs</test_depend>
+  <test_depend>controller_manager_msgs</test_depend>
+  <test_depend>hardware_interface</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
