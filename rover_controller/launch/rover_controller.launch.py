@@ -173,14 +173,8 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[resolved_config],
         namespace=namespace,
-        remappings=[
-            ("drive_controller/cmd_vel", "cmd_vel"),
-            ("drive_controller/odom", "odometry/wheels"),
-            ("drive_controller/transition_event", "_drive_controller/transition_event"),
-            ("imu_broadcaster/imu", "imu/data"),
-            ("imu_broadcaster/transition_event", "_imu_broadcaster/transition_event"),
-            ("joint_state_broadcaster/transition_event", "_joint_state_broadcaster/transition_event"),
-        ],
+        # No remappings here: they would not reach the controllers. Controller topic
+        # remaps are `node_options_args` in the controller config file.
         arguments=[
             "--ros-args",
             "--log-level",

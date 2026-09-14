@@ -71,6 +71,12 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     expected = yaml.safe_load(bundled.read_text())
     drive_parameters = expected['/**']['drive_controller']['ros__parameters']
     assert drive_parameters['tf_frame_prefix'] == '~'
+    # Controllers ignore ros2_control_node's remaps (use_global_arguments=false), so
+    # topic remaps must be each controller's node_options_args.
+    manager_parameters = expected['/**']['controller_manager']['ros__parameters']
+    assert '~/odom:=odometry/wheels' in manager_parameters['drive_controller']['node_options_args']
+    assert '~/cmd_vel:=cmd_vel' in manager_parameters['drive_controller']['node_options_args']
+    assert '~/imu:=imu/data' in manager_parameters['imu_broadcaster']['node_options_args']
     if selection != 'default':
         common = tmp_path / 'rover_controller/config/wheel_01_controller.yaml'
         common.parent.mkdir(parents=True)
@@ -99,6 +105,7 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     manager = next((node, args) for node, args in nodes
                    if args['executable'] == 'ros2_control_node')
     assert manager[0].condition.evaluate(context) == (use_sim == 'False')
+    assert not manager[1].get('remappings'), 'controller remaps belong in node_options_args'
     assert sum(args['executable'] == 'ros2_control_node' for _, args in nodes) == 1
     parameters = evaluate_parameters(context, normalize_parameters(manager[1]['parameters']))
     assert len(parameters) == 1
@@ -180,11 +187,17 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
     from std_msgs.msg import String
 
     namespace = 'controller_test_' + uuid.uuid4().hex[:8]
+    bundled = yaml.safe_load((Path(get_package_share_directory('rover_controller')) /
+                              'config/wheel_01_controller.yaml').read_text())
+    bundled_drive = bundled['/**']['controller_manager']['ros__parameters']['drive_controller']
     config = {
         '/**': {
             'controller_manager': {'ros__parameters': {
                 'update_rate': 50,
-                'drive_controller': {'type': 'diff_drive_controller/DiffDriveController'},
+                'drive_controller': {
+                    'type': 'diff_drive_controller/DiffDriveController',
+                    'node_options_args': bundled_drive['node_options_args'],
+                },
             }},
             'drive_controller': {'ros__parameters': {
                 'left_wheel_names': ['left_wheel_joint'],
@@ -290,6 +303,14 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
             assert future.done(), 'list_controllers timed out'
             assert any(c.name == 'drive_controller' and c.state == 'active'
                        for c in future.result().controller)
+            # The bundled node_options_args must actually rename the controller's topics.
+            deadline = time.monotonic() + 10
+            while (node.count_publishers(f'/{namespace}/odometry/wheels') == 0 and
+                   time.monotonic() < deadline):
+                executor.spin_once(timeout_sec=0.1)
+            assert node.count_publishers(f'/{namespace}/odometry/wheels') == 1
+            assert node.count_subscribers(f'/{namespace}/cmd_vel') == 1
+            assert node.count_publishers(f'/{namespace}/drive_controller/odom') == 0
             parameters = node.create_client(
                 GetParameters, f'/{namespace}/drive_controller/get_parameters')
             assert parameters.wait_for_service(timeout_sec=10)

@@ -37,3 +37,25 @@ Startup activates the joint-state broadcaster, drive controller, then IMU
 broadcaster. Each step requires the previous spawner to succeed. A mandatory
 spawner failure reports its controller name and exit code and shuts down the
 launch; subsequent controllers are not started.
+
+## Topic remapping
+
+Controller topics are remapped with each controller's `node_options_args` under
+`controller_manager` in the config file, **not** with launch `remappings=` on
+`ros2_control_node` or `<remapping>` tags in the Gazebo plugin. controller_manager
+creates every controller as its own node with `use_global_arguments(false)`, so
+process-wide remaps only affect the controller manager itself.
+
+```yaml
+controller_manager:
+  ros__parameters:
+    drive_controller:
+      type: diff_drive_controller/DiffDriveController
+      node_options_args: ["-r", "~/odom:=odometry/wheels"]
+```
+
+`--ros-args` is prepended automatically; remap targets are relative, so they follow
+the namespace. The spawner's `--controller-ros-args` sets the same parameter.
+Resulting topics (in the rover namespace): `cmd_vel` (drive controller input),
+`odometry/wheels`, `imu/data`, `joint_states`; lifecycle `transition_event` topics
+are hidden under `_<controller>/`.

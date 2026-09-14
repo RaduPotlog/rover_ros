@@ -6,8 +6,16 @@
     ros__parameters:
       update_rate: 100
 
+      # Topic remaps live here, not on ros2_control_node. controller_manager creates
+      # every controller as its own node with use_global_arguments=false, so
+      # command-line remaps given to ros2_control_node (launch `remappings=`, or
+      # gz_ros2_control <remapping> tags) never reach the controllers.
+      # `<controller>.node_options_args` are that controller node's own --ros-args.
+      # Remap targets are relative, so they follow the controller manager's namespace.
+
       joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster
+        node_options_args: ["-r", "~/transition_event:=_joint_state_broadcaster/transition_event"]
    
       pid_controller_rl_wheel_base_to_rl_wheel_joint:
         type: pid_controller/PidController
@@ -23,9 +31,14 @@
             
       drive_controller:
         type: diff_drive_controller/DiffDriveController
+        node_options_args: ["-r", "~/cmd_vel:=cmd_vel",
+                            "-r", "~/odom:=odometry/wheels",
+                            "-r", "~/transition_event:=_drive_controller/transition_event"]
       
       imu_broadcaster:
         type: imu_sensor_broadcaster/IMUSensorBroadcaster
+        node_options_args: ["-r", "~/imu:=imu/data",
+                            "-r", "~/transition_event:=_imu_broadcaster/transition_event"]
 
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
