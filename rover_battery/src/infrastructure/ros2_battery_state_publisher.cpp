@@ -90,11 +90,14 @@ void Ros2BatteryStatePublisher::logBatteryStatus(const BatteryStateMsg & battery
 
 void Ros2BatteryStatePublisher::logErrors(const std::string & error_msg)
 {
+    // Mirror the latest report, so "Battery errors" returns to OK once the BMS recovers instead of
+    // holding the last error forever.
+    error_msg_ = error_msg;
+    has_report_ = true;
+
     if (error_msg.empty()) {
         return;
     }
-
-    error_msg_ = error_msg;
 
     RCLCPP_ERROR_STREAM_THROTTLE(
         logger_, *clock_, kLogThrottleMs, "Rover battery error: " << error_msg);
@@ -103,6 +106,11 @@ void Ros2BatteryStatePublisher::logErrors(const std::string & error_msg)
 void Ros2BatteryStatePublisher::diagnoseErrors(
     diagnostic_updater::DiagnosticStatusWrapper & status)
 {
+    if (!has_report_) {
+        status.summary(diagnostic_updater::DiagnosticStatusWrapper::STALE, "No battery data yet.");
+        return;
+    }
+
     unsigned char error_level{diagnostic_updater::DiagnosticStatusWrapper::OK};
     std::string message{"Battery has no errors"};
 
@@ -119,6 +127,11 @@ void Ros2BatteryStatePublisher::diagnoseErrors(
 void Ros2BatteryStatePublisher::diagnoseStatus(
     diagnostic_updater::DiagnosticStatusWrapper & status)
 {
+    if (!has_report_) {
+        status.summary(diagnostic_updater::DiagnosticStatusWrapper::STALE, "No battery data yet.");
+        return;
+    }
+
     status.add("Power supply status", charging_status_.charging ? "connected" : "disconnected");
     status.add("Load current (A)", charging_status_.current);
 

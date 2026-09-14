@@ -19,6 +19,11 @@
 #include <cstdint>
 #include <utility>
 
+#include <diagnostic_msgs/msg/diagnostic_status.hpp>
+#include <lifecycle_msgs/msg/state.hpp>
+
+#include "rover_crfs_teleop/infrastructure/teleop_diagnostics_conversions.hpp"
+
 namespace rover_crfs_teleop
 {
 
@@ -52,6 +57,23 @@ RoverCrfsTeleopNode::RoverCrfsTeleopNode(
 : rclcpp_lifecycle::LifecycleNode(node_name, options)
 {
     declareParameters();
+
+    // Created here, not in on_configure: the Updater declares diagnostic_updater.period, which a
+    // cleanup -> configure cycle would otherwise try to declare twice.
+    const double expected_hz = get_parameter("rc_channels_expected_hz").as_double();
+    channels_min_hz_ = expected_hz;
+    channels_max_hz_ = expected_hz;
+    channels_rate_ = std::make_unique<diagnostic_updater::FrequencyStatus>(
+        diagnostic_updater::FrequencyStatusParam(
+            &channels_min_hz_, &channels_max_hz_,
+            get_parameter("rc_channels_rate_tolerance").as_double(), 10),
+        "RC channels rate", get_clock());
+
+    diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this);
+    diagnostic_updater_->setHardwareID("RC Receiver");
+    diagnostic_updater_->add("RC link", this, &RoverCrfsTeleopNode::diagnoseRcLink);
+    diagnostic_updater_->add("E-Stop requests", this, &RoverCrfsTeleopNode::diagnoseSafetyRequests);
+    diagnostic_updater_->add("RC channels rate", this, &RoverCrfsTeleopNode::diagnoseChannelsRate);
 }
 
 void RoverCrfsTeleopNode::declareParameters()
@@ -88,6 +110,11 @@ void RoverCrfsTeleopNode::declareParameters()
     declare_parameter<bool>("require_link_stats", link_defaults.require_link_stats);
     declare_parameter<int>("link_quality_lost_below", link_defaults.lq_lost_below);
     declare_parameter<int>("link_quality_recovered_at", link_defaults.lq_recovered_at);
+
+    // Diagnostics only - read once at construction. crsf_receiver's receiver_rate.
+    declare_parameter<double>("rc_channels_expected_hz", 50.0);
+    // Fraction the measured rc/channels rate may deviate before "RC channels rate" warns.
+    declare_parameter<double>("rc_channels_rate_tolerance", 0.2);
 }
 
 std::optional<TeleopConfig> RoverCrfsTeleopNode::readConfig()
@@ -207,6 +234,7 @@ RoverCrfsTeleopNode::CallbackReturn RoverCrfsTeleopNode::on_configure(const rclc
         std::make_shared<Ros2VelocityCommandPublisher>(*this, kCmdVelTopic, kCmdVelFrameId);
     safety_switch_ = std::make_shared<Ros2TriggerSafetySwitch>(*this);
     use_case_ = std::make_unique<TeleopUseCase>(*config, velocity_publisher_, safety_switch_);
+    channels_rate_->clear();
 
     // Sensor-data QoS, matching crsf_receiver's publishers. Input is recorded even while inactive,
     // so the link is already known healthy (or not) the moment teleop is activated.
@@ -216,6 +244,7 @@ RoverCrfsTeleopNode::CallbackReturn RoverCrfsTeleopNode::on_configure(const rclc
         "rc/channels", rc_qos,
         [this](const crsf_receiver_msg::msg::CRSFChannels16 & msg) {
             use_case_->onChannels(toRcFrame(msg), std::chrono::steady_clock::now());
+            channels_rate_->tick();
         });
 
     link_subscriber_ = create_subscription<crsf_receiver_msg::msg::CRSFLinkInfo>(
@@ -301,6 +330,40 @@ void RoverCrfsTeleopNode::controlTimerCallback()
     }
 
     last_tick_status_ = status;
+}
+
+void RoverCrfsTeleopNode::diagnoseRcLink(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    status.add("Lifecycle state", get_current_state().label());
+
+    if (!use_case_) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Teleop not configured.");
+        return;
+    }
+
+    const bool active =
+        get_current_state().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
+    fillRcLinkStatus(use_case_->diagnostics(std::chrono::steady_clock::now()), active, status);
+}
+
+void RoverCrfsTeleopNode::diagnoseSafetyRequests(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    if (!safety_switch_) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Teleop not configured.");
+        return;
+    }
+
+    fillSafetyRequestsStatus(safety_switch_->requestStatuses(), status);
+}
+
+void RoverCrfsTeleopNode::diagnoseChannelsRate(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    if (!use_case_) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Teleop not configured.");
+        return;
+    }
+
+    channels_rate_->run(status);
 }
 
 }  // namespace rover_crfs_teleop

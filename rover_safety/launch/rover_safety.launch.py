@@ -102,6 +102,7 @@ def generate_launch_description():
             },
         ],
         namespace=namespace,
+        remappings=[("/diagnostics", "diagnostics")],
         arguments=[
             "--ros-args",
             "--log-level",
@@ -123,6 +124,7 @@ def generate_launch_description():
             },
         ],
         namespace=namespace,
+        remappings=[("/diagnostics", "diagnostics")],
         arguments=[
             "--ros-args",
             "--log-level",

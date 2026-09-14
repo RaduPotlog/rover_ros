@@ -17,9 +17,13 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "diagnostic_updater/diagnostic_updater.hpp"
+#include "diagnostic_updater/update_functions.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 #include "sensor_msgs/msg/image.hpp"
@@ -31,6 +35,7 @@
 #include "rover_led/application/get_led_state_use_case.hpp"
 #include "rover_led/application/render_tick_use_case.hpp"
 #include "rover_led/application/set_animation_use_case.hpp"
+#include "rover_led/infrastructure/led_controller_diagnostics.hpp"
 #include "rover_led/infrastructure/pluginlib_animation_factory.hpp"
 #include "rover_led/led_controller_parameters.hpp"
 
@@ -58,7 +63,8 @@ public:
 
 private:
 
-    void checkAnimationTypes(const std::vector<LedAnimationDescription> & animations);
+    // Returns the number of animations using a type the factory cannot create.
+    std::size_t checkAnimationTypes(const std::vector<LedAnimationDescription> & animations);
 
     void publishPanelFrame(const std::size_t channel, std::vector<std::uint8_t> frame);
 
@@ -71,6 +77,10 @@ private:
     void stateTimerCallback();
 
     void publishAnimationCatalog(const std::vector<LedAnimationDescription> & animations);
+
+    // Diagnostics (hardware ID "Bumper Led"). Same default callback group as the render timer
+    // and the service, so the segments and the recorded state are never read while they change.
+    void diagnoseController(diagnostic_updater::DiagnosticStatusWrapper & status);
 
     // Declared first: animations created by the factory must be destroyed
     // before its class loader.
@@ -97,6 +107,16 @@ private:
     rclcpp::TimerBase::SharedPtr controller_timer_;
 
     rclcpp::TimerBase::SharedPtr state_timer_;
+
+    LedControllerDiagnostics diagnostics_;
+
+    // FrequencyStatusParam holds pointers to these, so they must outlive render_rate_.
+    double render_min_hz_ = 0.0;
+    double render_max_hz_ = 0.0;
+    std::unique_ptr<diagnostic_updater::FrequencyStatus> render_rate_;
+
+    // Last member: destroyed first, so its timer never runs a task on a half-destroyed node.
+    std::unique_ptr<diagnostic_updater::Updater> diagnostic_updater_;
 };
 
 }  // namespace rover_led

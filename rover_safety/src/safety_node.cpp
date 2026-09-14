@@ -26,7 +26,11 @@
 #include <vector>
 #include <chrono>
 
+#include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <rclcpp/rclcpp.hpp>
+
+#include "rover_safety/domain/safety_health.hpp"
+#include "rover_safety/infrastructure/safety_diagnostics.hpp"
 
 // Actions
 #include "rover_safety/plugins/action/call_set_bool_service_node.hpp"
@@ -73,6 +77,14 @@ SafetyNode::SafetyNode(
 , params_(param_listener_->get_params())
 , battery_thresholds_(params_.battery.temp.critical, params_.battery.temp.fatal)
 {
+    // Created here, not in on_configure: diagnostics must report an unconfigured node too, and a
+    // re-configure must not declare diagnostic_updater.period twice.
+    diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this);
+    diagnostic_updater_->setHardwareID("Rover Safety");
+    diagnostic_updater_->add("Safety inputs", this, &SafetyNode::diagnoseInputs);
+    diagnostic_updater_->add("Battery safety verdict", this, &SafetyNode::diagnoseBatteryVerdict);
+    diagnostic_updater_->add("Safety behavior tree", this, &SafetyNode::diagnoseBehaviorTree);
+
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
 }
 
@@ -126,6 +138,7 @@ void SafetyNode::init()
     safety_tree_timer_ = this->create_wall_timer(
         timer_period, std::bind(&SafetyNode::safetyTreeTimerCallback, this));
 
+    configured_ = true;
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
 }
 
@@ -189,6 +202,9 @@ void SafetyNode::batteryStateSubscriberCallback(const BatteryStateMsg::SharedPtr
 
     safety_tree_->getBlackboard()->set<unsigned>("battery_verdict", unsigned(decision.verdict));
     safety_tree_->getBlackboard()->set<std::string>("battery_verdict_reason", decision.reason);
+
+    last_battery_stamp_ = std::chrono::steady_clock::now();
+    last_battery_decision_ = decision;
 }
 
 void SafetyNode::driverStateSubscriberCallback(const RoverDriverStateMsg::SharedPtr driver_state)
@@ -206,6 +222,7 @@ void SafetyNode::driverStateSubscriberCallback(const RoverDriverStateMsg::Shared
 void SafetyNode::ioStateSubscriberCallback(const IOStateMsg::SharedPtr io_state)
 {
     safety_tree_->getBlackboard()->set<bool>("sw_e_stop_state", io_state->gpio_pin_sw_e_stop_user_button);
+    last_gpio_stamp_ = std::chrono::steady_clock::now();
 }
 
 void SafetyNode::systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr system_status)
@@ -214,6 +231,7 @@ void SafetyNode::systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr
     
     cpu_temp_ = system_status->cpu_temp;
     safety_tree_->getBlackboard()->set<float>("cpu_temp", cpu_temp_);
+    last_system_status_stamp_ = std::chrono::steady_clock::now();
 }
 
 bool SafetyNode::systemReady()
@@ -234,7 +252,9 @@ bool SafetyNode::systemReady()
 
 void SafetyNode::safetyTreeTimerCallback()
 {
-    if (!systemReady()) {
+    system_ready_ = systemReady();
+
+    if (!system_ready_) {
         return;
     }
 
@@ -243,6 +263,51 @@ void SafetyNode::safetyTreeTimerCallback()
     if (safety_tree_->getTreeStatus() == BT::NodeStatus::FAILURE) {
         RCLCPP_WARN(this->get_logger(), "Safety behavior tree returned FAILURE status");
     }
+}
+
+void SafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    const auto now = std::chrono::steady_clock::now();
+    const double timeout = param_listener_->get_params().input_timeout;
+
+    // gpio_state is transient-local and published on change only, so it cannot go stale.
+    infrastructure::fillSafetyInputsStatus(
+        {
+            {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
+            {"system_status", infrastructure::ageSeconds(last_system_status_stamp_, now), timeout},
+            {"hardware_interface/gpio_state", infrastructure::ageSeconds(last_gpio_stamp_, now), std::nullopt},
+        },
+        status);
+}
+
+void SafetyNode::diagnoseBatteryVerdict(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    if (!last_battery_decision_.has_value()) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::STALE, "No battery reading yet.");
+        return;
+    }
+
+    const auto & decision = *last_battery_decision_;
+
+    status.add("Verdict", domain::toString(decision.verdict));
+    status.add("Battery temperature (C)", battery_temp_);
+    status.add("Battery critical temperature (C)", battery_thresholds_.criticalTemp());
+    status.add("Battery fatal temperature (C)", battery_thresholds_.fatalTemp());
+    status.add("CPU temperature (C)", cpu_temp_);
+
+    status.summary(
+        infrastructure::toDiagnosticLevel(domain::verdictHealthLevel(decision.verdict)),
+        decision.verdict == domain::SafetyVerdict::None ?
+            std::string("Battery within safety limits.") : decision.reason);
+}
+
+void SafetyNode::diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    status.add("Lifecycle state", get_current_state().label());
+
+    infrastructure::fillBehaviorTreeStatus(
+        configured_, system_ready_,
+        configured_ ? safety_tree_->getTreeStatus() : BT::NodeStatus::IDLE, status);
 }
 
 }  // namespace rover_safety

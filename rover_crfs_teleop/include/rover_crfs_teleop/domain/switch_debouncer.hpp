@@ -50,6 +50,9 @@ public:
     // otherwise (including every frame of the settle period).
     std::optional<SwitchPosition> update(int raw_value);
 
+    // Last classified position, nullopt before the first frame. Includes the settle period.
+    std::optional<SwitchPosition> position() const { return position_; }
+
 private:
 
     SwitchPosition classify(int raw_value) const;

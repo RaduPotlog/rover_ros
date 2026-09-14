@@ -78,3 +78,9 @@ led_safety:
     default_value: 10.0
     description: Frequency in Hz at which lights tree will be ticked.
     validation: { gt<>: 0.0 }
+
+  input_timeout:
+    type: double
+    default_value: 5.0
+    description: Seconds after which the battery_status input is reported stale on diagnostics.
+    validation: { gt<>: 0.0 }

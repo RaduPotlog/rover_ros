@@ -76,6 +76,7 @@ def generate_launch_description():
         namespace=namespace,
         output="screen",
         parameters=[motion_lock_config_path],
+        remappings=[("/diagnostics", "diagnostics")],
         arguments=["--ros-args", "--log-level", log_level],
     )
 
@@ -86,7 +87,7 @@ def generate_launch_description():
         namespace=namespace,
         output='screen',
         parameters=[twist_mux_config_path],
-        remappings={('/cmd_vel_out', '/cmd_vel')},
+        remappings=[('/cmd_vel_out', '/cmd_vel'), ('/diagnostics', 'diagnostics')],
     )
 
     actions = [

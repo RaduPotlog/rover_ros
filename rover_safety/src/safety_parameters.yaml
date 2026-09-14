@@ -78,6 +78,12 @@ safety:
     description: Minimal time in seconds, after which the fan may be turned off.
     validation: { gt<>: 0.0 }
 
+  input_timeout:
+    type: double
+    default_value: 5.0
+    description: Seconds after which a periodic safety input (battery_status, system_status) is reported stale on diagnostics.
+    validation: { gt<>: 0.0 }
+
   plugin_libs:
     type: string_array
     default_value: []

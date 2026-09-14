@@ -75,6 +75,7 @@ def generate_launch_description():
         name="rover_battery_node",
         parameters=[rover_battery_config_path],
         namespace=namespace,
+        remappings=[("/diagnostics", "diagnostics")],
         arguments=[
             "--ros-args",
             "--log-level",

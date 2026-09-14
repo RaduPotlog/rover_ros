@@ -173,8 +173,11 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[resolved_config],
         namespace=namespace,
-        # No remappings here: they would not reach the controllers. Controller topic
-        # remaps are `node_options_args` in the controller config file.
+        # Only the /diagnostics remap belongs here: it reaches controller_manager and the
+        # hardware_controller node the hardware interface creates in this process, but never
+        # the controllers. Controller topic remaps are `node_options_args` in the controller
+        # config file.
+        remappings=[("/diagnostics", "diagnostics")],
         arguments=[
             "--ros-args",
             "--log-level",

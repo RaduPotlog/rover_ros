@@ -19,6 +19,8 @@
 #include <optional>
 #include <string>
 
+#include <diagnostic_updater/diagnostic_updater.hpp>
+#include <diagnostic_updater/update_functions.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 
@@ -42,7 +44,13 @@ namespace rover_crfs_teleop
 //   - deactivate: publish one zero command, then stop the timer.
 //
 // Designed for a single-threaded executor: the subscriptions and the timer all touch the use
-// case, and it is only safe because they never run concurrently.
+// case, and it is only safe because they never run concurrently. The diagnostic_updater timer
+// runs on the same executor.
+//
+// Diagnostics (hardware ID "RC Receiver"), published in every lifecycle state:
+//   - "RC link":          the LinkMonitor verdict that gates the command, with ages / LQ / switches;
+//   - "E-Stop requests":  reachability and last outcome of the hardware interface E-Stop services;
+//   - "RC channels rate": rc/channels arrival rate against rc_channels_expected_hz.
 class RoverCrfsTeleopNode : public rclcpp_lifecycle::LifecycleNode
 {
 
@@ -77,6 +85,12 @@ private:
 
     void releaseResources();
 
+    void diagnoseRcLink(diagnostic_updater::DiagnosticStatusWrapper & status);
+
+    void diagnoseSafetyRequests(diagnostic_updater::DiagnosticStatusWrapper & status);
+
+    void diagnoseChannelsRate(diagnostic_updater::DiagnosticStatusWrapper & status);
+
     std::unique_ptr<TeleopUseCase> use_case_;
     std::shared_ptr<Ros2VelocityCommandPublisher> velocity_publisher_;
     std::shared_ptr<Ros2TriggerSafetySwitch> safety_switch_;
@@ -87,6 +101,14 @@ private:
     rclcpp::TimerBase::SharedPtr control_timer_;
 
     std::optional<TickStatus> last_tick_status_;
+
+    // FrequencyStatusParam holds pointers to these, so they must outlive channels_rate_.
+    double channels_min_hz_{0.0};
+    double channels_max_hz_{0.0};
+    std::unique_ptr<diagnostic_updater::FrequencyStatus> channels_rate_;
+
+    // Last member: destroyed first, so its timer never runs a task on a half-destroyed node.
+    std::unique_ptr<diagnostic_updater::Updater> diagnostic_updater_;
 };
 
 }  // namespace rover_crfs_teleop

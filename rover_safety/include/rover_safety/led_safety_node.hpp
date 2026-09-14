@@ -15,12 +15,15 @@
 #ifndef ROVER_SAFETY_LED_SAFETY_NODE_HPP_
 #define ROVER_SAFETY_LED_SAFETY_NODE_HPP_
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <behaviortree_cpp/behavior_tree.h>
 #include "behaviortree_cpp/bt_factory.h"
+#include "diagnostic_updater/diagnostic_updater.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include <nav2_ros_common/lifecycle_node.hpp>
 
@@ -83,6 +86,10 @@ private:
     
     void ledTreeTimerCallback();
 
+    // Diagnostics (hardware ID "Bumper Led"), on the node's single-threaded executor.
+    void diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status);
+    void diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status);
+
     static constexpr std::size_t kDeadManButtonIndex = 4;
 
     float update_charging_anim_step_;
@@ -98,6 +105,17 @@ private:
     double battery_percent_;
     
     BT::BehaviorTreeFactory factory_;
+
+    using SteadyTime = std::chrono::steady_clock::time_point;
+    std::optional<SteadyTime> last_battery_stamp_;
+    std::optional<SteadyTime> last_gpio_stamp_;
+    std::optional<SteadyTime> last_joy_stamp_;
+    bool system_ready_{false};
+    // Set only once init() completed; a configure that threw leaves a half-built tree behind.
+    bool configured_{false};
+
+    // Last member: destroyed first, so its timer never runs a task on a half-destroyed node.
+    std::unique_ptr<diagnostic_updater::Updater> diagnostic_updater_;
 };
 
 }  // namespace rover_safety

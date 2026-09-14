@@ -25,9 +25,11 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <lifecycle_msgs/msg/state.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -156,6 +158,7 @@ protected:
         options.parameter_overrides({
             rclcpp::Parameter("switch_settle_frames", 0),
             rclcpp::Parameter("channel_timeout_ms", 200),
+            rclcpp::Parameter("diagnostic_updater.period", 0.1),
         });
         teleop_ = std::make_shared<RoverCrfsTeleopNode>("rover_crfs_teleop_node", options);
 
@@ -228,6 +231,36 @@ TEST_F(TeleopNodeTest, DeflectedStickIsPublished)
 
     ASSERT_TRUE(waitForDeflectedCommand());
     EXPECT_EQ(harness_->received.back().header.frame_id, "base_link");
+}
+
+TEST_F(TeleopNodeTest, RcLinkDiagnosticFollowsTheLink)
+{
+    // /diagnostics is absolute, so match on this test's node name and take the latest level.
+    std::optional<std::uint8_t> rc_link_level;
+    auto diagnostics_sub = helper_node_->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+        "/diagnostics", 10,
+        [&rc_link_level](const diagnostic_msgs::msg::DiagnosticArray & msg) {
+            for (const auto & status : msg.status) {
+                if (status.name == "rover_crfs_teleop_node: RC link") {
+                    rc_link_level = status.level;
+                }
+            }
+        });
+
+    // No frames yet: waiting for the first frame.
+    ASSERT_TRUE(spinUntil([&rc_link_level]() {
+        return rc_link_level == diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    }));
+
+    harness_->feeding = true;
+    ASSERT_TRUE(spinUntil([&rc_link_level]() {
+        return rc_link_level == diagnostic_msgs::msg::DiagnosticStatus::OK;
+    }));
+
+    harness_->feeding = false;
+    EXPECT_TRUE(spinUntil([&rc_link_level]() {
+        return rc_link_level == diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    }));
 }
 
 TEST_F(TeleopNodeTest, NoInputPublishesNothing)

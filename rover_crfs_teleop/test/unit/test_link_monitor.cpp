@@ -134,4 +134,61 @@ TEST(LinkMonitorTest, LinkQualityHysteresisKeepsThePreviousState)
     EXPECT_FALSE(monitor.isHealthy(kT0));
 }
 
+TEST(LinkMonitorTest, SnapshotBeforeAnyInputReportsNoChannels)
+{
+    const LinkMonitor monitor(testConfig());
+    const auto snapshot = monitor.snapshot(kT0);
+
+    EXPECT_EQ(snapshot.loss_reason, LinkLossReason::kNoChannels);
+    EXPECT_FALSE(snapshot.channels_age.has_value());
+    EXPECT_FALSE(snapshot.link_stats_age.has_value());
+    EXPECT_FALSE(snapshot.link_quality.has_value());
+}
+
+TEST(LinkMonitorTest, SnapshotReportsAgesAndQuality)
+{
+    LinkMonitor monitor(testConfig());
+    monitor.onChannels(kT0 + 50ms);
+    monitor.onLinkStats(kT0, 80);
+
+    const auto snapshot = monitor.snapshot(kT0 + 100ms);
+
+    EXPECT_EQ(snapshot.loss_reason, LinkLossReason::kNone);
+    ASSERT_TRUE(snapshot.channels_age.has_value());
+    EXPECT_EQ(*snapshot.channels_age, 50ms);
+    ASSERT_TRUE(snapshot.link_stats_age.has_value());
+    EXPECT_EQ(*snapshot.link_stats_age, 100ms);
+    ASSERT_TRUE(snapshot.link_quality.has_value());
+    EXPECT_EQ(*snapshot.link_quality, 80);
+    EXPECT_TRUE(snapshot.link_quality_ok);
+}
+
+TEST(LinkMonitorTest, LossReasonsFollowTheHealthCheckOrder)
+{
+    LinkMonitor monitor(testConfig());
+    monitor.onChannels(kT0);
+    EXPECT_EQ(monitor.snapshot(kT0).loss_reason, LinkLossReason::kNoLinkStats);
+
+    monitor.onLinkStats(kT0, 10);
+    EXPECT_EQ(monitor.snapshot(kT0).loss_reason, LinkLossReason::kLowLinkQuality);
+
+    EXPECT_EQ(monitor.snapshot(kT0 + 300ms).loss_reason, LinkLossReason::kChannelsStale);
+
+    monitor.onChannels(kT0 + 1500ms);
+    EXPECT_EQ(monitor.snapshot(kT0 + 1500ms).loss_reason, LinkLossReason::kLinkStatsStale);
+}
+
+TEST(LinkMonitorTest, SnapshotVerdictMatchesIsHealthy)
+{
+    LinkMonitor monitor(testConfig());
+    monitor.onChannels(kT0);
+    monitor.onLinkStats(kT0, 100);
+
+    for (const auto offset : {0ms, 150ms, 250ms, 1200ms}) {
+        const bool healthy = monitor.isHealthy(kT0 + offset);
+        EXPECT_EQ(monitor.snapshot(kT0 + offset).loss_reason == LinkLossReason::kNone, healthy)
+            << "offset " << offset.count() << " ms";
+    }
+}
+
 }  // namespace rover_crfs_teleop

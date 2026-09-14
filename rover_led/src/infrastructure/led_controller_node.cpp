@@ -88,9 +88,11 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     for (const auto & warning : catalog->warnings()) {
         RCLCPP_WARN(this->get_logger(), "%s", warning.c_str());
     }
+    diagnostics_.catalog_warnings = catalog->warnings().size();
 
     const auto animations = catalog->getAll();
-    checkAnimationTypes(animations);
+    diagnostics_.animations_loaded = animations.size();
+    diagnostics_.unavailable_animations = checkAnimationTypes(animations);
 
     RCLCPP_INFO(this->get_logger(), "Loaded default animations.");
 
@@ -121,22 +123,44 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
         std::chrono::microseconds(static_cast<std::uint64_t>(1e6 / this->params_.state_publish_rate)),
         std::bind(&LedControllerNode::stateTimerCallback, this));
 
+    render_min_hz_ = this->params_.controller_frequency;
+    render_max_hz_ = this->params_.controller_frequency;
+    render_rate_ = std::make_unique<diagnostic_updater::FrequencyStatus>(
+        diagnostic_updater::FrequencyStatusParam(&render_min_hz_, &render_max_hz_, 0.1, 10),
+        "Led render rate", this->get_clock());
+
+    diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this);
+    diagnostic_updater_->setHardwareID("Bumper Led");
+    diagnostic_updater_->add("Led controller status", this, &LedControllerNode::diagnoseController);
+    diagnostic_updater_->add(*render_rate_);
+
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
 }
 
-void LedControllerNode::checkAnimationTypes(const std::vector<LedAnimationDescription> & animations)
+std::size_t LedControllerNode::checkAnimationTypes(const std::vector<LedAnimationDescription> & animations)
 {
+    std::size_t unavailable = 0;
+
     for (const auto & led_animation : animations) {
+        bool available = true;
+
         for (const auto & animation : led_animation.animations) {
             try {
                 animation_factory_->create(animation.type);
             } catch (const std::runtime_error & e) {
+                available = false;
                 RCLCPP_WARN(
                     this->get_logger(), "Animation '%s' (id %zu) uses unavailable type '%s'; it can't be displayed.",
                     led_animation.name.c_str(), led_animation.id, animation.type.c_str());
             }
         }
+
+        if (!available) {
+            ++unavailable;
+        }
     }
+
+    return unavailable;
 }
 
 void LedControllerNode::setLedAnimationCallback(
@@ -157,10 +181,13 @@ void LedControllerNode::setLedAnimationCallback(
                 std::to_string(result.rejected_segments.size()) + " segment(s); '" + result.name +
                 "' dropped there.";
             RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            diagnostics_.last_rejected_request = response->message;
         }
     } catch (const std::exception & e) {
         response->success = false;
         response->message = e.what();
+        diagnostics_.last_rejected_request =
+            "id " + std::to_string(request->animation.id) + ": " + response->message;
     }
 }
 
@@ -188,11 +215,15 @@ void LedControllerNode::controllerTimerCallback()
     for (const auto & error : result.segment_errors) {
         RCLCPP_WARN_STREAM(this->get_logger(), "Failed to update animation on segment " << error);
     }
+    diagnostics_.segment_errors = result.segment_errors.size();
+    diagnostics_.render_error = result.error;
 
     if (result.error) {
         RCLCPP_ERROR(this->get_logger(), "%s", result.error->c_str());
         return;
     }
+
+    render_rate_->tick();
 
     for (auto & [channel, frame] : result.frames) {
         publishPanelFrame(channel, std::move(frame));
@@ -251,6 +282,11 @@ void LedControllerNode::stateTimerCallback()
     }
 
     state_publisher_->publish(msg);
+}
+
+void LedControllerNode::diagnoseController(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    fillLedControllerStatus(get_led_state_use_case_->execute(), diagnostics_, status);
 }
 
 }  // namespace rover_led

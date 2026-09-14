@@ -79,6 +79,19 @@ void TeleopUseCase::publish(const VelocityCommand & command)
 
     velocity_port_->publish(command);
     zero_sent_ = command.isZero();
+    last_command_ = command;
+}
+
+TeleopDiagnostics TeleopUseCase::diagnostics(const SteadyTime now) const
+{
+    TeleopDiagnostics diagnostics;
+    diagnostics.first_frame_received = last_frame_.has_value();
+    diagnostics.link = link_monitor_.snapshot(now);
+    diagnostics.health = evaluateTeleopHealth(diagnostics.first_frame_received, diagnostics.link);
+    diagnostics.last_command = last_command_;
+    diagnostics.e_stop_switch = e_stop_switch_.position();
+    diagnostics.latch_reset_switch = latch_reset_switch_.position();
+    return diagnostics;
 }
 
 double TeleopUseCase::mapChannel(const int channel_number, const AxisMapping & mapping) const

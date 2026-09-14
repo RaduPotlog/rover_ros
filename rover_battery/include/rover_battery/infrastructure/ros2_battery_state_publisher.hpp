@@ -55,6 +55,8 @@ private:
 
     // Last non-empty error; kept after errors clear (inherited behaviour, see README).
     std::string error_msg_;
+    // False until the first report (real or watchdog-stale), so diagnostics read STALE, not OK.
+    bool has_report_{false};
     ChargingStatusMsg charging_status_;
 };
 

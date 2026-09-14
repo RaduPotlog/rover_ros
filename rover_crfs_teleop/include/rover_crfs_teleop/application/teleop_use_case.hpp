@@ -24,6 +24,7 @@
 #include "rover_crfs_teleop/domain/rc_frame.hpp"
 #include "rover_crfs_teleop/domain/stick_mapping.hpp"
 #include "rover_crfs_teleop/domain/switch_debouncer.hpp"
+#include "rover_crfs_teleop/domain/teleop_health.hpp"
 
 namespace rover_crfs_teleop
 {
@@ -68,6 +69,17 @@ enum class TickStatus
 //      was lost fires on recovery, which is what the operator asked for.
 //
 // Not thread-safe: the node calls it from a single-threaded executor.
+// Read-only snapshot for diagnostics; building it has no side effects on teleop.
+struct TeleopDiagnostics
+{
+    bool first_frame_received{false};
+    LinkHealthSnapshot link;
+    HealthReport health;
+    VelocityCommand last_command;
+    std::optional<SwitchPosition> e_stop_switch;
+    std::optional<SwitchPosition> latch_reset_switch;
+};
+
 class TeleopUseCase
 {
 
@@ -87,6 +99,8 @@ public:
     // Stops commanding: publishes one zero unless the last command already was zero. Called when
     // teleop is being deactivated.
     void stop();
+
+    TeleopDiagnostics diagnostics(SteadyTime now) const;
 
 private:
 
@@ -111,6 +125,8 @@ private:
     // Shared by the link-lost and centred-stick paths, so going from one to the other doesn't
     // publish a second zero.
     bool zero_sent_{false};
+
+    VelocityCommand last_command_;
 };
 
 }  // namespace rover_crfs_teleop

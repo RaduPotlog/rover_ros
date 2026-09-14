@@ -271,4 +271,41 @@ TEST_F(TeleopUseCaseTest, InvalidAxisChannelCommandsNothingOnThatAxis)
     EXPECT_DOUBLE_EQ(velocity_->published[0].linear_x, 0.0);
 }
 
+TEST_F(TeleopUseCaseTest, DiagnosticsBeforeFirstFrameWarn)
+{
+    const auto diagnostics = use_case_->diagnostics(now_);
+
+    EXPECT_FALSE(diagnostics.first_frame_received);
+    EXPECT_EQ(diagnostics.health.level, HealthLevel::kWarn);
+    EXPECT_FALSE(diagnostics.e_stop_switch.has_value());
+}
+
+TEST_F(TeleopUseCaseTest, DiagnosticsReportHealthyLinkAndLastCommand)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+
+    const auto diagnostics = use_case_->diagnostics(now_);
+
+    EXPECT_TRUE(diagnostics.first_frame_received);
+    EXPECT_EQ(diagnostics.health.level, HealthLevel::kOk);
+    EXPECT_DOUBLE_EQ(diagnostics.last_command.linear_x, 2.0);
+    ASSERT_TRUE(diagnostics.e_stop_switch.has_value());
+    EXPECT_EQ(*diagnostics.e_stop_switch, SwitchPosition::kHigh);
+}
+
+TEST_F(TeleopUseCaseTest, DiagnosticsAgreeWithTickOnLinkLoss)
+{
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+
+    const auto later = now_ + 500ms;
+    ASSERT_EQ(use_case_->tick(later), TickStatus::kLinkLost);
+
+    const auto diagnostics = use_case_->diagnostics(later);
+
+    EXPECT_EQ(diagnostics.health.level, HealthLevel::kError);
+    EXPECT_EQ(diagnostics.link.loss_reason, LinkLossReason::kChannelsStale);
+    EXPECT_TRUE(diagnostics.last_command.isZero());
+}
+
 }  // namespace rover_crfs_teleop

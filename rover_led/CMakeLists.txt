@@ -107,12 +107,14 @@ generate_parameter_library(led_controller_parameters
 add_library(
     led_controller_node_component SHARED
     src/infrastructure/led_controller_node.cpp
+    src/infrastructure/led_controller_diagnostics.cpp
     src/infrastructure/pluginlib_animation_factory.cpp
     src/infrastructure/yaml_led_config.cpp
 )
 
 target_link_libraries(led_controller_node_component
     ${ament_index_cpp_TARGETS}
+    ${diagnostic_updater_TARGETS}
     ${rover_msgs_TARGETS}
     ${pluginlib_TARGETS}
     ${rclcpp_TARGETS}
@@ -180,6 +182,10 @@ if(BUILD_TESTING)
   rover_led_add_test(test_yaml_led_config
                      test/unit/infrastructure/test_yaml_led_config.cpp led_controller_node_component)
   target_compile_definitions(test_yaml_led_config PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+  rover_led_add_test(test_led_controller_diagnostics
+                     test/unit/infrastructure/test_led_controller_diagnostics.cpp
+                     led_controller_node_component)
 
   rover_led_add_test(test_led_driver_node
                      test/integration/test_led_driver_node.cpp led_driver_node_component)

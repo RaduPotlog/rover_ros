@@ -10,6 +10,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 set(PACKAGE_DEPENDENCIES
+    diagnostic_msgs
+    diagnostic_updater
     generate_parameter_library
     rclcpp
     rover_msgs
@@ -28,6 +30,7 @@ generate_parameter_library(motion_lock_params
 # Domain: plain C++, no ROS dependencies.
 add_library(${PROJECT_NAME}_core STATIC
             src/domain/motion_lock_policy.cpp
+            src/domain/motion_lock_health.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -42,6 +45,8 @@ target_link_libraries(${PROJECT_NAME}_ros
                       motion_lock_params
 )
 target_link_libraries(${PROJECT_NAME}_ros
+    ${diagnostic_msgs_TARGETS}
+    ${diagnostic_updater_TARGETS}
     ${rclcpp_TARGETS}
     ${rover_msgs_TARGETS}
     ${std_msgs_TARGETS}
@@ -61,6 +66,9 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_motion_lock_policy test/unit/test_motion_lock_policy.cpp)
   target_link_libraries(test_motion_lock_policy ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_motion_lock_health test/unit/test_motion_lock_health.cpp)
+  target_link_libraries(test_motion_lock_health ${PROJECT_NAME}_core)
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})

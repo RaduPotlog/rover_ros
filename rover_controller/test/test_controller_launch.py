@@ -105,7 +105,10 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     manager = next((node, args) for node, args in nodes
                    if args['executable'] == 'ros2_control_node')
     assert manager[0].condition.evaluate(context) == (use_sim == 'False')
-    assert not manager[1].get('remappings'), 'controller remaps belong in node_options_args'
+    # Only the manager-level /diagnostics remap is allowed here: it reaches controller_manager and
+    # the in-process hardware_controller node. Controller topic remaps belong in node_options_args.
+    assert list(manager[1].get('remappings') or []) == [('/diagnostics', 'diagnostics')], \
+        'controller remaps belong in node_options_args'
     assert sum(args['executable'] == 'ros2_control_node' for _, args in nodes) == 1
     parameters = evaluate_parameters(context, normalize_parameters(manager[1]['parameters']))
     assert len(parameters) == 1

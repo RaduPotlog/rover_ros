@@ -20,7 +20,7 @@
     drive:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Drive
-      find_and_remove_prefix: [ 'hardware_controller: ' ]
+      find_and_remove_prefix: [ 'hardware_controller: ', 'controller_manager: ' ]
     battery:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Battery
@@ -28,8 +28,20 @@
     localization:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Localization
-      find_and_remove_prefix: [ 'rover_ekf_node: ' ]
+      find_and_remove_prefix: [ 'rover_ekf_node: ', 'navsat_transform_node: ' ]
     lighting:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lighting
-      find_and_remove_prefix: [ 'led_driver: ' ]
+      find_and_remove_prefix: [ 'led_driver: ', 'led_controller: ' ]
+    teleop:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Teleop
+      find_and_remove_prefix: [ 'rover_crfs_teleop_node: ' ]
+    motion:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Motion
+      find_and_remove_prefix: [ 'motion_lock_node: ', 'rover_twist_mux_node: ' ]
+    safety:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Safety
+      find_and_remove_prefix: [ 'rover_safety_node: ', 'led_safety_node: ' ]

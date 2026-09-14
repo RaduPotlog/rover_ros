@@ -100,6 +100,7 @@ def generate_launch_description():
                 plugin="rover_led::LedControllerNode",
                 name="led_controller",
                 namespace=namespace,
+                remappings=[("/diagnostics", "diagnostics")],
                 parameters=[
                     {"animations_config_path": animations_config_path},
                 ],

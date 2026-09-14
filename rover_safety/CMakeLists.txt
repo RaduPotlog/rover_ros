@@ -9,6 +9,8 @@ set(PACKAGE_DEPENDENCIES
     ament_cmake
     ament_index_cpp
     behaviortree_cpp
+    diagnostic_msgs
+    diagnostic_updater
     generate_parameter_library
     geometry_msgs
     rover_msgs
@@ -34,9 +36,21 @@ include_directories(include)
 # Domain: plain C++, no ROS dependencies.
 add_library(${PROJECT_NAME}_core STATIC
     src/domain/battery_safety_policy.cpp
+    src/domain/safety_health.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+# Infrastructure: diagnostics formatting shared by both safety nodes.
+add_library(${PROJECT_NAME}_diagnostics STATIC
+    src/infrastructure/safety_diagnostics.cpp
+)
+target_link_libraries(${PROJECT_NAME}_diagnostics PUBLIC
+    ${PROJECT_NAME}_core
+    ${behaviortree_cpp_TARGETS}
+    ${diagnostic_msgs_TARGETS}
+    ${diagnostic_updater_TARGETS}
 )
 
 # ------------------------------------- Plugins -------------------------------------- #
@@ -111,6 +125,7 @@ target_link_libraries(${PROJECT_NAME}_node
     ${plugin_libs}
     safety_parameters
     ${PROJECT_NAME}_core
+    ${PROJECT_NAME}_diagnostics
 )
 
 add_executable(led_safety_node src/led_safety_main.cpp
@@ -135,6 +150,7 @@ generate_parameter_library(led_safety_parameters
 
 target_link_libraries(led_safety_node ${plugin_libs}
                       led_safety_parameters
+                      ${PROJECT_NAME}_diagnostics
 )
 
 install(TARGETS ${plugin_libs} 
@@ -157,6 +173,12 @@ if(BUILD_TESTING)
 
     ament_add_gtest(test_battery_safety_policy test/unit/test_battery_safety_policy.cpp)
     target_link_libraries(test_battery_safety_policy ${PROJECT_NAME}_core)
+
+    ament_add_gtest(test_safety_health test/unit/test_safety_health.cpp)
+    target_link_libraries(test_safety_health ${PROJECT_NAME}_core)
+
+    ament_add_gtest(test_safety_diagnostics test/unit/test_safety_diagnostics.cpp)
+    target_link_libraries(test_safety_diagnostics ${PROJECT_NAME}_diagnostics)
 
     ament_add_gtest(test_call_trigger_service test/integration/test_call_trigger_service.cpp
                     TIMEOUT 60)

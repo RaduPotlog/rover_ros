@@ -15,6 +15,8 @@
 #ifndef ROVER_TWIST_MUX_DOMAIN_MOTION_LOCK_POLICY_HPP_
 #define ROVER_TWIST_MUX_DOMAIN_MOTION_LOCK_POLICY_HPP_
 
+#include <vector>
+
 #include "rover_twist_mux/domain/safety_io_flags.hpp"
 
 namespace rover_twist_mux::domain
@@ -45,6 +47,26 @@ struct MotionLockPolicy
     /// its polarity is the inverse of every other pin. Enable only once verified on hardware.
     bool require_motor_contactor_engaged = false;
 };
+
+/** @brief One enabled stop condition that is currently active. */
+enum class MotionInhibitReason
+{
+    HwEStopUserButton,
+    SwEStopUserButton,
+    MotorDriverFault,
+    EStopLatched,
+    MotorContactorDisengaged,
+};
+
+/** @brief Human-readable label for logs and diagnostics. */
+const char * toString(MotionInhibitReason reason);
+
+/**
+ * @brief Lists every enabled stop condition that is active, in the fixed order of
+ *        MotionInhibitReason. Empty means motion is permitted.
+ */
+std::vector<MotionInhibitReason> motionInhibitReasons(
+    const SafetyIoFlags & flags, const MotionLockPolicy & policy);
 
 /**
  * @brief Decides whether motion must be inhibited for the given safety-IO state.

@@ -18,6 +18,8 @@
 #include <memory>
 #include <string>
 
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
+
 #include "rover_twist_mux/domain/motion_lock_policy.hpp"
 
 namespace rover_twist_mux
@@ -53,12 +55,25 @@ domain::MotionLockPolicy toPolicy(const motion_lock::Params & params)
     return policy;
 }
 
+unsigned char toDiagnosticLevel(domain::HealthLevel level)
+{
+    using diagnostic_msgs::msg::DiagnosticStatus;
+
+    switch (level) {
+        case domain::HealthLevel::Error: return DiagnosticStatus::ERROR;
+        case domain::HealthLevel::Warn: return DiagnosticStatus::WARN;
+        case domain::HealthLevel::Ok:
+        default: return DiagnosticStatus::OK;
+    }
+}
+
 }  // namespace
 
 MotionLockNode::MotionLockNode(
     const std::string & node_name, const rclcpp::NodeOptions & options)
 : rclcpp::Node(node_name, options)
 , last_gpio_stamp_(0, 0, this->get_clock()->get_clock_type())
+, diagnostic_updater_(this)
 {
     param_listener_ = std::make_shared<motion_lock::ParamListener>(
         this->get_node_parameters_interface());
@@ -83,6 +98,9 @@ MotionLockNode::MotionLockNode(
         std::chrono::duration_cast<std::chrono::nanoseconds>(period),
         std::bind(&MotionLockNode::timerCallback, this));
 
+    diagnostic_updater_.setHardwareID("Motion Lock");
+    diagnostic_updater_.add("Motion lock", this, &MotionLockNode::diagnoseMotionLock);
+
     RCLCPP_INFO(
         this->get_logger(),
         "Motion lock publishing on '%s' at %.1f Hz; locked until gpio_state arrives.",
@@ -95,26 +113,19 @@ void MotionLockNode::gpioStateCallback(const rover_msgs::msg::GpioState::SharedP
     last_gpio_stamp_ = this->now();
 }
 
-bool MotionLockNode::evaluateLock()
+domain::MotionLockHealth MotionLockNode::evaluateLock()
 {
-    // Nothing received yet: deny motion rather than assume the rover is safe to drive.
-    if (!flags_.has_value()) {
-        return true;
-    }
-
     const auto params = param_listener_->get_params();
 
-    const auto age = this->now() - last_gpio_stamp_;
-    if (age > rclcpp::Duration::from_seconds(params.gpio_timeout)) {
-        return true;
-    }
+    const double age_s = flags_.has_value() ? (this->now() - last_gpio_stamp_).seconds() : 0.0;
 
-    return domain::isMotionInhibited(*flags_, toPolicy(params));
+    return domain::evaluateMotionLockHealth(flags_, age_s, params.gpio_timeout, toPolicy(params));
 }
 
 void MotionLockNode::timerCallback()
 {
-    const bool locked = evaluateLock();
+    last_health_ = evaluateLock();
+    const bool locked = last_health_->locked;
 
     std_msgs::msg::Bool msg;
     msg.data = locked;
@@ -122,13 +133,45 @@ void MotionLockNode::timerCallback()
 
     if (!last_logged_lock_.has_value() || *last_logged_lock_ != locked) {
         if (locked) {
-            RCLCPP_WARN(this->get_logger(), "Motion LOCKED: velocity commands are inhibited.");
+            RCLCPP_WARN(
+                this->get_logger(), "Motion LOCKED: velocity commands are inhibited (%s)",
+                last_health_->message.c_str());
         } else {
             RCLCPP_INFO(this->get_logger(), "Motion unlocked: velocity commands are permitted.");
         }
 
         last_logged_lock_ = locked;
     }
+}
+
+void MotionLockNode::diagnoseMotionLock(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    if (!last_health_.has_value()) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::STALE, "Lock not evaluated yet.");
+        return;
+    }
+
+    const auto params = param_listener_->get_params();
+
+    status.add("Locked", last_health_->locked);
+
+    if (flags_.has_value()) {
+        status.add("gpio_state age (s)", (this->now() - last_gpio_stamp_).seconds());
+        status.add("HW E-Stop user button", flags_->hw_e_stop_user_button);
+        status.add("SW E-Stop user button", flags_->sw_e_stop_user_button);
+        status.add("SW E-Stop motor driver fault", flags_->sw_e_stop_motor_driver_fault);
+        status.add("SW E-Stop latch status", flags_->sw_e_stop_latch_status);
+        status.add("Motor contactor engaged", flags_->motor_contactor_engaged);
+    }
+
+    status.add("gpio_state timeout (s)", params.gpio_timeout);
+    status.add("Policy: use_hw_e_stop_user_button", params.use_hw_e_stop_user_button);
+    status.add("Policy: use_sw_e_stop_user_button", params.use_sw_e_stop_user_button);
+    status.add("Policy: use_sw_e_stop_motor_driver_fault", params.use_sw_e_stop_motor_driver_fault);
+    status.add("Policy: use_sw_e_stop_latch_status", params.use_sw_e_stop_latch_status);
+    status.add("Policy: require_motor_contactor_engaged", params.require_motor_contactor_engaged);
+
+    status.summary(toDiagnosticLevel(last_health_->level), last_health_->message);
 }
 
 }  // namespace rover_twist_mux

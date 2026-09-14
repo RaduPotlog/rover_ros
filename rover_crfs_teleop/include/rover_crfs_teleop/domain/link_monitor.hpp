@@ -56,6 +56,30 @@ struct LinkMonitorConfig
 //     link quality is in its "ok" hysteresis state.
 //
 // Before the first frame (and the first link report, when required) the link is unhealthy.
+// Why the link counts as lost, checked in this order; kNone means healthy.
+enum class LinkLossReason
+{
+    kNone,
+    kNoChannels,
+    kChannelsStale,
+    kNoLinkStats,
+    kLinkStatsStale,
+    kLowLinkQuality,
+};
+
+const char * toString(LinkLossReason reason);
+
+// Read-only view of the monitor for diagnostics. Ages are nullopt until the first message.
+struct LinkHealthSnapshot
+{
+    std::optional<std::chrono::milliseconds> channels_age;
+    std::optional<std::chrono::milliseconds> link_stats_age;
+    std::optional<std::uint8_t> link_quality;
+    bool link_quality_ok{false};
+    bool require_link_stats{true};
+    LinkLossReason loss_reason{LinkLossReason::kNoChannels};
+};
+
 class LinkMonitor
 {
 
@@ -69,12 +93,17 @@ public:
 
     bool isHealthy(SteadyTime now) const;
 
+    LinkHealthSnapshot snapshot(SteadyTime now) const;
+
 private:
+
+    LinkLossReason lossReason(SteadyTime now) const;
 
     LinkMonitorConfig config_;
 
     std::optional<SteadyTime> last_channels_;
     std::optional<SteadyTime> last_link_stats_;
+    std::optional<std::uint8_t> last_link_quality_;
 
     // Starts false: nothing has proven the link good yet.
     bool link_quality_ok_{false};

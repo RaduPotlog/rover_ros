@@ -162,3 +162,37 @@ TEST(MotionLockPolicy, CpuWatchdogHeartbeatIsNotAStopCondition)
 
     EXPECT_FALSE(isMotionInhibited(allClear(), all_enabled));
 }
+
+TEST(MotionLockPolicy, ReasonsAreEmptyWhenMotionIsPermitted)
+{
+    EXPECT_TRUE(motionInhibitReasons(allClear(), MotionLockPolicy{}).empty());
+}
+
+TEST(MotionLockPolicy, ReasonsListEveryActiveStopInOrder)
+{
+    auto flags = allClear();
+    flags.sw_e_stop_latch_status = true;
+    flags.hw_e_stop_user_button = true;
+    flags.motor_contactor_engaged = false;
+
+    MotionLockPolicy policy;
+    policy.require_motor_contactor_engaged = true;
+
+    const std::vector<MotionInhibitReason> expected{
+        MotionInhibitReason::HwEStopUserButton,
+        MotionInhibitReason::EStopLatched,
+        MotionInhibitReason::MotorContactorDisengaged};
+
+    EXPECT_EQ(motionInhibitReasons(flags, policy), expected);
+}
+
+TEST(MotionLockPolicy, ReasonsSkipDisabledPins)
+{
+    auto flags = allClear();
+    flags.sw_e_stop_user_button = true;
+
+    MotionLockPolicy policy;
+    policy.use_sw_e_stop_user_button = false;
+
+    EXPECT_TRUE(motionInhibitReasons(flags, policy).empty());
+}

@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 #include "sensor_msgs/msg/joy.hpp"
@@ -29,6 +30,7 @@
 #include "rover_safety/behavior_tree.hpp"
 #include "rover_safety/behavior_tree_utils.hpp"
 #include "rover_safety/led_safety_parameters.hpp"
+#include "rover_safety/infrastructure/safety_diagnostics.hpp"
 
 // Actions
 #include "rover_safety/plugins/action/call_set_led_animation_service_node.hpp"
@@ -48,6 +50,11 @@ LedSafetyNode::LedSafetyNode(
     this->params_ = this->param_listener_->get_params();
 
     battery_percent_ = 0.0;
+
+    diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this);
+    diagnostic_updater_->setHardwareID("Bumper Led");
+    diagnostic_updater_->add("LED safety inputs", this, &LedSafetyNode::diagnoseInputs);
+    diagnostic_updater_->add("LED safety behavior tree", this, &LedSafetyNode::diagnoseBehaviorTree);
 
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
 }
@@ -91,6 +98,7 @@ void LedSafetyNode::init()
     led_tree_timer_ = this->create_wall_timer(
         timer_period, std::bind(&LedSafetyNode::ledTreeTimerCallback, this));
 
+    configured_ = true;
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
 }
 
@@ -180,21 +188,27 @@ void LedSafetyNode::batteryCallback(const BatteryStateMsg::SharedPtr battery_sta
     led_tree_->getBlackboard()->set<float>("battery_percent", battery_percent_);
     led_tree_->getBlackboard()->set<std::string>("battery_percent_round",
         std::to_string(round(battery_percent_ / update_charging_anim_step_) * update_charging_anim_step_));
+
+    last_battery_stamp_ = std::chrono::steady_clock::now();
 }
 
 void LedSafetyNode::gpioCallback(const GpioMsg::SharedPtr gpio_state)
 {
     led_tree_->getBlackboard()->set<bool>("e_stop_state", gpio_state->gpio_pin_hw_e_stop_user_button);
+    last_gpio_stamp_ = std::chrono::steady_clock::now();
 }
 
 void LedSafetyNode::joyCallback(const JoyMsg::SharedPtr joy)
 {
     led_tree_->getBlackboard()->set<bool>("drive_state", joy->buttons[kDeadManButtonIndex]);
+    last_joy_stamp_ = std::chrono::steady_clock::now();
 }
 
 void LedSafetyNode::ledTreeTimerCallback()
 {
-    if (!systemReady()) {
+    system_ready_ = systemReady();
+
+    if (!system_ready_) {
         return;
     }
 
@@ -217,6 +231,35 @@ bool LedSafetyNode::systemReady()
     }
 
     return true;
+}
+
+void LedSafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    const auto now = std::chrono::steady_clock::now();
+    const double timeout = param_listener_->get_params().input_timeout;
+
+    // joy is optional for the tree (it only selects the drive animation), so it is reported as a
+    // value but not graded; gpio_state is on-change only and cannot go stale.
+    status.add("joy age (s)", last_joy_stamp_ ?
+        std::to_string(*infrastructure::ageSeconds(last_joy_stamp_, now)) :
+        std::string("never received"));
+    status.add("Battery percent", battery_percent_);
+
+    infrastructure::fillSafetyInputsStatus(
+        {
+            {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
+            {"hardware_interface/gpio_state", infrastructure::ageSeconds(last_gpio_stamp_, now), std::nullopt},
+        },
+        status);
+}
+
+void LedSafetyNode::diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    status.add("Lifecycle state", get_current_state().label());
+
+    infrastructure::fillBehaviorTreeStatus(
+        configured_, system_ready_,
+        configured_ ? led_tree_->getTreeStatus() : BT::NodeStatus::IDLE, status);
 }
 
 }  // namespace husarion_ugv_manager

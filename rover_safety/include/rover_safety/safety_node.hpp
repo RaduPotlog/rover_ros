@@ -15,12 +15,15 @@
 #ifndef ROVER_SAFETY_SAFETY_NODE_HPP_
 #define ROVER_SAFETY_SAFETY_NODE_HPP_
 
+#include <chrono>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <behaviortree_cpp/behavior_tree.h>
 #include <behaviortree_cpp/bt_factory.h>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <nav2_ros_common/lifecycle_node.hpp>
 
@@ -87,6 +90,12 @@ private:
     void systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr system_status);
     void safetyTreeTimerCallback();
 
+    // Diagnostics (hardware ID "Rover Safety"). They run on the node's single-threaded executor,
+    // like the subscriptions and the tree timer, and only read what those recorded.
+    void diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status);
+    void diagnoseBatteryVerdict(diagnostic_updater::DiagnosticStatusWrapper & status);
+    void diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status);
+
     rclcpp::Subscription<BatteryStateMsg>::SharedPtr battery_sub_;
     rclcpp::Subscription<RoverDriverStateMsg>::SharedPtr driver_state_sub_;
     rclcpp::Subscription<BoolMsg>::SharedPtr e_stop_sub_;
@@ -97,6 +106,18 @@ private:
     domain::BatteryThresholds battery_thresholds_;
     double battery_temp_{0.0};
     double cpu_temp_{0.0};
+
+    using SteadyTime = std::chrono::steady_clock::time_point;
+    std::optional<SteadyTime> last_battery_stamp_;
+    std::optional<SteadyTime> last_system_status_stamp_;
+    std::optional<SteadyTime> last_gpio_stamp_;
+    std::optional<domain::BatterySafetyDecision> last_battery_decision_;
+    bool system_ready_{false};
+    // Set only once init() completed; a configure that threw leaves a half-built tree behind.
+    bool configured_{false};
+
+    // Last member: destroyed first, so its timer never runs a task on a half-destroyed node.
+    std::unique_ptr<diagnostic_updater::Updater> diagnostic_updater_;
 };
 
 }  // namespace rover_safety

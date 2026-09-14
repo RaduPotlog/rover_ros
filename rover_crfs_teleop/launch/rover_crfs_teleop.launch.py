@@ -77,6 +77,7 @@ def generate_launch_description():
         name="rover_crfs_teleop_node",
         parameters=[rover_crfs_config_path],
         namespace=namespace,
+        remappings=[("/diagnostics", "diagnostics")],
         autostart=True,
         arguments=[
             "--ros-args",
