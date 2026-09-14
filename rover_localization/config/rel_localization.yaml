@@ -15,6 +15,12 @@
       publish_tf: true
       publish_acceleration: false
 
+      # robot_localization always registers the "odometry/filtered topic status"
+      # frequency diagnostic but only counts publishes when this is true; with the
+      # default (false) it reports "No events recorded" at ERROR while the filter
+      # is publishing normally. Also enables the filter's own input/setting checks.
+      print_diagnostics: true
+
       odom0: "drive_controller/odom"
       # Wheel odometry contributes body velocities only. Its absolute X/Y is
       # integrated along diff_drive_controller's own yaw (skewed by

@@ -25,6 +25,10 @@
       type: diagnostic_aggregator/GenericAnalyzer
       path: Battery
       find_and_remove_prefix: [ 'rover_battery_node: ' ]
+    localization:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Localization
+      find_and_remove_prefix: [ 'rover_ekf_node: ' ]
     lighting:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lighting
