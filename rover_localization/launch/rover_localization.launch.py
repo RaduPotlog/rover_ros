@@ -139,6 +139,12 @@ def generate_launch_description():
             "--ros-args",
             "--log-level",
             log_level,
+            # robot_localization leaves odom1/imu1/pose0/twist0 declared but unset; every
+            # bulk parameter fetch (foxglove_bridge) then makes rclcpp's parameter service
+            # log "Failed to get parameters: parameter 'imu1' is not initialized".
+            # Harmless noise; the filter's own messages use the node logger.
+            "--log-level",
+            "rclcpp:=ERROR",
         ],
         condition=IfCondition(use_ekf),
     )
