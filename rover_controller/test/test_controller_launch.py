@@ -69,6 +69,8 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     bundled = (Path(get_package_share_directory('rover_controller')) /
                'config/wheel_01_controller.yaml')
     expected = yaml.safe_load(bundled.read_text())
+    drive_parameters = expected['/**']['drive_controller']['ros__parameters']
+    assert drive_parameters['tf_frame_prefix'] == '~'
     if selection != 'default':
         common = tmp_path / 'rover_controller/config/wheel_01_controller.yaml'
         common.parent.mkdir(parents=True)
