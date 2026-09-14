@@ -1,5 +1,5 @@
 /**:
-  led_safety_node:
+  rover_led_safety_node:
     ros__parameters:
       timer_frequency: 10.0
       bt_server_port: 5555

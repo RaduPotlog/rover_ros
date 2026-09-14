@@ -48,7 +48,7 @@ namespace rover_led
 {
 
 LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
-: Node("led_controller", options)
+: Node("rover_led_controller", options)
 , animation_factory_(std::make_shared<PluginlibAnimationFactory>())
 {
     RCLCPP_INFO(this->get_logger(), "Initializing.");

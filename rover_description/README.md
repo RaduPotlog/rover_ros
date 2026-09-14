@@ -26,7 +26,7 @@ This puts the four wheels at:
 All four wheel joints spin about **`+y`** (`<axis xyz="0 1 0"/>`). That sign is
 deliberate and the same for every wheel: with the contact patch below the hub,
 a positive joint velocity drives the rover **forward** (`+x`). No wheel needs a
-negated axis. `drive_controller`'s `left_wheel_names` are correspondingly the
+negated axis. `rover_drive_controller`'s `left_wheel_names` are correspondingly the
 `+y` pair (`rl`, `fl`) and `right_wheel_names` the `-y` pair (`rr`, `fr`).
 
 `base_link` is the root and coincides with `body_link` (the chassis centre).

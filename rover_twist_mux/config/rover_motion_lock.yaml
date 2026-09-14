@@ -1,4 +1,4 @@
-/**/motion_lock_node:
+/**/rover_motion_lock_node:
   ros__parameters:
     publish_frequency: 10.0
     gpio_timeout: 1.0

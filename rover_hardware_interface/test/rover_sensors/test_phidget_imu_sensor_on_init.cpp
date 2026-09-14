@@ -18,7 +18,7 @@
 // rover_description/urdf/common/imu.urdf.xacro's <ros2_control type="sensor"> block, which wires
 // this plugin into the real, non-simulated bringup path - confirmed by tracing
 // rover_a1_macro.urdf.xacro's unconditional xacro:imu.imu invocation and
-// rover_controller.launch.py's imu_broadcaster_spawner).
+// rover_controller.launch.py's rover_imu_broadcaster spawner).
 //
 // Scope: on_init() and export_state_interfaces() only, mirroring
 // test/rover_system/test_rover_a1_system_on_init.cpp. PhidgetImuSensor::on_activate()

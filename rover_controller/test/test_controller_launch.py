@@ -69,30 +69,30 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     bundled = (Path(get_package_share_directory('rover_controller')) /
                'config/wheel_01_controller.yaml')
     expected = yaml.safe_load(bundled.read_text())
-    drive_parameters = expected['/**']['drive_controller']['ros__parameters']
+    drive_parameters = expected['/**']['rover_drive_controller']['ros__parameters']
     assert drive_parameters['tf_frame_prefix'] == '~'
     # Controllers ignore ros2_control_node's remaps (use_global_arguments=false), so
     # topic remaps must be each controller's node_options_args.
     manager_parameters = expected['/**']['controller_manager']['ros__parameters']
-    assert '~/odom:=odometry/wheels' in manager_parameters['drive_controller']['node_options_args']
-    assert '~/cmd_vel:=cmd_vel' in manager_parameters['drive_controller']['node_options_args']
-    assert '~/imu:=imu/data' in manager_parameters['imu_broadcaster']['node_options_args']
+    assert '~/odom:=odometry/wheels' in manager_parameters['rover_drive_controller']['node_options_args']
+    assert '~/cmd_vel:=cmd_vel' in manager_parameters['rover_drive_controller']['node_options_args']
+    assert '~/imu:=imu/data' in manager_parameters['rover_imu_broadcaster']['node_options_args']
     if selection != 'default':
         common = tmp_path / 'rover_controller/config/wheel_01_controller.yaml'
         common.parent.mkdir(parents=True)
-        expected['/**']['drive_controller']['ros__parameters'].update(
+        expected['/**']['rover_drive_controller']['ros__parameters'].update(
             wheel_radius=0.21, base_frame_id='<namespace>/base_link')
         common.write_text(yaml.safe_dump(expected))
         context.launch_configurations['common_dir_path'] = str(tmp_path)
-        expected['/**']['drive_controller']['ros__parameters']['base_frame_id'] = (
+        expected['/**']['rover_drive_controller']['ros__parameters']['base_frame_id'] = (
             f'{namespace}/base_link' if namespace else 'base_link')
     if selection == 'explicit':
         explicit = tmp_path / 'override.yaml'
-        expected['/**']['drive_controller']['ros__parameters'].update(
+        expected['/**']['rover_drive_controller']['ros__parameters'].update(
             wheel_radius=0.23, base_frame_id='<namespace>/base_link')
         explicit.write_text(yaml.safe_dump(expected))
         context.launch_configurations['controller_config_path'] = str(explicit)
-        expected['/**']['drive_controller']['ros__parameters']['base_frame_id'] = (
+        expected['/**']['rover_drive_controller']['ros__parameters']['base_frame_id'] = (
             f'{namespace}/base_link' if namespace else 'base_link')
 
     description = controller_launch.generate_launch_description()
@@ -106,7 +106,7 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
                    if args['executable'] == 'ros2_control_node')
     assert manager[0].condition.evaluate(context) == (use_sim == 'False')
     # Only the manager-level /diagnostics remap is allowed here: it reaches controller_manager and
-    # the in-process hardware_controller node. Controller topic remaps belong in node_options_args.
+    # the in-process rover_hardware_controller node. Controller topic remaps belong in node_options_args.
     assert list(manager[1].get('remappings') or []) == [('/diagnostics', 'diagnostics')], \
         'controller remaps belong in node_options_args'
     assert sum(args['executable'] == 'ros2_control_node' for _, args in nodes) == 1
@@ -123,12 +123,12 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     assert yaml.safe_load(Path(paths[0]).read_text()) == expected
 
 
-@pytest.mark.parametrize('failed', [None, 'joint_state_broadcaster',
-                                    'drive_controller', 'imu_broadcaster'])
+@pytest.mark.parametrize('failed', [None, 'rover_joint_state_broadcaster',
+                                    'rover_drive_controller', 'rover_imu_broadcaster'])
 def test_spawner_sequence(controller_launch, monkeypatch, tmp_path, failed):
     """Run real process exits through the production launch event handlers."""
     record = tmp_path / 'started.txt'
-    controllers = ['joint_state_broadcaster', 'drive_controller', 'imu_broadcaster']
+    controllers = ['rover_joint_state_broadcaster', 'rover_drive_controller', 'rover_imu_broadcaster']
 
     def fake_node(**kwargs):
         if kwargs['executable'] == 'ros2_control_node':
@@ -192,17 +192,17 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
     namespace = 'controller_test_' + uuid.uuid4().hex[:8]
     bundled = yaml.safe_load((Path(get_package_share_directory('rover_controller')) /
                               'config/wheel_01_controller.yaml').read_text())
-    bundled_drive = bundled['/**']['controller_manager']['ros__parameters']['drive_controller']
+    bundled_drive = bundled['/**']['controller_manager']['ros__parameters']['rover_drive_controller']
     config = {
         '/**': {
             'controller_manager': {'ros__parameters': {
                 'update_rate': 50,
-                'drive_controller': {
+                'rover_drive_controller': {
                     'type': 'diff_drive_controller/DiffDriveController',
                     'node_options_args': bundled_drive['node_options_args'],
                 },
             }},
-            'drive_controller': {'ros__parameters': {
+            'rover_drive_controller': {'ros__parameters': {
                 'left_wheel_names': ['left_wheel_joint'],
                 'right_wheel_names': ['right_wheel_joint'],
                 'wheel_separation': 0.6,
@@ -234,7 +234,7 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
             action.execute(launch_context)
     manager = next(args for args in captured if args['executable'] == 'ros2_control_node')
     spawner = next(args for args in captured if args['executable'] == 'spawner' and
-                   args['arguments'][0] == 'drive_controller')
+                   args['arguments'][0] == 'rover_drive_controller')
     params = evaluate_parameters(launch_context, normalize_parameters(manager['parameters']))
     manager_file = str(params[0])
     spawner_args = [resolve(launch_context, arg) for arg in spawner['arguments']]
@@ -304,7 +304,7 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
             future = client.call_async(ListControllers.Request())
             executor.spin_until_future_complete(future, timeout_sec=10)
             assert future.done(), 'list_controllers timed out'
-            assert any(c.name == 'drive_controller' and c.state == 'active'
+            assert any(c.name == 'rover_drive_controller' and c.state == 'active'
                        for c in future.result().controller)
             # The bundled node_options_args must actually rename the controller's topics.
             deadline = time.monotonic() + 10
@@ -313,9 +313,9 @@ def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_pa
                 executor.spin_once(timeout_sec=0.1)
             assert node.count_publishers(f'/{namespace}/odometry/wheels') == 1
             assert node.count_subscribers(f'/{namespace}/cmd_vel') == 1
-            assert node.count_publishers(f'/{namespace}/drive_controller/odom') == 0
+            assert node.count_publishers(f'/{namespace}/rover_drive_controller/odom') == 0
             parameters = node.create_client(
-                GetParameters, f'/{namespace}/drive_controller/get_parameters')
+                GetParameters, f'/{namespace}/rover_drive_controller/get_parameters')
             assert parameters.wait_for_service(timeout_sec=10)
             future = parameters.call_async(GetParameters.Request(
                 names=['wheel_radius', 'base_frame_id']))

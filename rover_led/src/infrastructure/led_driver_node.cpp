@@ -42,7 +42,7 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 
 LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
-: LifecycleNode("led_driver", options)
+: LifecycleNode("rover_led_driver", options)
 , diagnostic_updater_(this)
 {
     RCLCPP_INFO(this->get_logger(), "Constructing node.");

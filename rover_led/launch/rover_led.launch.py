@@ -79,14 +79,14 @@ def generate_launch_description():
     driver_config_path = PathJoinSubstitution([rover_led_pkg, "config", driver_config])
     led_container = ComposableNodeContainer(
         package="rclcpp_components",
-        name="led_container",
+        name="rover_led_container",
         namespace=namespace,
         executable="component_container",
         composable_node_descriptions=[
             ComposableNode(
                 package="rover_led",
                 plugin="rover_led::LedDriverNode",
-                name="led_driver",
+                name="rover_led_driver",
                 namespace=namespace,
                 remappings=[("/diagnostics", "diagnostics")],
                 parameters=[driver_config_path],
@@ -98,7 +98,7 @@ def generate_launch_description():
             ComposableNode(
                 package="rover_led",
                 plugin="rover_led::LedControllerNode",
-                name="led_controller",
+                name="rover_led_controller",
                 namespace=namespace,
                 remappings=[("/diagnostics", "diagnostics")],
                 parameters=[

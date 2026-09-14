@@ -40,6 +40,6 @@ def test_drive_controller_matches_description(wheel_type):
     wheel = _load(description_dir / f'{wheel_type}.yaml')
     controller = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')
 
-    drive = controller['/**']['drive_controller']['ros__parameters']
+    drive = controller['/**']['rover_drive_controller']['ros__parameters']
     assert drive['wheel_radius'] == pytest.approx(wheel['wheel_radius'])
     assert drive['wheel_separation'] == pytest.approx(wheel['wheel_separation'])

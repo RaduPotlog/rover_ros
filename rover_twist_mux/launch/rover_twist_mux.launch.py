@@ -72,7 +72,7 @@ def generate_launch_description():
     motion_lock_node = Node(
         package="rover_twist_mux",
         executable="motion_lock_node",
-        name="motion_lock_node",
+        name="rover_motion_lock_node",
         namespace=namespace,
         output="screen",
         parameters=[motion_lock_config_path],

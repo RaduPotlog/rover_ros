@@ -2,7 +2,7 @@
 
 This package is responsible for activates twist mux.
 
-It also provides `motion_lock_node`, the adapter that lets the rover's safety IO gate the mux.
+It also provides `rover_motion_lock_node`, the adapter that lets the rover's safety IO gate the mux.
 
 ## Command arbitration
 
@@ -22,7 +22,7 @@ transition: the nav input goes stale and the mux falls through, instead of relyi
 
 ## Motion lock
 
-`motion_lock_node` subscribes `hardware_interface/gpio_state` (`rover_msgs/GpioState`) and
+`rover_motion_lock_node` subscribes `hardware_interface/gpio_state` (`rover_msgs/GpioState`) and
 publishes `motion_lock` (`std_msgs/Bool`), which `twist_mux` consumes as a lock. It exists
 because `twist_mux` locks are typed `std_msgs/Bool` and nothing in the stack published one, so
 the safety IO could not gate the mux at all.
@@ -41,7 +41,7 @@ Two `gpio_state` fields are deliberately *not* lock conditions:
   `motion_lock` oscillate at the heartbeat rate. A stalled heartbeat is caught by the safety relay,
   which latches the E-Stop, and that *is* a lock condition (`use_sw_e_stop_latch_status`).
 
-`twist_mux` itself treats a *stale lock topic* as locked, so if `motion_lock_node` dies the mux
+`twist_mux` itself treats a *stale lock topic* as locked, so if `rover_motion_lock_node` dies the mux
 closes rather than opens. The node therefore republishes at `publish_frequency` (10 Hz) to stay
 well inside the lock's 0.5 s timeout, and is launched alongside the mux.
 

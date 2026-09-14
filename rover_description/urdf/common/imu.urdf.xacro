@@ -93,7 +93,7 @@
     </xacro:if>
 
     <!-- ROS2 controller -->
-    <ros2_control name="${ns}imu" type="sensor">
+    <ros2_control name="${ns}rover_imu" type="sensor">
       <xacro:unless value="${use_sim}">
         <hardware>
           <!-- Hardware IMU sensor interface  -->

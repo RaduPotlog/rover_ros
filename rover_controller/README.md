@@ -49,7 +49,7 @@ process-wide remaps only affect the controller manager itself.
 ```yaml
 controller_manager:
   ros__parameters:
-    drive_controller:
+    rover_drive_controller:
       type: diff_drive_controller/DiffDriveController
       node_options_args: ["-r", "~/odom:=odometry/wheels"]
 ```

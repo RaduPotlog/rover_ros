@@ -1,6 +1,6 @@
 # Wheel PID controllers below are experimental and are NOT spawned.
 # Activation requires deliberate reference-interface chaining to avoid competing
-# with drive_controller for physical wheel velocity command interfaces.
+# with rover_drive_controller for physical wheel velocity command interfaces.
 /**:
   controller_manager:
     ros__parameters:
@@ -13,9 +13,9 @@
       # `<controller>.node_options_args` are that controller node's own --ros-args.
       # Remap targets are relative, so they follow the controller manager's namespace.
 
-      joint_state_broadcaster:
+      rover_joint_state_broadcaster:
         type: joint_state_broadcaster/JointStateBroadcaster
-        node_options_args: ["-r", "~/transition_event:=_joint_state_broadcaster/transition_event"]
+        node_options_args: ["-r", "~/transition_event:=_rover_joint_state_broadcaster/transition_event"]
    
       pid_controller_rl_wheel_base_to_rl_wheel_joint:
         type: pid_controller/PidController
@@ -29,16 +29,16 @@
       pid_controller_fr_wheel_base_to_fr_wheel_joint:
         type: pid_controller/PidController
             
-      drive_controller:
+      rover_drive_controller:
         type: diff_drive_controller/DiffDriveController
         node_options_args: ["-r", "~/cmd_vel:=cmd_vel",
                             "-r", "~/odom:=odometry/wheels",
-                            "-r", "~/transition_event:=_drive_controller/transition_event"]
+                            "-r", "~/transition_event:=_rover_drive_controller/transition_event"]
       
-      imu_broadcaster:
+      rover_imu_broadcaster:
         type: imu_sensor_broadcaster/IMUSensorBroadcaster
         node_options_args: ["-r", "~/imu:=imu/data",
-                            "-r", "~/transition_event:=_imu_broadcaster/transition_event"]
+                            "-r", "~/transition_event:=_rover_imu_broadcaster/transition_event"]
 
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
@@ -96,7 +96,7 @@
       gains:
         fr_wheel_base_to_fr_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
 
-  imu_broadcaster:
+  rover_imu_broadcaster:
     ros__parameters:
       sensor_name: "imu"
       frame_id: "imu_link"
@@ -104,7 +104,7 @@
       static_covariance_angular_velocity: [1.0e-4, 0.0, 0.0, 0.0, 1.0e-4, 0.0, 0.0, 0.0, 1.0e-4]
       static_covariance_linear_acceleration: [7.6e-4, 0.0, 0.0, 0.0, 7.6e-4, 0.0, 0.0, 0.0, 7.6e-4]
 
-  drive_controller:
+  rover_drive_controller:
     ros__parameters:
 
       left_wheel_names: ["rl_wheel_base_to_rl_wheel_joint", "fl_wheel_base_to_fl_wheel_joint"]

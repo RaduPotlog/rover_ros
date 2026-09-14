@@ -94,7 +94,7 @@ def generate_launch_description():
     rover_led_safety_node = Node(
         package="rover_safety",
         executable="led_safety_node",
-        name="led_safety_node",
+        name="rover_led_safety_node",
         parameters=[
             PathJoinSubstitution([rover_safety_pkg, "config", "led_safety.yaml"]),
             {

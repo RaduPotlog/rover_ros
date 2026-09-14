@@ -21,7 +21,7 @@
         timeout : 0.5
         priority: 5
 
-    # Safety lock, fed by motion_lock_node from hardware_interface/gpio_state.
+    # Safety lock, fed by rover_motion_lock_node from hardware_interface/gpio_state.
     #
     # twist_mux masks an input when `input priority < active lock priority` (strictly), so
     # priority 200 outranks all three inputs above and stops the rover outright while any
@@ -29,8 +29,8 @@
     # drop this to 7 (above nav's 5, below cmd_elrs's 10).
     #
     # The timeout is what makes this fail-safe: twist_mux treats a stale lock topic as LOCKED
-    # (isLocked() == hasExpired() || data), so if motion_lock_node dies the mux closes rather
-    # than opens. motion_lock_node republishes at 10 Hz to stay well inside this window.
+    # (isLocked() == hasExpired() || data), so if rover_motion_lock_node dies the mux closes rather
+    # than opens. rover_motion_lock_node republishes at 10 Hz to stay well inside this window.
     locks:
       motion_lock:
         topic   : motion_lock

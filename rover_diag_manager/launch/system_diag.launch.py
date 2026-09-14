@@ -87,7 +87,7 @@ def generate_launch_description():
     diagnostic_aggregator_node = Node(
         package="diagnostic_aggregator",
         executable="aggregator_node",
-        name="diagnostic_aggregator",
+        name="rover_diagnostic_aggregator",
         parameters=[diagnostic_aggregator_config_path],
         namespace=namespace,
         remappings=[

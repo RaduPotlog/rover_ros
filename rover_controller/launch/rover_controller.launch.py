@@ -153,9 +153,9 @@ def generate_launch_description():
         [
             "'",
             namespace,
-            "' + '.joint_state_broadcaster' if '",
+            "' + '.rover_joint_state_broadcaster' if '",
             namespace,
-            "' else 'joint_state_broadcaster'",
+            "' else 'rover_joint_state_broadcaster'",
         ]
     )
     controller_manager_log_unit = PythonExpression(
@@ -174,7 +174,7 @@ def generate_launch_description():
         parameters=[resolved_config],
         namespace=namespace,
         # Only the /diagnostics remap belongs here: it reaches controller_manager and the
-        # hardware_controller node the hardware interface creates in this process, but never
+        # rover_hardware_controller node the hardware interface creates in this process, but never
         # the controllers. Controller topic remaps are `node_options_args` in the controller
         # config file.
         remappings=[("/diagnostics", "diagnostics")],
@@ -234,13 +234,13 @@ def generate_launch_description():
             )
 
         drive_controller_spawner = make_spawner(
-            'drive_controller', include_log_args=True
+            'rover_drive_controller', include_log_args=True
         )
         joint_state_broadcaster_spawner = make_spawner(
-            'joint_state_broadcaster'
+            'rover_joint_state_broadcaster'
         )
         imu_broadcaster_spawner = make_spawner(
-            'imu_broadcaster', include_log_args=True
+            'rover_imu_broadcaster', include_log_args=True
         )
 
         return [
@@ -248,7 +248,7 @@ def generate_launch_description():
                 event_handler=OnProcessExit(
                     target_action=joint_state_broadcaster_spawner,
                     on_exit=spawner_exit_handler(
-                        'joint_state_broadcaster',
+                        'rover_joint_state_broadcaster',
                         drive_controller_spawner,
                     ),
                 )
@@ -257,14 +257,14 @@ def generate_launch_description():
                 event_handler=OnProcessExit(
                     target_action=drive_controller_spawner,
                     on_exit=spawner_exit_handler(
-                        'drive_controller', imu_broadcaster_spawner
+                        'rover_drive_controller', imu_broadcaster_spawner
                     ),
                 ),
             ),
             RegisterEventHandler(
                 OnProcessExit(
                     target_action=imu_broadcaster_spawner,
-                    on_exit=spawner_exit_handler('imu_broadcaster'),
+                    on_exit=spawner_exit_handler('rover_imu_broadcaster'),
                 )
             ),
             joint_state_broadcaster_spawner,

@@ -121,7 +121,7 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
         // a previous activation - see the member's declaration for why the clock type must match.
         driver_state_update_time_initialized_ = false;
 
-        system_ros_interface_ = std::make_unique<SystemROSInterface>("hardware_controller");
+        system_ros_interface_ = std::make_unique<SystemROSInterface>("rover_hardware_controller");
 
         system_ros_interface_->addService<TriggerSrv, std::function<void()>>(
             "hardware_interface/sw_user_e_stop_set", std::bind(&EmergencyStopInterface::setEStop, e_stop_), 1,

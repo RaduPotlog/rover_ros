@@ -29,7 +29,7 @@ int main(int argc, char ** argv)
     try {
         // Construction can throw on an invalid parameter override.
         auto motion_lock_node =
-            std::make_shared<rover_twist_mux::MotionLockNode>("motion_lock_node");
+            std::make_shared<rover_twist_mux::MotionLockNode>("rover_motion_lock_node");
 
         rclcpp::spin(motion_lock_node);
     } catch (const std::exception & e) {
