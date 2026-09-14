@@ -63,7 +63,7 @@ def generate_launch_description():
         executable='udp_receiver_node_exe',
         parameters=[rover_battery_config_path],
         remappings=[
-            ('/udp_read', '/rover_battery_udp_data')
+            ('udp_read', 'rover_battery_udp_data')
         ],
         autostart=True,
         emulate_tty=True,

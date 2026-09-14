@@ -6,7 +6,7 @@ It also provides `rover_motion_lock_node`, the adapter that lets the rover's saf
 
 ## Command arbitration
 
-`twist_mux` is the **sole publisher of `/cmd_vel`**. Every velocity source feeds it as an input,
+`twist_mux` is the **sole publisher of `cmd_vel` (`/rover/cmd_vel`)**. Every velocity source feeds it as an input,
 highest priority wins, and each input has a 0.5 s timeout:
 
 | Priority | Input | Topic | Source |
@@ -16,7 +16,7 @@ highest priority wins, and each input has a 0.5 s timeout:
 | 5 | `nav` | `nav_cmd_vel_stamped` | Nav 2, on the separate orchestrator computer |
 
 Nav 2 sits lowest so either teleop source preempts autonomy deterministically, rather than the
-two racing each other on `/cmd_vel`. The timeout also makes a LAN partition a defined
+two racing each other on `cmd_vel`. The timeout also makes a LAN partition a defined
 transition: the nav input goes stale and the mux falls through, instead of relying on
 `diff_drive_controller`'s own `cmd_vel_timeout` as a backstop.
 

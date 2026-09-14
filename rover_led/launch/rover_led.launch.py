@@ -57,7 +57,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     declare_namespace_arg = DeclareLaunchArgument(
         "namespace",
-        default_value=EnvironmentVariable("ROBOT_NAMESPACE", default_value=""),
+        default_value=EnvironmentVariable("ROVER_NAMESPACE", default_value=""),
         description="Add namespace to all launched nodes.",
     )
 
@@ -132,7 +132,7 @@ def generate_launch_description():
         executable='udp_sender_node_exe',
         parameters=[driver_udp_channel_1_config_path],
         remappings=[
-            ('/udp_write', '/udp_write/led_channel_1')
+            ('udp_write', 'udp_write/led_channel_1')
         ],
         autostart=True,
         emulate_tty=True,
@@ -148,7 +148,7 @@ def generate_launch_description():
         executable='udp_sender_node_exe',
         parameters=[driver_udp_channel_2_config_path],
         remappings=[
-            ('/udp_write', '/udp_write/led_channel_2')
+            ('udp_write', 'udp_write/led_channel_2')
         ],
         autostart=True,
         emulate_tty=True,

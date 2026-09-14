@@ -68,7 +68,7 @@ protected:
         battery_node_->init();
 
         tester_ = std::make_shared<rclcpp::Node>("tester", "/rover_battery_test");
-        udp_pub_ = tester_->create_publisher<UdpPacketMsg>("/rover_battery_udp_data", 100);
+        udp_pub_ = tester_->create_publisher<UdpPacketMsg>("rover_battery_udp_data", 100);
         battery_sub_ = tester_->create_subscription<BatteryStateMsg>(
             "rover_battery/battery_status", 10,
             [this](BatteryStateMsg::SharedPtr msg) {battery_msgs_.push_back(*msg);});

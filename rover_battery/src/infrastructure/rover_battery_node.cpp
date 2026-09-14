@@ -86,7 +86,7 @@ void RoverBatteryNode::init()
         std::bind(&RoverBatteryNode::batteryUdpDataSubscriberTimeoutCallback, this));
 
     battery_subscriber_ = create_subscription<udp_msgs::msg::UdpPacket>(
-        "/rover_battery_udp_data", 100,
+        "rover_battery_udp_data", 100,
         std::bind(&RoverBatteryNode::batteryUdpDataCallback, this, _1));
 }
 

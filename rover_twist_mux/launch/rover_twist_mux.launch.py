@@ -87,7 +87,7 @@ def generate_launch_description():
         namespace=namespace,
         output='screen',
         parameters=[twist_mux_config_path],
-        remappings=[('/cmd_vel_out', '/cmd_vel'), ('/diagnostics', 'diagnostics')],
+        remappings=[('cmd_vel_out', 'cmd_vel'), ('/diagnostics', 'diagnostics')],
     )
 
     actions = [

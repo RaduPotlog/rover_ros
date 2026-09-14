@@ -34,7 +34,7 @@ link failsafe stops the rover when the transmitter link is lost.
 
 All parameters, with the reasoning behind their defaults, are documented in
 [`config/rover_crfs.yaml`](config/rover_crfs.yaml). The link failsafe values are initial and need
-tuning on the rover (`ros2 topic hz /rc/link`, `ros2 topic echo /rc/link`).
+tuning on the rover (`ros2 topic hz /rover/rc/link`, `ros2 topic echo /rover/rc/link`).
 
 ## Layout (Clean Architecture)
 

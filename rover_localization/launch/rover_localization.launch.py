@@ -133,7 +133,7 @@ def generate_launch_description():
             ("enable", "localization/enable"),
             ("set_pose", "localization/set_pose"),
             ("toggle", "localization/toggle"),
-            ('/odometry/filtered', 'odom'),
+            ('odometry/filtered', 'odom'),
         ],
         arguments=[
             "--ros-args",

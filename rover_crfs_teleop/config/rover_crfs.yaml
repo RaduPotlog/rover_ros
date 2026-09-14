@@ -4,7 +4,7 @@
     # Raw CRSF channel endpoints, exactly as crsf_receiver republishes them on rc/channels
     # (see rover_crsf_receiver/crsf_receiver/include/crsf_protocol.h). The midpoint matters most:
     # the stick -> twist mapping is defined about it, so a centred stick produces exactly 0.0.
-    # If `ros2 topic echo /rc/channels` shows a different resting value for this transmitter,
+    # If `ros2 topic echo /rover/rc/channels` shows a different resting value for this transmitter,
     # set channel_in_mid to that value.
     channel_in_min: 172
     channel_in_mid: 992
@@ -16,7 +16,7 @@
     # Anything narrower leaves a permanent creep command, which makes the hardware interface's
     # E-Stop reset invariant unsatisfiable ("velocity commands are not zero").
     # 30 counts is ~3.7 % of the 819-count half-throw and costs ~0.07 m/s of resolution at centre.
-    # To re-measure: `ros2 topic echo /rc/channels` with both sticks released.
+    # To re-measure: `ros2 topic echo /rover/rc/channels` with both sticks released.
     channel_deadband: 30
 
     # Stick axes
@@ -51,8 +51,8 @@
     # Freshness alone can't catch a receiver in failsafe that keeps sending held channel values;
     # link quality can. Only set require_link_stats: false if crsf_receiver runs without link_stats.
     #
-    # INITIAL VALUES - tune on the rover: `ros2 topic hz /rc/link` for the stats rate (it follows
-    # the ELRS telemetry ratio), and `ros2 topic echo /rc/link` (uplink_status) while walking the
+    # INITIAL VALUES - tune on the rover: `ros2 topic hz /rover/rc/link` for the stats rate (it follows
+    # the ELRS telemetry ratio), and `ros2 topic echo /rover/rc/link` (uplink_status) while walking the
     # transmitter out of range for the LQ thresholds.
     channel_timeout_ms: 200
     link_stats_timeout_ms: 1000

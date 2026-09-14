@@ -5,7 +5,7 @@
     <Sequence>
       <Sequence name="BatteryTripEStopSequence"
                 _skipIf="battery_verdict != VERDICT_TRIP_E_STOP">
-        <CallTriggerService service_name="/hardware_interface/sw_user_e_stop_set"
+        <CallTriggerService service_name="hardware_interface/sw_user_e_stop_set"
                             _skipIf="sw_e_stop_state"/>
       </Sequence>
       <Sequence name="BatteryShutdownSequence"

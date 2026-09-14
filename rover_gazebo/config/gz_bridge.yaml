@@ -12,7 +12,7 @@
   gz_type_name: gz.msgs.Twist
   direction: GZ_TO_ROS
 
-- ros_topic_name: "/scan"
+- ros_topic_name: "/<namespace>/scan"
   gz_topic_name: "/lidar"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   gz_type_name: "gz.msgs.LaserScan"

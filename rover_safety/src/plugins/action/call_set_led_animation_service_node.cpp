@@ -33,7 +33,7 @@ CallSetLedAnimationService::CallSetLedAnimationService(
 BT::PortsList CallSetLedAnimationService::providedPorts() 
 {
     return {
-        BT::InputPort<std::string>("service_name", "/led/set_animation"),
+        BT::InputPort<std::string>("service_name", "led/set_animation"),
         BT::InputPort<unsigned>("id", "Animation ID to trigger."),
         BT::InputPort<std::string>("param", "Optional animation parameter."),
         BT::InputPort<bool>("repeating", "Specifies whether the animation should repeated continuously.")
