@@ -25,6 +25,7 @@ from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
     PythonExpression,
+    PathSubstitution,
 )
 from launch_ros.actions import Node, SetParameter
 from launch_ros.substitutions import FindPackageShare
@@ -151,7 +152,12 @@ def generate_launch_description():
     rover_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[ns_controller_config_path],
+        parameters=[
+            "--param-file",
+            PathSubstitution(FindPackageShare("rover_controller"))
+            / 'config'
+            / 'wheel_01_controller.yaml',
+        ],
         namespace=namespace,
         remappings=[
             ("drive_controller/cmd_vel", "cmd_vel"),
@@ -205,7 +211,9 @@ def generate_launch_description():
             "--controller-manager-timeout",
             "10",
             "--param-file",
-            ns_controller_config_path,
+            PathSubstitution(FindPackageShare("rover_controller"))
+            / "config"
+            / "wheel_01_controller.yaml",
             "--ros-args",
             "--log-level",
             log_level,
@@ -240,7 +248,9 @@ def generate_launch_description():
             "--controller-manager-timeout",
             "10",
             "--param-file",
-            ns_controller_config_path,
+            PathSubstitution(FindPackageShare("rover_controller"))
+            / 'config'
+            / 'wheel_01_controller.yaml',
             "--ros-args",
             "--log-level",
             log_level,

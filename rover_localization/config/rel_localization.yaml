@@ -15,7 +15,7 @@
       publish_tf: true
       publish_acceleration: false
 
-      odom0: "odometry/wheels"
+      odom0: "drive_controller/odom"
       # Wheel odometry contributes body velocities only. Its absolute X/Y is
       # integrated along diff_drive_controller's own yaw (skewed by
       # wheel_separation_multiplier) and would fight the IMU-derived heading.
@@ -32,7 +32,7 @@
       odom0_differential: false
       odom0_relative: false
 
-      imu0: "imu/data"
+      imu0: "imu_broadcaster/imu"
       # Yaw RATE only. Absolute orientation is magnetometer-influenced and is not
       # trustworthy near the drive motors; fusing yaw and its own derivative from
       # the same sensor is also correlated. Accelerations are not fused because the
