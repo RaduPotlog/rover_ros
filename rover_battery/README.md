@@ -9,7 +9,7 @@ Decodes BMS telemetry received over UDP and publishes the rover's battery state.
 | in  | `rover_battery_udp_data` | `udp_msgs/UdpPacket` (from `udp_driver`, 392-byte BMS payload) |
 | out | `rover_battery/battery_status` | `sensor_msgs/BatteryState` — used by `rover_safety` |
 | out | `rover_battery/charging_status` | `rover_msgs/ChargingStatus` |
-| out | `diagnostics` | hardware id `RoverBattery`, tasks `Battery errors`, `Battery status` (voltage, current, SoC, residual / design capacity, temperature, charge state, health, cell min / max) |
+| out | `diagnostics` | hardware id `RoverBattery`, tasks `Battery errors`, `Battery status` (voltage, current, SoC, charge, design capacity, temperature, charge state, health, cell min / max) |
 
 If no packet arrives within `watchdog_timeout_ms`, the node publishes a state with
 `present: false` and `POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE`.
@@ -37,16 +37,14 @@ running ROS graph. `test/integration/test_rover_battery_node.cpp` runs the real 
 valid and wrong-size packets, the watchdog, and parameter range validation.
 Run everything with `colcon test --packages-select rover_battery` (configure with `-DBUILD_TESTING=ON`).
 
-## Known issues (not yet fixed — need BMS documentation / rover_safety review)
+## Units
 
-These are passed through unchanged from the original implementation, because fixing them
-changes the values `rover_safety` reads:
+The BMS bridge (daly-bms-uart) already decodes the Daly raw units
+(`docs/Part 4 - Daly RS485+UART Protocol.pdf`), so pack voltage, current, SoC and temperatures
+arrive in V, A, % and °C. `rover_battery/battery_status` follows `sensor_msgs/BatteryState`:
 
-- `cell_voltage` is published in mV; `BatteryState` specifies volts.
-- `capacity` is the residual capacity in mAh, while `design_capacity` is in Ah.
-- `charge` holds the SoC percentage (0–100), not a charge in Ah.
-- `packVoltage` / `packCurrent` are documented by the BMS as 0.1 V / 0.1 A units but are
-  published without scaling. Check this against real hardware before changing it.
-- The watchdog-expired state reports `POWER_SUPPLY_STATUS_FULL`; `UNKNOWN` would be more
-  accurate.
-- The `Battery errors` diagnostic keeps showing the last error after the alarms clear.
+- `cell_voltage` in V (converted from the BMS mV);
+- `charge` is the BMS residual capacity in Ah (converted from mAh);
+- `capacity` is NaN — the BMS does not report the last full capacity; `design_capacity` comes
+  from the parameter;
+- the watchdog-expired state reports `POWER_SUPPLY_STATUS_UNKNOWN` with NaN `charge` / `capacity`.

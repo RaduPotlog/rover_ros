@@ -68,7 +68,7 @@ TEST(BatteryMsgConversions, BatteryStateMsgCarriesReading)
     reading.design_capacity = 40.0f;
     reading.present = true;
     reading.serial_number = "SN";
-    reading.cell_voltages = {3300.0f, 3310.0f};
+    reading.cell_voltages = {3.3f, 3.31f};
     reading.cell_temperatures = {21.0f};
     reading.charge_state = domain::ChargeState::Discharging;
     reading.health = domain::BatteryHealth::Cold;

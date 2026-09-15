@@ -53,7 +53,7 @@ private:
     rclcpp::Publisher<BatteryStateMsg>::SharedPtr battery_pub_;
     rclcpp::Publisher<ChargingStatusMsg>::SharedPtr charging_status_pub_;
 
-    // Last non-empty error; kept after errors clear (inherited behaviour, see README).
+    // Errors of the latest report; empty once the BMS alarms clear.
     std::string error_msg_;
     // False until the first report (real or watchdog-stale), so diagnostics read STALE, not OK.
     bool has_report_{false};

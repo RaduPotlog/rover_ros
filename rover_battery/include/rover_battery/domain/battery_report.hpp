@@ -55,22 +55,21 @@ struct BatteryIdentity
 };
 
 /**
- * @brief Battery snapshot in the units currently published on rover_battery/battery_status.
- * @todo  Units are passed through from the BMS unconverted — see README "Known issues".
+ * @brief Battery snapshot in sensor_msgs/BatteryState units; NaN = not measured.
  */
 struct BatteryReading
 {
-    float voltage{0.0f};
-    float temperature{0.0f};
-    float current{0.0f};
-    float charge{0.0f};
-    float capacity{0.0f};
-    float design_capacity{0.0f};
-    float percentage{0.0f};  // [0, 1]
+    float voltage{0.0f};          // [V]
+    float temperature{0.0f};      // [°C]
+    float current{0.0f};          // [A], negative while discharging
+    float charge{0.0f};           // [Ah] remaining
+    float capacity{0.0f};         // [Ah] last full capacity
+    float design_capacity{0.0f};  // [Ah]
+    float percentage{0.0f};       // [0, 1]
     bool present{false};
     std::string serial_number;
-    std::vector<float> cell_voltages;
-    std::vector<float> cell_temperatures;
+    std::vector<float> cell_voltages;      // [V]
+    std::vector<float> cell_temperatures;  // [°C]
     ChargeState charge_state{ChargeState::Unknown};
     BatteryHealth health{BatteryHealth::Good};
 };

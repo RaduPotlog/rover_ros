@@ -173,15 +173,14 @@ void Ros2BatteryStatePublisher::diagnoseStatus(
     status.add("Power supply status", charging_status_.charging ? "connected" : "disconnected");
     status.add("Load current (A)", charging_status_.current);
 
-    // Values exactly as published on rover_battery/battery_status - the unit labels follow the
-    // unconverted BMS values (see README "Known issues").
+    // Values exactly as published on rover_battery/battery_status.
     status.add("Present", battery_state_.present ? "true" : "false");
     status.add("Charge state", chargeStateText(battery_state_.power_supply_status));
     status.add("Health", healthText(battery_state_.power_supply_health));
     status.addf("Voltage (V)", "%.2f", battery_state_.voltage);
     status.addf("Current (A)", "%.2f", battery_state_.current);
     status.addf("State of charge (%)", "%.1f", battery_state_.percentage * 100.0);
-    status.addf("Residual capacity (mAh)", "%.0f", battery_state_.capacity);
+    status.addf("Charge (Ah)", "%.2f", battery_state_.charge);
     status.addf("Design capacity (Ah)", "%.1f", battery_state_.design_capacity);
     status.addf("Temperature (C)", "%.1f", battery_state_.temperature);
     status.add("Cell count", battery_state_.cell_voltage.size());
@@ -189,9 +188,9 @@ void Ros2BatteryStatePublisher::diagnoseStatus(
     if (!battery_state_.cell_voltage.empty()) {
         const auto [min_cell, max_cell] = std::minmax_element(
             battery_state_.cell_voltage.begin(), battery_state_.cell_voltage.end());
-        status.addf("Min cell voltage (mV)", "%.0f", *min_cell);
-        status.addf("Max cell voltage (mV)", "%.0f", *max_cell);
-        status.addf("Cell voltage difference (mV)", "%.0f", *max_cell - *min_cell);
+        status.addf("Min cell voltage (V)", "%.3f", *min_cell);
+        status.addf("Max cell voltage (V)", "%.3f", *max_cell);
+        status.addf("Cell voltage difference (mV)", "%.0f", (*max_cell - *min_cell) * 1000.0f);
     }
 
     status.summary(diagnostic_updater::DiagnosticStatusWrapper::OK, "Battery status monitoring");

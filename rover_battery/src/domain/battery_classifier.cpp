@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -182,8 +183,9 @@ BatteryReading toBatteryReading(const BmsFrame & frame, const BatteryIdentity & 
     reading.voltage = data.packVoltage;
     reading.temperature = data.tempAverage;
     reading.current = data.packCurrent;
-    reading.charge = data.packSOC;
-    reading.capacity = static_cast<float>(data.resCapacitymAh);
+    reading.charge = static_cast<float>(data.resCapacitymAh) / 1000.0f;  // mAh -> Ah
+    // The BMS reports no last-full capacity; BatteryState marks unmeasured values NaN.
+    reading.capacity = std::numeric_limits<float>::quiet_NaN();
     reading.design_capacity = identity.design_capacity;
     reading.percentage = data.packSOC / 100.0f;
     reading.present = true;
@@ -193,7 +195,7 @@ BatteryReading toBatteryReading(const BmsFrame & frame, const BatteryIdentity & 
     const std::size_t cell_count = validCellCount(data);
     reading.cell_voltages.reserve(cell_count);
     for (std::size_t i = 0; i < cell_count; ++i) {
-        reading.cell_voltages.push_back(data.cellVmV[i]);
+        reading.cell_voltages.push_back(data.cellVmV[i] / 1000.0f);  // mV -> V
     }
 
     const std::size_t temp_count = validTempSensorCount(data);
@@ -220,14 +222,16 @@ BatteryReport staleBatteryReport(
     const BatteryIdentity & identity, std::size_t cell_count, std::size_t temp_sensor_count)
 {
     BatteryReport report;
+    report.reading.charge = std::numeric_limits<float>::quiet_NaN();
+    report.reading.capacity = std::numeric_limits<float>::quiet_NaN();
     report.reading.design_capacity = identity.design_capacity;
     report.reading.present = false;
     report.reading.serial_number = identity.serial_number;
     report.reading.cell_voltages.assign(std::min(cell_count, kBmsMaxCells), 0.0f);
     report.reading.cell_temperatures.assign(std::min(temp_sensor_count, kBmsMaxTempSensors), 0.0f);
-    // TODO(rover_battery): Full is inherited behaviour; Unknown would be more accurate for stale
-    // data but rover_safety consumers must be checked first (see README "Known issues").
-    report.reading.charge_state = ChargeState::Full;
+    // Unknown: rover_safety then ignores the stale temperature / percentage and the LED tree
+    // shows its error animation.
+    report.reading.charge_state = ChargeState::Unknown;
     report.reading.health = BatteryHealth::WatchdogTimerExpired;
     report.errors = {kWatchdogExpiredError};
     return report;

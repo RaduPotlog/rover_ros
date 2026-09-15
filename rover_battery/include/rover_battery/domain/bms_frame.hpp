@@ -25,23 +25,25 @@ constexpr std::size_t kBmsMaxCells = 48;
 constexpr std::size_t kBmsMaxTempSensors = 16;
 
 /**
- * @brief Raw BMS telemetry exactly as laid out in the UDP payload.
+ * @brief BMS telemetry exactly as laid out in the UDP payload.
  * @details The layout is a wire contract with the BMS bridge — do not reorder, resize or
- *          add fields. Comments specify precision and units as documented by the BMS.
+ *          add fields. The bridge (daly-bms-uart) has already decoded the Daly raw units
+ *          (0.1 V, 0.1 A with 30000 offset, 0.1 %, +40 °C offset — see
+ *          docs/Part 4 - Daly RS485+UART Protocol.pdf), so comments give the units as received.
  */
 struct __attribute__((packed)) BmsData
 {
     // data from 0x90
-    float packVoltage; // Total pack voltage (0.1 V)
-    float packCurrent; // Current in (+) or out (-) of pack (0.1 A)
-    float packSOC;     // State Of Charge
+    float packVoltage; // Total pack voltage (V)
+    float packCurrent; // Current in (+, charging) or out (-, discharging) of pack (A)
+    float packSOC;     // State Of Charge (%, 0-100)
 
     // data from 0x91
     float maxCellmV; // Maximum cell voltage (mV)
     int maxCellVNum; // Number of cell with highest voltage
     float minCellmV; // Minimum cell voltage (mV)
     int minCellVNum; // Number of cell with lowest voltage
-    float cellDiff;  // Difference between min and max cell voltages
+    float cellDiff;  // Difference between min and max cell voltages (mV)
 
     // data from 0x92
     int tempMax;       // Maximum temperature sensor reading (°C)

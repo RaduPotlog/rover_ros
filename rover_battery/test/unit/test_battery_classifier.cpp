@@ -14,6 +14,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -167,7 +169,7 @@ TEST(ToChargingInfo, MapsBmsStatus)
     EXPECT_EQ(toChargingInfo(makeFrame(50.0f, 7).data).charger_type, ChargerType::Unknown);
 }
 
-TEST(ToBatteryReading, PassesThroughBmsValues)
+TEST(ToBatteryReading, ConvertsBmsValues)
 {
     const BatteryIdentity identity{42.0f, "SN-1"};
     const auto reading = toBatteryReading(makeFrame(80.0f, 2), identity);
@@ -175,9 +177,9 @@ TEST(ToBatteryReading, PassesThroughBmsValues)
     EXPECT_FLOAT_EQ(reading.voltage, 52.1f);
     EXPECT_FLOAT_EQ(reading.current, -3.5f);
     EXPECT_FLOAT_EQ(reading.temperature, 25.5f);
-    EXPECT_FLOAT_EQ(reading.charge, 80.0f);
+    EXPECT_FLOAT_EQ(reading.charge, 32.0f);  // 32000 mAh
     EXPECT_FLOAT_EQ(reading.percentage, 0.8f);
-    EXPECT_FLOAT_EQ(reading.capacity, 32000.0f);
+    EXPECT_TRUE(std::isnan(reading.capacity));
     EXPECT_FLOAT_EQ(reading.design_capacity, 42.0f);
     EXPECT_EQ(reading.serial_number, "SN-1");
     EXPECT_TRUE(reading.present);
@@ -185,8 +187,8 @@ TEST(ToBatteryReading, PassesThroughBmsValues)
     EXPECT_EQ(reading.health, BatteryHealth::Good);
 
     ASSERT_EQ(reading.cell_voltages.size(), 16u);
-    EXPECT_FLOAT_EQ(reading.cell_voltages.front(), 3000.0f);
-    EXPECT_FLOAT_EQ(reading.cell_voltages.back(), 3015.0f);
+    EXPECT_FLOAT_EQ(reading.cell_voltages.front(), 3.0f);  // mV -> V
+    EXPECT_FLOAT_EQ(reading.cell_voltages.back(), 3.015f);
     ASSERT_EQ(reading.cell_temperatures.size(), 4u);
     EXPECT_FLOAT_EQ(reading.cell_temperatures.back(), 23.0f);
 }
@@ -220,7 +222,9 @@ TEST(StaleBatteryReport, ReportsWatchdogExpiry)
 
     EXPECT_FALSE(report.reading.present);
     EXPECT_EQ(report.reading.health, BatteryHealth::WatchdogTimerExpired);
-    EXPECT_EQ(report.reading.charge_state, ChargeState::Full);  // inherited behaviour
+    EXPECT_EQ(report.reading.charge_state, ChargeState::Unknown);
+    EXPECT_TRUE(std::isnan(report.reading.charge));
+    EXPECT_TRUE(std::isnan(report.reading.capacity));
     EXPECT_FLOAT_EQ(report.reading.voltage, 0.0f);
     EXPECT_FLOAT_EQ(report.reading.percentage, 0.0f);
     EXPECT_FLOAT_EQ(report.reading.design_capacity, 40.0f);

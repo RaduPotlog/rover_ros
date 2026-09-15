@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <map>
@@ -48,6 +49,10 @@ std::vector<uint8_t> makePacket(float soc, int status, int cells)
     frame.data.chargeDischargeStatus = status;
     frame.data.numberOfCells = cells;
     frame.data.numOfTempSensors = 2;
+    frame.data.resCapacitymAh = 24000;
+    for (int i = 0; i < cells && i < static_cast<int>(rover_battery::domain::kBmsMaxCells); ++i) {
+        frame.data.cellVmV[i] = 3300.0f;
+    }
 
     std::vector<uint8_t> bytes(rover_battery::domain::kBmsPayloadSize);
     std::memcpy(bytes.data(), &frame.data, sizeof(frame.data));
@@ -148,7 +153,10 @@ TEST_F(RoverBatteryNodeTest, PublishesStateForValidPacket)
     EXPECT_FLOAT_EQ(state.voltage, 52.0f);
     EXPECT_EQ(state.power_supply_status, BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING);
     EXPECT_EQ(state.power_supply_health, BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD);
-    EXPECT_EQ(state.cell_voltage.size(), 8u);
+    ASSERT_EQ(state.cell_voltage.size(), 8u);
+    EXPECT_FLOAT_EQ(state.cell_voltage.front(), 3.3f);
+    EXPECT_FLOAT_EQ(state.charge, 24.0f);
+    EXPECT_TRUE(std::isnan(state.capacity));
     EXPECT_EQ(state.serial_number, "TEST-SN");
 
     const auto & charging = charging_msgs_.front();
@@ -186,6 +194,7 @@ TEST_F(RoverBatteryNodeTest, PublishesWatchdogStateWithoutData)
     EXPECT_FALSE(state.present);
     EXPECT_EQ(state.power_supply_health,
               BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE);
+    EXPECT_EQ(state.power_supply_status, BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN);
 }
 
 TEST_F(RoverBatteryNodeTest, BatteryStatusDiagnosticReportsBatteryValues)
@@ -222,7 +231,8 @@ TEST_F(RoverBatteryNodeTest, BatteryStatusDiagnosticReportsBatteryValues)
     EXPECT_EQ(values["Charge state"], "Charging");
     EXPECT_EQ(values["Health"], "Good");
     EXPECT_EQ(values["Cell count"], "8");
-    EXPECT_TRUE(values.count("Residual capacity (mAh)") > 0);
+    EXPECT_EQ(values["Charge (Ah)"], "24.00");
+    EXPECT_EQ(values["Min cell voltage (V)"], "3.300");
     EXPECT_TRUE(values.count("Design capacity (Ah)") > 0);
 }
 
