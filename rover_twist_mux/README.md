@@ -1,6 +1,6 @@
 # rover_twist_mux
 
-This package is responsible for activates twist mux.
+Arbitrates the rover's velocity command sources with [`twist_mux`](https://github.com/ros-teleop/twist_mux).
 
 It also provides `rover_motion_lock_node`, the adapter that lets the rover's safety IO gate the mux.
 

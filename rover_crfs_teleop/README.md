@@ -49,7 +49,7 @@ include/rover_crfs_teleop/
 
 ```bash
 ros2 launch rover_crfs_teleop rover_crfs_teleop.launch.py   # receiver + teleop
-ros2 lifecycle get /rover_crfs_teleop_node
+ros2 lifecycle get /rover/rover_crfs_teleop_node
 ```
 
 ## Tests

@@ -19,7 +19,8 @@ Plain (non-lifecycle) node: it owns no resource, only reads ephemeral OS counter
 
 ## Config Files
 
-- `system_diag.yaml` - Rover system diagnostic node's configuration, keyed under
+- `system_diag.yaml` - Rover system diagnostic node's configuration (parameters are declared in
+  `src/system_diag_params.yaml`, `generate_parameter_library`), keyed under
   `rover_diag_manager_node` (the node's runtime name — see `launch/system_diag.launch.py`).
   **This key must match the node's runtime name exactly** (or use a `/**/` wildcard prefix, as
   here) — a mismatch fails silently: `ros2 launch` starts fine and the node falls back to its
