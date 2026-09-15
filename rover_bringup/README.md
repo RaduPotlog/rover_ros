@@ -1,7 +1,6 @@
 # rover_bringup
 
-Top-level launch files that start the whole Rover A1 stack on real hardware, plus the host
-setup files the rover computer needs (udev rules, network configuration). For simulation use
+Top-level launch files that start the whole Rover A1 stack on real hardware. For simulation use
 `rover_gazebo` instead.
 
 ## Launch Files
@@ -70,23 +69,10 @@ The bridges are not namespaced, so they see the whole graph (`/rover/...` topics
 ros2 launch rover_bringup rover_web_bridges.launch.py
 ```
 
-## Host setup files (`scripts/`)
+## Scripts (`scripts/`)
 
-These files are not installed by CMake. Copy them onto the rover host OS.
+Not installed by CMake; run them from a checkout.
 
-| File | Destination | Purpose |
-|------|-------------|---------|
-| `99-elrs.rules` | `/etc/udev/rules.d/` | Creates the `/dev/ttyELRS` symlink for the ELRS receiver's CP210x USB-UART (`10c4:ea60`). |
-| `99-libphidget22.rules` | `/etc/udev/rules.d/` | Grants access to Phidgets USB devices (the IMU, vendor `06c2`). |
-| `60-plc-init.yaml` | `/etc/netplan/` | Static `192.168.88.10/24` on the USB Ethernet adapter to the safety controller. |
-| `60-switch-init.yaml` | `/etc/netplan/` | Static `192.168.99.10/24` on `eth0`. |
-| `60-wifi-init.yaml` | `/etc/netplan/` | `wlan0` Wi-Fi client with DHCP. |
-| `balena-eth0` | NetworkManager system connection (balenaOS) | `safety-controller` profile: static `192.168.88.10/24` on `eth0`. |
-| `rutx11_gps_nmea_forwarding.sh` | run from any host on the rover LAN | Shows (`show`) or configures (`apply`) the RUTX11 GNSS and its NMEA forwarding over UDP to `rover_gps`. See `rover_gps/README.md`. |
-
-After adding udev rules, run `sudo udevadm control --reload-rules && sudo udevadm trigger`.
-After adding netplan files, run `sudo netplan apply`.
-
-## Known limitations
-
-- `60-wifi-init.yaml` stores the Wi-Fi access point credentials in plain text in the repository.
+| File | Purpose |
+|------|---------|
+| `rutx11_gps_nmea_forwarding.sh` | Shows (`show`) or configures (`apply`) the RUTX11 GNSS and its NMEA forwarding over UDP to `rover_gps`. See `rover_gps/README.md`. |

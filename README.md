@@ -71,27 +71,6 @@ colcon build --symlink-install --packages-up-to rover_metapackage --cmake-args -
 source install/setup.bash
 ```
 
-#### Only for real rover
-
-```bash
-sudo cp src/rover_ros/rover_bringup/scripts/99-elrs.rules /etc/udev/rules.d/
-sudo cp src/rover_ros/rover_bringup/scripts/99-libphidget22.rules /etc/udev/rules.d/
-
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-
-sudo cp src/rover_ros/rover_bringup/scripts/60-wifi-init.yaml /etc/netplan
-sudo chmod 600 /etc/netplan/60-wifi-init.yaml
-
-sudo cp src/rover_ros/rover_bringup/scripts/60-plc-init.yaml /etc/netplan
-sudo chmod 600 /etc/netplan/60-plc-init.yaml
-
-sudo cp src/rover_ros/rover_bringup/scripts/60-switch-init.yaml /etc/netplan/
-sudo chmod 600 /etc/netplan/60-switch-init.yaml
-
-sudo netplan apply
-```
-
 ### Running
 
 #### Real rover:
