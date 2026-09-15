@@ -1,9 +1,24 @@
 # rover_localization
 
-Fuses the rover's wheel odometry and IMU with a `robot_localization` EKF. The result is the
-`odom` odometry and the `<namespace>/odom → <namespace>/base_link` transform that Nav 2 uses.
+Fuses the rover's wheel odometry and IMU (and optionally the RUTX11 GPS) with
+`robot_localization` EKFs. The `EKF_USE_GPS` environment variable (the `fuse_gps` argument)
+selects between two modes:
 
-## Interfaces (`rover_ekf_node`)
+| Mode | Nodes | Transforms |
+|------|-------|------------|
+| `EKF_USE_GPS=false` (default) | `rover_ekf_node`: wheels + IMU yaw rate | `<ns>/odom → <ns>/base_link` |
+| `EKF_USE_GPS=true` | `rover_ekf_node` (unchanged), `rover_ekf_global_node`: wheels + IMU yaw rate + GPS position, `rover_navsat_transform_node` | also `<ns>/map → <ns>/odom` |
+
+With GPS, `odom` stays continuous for local control, and GPS corrections show up only in
+`map → odom`. The GPS driver, its diagnostics and the ENU heading (`gps/heading_imu`) come from
+`rover_gps`.
+
+> Do not run AMCL (`rover_orchestrator/rover_navigation/launch/localization.launch.py`) together
+> with `EKF_USE_GPS=true`: both publish `map → odom`.
+
+## Interfaces
+
+### `rover_ekf_node` (both modes)
 
 | Direction | Name | Type |
 |-----------|------|------|
@@ -14,28 +29,52 @@ Fuses the rover's wheel odometry and IMU with a `robot_localization` EKF. The re
 | srv | `localization/set_pose`, `localization/enable`, `localization/toggle` | robot_localization services |
 | pub | `diagnostics` | robot_localization status |
 
-The filter runs at 50 Hz in 2D mode (`two_d_mode: true`).
+### `rover_ekf_global_node` (GPS mode)
+
+| Direction | Name | Type |
+|-----------|------|------|
+| sub | `odometry/wheels`, `imu/data` | as above |
+| sub | `odometry/gps` | `nav_msgs/Odometry` from `rover_navsat_transform_node` (X/Y fused) |
+| pub | `odometry/global` | `nav_msgs/Odometry` in `<namespace>/map` |
+| pub | `/tf` | `<namespace>/map → <namespace>/odom` |
+| srv | `localization/global/{set_pose,enable,toggle}` | robot_localization services |
+
+### `rover_navsat_transform_node` (GPS mode)
+
+| Direction | Name | Type |
+|-----------|------|------|
+| sub | `gps/fix` | `sensor_msgs/NavSatFix` (`rover_gps_driver`) |
+| sub | `gps/heading_imu` | `sensor_msgs/Imu`, ENU heading from `rover_gps_node` (published once aligned) |
+| sub | `odometry/global` | global EKF output |
+| pub | `odometry/gps` | GPS position in the map frame |
+| pub | `gps/filtered` | `sensor_msgs/NavSatFix` of the filtered pose |
+| srv | `localization/datum` | robot_localization `SetDatum` |
+
+The filters run at 50 Hz in 2D mode (`two_d_mode: true`).
 
 ## Config Files
 
-- `config/rel_localization.yaml` - EKF configuration for data fusion using the IMU (`imu/data`)
-  and wheel odometry (`odometry/wheels`); the filtered output is published on `odom`.
+- `config/rel_localization.yaml`: `rover_ekf_node`, which fuses the IMU (`imu/data`) and wheel
+  odometry (`odometry/wheels`). The output is published on `odom`.
   `print_diagnostics` must stay `true`. robot_localization always reports the
-  `odometry/filtered topic status` frequency diagnostic, but only counts publishes when it is
+  `odometry/filtered topic status` frequency diagnostic but only counts publishes when it is
   enabled, so with `false` that status is a permanent false ERROR ("No events recorded").
+- `config/rel_localization_with_gps.yaml`: the same `rover_ekf_node`, plus `rover_ekf_global_node`
+  (`world_frame: map`, `odom1: odometry/gps` X/Y) and `rover_navsat_transform_node`
+  (`yaw_offset: 0`, `magnetic_declination_radians: 0`, because the heading already arrives in
+  ENU; `zero_altitude: true`).
 
 ## Launch Files
 
-- `rover_localization.launch.py` - starts `rover_ekf_node` (and optionally
-  `navsat_transform_node`).
+- `rover_localization.launch.py`: starts `rover_ekf_node`, and in GPS mode also
+  `rover_ekf_global_node` and `rover_navsat_transform_node`.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `use_ekf` | `False` | Start the EKF. `rover_bringup` and `rover_gazebo` pass `True`. |
+| `use_ekf` | `False` | Start the EKFs. `rover_bringup` and `rover_gazebo` pass `True`. |
+| `fuse_gps` | `$EKF_USE_GPS`, else `false` | GPS mode (`true`/`1`/`yes`/`on`, any case). Selects the `_with_gps` config. `rover_bringup` passes its `use_gps`; `rover_gazebo` passes `False`. |
 | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace and TF prefix. |
 | `localization_mode` | `rel` | `rel`: relative to the start pose; `enu`: East-North-Up orientation. Selects `config/<mode>_localization[_with_gps].yaml`. |
-| `fuse_gps` | `False` | Also start `navsat_transform_node` and use the `_with_gps` config. |
-| `launch_nmea_gps` | `False` | Start an NMEA GPS driver. |
 | `localization_config_path` | `config/<mode>_localization[_with_gps].yaml` | Explicit EKF config. |
 | `common_dir_path` | empty | If set, the default config is read from `<common_dir_path>/rover_localization/config/`. |
 | `use_sim` | `False` | Use simulation time. |
@@ -43,6 +82,7 @@ The filter runs at 50 Hz in 2D mode (`two_d_mode: true`).
 
 ```bash
 ros2 launch rover_localization rover_localization.launch.py use_ekf:=True
+EKF_USE_GPS=true ros2 launch rover_localization rover_localization.launch.py use_ekf:=True
 ros2 topic echo /rover/odom
 ```
 
@@ -53,7 +93,7 @@ ros2 topic echo /rover/odom
   bridge's bulk parameter request is rejected as a whole. The resulting rclcpp warning
   (`Failed to get parameters: parameter 'imu1' is not initialized`) is silenced in the launch
   file with `--log-level rclcpp:=ERROR`.
-- Only `rel_localization.yaml` exists. `localization_mode:=enu` and `fuse_gps:=True` select
-  config files that are not in the package, so pass `localization_config_path` with them.
-- `launch_nmea_gps:=True` includes `rover_localization.launch.py` itself instead of a GPS driver
-  launch file.
+- Only the `rel` configs exist. `localization_mode:=enu` selects files that are not in the
+  package, so pass `localization_config_path` with it.
+- `rover_navsat_transform_node` computes its transform once, from the first heading it
+  receives. After `gps/reset_heading_alignment` (rover_gps), restart the node.

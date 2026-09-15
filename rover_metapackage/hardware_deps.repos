@@ -27,3 +27,7 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_network_monitor.git
     version: master
+  rover_nmea_navsat_driver:
+    type: git
+    url: https://github.com/RaduPotlog/rover_nmea_navsat_driver.git
+    version: ros2

@@ -83,6 +83,15 @@ def generate_launch_description():
         description="Add namespace to all launched nodes.",
     )
 
+    # EKF_USE_GPS (balenaCloud variable, normalized to true/false by rovera1_app's start.sh)
+    # selects the localization: false = wheels + IMU; true = wheels + IMU + GPS (dual EKF).
+    use_gps = LaunchConfiguration("use_gps")
+    declare_use_gps_arg = DeclareLaunchArgument(
+        "use_gps",
+        default_value=EnvironmentVariable("EKF_USE_GPS", default_value="false"),
+        description="Fuse the RUTX11 GPS into localization (true/false).",
+    )
+
     rover_model_name = EnvironmentVariable(name="ROBOT_MODEL_NAME", default_value="rover_a1")
     rover_serial_no = EnvironmentVariable(name="ROBOT_SERIAL_NO", default_value="A1-2026-01")
     rover_version = EnvironmentVariable(name="ROBOT_VERSION", default_value="1.0")
@@ -134,6 +143,7 @@ def generate_launch_description():
             "namespace": namespace,
             "use_sim": "False",
             "use_ekf": "True",
+            "fuse_gps": use_gps,
             "common_dir_path": common_dir_path,
         }.items(),
     )
@@ -207,16 +217,18 @@ def generate_launch_description():
         }.items(),
     )
 
-    rover_ublox_launch = IncludeLaunchDescription(
+    # RUTX11 NMEA driver + GPS diagnostics always run, so GPS health is visible even when it
+    # is not fused; the heading output for navsat_transform follows use_gps.
+    rover_gps_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("ublox_gps"), "launch", "rover_ublox_gps.launch.py"]
+                [FindPackageShare("rover_gps"), "launch", "rover_gps.launch.py"]
             )
         ),
         launch_arguments={
             "log_level": log_level,
             "namespace": namespace,
-            "use_sim": "False",
+            "publish_heading": use_gps,
             "common_dir_path": common_dir_path,
         }.items(),
     )
@@ -271,6 +283,7 @@ def generate_launch_description():
             rover_led_launch,
             rover_safety_launch,
             rover_ekf_launch,
+            rover_gps_launch,
             rover_crfs_teleop_launch,
             rover_twist_mux_launch,
         ],
@@ -291,6 +304,7 @@ def generate_launch_description():
         declare_disable_manager_arg,
         declare_log_level_arg,
         declare_namespace_arg,
+        declare_use_gps_arg,
         welcome_info,
         incorrect_hw_config_action,
         incorrect_os_version_action,

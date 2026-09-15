@@ -8,7 +8,9 @@
             imu_xyz 
             imu_rpy
             lidar_xyz
-            lidar_rpy">
+            lidar_rpy
+            gps_xyz
+            gps_rpy">
 
     <link name="base_link" />
 
@@ -48,6 +50,15 @@
     </joint>
 
     <link name="lidar_link" />
+
+    <!-- GNSS antenna of the RUTX11 (frame_id of gps/fix); navsat_transform uses this offset. -->
+    <joint name="body_to_gps_joint" type="fixed">
+      <origin xyz="${gps_xyz}" rpy="${gps_rpy}" />
+      <parent link="body_link" />
+      <child link="gps_link" />
+    </joint>
+
+    <link name="gps_link" />
 
     <!-- Ground projection of body_link: the wheel axis height minus the wheel radius. -->
     <joint name="body_to_footprint_joint" type="fixed">

@@ -15,9 +15,8 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     EnvironmentVariable,
     LaunchConfiguration,
@@ -30,20 +29,19 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     
+    # Not restricted with `choices`: the value usually comes straight from the EKF_USE_GPS
+    # balena variable, so any of true/1/yes/on (any case) enables GPS fusion.
     fuse_gps = LaunchConfiguration("fuse_gps")
     declare_fuse_gps_arg = DeclareLaunchArgument(
         "fuse_gps",
-        default_value="False",
-        description="Include GPS for data fusion",
-        choices=["True", "true", "False", "false"],
+        default_value=EnvironmentVariable("EKF_USE_GPS", default_value="false"),
+        description=(
+            "Fuse GPS: adds rover_ekf_global_node (map -> odom) and rover_navsat_transform_node "
+            "and loads the _with_gps config. The GPS driver itself is started by rover_gps."
+        ),
     )
-
-    launch_nmea_gps = LaunchConfiguration("launch_nmea_gps")
-    declare_launch_nmea_gps_arg = DeclareLaunchArgument(
-        "launch_nmea_gps",
-        default_value="False",
-        description="Launch NMEA navsat gps driver",
-        choices=["True", "true", "False", "false"],
+    fuse_gps_bool = PythonExpression(
+        ["'", fuse_gps, "'.strip().lower() in ('true', '1', 'yes', 'on')"]
     )
 
     localization_mode = LaunchConfiguration("localization_mode")
@@ -90,7 +88,7 @@ def generate_launch_description():
     )
 
     mode_prefix = PythonExpression(["'", localization_mode, "_'"])
-    gps_postfix = PythonExpression(["'_with_gps' if ", fuse_gps, " else ''"])
+    gps_postfix = PythonExpression(["'_with_gps' if ", fuse_gps_bool, " else ''"])
     localization_config_filename = PythonExpression(
         ["'", mode_prefix, "localization", gps_postfix, ".yaml'"]
     )
@@ -149,39 +147,62 @@ def generate_launch_description():
         condition=IfCondition(use_ekf),
     )
 
-    nmea_navsat_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("rover_localization"), "launch", "rover_localization.launch.py"]
-            )
-        ),
-        launch_arguments={"log_level": log_level, "namespace": namespace}.items(),
-        condition=IfCondition(launch_nmea_gps),
-    )
+    gps_enabled = PythonExpression(["'", use_ekf, "'.lower() == 'true' and ", fuse_gps_bool])
 
-    navsat_transform_node = Node(
+    # Global filter of the dual EKF: same inputs as rover_ekf_node plus odometry/gps, publishing
+    # map -> odom. Do not run AMCL at the same time; it publishes map -> odom too.
+    ekf_global_filter_node = Node(
         package="robot_localization",
-        executable="navsat_transform_node",
-        name="navsat_transform_node",
+        executable="ekf_node",
+        name="rover_ekf_global_node",
         parameters=[localization_config_path, {"tf_prefix": namespace}],
         namespace=namespace,
         remappings=[
-            ("imu", "imu/data"),
+            ("/diagnostics", "diagnostics"),
+            ("enable", "localization/global/enable"),
+            ("set_pose", "localization/global/set_pose"),
+            ("toggle", "localization/global/toggle"),
+            ("odometry/filtered", "odometry/global"),
+        ],
+        arguments=[
+            "--ros-args",
+            "--log-level",
+            log_level,
+            # Same unset-sensor parameter noise as rover_ekf_node.
+            "--log-level",
+            "rclcpp:=ERROR",
+        ],
+        condition=IfCondition(gps_enabled),
+    )
+
+    # Converts gps/fix into odometry/gps in the map frame. The heading it needs comes from
+    # rover_gps_node (gps/heading_imu), published only once aligned from the GNSS course.
+    navsat_transform_node = Node(
+        package="robot_localization",
+        executable="navsat_transform_node",
+        name="rover_navsat_transform_node",
+        parameters=[localization_config_path, {"tf_prefix": namespace}],
+        namespace=namespace,
+        remappings=[
+            ("/diagnostics", "diagnostics"),
+            ("imu", "gps/heading_imu"),
             ("gps/fix", "gps/fix"),
-            ("odometry/gps", "_odometry/gps"),
+            ("gps/filtered", "gps/filtered"),
+            ("odometry/filtered", "odometry/global"),
+            ("odometry/gps", "odometry/gps"),
+            ("datum", "localization/datum"),
         ],
         arguments=[
             "--ros-args",
             "--log-level",
             log_level,
         ],
-        condition=IfCondition(fuse_gps),
+        condition=IfCondition(gps_enabled),
     )
 
     actions = [
         declare_common_dir_path_arg,
         declare_fuse_gps_arg,
-        declare_launch_nmea_gps_arg,
         declare_localization_mode_arg,
         declare_localization_config_path_arg,
         declare_log_level_arg,
@@ -190,8 +211,8 @@ def generate_launch_description():
         declare_use_sim_arg,
         SetParameter(name="use_sim_time", value=use_sim),
         ekf_filter_node,
-        # nmea_navsat_launch,
-        # navsat_transform_node,
+        ekf_global_filter_node,
+        navsat_transform_node,
     ]
 
     return LaunchDescription(actions)

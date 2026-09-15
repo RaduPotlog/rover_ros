@@ -1,0 +1,37 @@
+# Shared by both nodes in launch/rover_gps.launch.py.
+
+# rover_gps_driver (nmea_navsat_driver/nmea_socket_driver): receives the NMEA sentences the
+# RUTX11 forwards over UDP (GPS > NMEA > NMEA forwarding -> <rover IP>:10110, UDP).
+/**/rover_gps_driver:
+  ros__parameters:
+    ip: "0.0.0.0"          # listen on every interface; the RUTX11 sends to the rover LAN address
+    port: 10110
+    buffer_size: 4096
+    timeout_sec: 2
+    frame_id: "gps_link"   # the launch file passes the namespace as tf_prefix
+    time_ref_source: "gps"
+    useRMC: false          # GGA carries fix quality and HDOP, which set the fix covariance
+
+/**/rover_gps_node:
+  ros__parameters:
+    # GPS fix diagnostics
+    expected_rate_hz: 1.0         # RUTX11 NMEA forwarding default
+    min_rate_ratio: 0.5
+    fix_timeout_s: 3.0
+    warn_horizontal_std_m: 5.0
+    error_horizontal_std_m: 20.0
+
+    # Heading output (publish_heading is set by the launch file from EKF_USE_GPS)
+    min_heading_std_rad: 0.05
+
+    # Odom -> ENU yaw alignment from GNSS course while driving straight
+    alignment:
+      min_segment_length_m: 3.0
+      min_speed_m_s: 0.3
+      max_yaw_rate_rad_s: 0.1
+      max_yaw_change_rad: 0.1
+      max_horizontal_std_m: 5.0
+      max_fix_gap_s: 2.5
+      max_odometry_age_s: 0.5
+      required_segments: 3
+      max_offset_std_rad: 0.1

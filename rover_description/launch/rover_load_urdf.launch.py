@@ -113,6 +113,15 @@ def generate_launch_description():
     lidar_rot_p = os.environ.get("ROBOT_LIDAR_ORIENTATION_P", "0.0")
     lidar_rot_y = os.environ.get("ROBOT_LIDAR_ORIENTATION_Y", "0.0")
 
+    # GNSS antenna mount pose relative to body_link. Measure it on the rover and set the
+    # variables; until then the antenna is assumed at the body origin.
+    gps_pos_x = os.environ.get("ROBOT_GPS_LOCALIZATION_X", "0.0")
+    gps_pos_y = os.environ.get("ROBOT_GPS_LOCALIZATION_Y", "0.0")
+    gps_pos_z = os.environ.get("ROBOT_GPS_LOCALIZATION_Z", "0.0")
+    gps_rot_r = os.environ.get("ROBOT_GPS_ORIENTATION_R", "0.0")
+    gps_rot_p = os.environ.get("ROBOT_GPS_ORIENTATION_P", "0.0")
+    gps_rot_y = os.environ.get("ROBOT_GPS_ORIENTATION_Y", "0.0")
+
     urdf_file = PythonExpression(["'", robot_model, ".urdf.xacro'"])
     robot_description_content = Command(
         [
@@ -135,6 +144,10 @@ def generate_launch_description():
             f"'{lidar_pos_x} {lidar_pos_y} {lidar_pos_z}'",
             " lidar_rpy:=",
             f"'{lidar_rot_r} {lidar_rot_p} {lidar_rot_y}'",
+            " gps_xyz:=",
+            f"'{gps_pos_x} {gps_pos_y} {gps_pos_z}'",
+            " gps_rpy:=",
+            f"'{gps_rot_r} {gps_rot_p} {gps_rot_y}'",
             " namespace:=",
             namespace,
         ]

@@ -26,7 +26,7 @@ Plain (non-lifecycle) node: it owns no resource, only reads ephemeral OS counter
   here) — a mismatch fails silently: `ros2 launch` starts fine and the node falls back to its
   compiled-in defaults with no warning that the file was never applied.
 - `diagnostic_aggregator.yaml` - `diagnostic_aggregator` analyzers. Groups every rover node's
-  `diagnostics` into `diagnostics_agg` under `/Rover/{Computer,Drive,Battery,Localization,Lighting,Teleop,Motion,Safety}`, matched by
+  `diagnostics` into `diagnostics_agg` under `/Rover/{Computer,Drive,Battery,Localization,GPS,Lighting,Teleop,Motion,Safety}`, matched by
   the `"<node name>: "` prefix of each status. Statuses from nodes not listed land in `/Rover/Other`;
   add an analyzer when a new node publishes diagnostics.
 

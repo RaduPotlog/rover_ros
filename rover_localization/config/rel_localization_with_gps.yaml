@@ -1,0 +1,244 @@
+# Localization with GPS (EKF_USE_GPS=true), dual EKF:
+#   rover_ekf_node              odom -> base_link   wheels + IMU yaw rate      (same as rel_localization.yaml)
+#   rover_ekf_global_node       map  -> odom        wheels + IMU yaw rate + GPS position
+#   rover_navsat_transform_node gps/fix + gps/heading_imu + odometry/global -> odometry/gps
+# rover_gps_node publishes gps/heading_imu only after it aligned the odom yaw to ENU from the
+# GNSS course while driving straight; until then navsat_transform has no transform, and the
+# global filter runs on wheels + IMU only.
+/**:
+  rover_ekf_node:
+    ros__parameters:
+      frequency: 50.0
+      sensor_timeout: 0.1
+      two_d_mode: true
+
+      transform_time_offset: 0.0
+      transform_timeout: 0.05
+
+      map_frame: map
+      world_frame: odom
+      odom_frame: odom
+      base_link_frame: base_link
+      publish_tf: true
+      publish_acceleration: false
+
+      # robot_localization always registers the "odometry/filtered topic status"
+      # frequency diagnostic but only counts publishes when this is true; with the
+      # default (false) it reports "No events recorded" at ERROR while the filter
+      # is publishing normally. Also enables the filter's own input/setting checks.
+      print_diagnostics: true
+
+      odom0: "odometry/wheels"
+      # Wheel odometry contributes body velocities only. Its absolute X/Y is
+      # integrated along diff_drive_controller's own yaw (skewed by
+      # wheel_separation_multiplier) and would fight the IMU-derived heading.
+      # vy is kept deliberately: the controller publishes vy = 0, which acts as a
+      # nonholonomic constraint.
+      odom0_config: [ false, false, false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      true,  true,  false,   # vx, vy, vz
+                      false, false, false,   # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
+                    ]
+      odom0_queue_size: 3
+      odom0_nodelay: true
+      odom0_differential: false
+      odom0_relative: false
+
+      imu0: "imu/data"
+      # Yaw RATE only. Absolute orientation is magnetometer-influenced and is not
+      # trustworthy near the drive motors; fusing yaw and its own derivative from
+      # the same sensor is also correlated. Accelerations are not fused because the
+      # driver publishes gravity-inclusive linear acceleration.
+      imu0_config: [  false, false, false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      false, false, false,   # vx, vy, vz
+                      false, false, true,    # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
+                    ]
+      imu0_queue_size: 3
+      imu0_nodelay: true
+      imu0_differential: false
+      imu0_relative: false
+      imu0_remove_gravitational_acceleration: true
+
+      use_control: false
+      stamped_control: false
+      control_timeout: 0.5
+      control_config: [true, true, false, false, false, true]
+      acceleration_limits: [2.7, 1.5, 0.0, 0.0, 0.0, 5.7]
+
+      predict_to_current_time: true
+
+      dynamic_process_noise_covariance: true
+      process_noise_covariance: [1e-4,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0, 1e-4,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0, 1e-4,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0, 3e-3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0, 3e-3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0, 3e-3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-4,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-4,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-4,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 5e-5,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 5e-5,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 5e-5]
+
+      initial_state: [0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0]
+
+      initial_estimate_covariance: [1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9]
+
+  rover_ekf_global_node:
+    ros__parameters:
+      frequency: 50.0
+      sensor_timeout: 0.1
+      two_d_mode: true
+
+      transform_time_offset: 0.0
+      transform_timeout: 0.05
+
+      map_frame: map
+      # Global filter: continuous odometry + absolute GPS position, publishes map -> odom.
+      world_frame: map
+      odom_frame: odom
+      base_link_frame: base_link
+      publish_tf: true
+      publish_acceleration: false
+
+      # robot_localization always registers the "odometry/filtered topic status"
+      # frequency diagnostic but only counts publishes when this is true; with the
+      # default (false) it reports "No events recorded" at ERROR while the filter
+      # is publishing normally. Also enables the filter's own input/setting checks.
+      print_diagnostics: true
+
+      odom0: "odometry/wheels"
+      # Wheel odometry contributes body velocities only. Its absolute X/Y is
+      # integrated along diff_drive_controller's own yaw (skewed by
+      # wheel_separation_multiplier) and would fight the IMU-derived heading.
+      # vy is kept deliberately: the controller publishes vy = 0, which acts as a
+      # nonholonomic constraint.
+      odom0_config: [ false, false, false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      true,  true,  false,   # vx, vy, vz
+                      false, false, false,   # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
+                    ]
+      odom0_queue_size: 3
+      odom0_nodelay: true
+      odom0_differential: false
+      odom0_relative: false
+
+      imu0: "imu/data"
+      # Yaw RATE only. Absolute orientation is magnetometer-influenced and is not
+      # trustworthy near the drive motors; fusing yaw and its own derivative from
+      # the same sensor is also correlated. Accelerations are not fused because the
+      # driver publishes gravity-inclusive linear acceleration.
+      imu0_config: [  false, false, false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      false, false, false,   # vx, vy, vz
+                      false, false, true,    # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
+                    ]
+      imu0_queue_size: 3
+      imu0_nodelay: true
+      imu0_differential: false
+      imu0_relative: false
+      imu0_remove_gravitational_acceleration: true
+
+      odom1: "odometry/gps"
+      # GPS position in the map frame from rover_navsat_transform_node. Absolute X/Y only:
+      # the heading it was aligned with already comes from the IMU/odometry chain, and the
+      # NMEA altitude is too noisy for a 2D filter.
+      odom1_config: [ true,  true,  false,   # X, Y, Z
+                      false, false, false,   # roll, pitch, yaw
+                      false, false, false,   # vx, vy, vz
+                      false, false, false,   # vroll, vpitch, vyaw
+                      false, false, false    # ax, ay, az
+                    ]
+      odom1_queue_size: 2
+      odom1_nodelay: true
+      odom1_differential: false
+      odom1_relative: false
+
+      use_control: false
+      stamped_control: false
+      control_timeout: 0.5
+      control_config: [true, true, false, false, false, true]
+      acceleration_limits: [2.7, 1.5, 0.0, 0.0, 0.0, 5.7]
+
+      predict_to_current_time: true
+
+      dynamic_process_noise_covariance: true
+      process_noise_covariance: [1e-4,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0, 1e-4,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0, 1e-4,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0, 3e-3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0, 3e-3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0, 3e-3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-4,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-4,  0.0,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 2e-4,  0.0,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 5e-5,  0.0,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 5e-5,  0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 5e-5]
+
+      initial_state: [0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0,
+                      0.0,  0.0,  0.0]
+
+      initial_estimate_covariance: [1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9,  0.0,
+                                     0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1e-9]
+
+  rover_navsat_transform_node:
+    ros__parameters:
+      frequency: 10.0
+      # Wait for the filters and the first fixes before computing the transform.
+      delay: 3.0
+      # gps/heading_imu (rover_gps) is already an ENU heading derived from GNSS course, so no
+      # magnetic declination and no IMU mounting offset apply.
+      magnetic_declination_radians: 0.0
+      yaw_offset: 0.0
+      zero_altitude: true
+      broadcast_cartesian_transform: false
+      publish_filtered_gps: true
+      use_odometry_yaw: false
+      wait_for_datum: false

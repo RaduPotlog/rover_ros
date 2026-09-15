@@ -11,6 +11,8 @@
             imu_rpy:='0.0 0.0 0.0'
             lidar_xyz:='0.0 0.0 0.0'
             lidar_rpy:='0.0 0.0 0.0'
+            gps_xyz:='0.0 0.0 0.0'
+            gps_rpy:='0.0 0.0 0.0'
             namespace:=''">
 
     <xacro:if value="${use_sim}">
@@ -53,7 +55,9 @@
       imu_xyz="${imu_xyz}"
       imu_rpy="${imu_rpy}"
       lidar_xyz="${lidar_xyz}"
-      lidar_rpy="${lidar_rpy}" />
+      lidar_rpy="${lidar_rpy}"
+      gps_xyz="${gps_xyz}"
+      gps_rpy="${gps_rpy}" />
 
     <!-- Rover wheel -->
     <xacro:wheel.wheel

@@ -6,6 +6,8 @@
   <xacro:arg name="imu_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="lidar_xyz" default="0.0 0.0 0.0" />
   <xacro:arg name="lidar_rpy" default="0.0 0.0 0.0" />
+  <xacro:arg name="gps_xyz" default="0.0 0.0 0.0" />
+  <xacro:arg name="gps_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="wheel_config_file" default="$(find rover_description)/config/wheel_01.yaml" />
   <xacro:arg name="battery_config_file" default="$(find rover_description)/config/battery.yaml" />
   <!-- Only used by the gz_ros2_control plugin (use_sim:=true); the caller must supply it. -->
@@ -19,6 +21,8 @@
     imu_rpy="$(arg imu_rpy)"
     lidar_xyz="$(arg lidar_xyz)"
     lidar_rpy="$(arg lidar_rpy)"
+    gps_xyz="$(arg gps_xyz)"
+    gps_rpy="$(arg gps_rpy)"
     wheel_config_file="$(arg wheel_config_file)"
     battery_config_file="$(arg battery_config_file)"
     controller_config_file="$(arg controller_config_file)"

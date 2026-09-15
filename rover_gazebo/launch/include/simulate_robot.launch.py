@@ -122,6 +122,8 @@ def generate_launch_description():
             "namespace": namespace,
             "use_sim": "True",
             "use_ekf": "True",
+            # The simulated rover has no GNSS; ignore EKF_USE_GPS from the environment.
+            "fuse_gps": "False",
         }.items(),
     )
 

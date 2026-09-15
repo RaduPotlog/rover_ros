@@ -10,7 +10,7 @@ The dependencies are selected by `ROVER_ROS_BUILD_TYPE`:
 
 | `ROVER_ROS_BUILD_TYPE` | Depends on |
 |------------------------|------------|
-| `hardware` | `rover_bringup` |
+| `hardware` | `rover_bringup`, `rover_gps`, `nmea_navsat_driver` |
 | `simulation` | `rover_gazebo` |
 
 Its version (`ros2 pkg xml -t version rover_metapackage`) is shown as the "ROS Driver Version"
@@ -20,7 +20,7 @@ in the `rover_bringup` banner.
 
 | File | Repositories |
 |------|--------------|
-| `hardware_deps.repos` | `rover_modbus`, `rover_cppuprofile`, `rover_crsf_receiver` (`lyrical`), `rover_arch`, `rover_foxglove`, `rover_transport` (`lyrical`), `rover_network_monitor` |
+| `hardware_deps.repos` | `rover_modbus`, `rover_cppuprofile`, `rover_crsf_receiver` (`lyrical`), `rover_arch`, `rover_foxglove`, `rover_transport` (`lyrical`), `rover_network_monitor`, `rover_nmea_navsat_driver` (`ros2`) |
 | `simulation_deps.repos` | none (empty) |
 
 ```bash

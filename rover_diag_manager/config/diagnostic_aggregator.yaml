@@ -28,7 +28,11 @@
     localization:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Localization
-      find_and_remove_prefix: [ 'rover_ekf_node: ', 'navsat_transform_node: ' ]
+      find_and_remove_prefix: [ 'rover_ekf_node: ', 'rover_ekf_global_node: ', 'rover_navsat_transform_node: ' ]
+    gps:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: GPS
+      find_and_remove_prefix: [ 'rover_gps_node: ' ]
     lighting:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lighting
