@@ -23,7 +23,7 @@
     <link name="body_link">
       <visual>
         <geometry>
-          <mesh filename="package://rover_description/meshes/rover_a1/base.STL" />
+          <mesh filename="package://rover_description/meshes/rover_a1/base.stl" />
         </geometry>
       </visual>
 

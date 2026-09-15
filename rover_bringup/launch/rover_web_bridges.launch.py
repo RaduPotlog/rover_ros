@@ -24,11 +24,28 @@ from launch_ros.actions import Node, SetRemap
 from launch_ros.substitutions import FindPackageShare
 
 
+# Upstream's default allowlist spells the extensions lowercase and compiles the pattern with
+# a case-sensitive std::regex, so a mesh named `.STL` is refused and its link renders empty.
+# std::regex uses the ECMAScript grammar, which rejects the inline `(?i)` flag (it throws
+# "Invalid '(?...)' zero-width assertion"), so each letter becomes a two-case character class.
+# Extension list is upstream's, verbatim.
+_ASSET_EXTENSIONS = (
+    "dae fbx glb gltf jpeg jpg mtl obj png stl tif tiff urdf webp xacro".split()
+)
+_ANY_CASE = "|".join(
+    "".join(f"[{c}{c.upper()}]" for c in ext) for ext in _ASSET_EXTENSIONS
+)
+FOXGLOVE_ASSET_URI_ALLOWLIST = (
+    r"['^package://(?:[-\w%]+/)*[-\w%.]+\." + f"(?:{_ANY_CASE})" + r"$']"
+)
+
+
 def generate_launch_description():
-    # The upstream launch file keeps every foxglove_bridge parameter default. Its <node>
-    # has no name, so a global __node remap is the only node-name rule and renames it.
-    # (It would not work on a named node: launch_ros puts `-r __node:=<name>` first and rcl
-    # uses the first matching rule.)
+    # The upstream launch file keeps every foxglove_bridge parameter default except
+    # asset_uri_allowlist, overridden below. Its <node> has no name, so a global __node remap
+    # is the only node-name rule and renames it. (It would not work on a named node:
+    # launch_ros puts `-r __node:=<name>` first and rcl uses the first matching rule.)
+    # Passing a launch *argument* does not name the node, so the remap still applies.
     foxglove_bridge = GroupAction(
         scoped=True,
         actions=[
@@ -38,7 +55,10 @@ def generate_launch_description():
                     PathJoinSubstitution(
                         [FindPackageShare("foxglove_bridge"), "launch", "foxglove_bridge_launch.xml"]
                     )
-                )
+                ),
+                launch_arguments={
+                    "asset_uri_allowlist": FOXGLOVE_ASSET_URI_ALLOWLIST,
+                }.items(),
             ),
         ],
     )
