@@ -94,6 +94,12 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
         context.launch_configurations['controller_config_path'] = str(explicit)
         expected['/**']['rover_drive_controller']['ros__parameters']['base_frame_id'] = (
             f'{namespace}/base_link' if namespace else 'base_link')
+    # The URDF names the IMU sensor `<namespace>/imu`, so the broadcaster must resolve the same prefix.
+    imu_parameters = expected['/**']['rover_imu_broadcaster']['ros__parameters']
+    assert imu_parameters['sensor_name'] == '<namespace>/imu'
+    assert imu_parameters['frame_id'] == '<namespace>/imu_link'
+    prefix = f'{namespace}/' if namespace else ''
+    imu_parameters.update(sensor_name=f'{prefix}imu', frame_id=f'{prefix}imu_link')
 
     description = controller_launch.generate_launch_description()
     for action in description.entities:
