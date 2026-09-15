@@ -183,6 +183,37 @@ TEST_F(RoverBatteryNodeTest, IgnoresPacketWithWrongSize)
     EXPECT_TRUE(battery_msgs_.front().present);
 }
 
+TEST_F(RoverBatteryNodeTest, NoDataPayloadDoesNotFeedTheWatchdog)
+{
+    startNode({rclcpp::Parameter("watchdog_timeout_ms", 200)});
+    ASSERT_TRUE(waitForDiscovery());
+
+    // The bridge's "no BMS data" payload: correct size, all zero. It must never be decoded as a
+    // reading, and it must not keep the watchdog alive.
+    const std::vector<uint8_t> no_data(rover_battery::domain::kBmsPayloadSize, 0);
+    ASSERT_TRUE(spinUntil(
+        [this] {return !battery_msgs_.empty();}, 5s, [&] {publishPacket(no_data);}));
+
+    for (const auto & state : battery_msgs_) {
+        EXPECT_FALSE(state.present);
+        EXPECT_EQ(state.power_supply_health,
+                  BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE);
+    }
+}
+
+TEST_F(RoverBatteryNodeTest, WrongSizePacketsDoNotFeedTheWatchdog)
+{
+    startNode({rclcpp::Parameter("watchdog_timeout_ms", 200)});
+    ASSERT_TRUE(waitForDiscovery());
+
+    auto bad_packet = makePacket(60.0f, 1, 8);
+    bad_packet.pop_back();
+    ASSERT_TRUE(spinUntil(
+        [this] {return !battery_msgs_.empty();}, 5s, [&] {publishPacket(bad_packet);}));
+    EXPECT_EQ(battery_msgs_.front().power_supply_health,
+              BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE);
+}
+
 TEST_F(RoverBatteryNodeTest, PublishesWatchdogStateWithoutData)
 {
     startNode({rclcpp::Parameter("watchdog_timeout_ms", 200)});

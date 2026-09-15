@@ -26,10 +26,13 @@ constexpr std::size_t kBmsMaxTempSensors = 16;
 
 /**
  * @brief BMS telemetry exactly as laid out in the UDP payload.
- * @details The layout is a wire contract with the BMS bridge — do not reorder, resize or
- *          add fields. The bridge (daly-bms-uart) has already decoded the Daly raw units
+ * @details The layout is a wire contract with the BMS bridge — the ESP32 firmware
+ *          rover_led_bms_ble_controller (Daly100Bms::BmsData, serialised by
+ *          BmsTelemetryCodec) — so do not reorder, resize or retype fields without changing
+ *          both. The bridge polls the Daly BMS over BLE and has already decoded its raw units
  *          (0.1 V, 0.1 A with 30000 offset, 0.1 %, +40 °C offset — see
  *          docs/Part 4 - Daly RS485+UART Protocol.pdf), so comments give the units as received.
+ *          An all-zero payload means the bridge has no BMS data (see isNoDataFrame()).
  */
 struct __attribute__((packed)) BmsData
 {
@@ -46,9 +49,9 @@ struct __attribute__((packed)) BmsData
     float cellDiff;  // Difference between min and max cell voltages (mV)
 
     // data from 0x92
-    int tempMax;       // Maximum temperature sensor reading (°C)
-    int tempMin;       // Minimum temperature sensor reading (°C)
-    float tempAverage; // Average of temp sensors
+    float tempMax;     // Maximum temperature sensor reading (°C)
+    float tempMin;     // Minimum temperature sensor reading (°C)
+    float tempAverage; // (tempMax + tempMin) / 2 (°C), as computed by the bridge
 
     // data from 0x93
     int chargeDischargeStatus;    // charge/discharge status (0 stationary, 1 charge, 2 discharge)

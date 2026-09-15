@@ -34,6 +34,8 @@ BmsFrame makeFrame(float soc, int status, int cells = 16, int temps = 4)
     frame.data.packVoltage = 52.1f;
     frame.data.packCurrent = -3.5f;
     frame.data.packSOC = soc;
+    frame.data.tempMax = 31.0f;
+    frame.data.tempMin = 20.0f;
     frame.data.tempAverage = 25.5f;
     frame.data.resCapacitymAh = 32000;
     frame.data.chargeDischargeStatus = status;
@@ -65,6 +67,24 @@ BmsAlarms alarmsWithBits(std::initializer_list<std::pair<int, int>> bits)
 TEST(BmsFrame, WireLayoutIsStable)
 {
     EXPECT_EQ(kBmsPayloadSize, 392u);
+}
+
+TEST(IsNoDataFrame, AllZeroPayloadHasNoData)
+{
+    EXPECT_TRUE(isNoDataFrame(BmsFrame{}));
+}
+
+TEST(IsNoDataFrame, AnyDataOrAlarmIsARealFrame)
+{
+    BmsFrame with_voltage{};
+    with_voltage.data.packVoltage = 51.2f;
+    EXPECT_FALSE(isNoDataFrame(with_voltage));
+
+    BmsFrame with_alarm{};
+    with_alarm.alarms = alarmsWithBits({{6, 3}});
+    EXPECT_FALSE(isNoDataFrame(with_alarm));
+
+    EXPECT_FALSE(isNoDataFrame(makeFrame(50.0f, 0)));
 }
 
 TEST(ClassifyBatteryHealth, NoAlarmsIsGood)
@@ -176,7 +196,7 @@ TEST(ToBatteryReading, ConvertsBmsValues)
 
     EXPECT_FLOAT_EQ(reading.voltage, 52.1f);
     EXPECT_FLOAT_EQ(reading.current, -3.5f);
-    EXPECT_FLOAT_EQ(reading.temperature, 25.5f);
+    EXPECT_FLOAT_EQ(reading.temperature, 31.0f);  // hottest sensor, not the average
     EXPECT_FLOAT_EQ(reading.charge, 32.0f);  // 32000 mAh
     EXPECT_FLOAT_EQ(reading.percentage, 0.8f);
     EXPECT_TRUE(std::isnan(reading.capacity));

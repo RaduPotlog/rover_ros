@@ -30,6 +30,12 @@ constexpr float kFullChargeThreshold = 1.0f;
 
 constexpr const char * kWatchdogExpiredError = "Battery watchdog expired";
 
+/**
+ * True for the all-zero payload the BMS bridge sends when it has no BMS data (BLE link down
+ * or the BMS stopped answering). Such a frame must not be decoded as a reading.
+ */
+bool isNoDataFrame(const BmsFrame & frame);
+
 /** Overvoltage/dead from voltage & SoC alarms; a temperature alarm overrides either. */
 BatteryHealth classifyBatteryHealth(const BmsAlarms & alarms);
 
@@ -45,7 +51,10 @@ ChargingInfo toChargingInfo(const BmsData & data);
 std::size_t validCellCount(const BmsData & data);
 std::size_t validTempSensorCount(const BmsData & data);
 
-/** Converts a BMS frame to a battery reading (health and charge state included). */
+/**
+ * Converts a BMS frame to a battery reading (health and charge state included).
+ * temperature is the hottest sensor, so rover_safety's thresholds see a single hot cell.
+ */
 BatteryReading toBatteryReading(const BmsFrame & frame, const BatteryIdentity & identity);
 
 /** Full report for one BMS frame. */

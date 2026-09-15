@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <limits>
 #include <string>
 #include <vector>
@@ -105,6 +106,15 @@ std::size_t clampCount(int reported, std::size_t max)
 
 }  // namespace
 
+bool isNoDataFrame(const BmsFrame & frame)
+{
+    static const BmsData kZeroData{};
+    static const BmsAlarms kZeroAlarms{};
+
+    return std::memcmp(&frame.data, &kZeroData, sizeof(BmsData)) == 0 &&
+           std::memcmp(&frame.alarms, &kZeroAlarms, sizeof(BmsAlarms)) == 0;
+}
+
 BatteryHealth classifyBatteryHealth(const BmsAlarms & alarms)
 {
     BatteryHealth health = BatteryHealth::Good;
@@ -181,7 +191,7 @@ BatteryReading toBatteryReading(const BmsFrame & frame, const BatteryIdentity & 
 
     BatteryReading reading;
     reading.voltage = data.packVoltage;
-    reading.temperature = data.tempAverage;
+    reading.temperature = data.tempMax;
     reading.current = data.packCurrent;
     reading.charge = static_cast<float>(data.resCapacitymAh) / 1000.0f;  // mAh -> Ah
     // The BMS reports no last-full capacity; BatteryState marks unmeasured values NaN.

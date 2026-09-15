@@ -22,6 +22,7 @@
 
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
 
+#include "rover_battery/domain/battery_classifier.hpp"
 #include "rover_battery/domain/bms_frame.hpp"
 #include "rover_battery/infrastructure/ros2_battery_state_publisher.hpp"
 
@@ -92,8 +93,8 @@ void RoverBatteryNode::init()
 
 void RoverBatteryNode::batteryUdpDataCallback(const udp_msgs::msg::UdpPacket::SharedPtr msg)
 {
-    battery_read_timeout_->reset();
-
+    // Only a real BMS frame feeds the watchdog: a wrong-size packet or the bridge's no-data
+    // payload must let it expire, so a lost BMS still ends in the watchdog state.
     if (msg->data.size() != domain::kBmsPayloadSize) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
             "Packet size mismatch! Received: %zu bytes, Expected: %zu bytes.",
@@ -105,6 +106,13 @@ void RoverBatteryNode::batteryUdpDataCallback(const udp_msgs::msg::UdpPacket::Sh
     std::memcpy(&frame.data, msg->data.data(), sizeof(frame.data));
     std::memcpy(&frame.alarms, msg->data.data() + sizeof(frame.data), sizeof(frame.alarms));
 
+    if (domain::isNoDataFrame(frame)) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+            "BMS bridge reports no BMS data (BLE link down or BMS not answering).");
+        return;
+    }
+
+    battery_read_timeout_->reset();
     monitor_battery_->onFrame(frame);
 }
 
