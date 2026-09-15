@@ -26,8 +26,10 @@ HealthReport evaluateTeleopHealth(const bool first_frame_received, const LinkHea
         return {HealthLevel::kWarn, "Waiting for the first rc/channels frame."};
     }
 
+    // RC teleop is optional: on loss the node stops commanding and twist_mux falls through, so a
+    // lost link is a warning, never an error that would mark the whole rover faulty.
     if (link.loss_reason != LinkLossReason::kNone) {
-        return {HealthLevel::kError, std::string("RC link lost: ") + toString(link.loss_reason) + "."};
+        return {HealthLevel::kWarn, std::string("RC link lost: ") + toString(link.loss_reason) + "."};
     }
 
     return {HealthLevel::kOk, "RC link healthy."};

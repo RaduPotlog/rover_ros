@@ -303,7 +303,7 @@ TEST_F(TeleopUseCaseTest, DiagnosticsAgreeWithTickOnLinkLoss)
 
     const auto diagnostics = use_case_->diagnostics(later);
 
-    EXPECT_EQ(diagnostics.health.level, HealthLevel::kError);
+    EXPECT_EQ(diagnostics.health.level, HealthLevel::kWarn);
     EXPECT_EQ(diagnostics.link.loss_reason, LinkLossReason::kChannelsStale);
     EXPECT_TRUE(diagnostics.last_command.isZero());
 }

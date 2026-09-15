@@ -27,7 +27,9 @@ link failsafe stops the rover when the transmitter link is lost.
   link quality has not dropped below `link_quality_lost_below` (it recovers at
   `link_quality_recovered_at`). When it isn't, the node publishes **one zero command and goes
   silent**: the rover stops at once and `twist_mux` falls through to its next source. The E-Stop
-  is not triggered. Switches are ignored while the link is lost.
+  is not triggered. Switches are ignored while the link is lost. The `RC link` diagnostic reports
+  the loss as WARN, not ERROR: RC teleop is optional, so none of this node's diagnostics raise
+  the rover to ERROR.
 - **Switches.** Only a change of switch position fires a service call: e-stop channel low = set,
   high = reset; latch-reset channel low = reset latch. Their resting position is learned over
   `switch_settle_frames` ticks at startup and never fires.

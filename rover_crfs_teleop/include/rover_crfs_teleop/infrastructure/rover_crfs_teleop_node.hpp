@@ -48,10 +48,12 @@ namespace rover_crfs_teleop
 // runs on the same executor.
 //
 // Diagnostics (hardware ID "RC Receiver"), published in every lifecycle state:
-//   - "RC link":          the LinkMonitor verdict that gates the command, with ages / LQ / switches;
+//   - "RC link":          the LinkMonitor verdict that gates the command, with ages / LQ / switches
+//                         (WARN while waiting for the first frame and while the link is lost);
 //   - "E-Stop requests":  reachability and last outcome of the hardware interface E-Stop services;
 //   - "RC channels rate": rc/channels arrival rate against rc_channels_expected_hz (WARN at
-//                         worst, also when no frames arrive - link loss is "RC link"'s ERROR).
+//                         worst, also when no frames arrive).
+// None of them reports ERROR: RC teleop is optional.
 class RoverCrfsTeleopNode : public rclcpp_lifecycle::LifecycleNode
 {
 

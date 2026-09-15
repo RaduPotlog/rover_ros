@@ -27,14 +27,14 @@ TEST(TeleopHealthTest, WaitingForFirstFrameIsWarn)
     EXPECT_EQ(report.level, HealthLevel::kWarn);
 }
 
-TEST(TeleopHealthTest, LostLinkIsErrorWithReason)
+TEST(TeleopHealthTest, LostLinkIsWarnWithReason)
 {
     LinkHealthSnapshot link;
     link.loss_reason = LinkLossReason::kLowLinkQuality;
 
     const auto report = evaluateTeleopHealth(true, link);
 
-    EXPECT_EQ(report.level, HealthLevel::kError);
+    EXPECT_EQ(report.level, HealthLevel::kWarn);
     EXPECT_NE(report.message.find(toString(LinkLossReason::kLowLinkQuality)), std::string::npos);
 }
 

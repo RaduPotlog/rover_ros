@@ -23,12 +23,12 @@
 namespace rover_crfs_teleop
 {
 
-// Ordered by severity.
+// Ordered by severity. There is deliberately no error level: RC teleop is optional, so its
+// diagnostics warn at worst.
 enum class HealthLevel
 {
     kOk,
     kWarn,
-    kError,
 };
 
 struct HealthReport

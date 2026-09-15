@@ -237,12 +237,14 @@ TEST_F(TeleopNodeTest, RcLinkDiagnosticFollowsTheLink)
 {
     // /diagnostics is absolute, so match on this test's node name and take the latest level.
     std::optional<std::uint8_t> rc_link_level;
+    std::string rc_link_message;
     auto diagnostics_sub = helper_node_->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
         "/diagnostics", 10,
-        [&rc_link_level](const diagnostic_msgs::msg::DiagnosticArray & msg) {
+        [&rc_link_level, &rc_link_message](const diagnostic_msgs::msg::DiagnosticArray & msg) {
             for (const auto & status : msg.status) {
                 if (status.name == "rover_crfs_teleop_node: RC link") {
                     rc_link_level = status.level;
+                    rc_link_message = status.message;
                 }
             }
         });
@@ -257,9 +259,11 @@ TEST_F(TeleopNodeTest, RcLinkDiagnosticFollowsTheLink)
         return rc_link_level == diagnostic_msgs::msg::DiagnosticStatus::OK;
     }));
 
+    // Link loss warns (RC teleop is optional); the message tells it apart from "waiting".
     harness_->feeding = false;
-    EXPECT_TRUE(spinUntil([&rc_link_level]() {
-        return rc_link_level == diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    EXPECT_TRUE(spinUntil([&rc_link_level, &rc_link_message]() {
+        return rc_link_level == diagnostic_msgs::msg::DiagnosticStatus::WARN &&
+               rc_link_message.find("RC link lost") != std::string::npos;
     }));
 }
 

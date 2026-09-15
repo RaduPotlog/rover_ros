@@ -50,12 +50,13 @@ bool hasKey(const diagnostic_updater::DiagnosticStatusWrapper & status, const st
 
 }  // namespace
 
-TEST(TeleopDiagnosticsConversionsTest, ActiveLostLinkIsError)
+TEST(TeleopDiagnosticsConversionsTest, ActiveLostLinkIsWarn)
 {
     diagnostic_updater::DiagnosticStatusWrapper status;
     fillRcLinkStatus(lostLink(), true, status);
 
-    EXPECT_EQ(status.level, DiagnosticStatus::ERROR);
+    EXPECT_EQ(status.level, DiagnosticStatus::WARN);
+    EXPECT_NE(status.message.find("RC link lost"), std::string::npos);
     EXPECT_TRUE(hasKey(status, "Link loss reason"));
     EXPECT_TRUE(hasKey(status, "rc/channels age (ms)"));
 }

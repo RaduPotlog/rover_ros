@@ -54,7 +54,6 @@ const char * toString(const SafetyRequestOutcome outcome)
 unsigned char toDiagnosticLevel(const HealthLevel level)
 {
     switch (level) {
-        case HealthLevel::kError: return DiagnosticStatus::ERROR;
         case HealthLevel::kWarn: return DiagnosticStatus::WARN;
         case HealthLevel::kOk:
         default: return DiagnosticStatus::OK;
