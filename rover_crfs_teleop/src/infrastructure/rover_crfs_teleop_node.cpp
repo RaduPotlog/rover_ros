@@ -364,6 +364,12 @@ void RoverCrfsTeleopNode::diagnoseChannelsRate(diagnostic_updater::DiagnosticSta
     }
 
     channels_rate_->run(status);
+
+    // FrequencyStatus reports "No events recorded." as ERROR. Link loss is already the "RC link"
+    // task's ERROR, so the rate task only warns.
+    if (status.level > diagnostic_msgs::msg::DiagnosticStatus::WARN) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, status.message);
+    }
 }
 
 }  // namespace rover_crfs_teleop

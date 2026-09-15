@@ -61,7 +61,8 @@
     link_quality_recovered_at: 50
 
     # Diagnostics: "RC channels rate" warns when rc/channels arrives more than
-    # rc_channels_rate_tolerance (fraction) away from rc_channels_expected_hz. Match crsf_receiver's
+    # rc_channels_rate_tolerance (fraction) away from rc_channels_expected_hz, or when no frames arrive
+    # (WARN only - link loss is reported as ERROR by "RC link"). Match crsf_receiver's
     # receiver_rate. Read once at startup.
     rc_channels_expected_hz: 50.0
     rc_channels_rate_tolerance: 0.2

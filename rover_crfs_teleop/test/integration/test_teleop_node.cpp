@@ -263,6 +263,26 @@ TEST_F(TeleopNodeTest, RcLinkDiagnosticFollowsTheLink)
     }));
 }
 
+TEST_F(TeleopNodeTest, ChannelsRateDiagnosticWarnsWithoutFrames)
+{
+    // No frames: FrequencyStatus would say ERROR ("No events recorded."), the node caps it at WARN.
+    std::vector<std::uint8_t> rate_levels;
+    auto diagnostics_sub = helper_node_->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+        "/diagnostics", 10,
+        [&rate_levels](const diagnostic_msgs::msg::DiagnosticArray & msg) {
+            for (const auto & status : msg.status) {
+                if (status.name == "rover_crfs_teleop_node: RC channels rate") {
+                    rate_levels.push_back(status.level);
+                }
+            }
+        });
+
+    ASSERT_TRUE(spinUntil([&rate_levels]() { return rate_levels.size() >= 3; }));
+    for (const auto level : rate_levels) {
+        EXPECT_EQ(level, diagnostic_msgs::msg::DiagnosticStatus::WARN);
+    }
+}
+
 TEST_F(TeleopNodeTest, NoInputPublishesNothing)
 {
     spinFor(300ms);
