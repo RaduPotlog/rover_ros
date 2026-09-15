@@ -7,12 +7,14 @@ Panels:
         - /Global Options1
         - /Map1
         - /Robot1
+        - /Robot1/RobotModel1
+        - /Robot1/RobotModel1/Links1
+        - /Robot1/TF1/Frames1
         - /Robot1/Odometry1/Topic1
         - /Imu1/Axes properties1
         - /Imu1/Acceleration properties1
-        - /Map2
       Splitter Ratio: 0.5
-    Tree Height: 1056
+    Tree Height: 1059
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -68,7 +70,7 @@ Visualization Manager:
             Durability Policy: Volatile
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: robot_description
+            Value: /rover/robot_description
           Enabled: true
           Links:
             All Links Enabled: true
@@ -76,63 +78,6 @@ Visualization Manager:
             Expand Link Details: false
             Expand Tree: false
             Link Tree Style: Links in Alphabetic Order
-            base_footprint:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            base_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            body_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            fl_wheel_base_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            fl_wheel_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            fr_wheel_base_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            fr_wheel_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            imu_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            lidar_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            rl_wheel_base_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            rl_wheel_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            rr_wheel_base_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            rr_wheel_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
           Mass Properties:
             Inertia: false
             Mass: false
@@ -147,64 +92,68 @@ Visualization Manager:
           Filter (whitelist): ""
           Frame Timeout: 15
           Frames:
-            All Enabled: false
-            base_footprint:
-              Value: false
-            base_link:
-              Value: false
-            body_link:
-              Value: false
-            fl_wheel_base_link:
-              Value: false
-            fl_wheel_link:
-              Value: false
-            fr_wheel_base_link:
-              Value: false
-            fr_wheel_link:
-              Value: false
-            imu_link:
+            All Enabled: true
+            rover/base_footprint:
               Value: true
-            lidar_link:
+            rover/base_link:
               Value: true
-            map:
+            rover/body_link:
               Value: true
-            odom:
+            rover/fl_wheel_base_link:
               Value: true
-            rl_wheel_base_link:
-              Value: false
-            rl_wheel_link:
-              Value: false
-            rr_wheel_base_link:
-              Value: false
-            rr_wheel_link:
-              Value: false
+            rover/fl_wheel_link:
+              Value: true
+            rover/fr_wheel_base_link:
+              Value: true
+            rover/fr_wheel_link:
+              Value: true
+            rover/gps_link:
+              Value: true
+            rover/imu_link:
+              Value: true
+            rover/lidar_link:
+              Value: true
+            rover/map:
+              Value: true
+            rover/odom:
+              Value: true
+            rover/rl_wheel_base_link:
+              Value: true
+            rover/rl_wheel_link:
+              Value: true
+            rover/rr_wheel_base_link:
+              Value: true
+            rover/rr_wheel_link:
+              Value: true
           Marker Scale: 1
           Name: TF
           Show Arrows: true
           Show Axes: true
           Show Names: false
           Tree:
-            map:
-              odom:
-                base_link:
-                  body_link:
-                    base_footprint:
+            rover/map:
+              rover/odom:
+                rover/base_link:
+                  rover/body_link:
+                    rover/base_footprint:
                       {}
-                    fl_wheel_base_link:
-                      fl_wheel_link:
+                    rover/fl_wheel_base_link:
+                      rover/fl_wheel_link:
                         {}
-                    fr_wheel_base_link:
-                      fr_wheel_link:
+                    rover/fr_wheel_base_link:
+                      rover/fr_wheel_link:
                         {}
-                    imu_link:
+                    rover/gps_link:
                       {}
-                    lidar_link:
+                    rover/imu_link:
                       {}
-                    rl_wheel_base_link:
-                      rl_wheel_link:
+                    rover/lidar_link:
+                      {}
+                    rover/rl_wheel_base_link:
+                      rover/rl_wheel_link:
                         {}
-                    rr_wheel_base_link:
-                      rr_wheel_link:
+                    rover/rr_wheel_base_link:
+                      rover/rr_wheel_link:
                         {}
           Update Interval: 0
           Value: true
@@ -225,7 +174,7 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: true
-          Enabled: false
+          Enabled: true
           Keep: 1000
           Name: Odometry
           Position Tolerance: 0.10000000149011612
@@ -245,8 +194,8 @@ Visualization Manager:
             Filter size: 10
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /odometry/wheels
-          Value: false
+            Value: /rover/odom
+          Value: true
       Enabled: true
       Name: Robot
     - Acceleration properties:
@@ -277,27 +226,13 @@ Visualization Manager:
         Value: /imu/data
       Value: false
       fixed_frame_orientation: true
-    - Class: rviz_default_plugins/Image
-      Enabled: false
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Image
-      Normalize Range: true
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /led/channel_1_frame
-      Value: false
     - Alpha: 0.699999988079071
       Binary representation: false
       Binary threshold: 100
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: Map
       Topic:
         Depth: 5
@@ -313,12 +248,12 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /local_costmap/stvl_layer_updates
       Use Timestamp: false
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
@@ -341,11 +276,11 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /plan
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: odom
+    Fixed Frame: rover/odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -388,7 +323,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 8.84580135345459
+      Distance: 7.979314804077148
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -403,10 +338,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0297963619232178
+      Pitch: 0.6647961735725403
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.938188552856445
+      Yaw: 5.3131818771362305
     Saved: ~
 Window Geometry:
   Displays:
@@ -414,9 +349,7 @@ Window Geometry:
   Height: 1347
   Hide Left Dock: false
   Hide Right Dock: true
-  Image:
-    collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000017b000004a9fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b000004a9000000c700fffffffb0000000a0049006d00610067006500000002e3000002010000001600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f0000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000035a000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000009f40000003efc0100000002fb0000000800540069006d00650100000000000009f40000025300fffffffb0000000800540069006d0065010000000000000450000000000000000000000873000004a900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000017b000004abfc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003a000004ab000000c600fffffffb0000000a0049006d0061006700650000000380000001650000000000000000fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f0000035afc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000035a0000009e00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000009f40000003efc0100000002fb0000000800540069006d00650100000000000009f40000025200fffffffb0000000800540069006d0065010000000000000450000000000000000000000873000004ab00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -426,5 +359,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 2548
-  X: 0
-  Y: 0
+  X: -32
+  Y: -32
