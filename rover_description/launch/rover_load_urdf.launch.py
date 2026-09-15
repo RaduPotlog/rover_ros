@@ -34,6 +34,26 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
 
+
+def _env_float(name, default):
+    """Read a sensor mount value from the environment (e.g. a balenaCloud device variable).
+
+    A malformed value would break xacro and take robot_state_publisher down with it, so it
+    is rejected with a warning and the default is used instead.
+    """
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        value = float("nan")
+    if value != value or value in (float("inf"), float("-inf")):
+        print(f"[rover_load_urdf] WARNING: {name}={raw!r} is not a finite number; using {default}")
+        return default
+    return raw
+
+
 def generate_launch_description():
     
     wheel_type = LaunchConfiguration("wheel_type")
@@ -99,28 +119,28 @@ def generate_launch_description():
 
     # IMU mount pose relative to body_link (x forward, y left, z up):
     # centerline, 90 mm to the rear, 200 mm up.
-    imu_pos_x = os.environ.get("ROBOT_IMU_LOCALIZATION_X", "-0.09")
-    imu_pos_y = os.environ.get("ROBOT_IMU_LOCALIZATION_Y", "0.0")
-    imu_pos_z = os.environ.get("ROBOT_IMU_LOCALIZATION_Z", "0.2")
-    imu_rot_r = os.environ.get("ROBOT_IMU_ORIENTATION_R", "0.0")
-    imu_rot_p = os.environ.get("ROBOT_IMU_ORIENTATION_P", "0.0")
-    imu_rot_y = os.environ.get("ROBOT_IMU_ORIENTATION_Y", "0.0")
+    imu_pos_x = _env_float("ROBOT_IMU_LOCALIZATION_X", "-0.09")
+    imu_pos_y = _env_float("ROBOT_IMU_LOCALIZATION_Y", "0.0")
+    imu_pos_z = _env_float("ROBOT_IMU_LOCALIZATION_Z", "0.2")
+    imu_rot_r = _env_float("ROBOT_IMU_ORIENTATION_R", "0.0")
+    imu_rot_p = _env_float("ROBOT_IMU_ORIENTATION_P", "0.0")
+    imu_rot_y = _env_float("ROBOT_IMU_ORIENTATION_Y", "0.0")
 
-    lidar_pos_x = os.environ.get("ROBOT_LIDAR_LOCALIZATION_X", "0.0")
-    lidar_pos_y = os.environ.get("ROBOT_LIDAR_LOCALIZATION_Y", "0.0")
-    lidar_pos_z = os.environ.get("ROBOT_LIDAR_LOCALIZATION_Z", "0.0")
-    lidar_rot_r = os.environ.get("ROBOT_LIDAR_ORIENTATION_R", "0.0")
-    lidar_rot_p = os.environ.get("ROBOT_LIDAR_ORIENTATION_P", "0.0")
-    lidar_rot_y = os.environ.get("ROBOT_LIDAR_ORIENTATION_Y", "0.0")
+    lidar_pos_x = _env_float("ROBOT_LIDAR_LOCALIZATION_X", "0.0")
+    lidar_pos_y = _env_float("ROBOT_LIDAR_LOCALIZATION_Y", "0.0")
+    lidar_pos_z = _env_float("ROBOT_LIDAR_LOCALIZATION_Z", "0.0")
+    lidar_rot_r = _env_float("ROBOT_LIDAR_ORIENTATION_R", "0.0")
+    lidar_rot_p = _env_float("ROBOT_LIDAR_ORIENTATION_P", "0.0")
+    lidar_rot_y = _env_float("ROBOT_LIDAR_ORIENTATION_Y", "0.0")
 
     # GNSS antenna mount pose relative to body_link. Measure it on the rover and set the
     # variables; until then the antenna is assumed at the body origin.
-    gps_pos_x = os.environ.get("ROBOT_GPS_LOCALIZATION_X", "0.0")
-    gps_pos_y = os.environ.get("ROBOT_GPS_LOCALIZATION_Y", "0.0")
-    gps_pos_z = os.environ.get("ROBOT_GPS_LOCALIZATION_Z", "0.0")
-    gps_rot_r = os.environ.get("ROBOT_GPS_ORIENTATION_R", "0.0")
-    gps_rot_p = os.environ.get("ROBOT_GPS_ORIENTATION_P", "0.0")
-    gps_rot_y = os.environ.get("ROBOT_GPS_ORIENTATION_Y", "0.0")
+    gps_pos_x = _env_float("ROBOT_GPS_LOCALIZATION_X", "0.0")
+    gps_pos_y = _env_float("ROBOT_GPS_LOCALIZATION_Y", "0.0")
+    gps_pos_z = _env_float("ROBOT_GPS_LOCALIZATION_Z", "0.0")
+    gps_rot_r = _env_float("ROBOT_GPS_ORIENTATION_R", "0.0")
+    gps_rot_p = _env_float("ROBOT_GPS_ORIENTATION_P", "0.0")
+    gps_rot_y = _env_float("ROBOT_GPS_ORIENTATION_Y", "0.0")
 
     urdf_file = PythonExpression(["'", robot_model, ".urdf.xacro'"])
     robot_description_content = Command(
