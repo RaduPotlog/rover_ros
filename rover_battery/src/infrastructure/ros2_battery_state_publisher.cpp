@@ -14,7 +14,9 @@
 
 #include "rover_battery/infrastructure/ros2_battery_state_publisher.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -28,6 +30,42 @@ constexpr int kLogThrottleMs = 10000;
 std::string percentageText(const BatteryStateMsg & battery_state)
 {
     return std::to_string(static_cast<int>(std::round(battery_state.percentage * 100.0))) + "%.";
+}
+
+const char * chargeStateText(std::uint8_t power_supply_status)
+{
+    switch (power_supply_status) {
+        case BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING:
+            return "Charging";
+        case BatteryStateMsg::POWER_SUPPLY_STATUS_DISCHARGING:
+            return "Discharging";
+        case BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING:
+            return "Not charging";
+        case BatteryStateMsg::POWER_SUPPLY_STATUS_FULL:
+            return "Full";
+        default:
+            return "Unknown";
+    }
+}
+
+const char * healthText(std::uint8_t power_supply_health)
+{
+    switch (power_supply_health) {
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD:
+            return "Good";
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT:
+            return "Overheat";
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_DEAD:
+            return "Dead";
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERVOLTAGE:
+            return "Overvoltage";
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_COLD:
+            return "Cold";
+        case BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE:
+            return "Watchdog timer expired";
+        default:
+            return "Unknown";
+    }
 }
 }  // namespace
 
@@ -47,9 +85,9 @@ Ros2BatteryStatePublisher::Ros2BatteryStatePublisher(
 
 void Ros2BatteryStatePublisher::publish(const domain::BatteryReport & report)
 {
-    const BatteryStateMsg battery_state = toBatteryStateMsg(report.reading);
-    battery_pub_->publish(battery_state);
-    logBatteryStatus(battery_state);
+    battery_state_ = toBatteryStateMsg(report.reading);
+    battery_pub_->publish(battery_state_);
+    logBatteryStatus(battery_state_);
 
     charging_status_ = toChargingStatusMsg(report.charging);
     charging_status_pub_->publish(charging_status_);
@@ -134,6 +172,27 @@ void Ros2BatteryStatePublisher::diagnoseStatus(
 
     status.add("Power supply status", charging_status_.charging ? "connected" : "disconnected");
     status.add("Load current (A)", charging_status_.current);
+
+    // Values exactly as published on rover_battery/battery_status - the unit labels follow the
+    // unconverted BMS values (see README "Known issues").
+    status.add("Present", battery_state_.present ? "true" : "false");
+    status.add("Charge state", chargeStateText(battery_state_.power_supply_status));
+    status.add("Health", healthText(battery_state_.power_supply_health));
+    status.addf("Voltage (V)", "%.2f", battery_state_.voltage);
+    status.addf("Current (A)", "%.2f", battery_state_.current);
+    status.addf("State of charge (%)", "%.1f", battery_state_.percentage * 100.0);
+    status.addf("Residual capacity (mAh)", "%.0f", battery_state_.capacity);
+    status.addf("Design capacity (Ah)", "%.1f", battery_state_.design_capacity);
+    status.addf("Temperature (C)", "%.1f", battery_state_.temperature);
+    status.add("Cell count", battery_state_.cell_voltage.size());
+
+    if (!battery_state_.cell_voltage.empty()) {
+        const auto [min_cell, max_cell] = std::minmax_element(
+            battery_state_.cell_voltage.begin(), battery_state_.cell_voltage.end());
+        status.addf("Min cell voltage (mV)", "%.0f", *min_cell);
+        status.addf("Max cell voltage (mV)", "%.0f", *max_cell);
+        status.addf("Cell voltage difference (mV)", "%.0f", *max_cell - *min_cell);
+    }
 
     status.summary(diagnostic_updater::DiagnosticStatusWrapper::OK, "Battery status monitoring");
 }

@@ -9,7 +9,7 @@ Decodes BMS telemetry received over UDP and publishes the rover's battery state.
 | in  | `rover_battery_udp_data` | `udp_msgs/UdpPacket` (from `udp_driver`, 392-byte BMS payload) |
 | out | `rover_battery/battery_status` | `sensor_msgs/BatteryState` — used by `rover_safety` |
 | out | `rover_battery/charging_status` | `rover_msgs/ChargingStatus` |
-| out | `diagnostics` | hardware id `RoverBattery`, tasks `Battery errors`, `Battery status` |
+| out | `diagnostics` | hardware id `RoverBattery`, tasks `Battery errors`, `Battery status` (voltage, current, SoC, residual / design capacity, temperature, charge state, health, cell min / max) |
 
 If no packet arrives within `watchdog_timeout_ms`, the node publishes a state with
 `present: false` and `POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE`.

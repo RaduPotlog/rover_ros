@@ -57,6 +57,7 @@ private:
     std::string error_msg_;
     // False until the first report (real or watchdog-stale), so diagnostics read STALE, not OK.
     bool has_report_{false};
+    BatteryStateMsg battery_state_;
     ChargingStatusMsg charging_status_;
 };
 

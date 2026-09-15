@@ -17,10 +17,12 @@
 #include <chrono>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rover_msgs/msg/charging_status.hpp"
 #include "sensor_msgs/msg/battery_state.hpp"
@@ -184,6 +186,44 @@ TEST_F(RoverBatteryNodeTest, PublishesWatchdogStateWithoutData)
     EXPECT_FALSE(state.present);
     EXPECT_EQ(state.power_supply_health,
               BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE);
+}
+
+TEST_F(RoverBatteryNodeTest, BatteryStatusDiagnosticReportsBatteryValues)
+{
+    startNode({rclcpp::Parameter("diagnostic_updater.period", 0.1)});
+    ASSERT_TRUE(waitForDiscovery());
+
+    // /diagnostics is absolute; keep the latest "Battery status" values once data has arrived.
+    std::map<std::string, std::string> values;
+    auto diagnostics_sub = tester_->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+        "/diagnostics", 10,
+        [&values](const diagnostic_msgs::msg::DiagnosticArray & msg) {
+            for (const auto & status : msg.status) {
+                if (status.name != "rover_battery_node: Battery status" ||
+                    status.level == diagnostic_msgs::msg::DiagnosticStatus::STALE)
+                {
+                    continue;
+                }
+                values.clear();
+                for (const auto & kv : status.values) {
+                    values[kv.key] = kv.value;
+                }
+            }
+        });
+
+    const auto packet = makePacket(60.0f, 1, 8);
+    ASSERT_TRUE(spinUntil(
+        [&values] {return values.count("Voltage (V)") > 0;}, 5s,
+        [&] {publishPacket(packet);}));
+
+    EXPECT_EQ(values["Voltage (V)"], "52.00");
+    EXPECT_EQ(values["Current (A)"], "4.00");
+    EXPECT_EQ(values["State of charge (%)"], "60.0");
+    EXPECT_EQ(values["Charge state"], "Charging");
+    EXPECT_EQ(values["Health"], "Good");
+    EXPECT_EQ(values["Cell count"], "8");
+    EXPECT_TRUE(values.count("Residual capacity (mAh)") > 0);
+    EXPECT_TRUE(values.count("Design capacity (Ah)") > 0);
 }
 
 TEST(RoverBatteryNodeParameters, RejectsOutOfRangeValues)
