@@ -107,10 +107,44 @@ safety:
     default_value: []
     description: A list with names of ROS plugins that are used in a BehaviorTree project.
 
+  shutdown:
+    bt_server_port:
+      type: int
+      default_value: 7777
+      description: Port number for the BehaviorTree server of the shutdown tree.
+      read_only: true
+      validation: { gt<>: 0 }
+
+    command:
+      type: string
+      default_value: ""
+      description: Bash command that powers off the ROS controller, run as the last step of the shutdown tree. Empty runs the installed shutdown_ros_controller.sh with --no-e-stop. The shutdown reason is exported as ROVER_SHUTDOWN_REASON.
+      read_only: true
+
+    command_timeout:
+      type: double
+      default_value: 15.0
+      description: Seconds after which the power-off command is killed and the shutdown reported as failed.
+      read_only: true
+      validation: { gt<>: 0.0 }
+
+    retry_backoff:
+      type: double
+      default_value: 30.0
+      description: Seconds after a failed shutdown during which new shutdown requests are refused.
+      read_only: true
+      validation: { gt_eq<>: 0.0 }
+
+    service_enabled:
+      type: bool
+      default_value: true
+      description: Whether to offer the ~/shutdown (std_srvs/Trigger) service that powers off the ROS controller.
+      read_only: true
+
   shutdown_hosts_path:
     type: string
     default_value: ""
-    description: Path to a YAML file containing a list of hosts to request shutdown. To correctly format the YAML file, consult the README.
+    description: Path to a YAML file listing the hosts to shut down before the ROS controller powers off. Empty or no hosts skips that step. See config/shutdown_hosts.yaml.
 
   timer_frequency:
     type: double

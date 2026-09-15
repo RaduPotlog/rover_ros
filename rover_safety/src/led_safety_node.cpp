@@ -32,11 +32,6 @@
 #include "rover_safety/led_safety_parameters.hpp"
 #include "rover_safety/infrastructure/safety_diagnostics.hpp"
 
-// Actions
-#include "rover_safety/plugins/action/call_set_led_animation_service_node.hpp"
-// Decorators
-#include "rover_safety/plugins/decorator/tick_after_timeout_node.hpp"
-
 namespace rover_safety
 {
 
@@ -62,7 +57,21 @@ LedSafetyNode::LedSafetyNode(
 nav2::CallbackReturn LedSafetyNode::on_configure(const rclcpp_lifecycle::State & previous_state)
 {
     (void)previous_state;
-    init();
+
+    if (configured_) {
+        return nav2::CallbackReturn::SUCCESS;
+    }
+
+    try {
+        init();
+    } catch (const std::exception & e) {
+        // A missing plugin library, a bad tree project or an unavailable service throws while the
+        // tree is built. Stay unconfigured so the transition can be retried.
+        RCLCPP_ERROR(this->get_logger(), "Configuration failed: %s", e.what());
+        led_tree_timer_.reset();
+        return nav2::CallbackReturn::FAILURE;
+    }
+
     return nav2::CallbackReturn::SUCCESS;
 }
 
@@ -73,10 +82,15 @@ void LedSafetyNode::init()
     const auto bt_server_port = this->get_parameter("bt_server_port").as_int();
     const auto initial_blackboard = createLedInitialBlackboard();
     
+    // A retried configure needs a fresh factory, since plugins and trees register only once. It is
+    // recreated, not move-assigned: a move-assigned BT::BehaviorTreeFactory (BT.CPP 4.10) crashes
+    // while parsing tree files.
+    led_tree_.reset();
+    factory_ = std::make_unique<BT::BehaviorTreeFactory>();
     led_tree_ = std::make_unique<BehaviorTreeSafety>(
         this->shared_from_this(), "RoverLedSafety", initial_blackboard, bt_server_port);
     registerBehaviorTree();
-    led_tree_->init(factory_);
+    led_tree_->init(*factory_);
 
     using namespace std::placeholders;
 
@@ -106,13 +120,8 @@ void LedSafetyNode::registerBehaviorTree()
 {
     const auto bt_project_path = this->params_.bt_project_path;
 
-    // TODO: Register form config file
-    // Actions
-    factory_.registerNodeType<CallSetLedAnimationService>("CallSetLedAnimationService");
-    // Decorators
-    factory_.registerNodeType<SafetyBtTickAfterTimeout>("SafetyBtTickAfterTimeout");
-    
-    factory_.registerBehaviorTreeFromFile(bt_project_path);
+    rover_safety::registerBehaviorTree(
+        *factory_, bt_project_path, params_.plugin_libs, params_.ros_plugin_libs);
 
     RCLCPP_INFO_STREAM(this->get_logger(), "BehaviorTree registered from path '" << bt_project_path << "'");
 }

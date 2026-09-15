@@ -26,8 +26,10 @@
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <nav2_ros_common/lifecycle_node.hpp>
+#include <nav2_ros_common/service_server.hpp>
 
 #include <std_srvs/srv/set_bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
 
 #include "rover_msgs/msg/gpio_state.hpp"
@@ -36,6 +38,7 @@
 
 #include "rover_safety/behavior_tree.hpp"
 #include "rover_safety/domain/battery_safety_policy.hpp"
+#include "rover_safety/domain/shutdown_sequence.hpp"
 #include "rover_safety/safety_parameters.hpp"
 
 namespace rover_safety
@@ -46,6 +49,7 @@ using BoolMsg = std_msgs::msg::Bool;
 using RoverDriverStateMsg = rover_msgs::msg::RoverDriverState;
 using IOStateMsg = rover_msgs::msg::GpioState;
 using SystemStatusMsg = rover_msgs::msg::SystemStatus;
+using TriggerSrv = std_srvs::srv::Trigger;
 
 class SafetyNode : public nav2::LifecycleNode
 {
@@ -70,19 +74,20 @@ protected:
     
     std::map<std::string, std::any> createSafetyInitialBlackboard();
 
+    std::map<std::string, std::any> createShutdownInitialBlackboard();
+
     bool systemReady();
 
-    BT::BehaviorTreeFactory factory_;
+    std::unique_ptr<BT::BehaviorTreeFactory> factory_;
     std::unique_ptr<BehaviorTreeSafety> safety_tree_;
+    std::unique_ptr<BehaviorTreeSafety> shutdown_tree_;
 
     std::shared_ptr<safety::ParamListener> param_listener_;
     safety::Params params_;
 
 private:
 
-    static constexpr char kShutdownLocalhostCommand[] =
-        "dbus-send --system --print-reply --dest=org.freedesktop.login1 /org/freedesktop/login1 "
-        "org.freedesktop.login1.Manager.PowerOff boolean:true";
+    static constexpr char kShutdownScript[] = "shutdown_ros_controller.sh";
 
     void batteryStateSubscriberCallback(const BatteryStateMsg::SharedPtr battery_state);
     void driverStateSubscriberCallback(const RoverDriverStateMsg::SharedPtr driver_state);
@@ -90,11 +95,25 @@ private:
     void systemStatusSubscriberCallback(const SystemStatusMsg::SharedPtr system_status);
     void safetyTreeTimerCallback();
 
+    // Shutdown of the ROS controller. Every trigger (SignalShutdown in the safety tree, the
+    // ~/shutdown service) goes through requestShutdown(); the tree timer then ticks the
+    // RoverShutdown tree instead of the safety tree until it finishes.
+    domain::ShutdownRequestResult requestShutdown(const std::string & reason);
+    void consumeShutdownSignal();
+    void tickShutdownTree();
+    void shutdownServiceCallback(
+        const std::shared_ptr<rmw_request_id_t> request_header,
+        const std::shared_ptr<TriggerSrv::Request> request,
+        std::shared_ptr<TriggerSrv::Response> response);
+    /** The shutdown.command parameter, or the installed shutdown script when it is empty. */
+    std::string resolveShutdownCommand() const;
+
     // Diagnostics (hardware ID "Rover Safety"). They run on the node's single-threaded executor,
     // like the subscriptions and the tree timer, and only read what those recorded.
     void diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status);
     void diagnoseBatteryVerdict(diagnostic_updater::DiagnosticStatusWrapper & status);
     void diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status);
+    void diagnoseShutdown(diagnostic_updater::DiagnosticStatusWrapper & status);
 
     rclcpp::Subscription<BatteryStateMsg>::SharedPtr battery_sub_;
     rclcpp::Subscription<RoverDriverStateMsg>::SharedPtr driver_state_sub_;
@@ -102,8 +121,11 @@ private:
     rclcpp::Subscription<IOStateMsg>::SharedPtr io_state_sub_;
     rclcpp::Subscription<SystemStatusMsg>::SharedPtr system_status_sub_;
     rclcpp::TimerBase::SharedPtr safety_tree_timer_;
+    nav2::ServiceServer<TriggerSrv>::SharedPtr shutdown_service_;
 
     domain::BatteryThresholds battery_thresholds_;
+    domain::ShutdownSequence shutdown_sequence_;
+    std::string shutdown_command_;
     double battery_temp_{0.0};
     double cpu_temp_{0.0};
 

@@ -15,7 +15,6 @@
 # limitations under the License.
 
 from rover_utils.logging import limit_log_level_to_info
-from rover_utils.logging import limit_log_level_to_info
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import UnlessCondition
@@ -84,6 +83,15 @@ def generate_launch_description():
         description="Path to BehaviorTree project file, responsible for safety.",
     )
 
+    shutdown_hosts_config_path = LaunchConfiguration("shutdown_hosts_config_path")
+    declare_shutdown_hosts_config_path_arg = DeclareLaunchArgument(
+        "shutdown_hosts_config_path",
+        default_value=PathJoinSubstitution(
+            [rover_safety_common_dir, "config", "shutdown_hosts.yaml"]
+        ),
+        description="Path to the YAML file listing the hosts to shut down before the ROS controller powers off.",
+    )
+
     use_sim = LaunchConfiguration("use_sim")
     declare_use_sim_arg = DeclareLaunchArgument(
         "use_sim",
@@ -121,6 +129,7 @@ def generate_launch_description():
             PathJoinSubstitution([rover_safety_pkg, "config", "rover_safety.yaml"]),
             {
                 "bt_project_path": safety_bt_project_path,
+                "shutdown_hosts_path": shutdown_hosts_config_path,
             },
         ],
         namespace=namespace,
@@ -142,6 +151,7 @@ def generate_launch_description():
         declare_led_bt_project_path_arg,
         declare_safety_bt_project_path_arg,
         declare_namespace_arg,
+        declare_shutdown_hosts_config_path_arg,
         declare_use_sim_arg,
         rover_safety_node,
         rover_led_safety_node,

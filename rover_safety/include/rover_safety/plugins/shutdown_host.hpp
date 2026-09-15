@@ -16,8 +16,14 @@
 #define ROVER_SAFETY_PLUGINS_SHUTDOWN_HOST_HPP_
 
 #include <chrono>
+#include <cstdint>
+#include <cstdlib>
+#include <functional>
 #include <iomanip>
 #include <ios>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 
 #include <openssl/hmac.h>
@@ -30,7 +36,7 @@ namespace rover_safety
 
 enum class ShutdownHostState {
     IDLE = 0,
-    COMMAND_executeD,
+    COMMAND_EXECUTED,
     RESPONSE_RECEIVED,
     PINGING,
     SKIPPED,
@@ -48,10 +54,7 @@ public:
 
     }
   
-    ~ShutdownHostInterface() 
-    {
-
-    }
+    virtual ~ShutdownHostInterface() = default;
 
     virtual void call() = 0;
     virtual void halt() = 0;
@@ -91,8 +94,9 @@ public:
     , port_("3003")
     , secret_("")
     , timeout_ms_(5000)
+    , state_(ShutdownHostState::IDLE)
     {
-    
+        command_handler_ = std::make_shared<CommandHandler>();
     }
   
     ShutdownHost(
@@ -129,10 +133,10 @@ public:
                     break;
                 }
                 
-                state_ = ShutdownHostState::COMMAND_executeD;
+                state_ = ShutdownHostState::COMMAND_EXECUTED;
                 break;
 
-            case ShutdownHostState::COMMAND_executeD:
+            case ShutdownHostState::COMMAND_EXECUTED:
                 if (commandRunning()) {
                     break;
                 }

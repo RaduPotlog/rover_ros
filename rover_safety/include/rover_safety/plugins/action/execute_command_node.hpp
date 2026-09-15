@@ -20,6 +20,7 @@
 #include "behaviortree_cpp/action_node.h"
 #include "behaviortree_cpp/basic_types.h"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/logging.hpp"
 
 #include "rover_safety/plugins/command_handler.hpp"
 

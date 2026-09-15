@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <!-- Ticked by rover_safety_node once a shutdown was requested (SignalShutdown in RoverSafety, or
+       the ~/shutdown service). Every step before the local power-off is best effort. -->
+  <BehaviorTree ID="RoverShutdown">
+    <Sequence>
+      <ForceSuccess>
+        <CallTriggerService name="TripEStop"
+                            service_name="hardware_interface/sw_user_e_stop_set"/>
+      </ForceSuccess>
+      <ForceSuccess>
+        <ShutdownHostsFromFile name="ShutdownRemoteHosts"
+                               shutdown_hosts_file="{SHUTDOWN_HOSTS_FILE}"/>
+      </ForceSuccess>
+      <ExecuteCommand name="PowerOffRosController"
+                      command="{SHUTDOWN_LOCALHOST_COMMAND}"
+                      timeout="{SHUTDOWN_COMMAND_TIMEOUT}"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Action ID="CallTriggerService"
+            editable="true">
+      <input_port name="service_name">ROS service name</input_port>
+      <input_port name="server_timeout">time in ms to wait for the response</input_port>
+    </Action>
+    <Action ID="ExecuteCommand"
+            editable="true">
+      <input_port name="command">command to execute</input_port>
+      <input_port name="timeout">command timeout in seconds</input_port>
+    </Action>
+    <Action ID="ShutdownHostsFromFile"
+            editable="true">
+      <input_port name="shutdown_hosts_file">global path to YAML file with hosts to shutdown</input_port>
+    </Action>
+  </TreeNodesModel>
+
+</root>

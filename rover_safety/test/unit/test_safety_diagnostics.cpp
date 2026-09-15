@@ -67,3 +67,27 @@ TEST(SafetyDiagnostics, BehaviorTreeLevels)
     infrastructure::fillBehaviorTreeStatus(true, true, BT::NodeStatus::RUNNING, running);
     EXPECT_EQ(running.level, DiagnosticStatus::OK);
 }
+
+TEST(SafetyDiagnostics, ShutdownLevels)
+{
+    using rover_safety::domain::ShutdownSequence;
+    const ShutdownSequence::SteadyTime t0{};
+
+    ShutdownSequence sequence(std::chrono::seconds(30));
+
+    diagnostic_updater::DiagnosticStatusWrapper idle;
+    infrastructure::fillShutdownStatus(sequence, idle);
+    EXPECT_EQ(idle.level, DiagnosticStatus::OK);
+
+    sequence.request("battery fatal", t0);
+    diagnostic_updater::DiagnosticStatusWrapper in_progress;
+    infrastructure::fillShutdownStatus(sequence, in_progress);
+    EXPECT_EQ(in_progress.level, DiagnosticStatus::WARN);
+    EXPECT_NE(in_progress.message.find("battery fatal"), std::string::npos);
+
+    sequence.finish(false, "command failed", t0);
+    diagnostic_updater::DiagnosticStatusWrapper failed;
+    infrastructure::fillShutdownStatus(sequence, failed);
+    EXPECT_EQ(failed.level, DiagnosticStatus::ERROR);
+    EXPECT_NE(failed.message.find("command failed"), std::string::npos);
+}

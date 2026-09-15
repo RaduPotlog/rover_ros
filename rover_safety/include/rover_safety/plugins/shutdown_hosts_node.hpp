@@ -69,8 +69,17 @@ public:
 
 protected:
   
-    BT::NodeStatus onStart()
+    BT::NodeStatus onStart() override
     {
+        // The node is ticked again when a failed shutdown is retried: start from a clean slate.
+        onHalted();
+        this->hosts_.clear();
+        this->hosts_to_check_.clear();
+        this->skipped_hosts_.clear();
+        this->succeeded_hosts_.clear();
+        this->failed_hosts_.clear();
+        this->check_host_index_ = 0;
+
         if (!updateHosts(this->hosts_)) {
             RCLCPP_ERROR_STREAM(*this->logger_, getLoggerPrefix(name()) << "Cannot update hosts!");
             
@@ -79,10 +88,10 @@ protected:
 
         removeDuplicatedHosts(this->hosts_);
     
-        if (this->hosts_.size() <= 0) {
-            RCLCPP_ERROR_STREAM(*this->logger_, getLoggerPrefix(name()) << "Hosts list is empty! Check configuration!");
+        if (this->hosts_.empty()) {
+            RCLCPP_INFO_STREAM(*this->logger_, getLoggerPrefix(name()) << "No remote hosts to shut down.");
     
-            return BT::NodeStatus::FAILURE;
+            return BT::NodeStatus::SUCCESS;
         }
     
         this->hosts_to_check_.resize(this->hosts_.size());
@@ -91,7 +100,7 @@ protected:
         return BT::NodeStatus::RUNNING;
     }
 
-    BT::NodeStatus onRunning()
+    BT::NodeStatus onRunning() override
     {
         if (this->hosts_to_check_.size() <= 0) {
             return postProcess();
@@ -180,7 +189,7 @@ protected:
         hosts.end());
     }
 
-    void onHalted()
+    void onHalted() override
     {
         for (auto & host : this->hosts_) {
             host->halt();

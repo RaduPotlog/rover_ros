@@ -16,10 +16,14 @@
 #define ROVER_SAFETY_PLUGINS_ACTION_COMMAND_HANDLER_HPP_
 
 #include <fcntl.h>
+#include <signal.h>
+#include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -37,64 +41,72 @@ enum class CommandState {
     FAILURE,
 };
 
+/**
+ * Runs a bash command in a child process and watches it from a background thread, so a behavior
+ * tree can poll getState() without blocking. The command runs in its own process group, so a
+ * timeout or halt() kills everything it spawned. execute() may be called again to re-run.
+ */
 class CommandHandler
 {
 
 public:
-    
-    explicit CommandHandler() 
-    {
 
-    }
+    CommandHandler() = default;
+
+    CommandHandler(const CommandHandler &) = delete;
+    CommandHandler & operator=(const CommandHandler &) = delete;
 
     ~CommandHandler()
     {
-        killChildProcess();
-        
-        if (command_checker_thread_.joinable()) {
-            command_checker_thread_.join();
-        }
-    };
+        halt();
+    }
 
     void execute(const std::string & command, const std::chrono::milliseconds & timeout);
 
+    /** Kills a running command and waits for the watcher thread. No-op when nothing runs. */
     void halt();
 
-    CommandState getState() 
-    { 
-        return state_.load(); 
+    CommandState getState()
+    {
+        return state_.load();
     }
 
     std::string getOutput()
     {
         std::lock_guard<std::mutex> lock(output_mtx_);
-        
+
         return output_;
     }
 
     std::string getError()
     {
         std::lock_guard<std::mutex> lock(error_mtx_);
-        
+
         return error_;
     }
 
 private:
-  
+
     void checkExecution();
 
     bool executeCommandInChildProcess(const std::string & command);
 
+    /** Appends whatever the pipe holds to the output; false when nothing was read. */
     bool readCommandOutput();
 
-  void killChildProcess();
+    void setError(const std::string & error)
+    {
+        std::lock_guard<std::mutex> lock(error_mtx_);
+        error_ = error;
+    }
 
-    int pipefd_[2];
-    pid_t m_child_pid_;
-    std::chrono::milliseconds timeout_ms_;
+    int pipefd_[2]{-1, -1};
+    pid_t child_pid_{-1};
+    std::chrono::milliseconds timeout_ms_{0};
     std::chrono::time_point<std::chrono::steady_clock> command_time_;
 
     std::atomic<CommandState> state_{CommandState::IDLE};
+    std::atomic<bool> kill_requested_{false};
     std::string output_;
     std::mutex output_mtx_;
     std::string error_;
@@ -103,12 +115,21 @@ private:
 };
 
 inline void CommandHandler::execute(
-    const std::string & command, 
+    const std::string & command,
     const std::chrono::milliseconds & timeout_ms)
 {
+    halt();
+
+    {
+        std::lock_guard<std::mutex> lock(output_mtx_);
+        output_.clear();
+    }
+    setError("");
+
     timeout_ms_ = timeout_ms;
+    kill_requested_ = false;
     state_ = CommandState::RUNNING;
-    
+
     if (!executeCommandInChildProcess(command)) {
         state_ = CommandState::FAILURE;
     }
@@ -116,80 +137,96 @@ inline void CommandHandler::execute(
 
 inline void CommandHandler::halt()
 {
-    killChildProcess();
-    state_ = CommandState::FAILURE;
+    if (command_checker_thread_.joinable()) {
+        // The watcher thread owns the child: it kills, reaps it and closes the pipe.
+        kill_requested_ = true;
+        command_checker_thread_.join();
+    }
 }
 
 inline void CommandHandler::checkExecution()
 {
-    while (state_.load() == CommandState::RUNNING) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-        if (readCommandOutput()) {
-            continue;
+    bool killed = false;
+    std::string kill_reason;
+
+    while (true) {
+        while (readCommandOutput()) {
         }
 
-        int status;
-    
-        if (waitpid(m_child_pid_, &status, WNOHANG) == m_child_pid_) {
-            close(pipefd_[0]);  // Close read end after reading
+        int status = 0;
 
-            if (WEXITSTATUS(status) != 0) {
-                std::lock_guard<std::mutex> lock(error_mtx_);
-                error_ = "Command return code: " + std::to_string(WEXITSTATUS(status));
+        if (waitpid(child_pid_, &status, WNOHANG) == child_pid_) {
+            while (readCommandOutput()) {
+            }
+            close(pipefd_[0]);
+            pipefd_[0] = -1;
+
+            if (killed) {
+                setError(kill_reason);
+                state_ = CommandState::FAILURE;
+            } else if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                state_ = CommandState::SUCCESS;
+            } else if (WIFEXITED(status)) {
+                setError("Command return code: " + std::to_string(WEXITSTATUS(status)));
                 state_ = CommandState::FAILURE;
             } else {
-                state_ = CommandState::SUCCESS;
+                setError("Command terminated by signal " + std::to_string(WTERMSIG(status)));
+                state_ = CommandState::FAILURE;
             }
 
-            break;
+            return;
         }
 
-        if (timeoutExceeded(command_time_, timeout_ms_)) {
-            killChildProcess();
-            std::lock_guard<std::mutex> lock(error_mtx_);
-            error_ = "Timeout exceeded";
-            state_ = CommandState::FAILURE;
-            break;
+        if (!killed && (kill_requested_.load() || timeoutExceeded(command_time_, timeout_ms_))) {
+            kill_reason = kill_requested_.load() ? "Command halted" : "Timeout exceeded";
+            // Negative pid: the whole process group started by the command. Falls back to the child
+            // alone should the group not exist yet.
+            if (kill(-child_pid_, SIGKILL) != 0) {
+                kill(child_pid_, SIGKILL);
+            }
+            killed = true;
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
 
 inline bool CommandHandler::executeCommandInChildProcess(const std::string & command)
 {
-    // Create a pipe
     if (pipe(pipefd_) == -1) {
-        std::lock_guard<std::mutex> lock(error_mtx_);
-        error_ = "Failed to create pipe";
-       
+        setError("Failed to create pipe");
+
         return false;
     }
 
-    // Set the pipe to non-blocking mode
+    // Non-blocking read end: the watcher thread polls it.
     int flags = fcntl(pipefd_[0], F_GETFL, 0);
     fcntl(pipefd_[0], F_SETFL, flags | O_NONBLOCK);
 
-    // Create a child process that will execute the command
-    m_child_pid_ = fork();
+    child_pid_ = fork();
     command_time_ = std::chrono::steady_clock::now();
 
-    if (m_child_pid_ == -1) {
-        std::lock_guard<std::mutex> lock(error_mtx_);
-        error_ = "Failed to fork";
-    
+    if (child_pid_ == -1) {
+        close(pipefd_[0]);
+        close(pipefd_[1]);
+        setError("Failed to fork");
+
         return false;
     }
 
-    if (m_child_pid_ == 0) {
+    if (child_pid_ == 0) {
+        setpgid(0, 0);                    // Own process group, killed as a whole
         close(pipefd_[0]);                // Close unused read end
         dup2(pipefd_[1], STDOUT_FILENO);  // Redirect stdout to pipe
         dup2(pipefd_[1], STDERR_FILENO);  // Redirect stderr to pipe
         close(pipefd_[1]);                // Close write end after redirecting
 
         execl("/bin/bash", "bash", "-c", command.c_str(), nullptr);
-        exit(EXIT_FAILURE);
+        _exit(127);
     }
 
+    // Also set from the parent so a kill right after fork() cannot miss the group.
+    setpgid(child_pid_, child_pid_);
     close(pipefd_[1]);  // Close unused write end
 
     command_checker_thread_ = std::thread(&CommandHandler::checkExecution, this);
@@ -200,11 +237,10 @@ inline bool CommandHandler::executeCommandInChildProcess(const std::string & com
 inline bool CommandHandler::readCommandOutput()
 {
     char buffer[128];
-    ssize_t bytes_read;
 
-    bytes_read = read(pipefd_[0], buffer, sizeof(buffer) - 1);
+    const ssize_t bytes_read = read(pipefd_[0], buffer, sizeof(buffer) - 1);
 
-    if ((bytes_read) > 0) {
+    if (bytes_read > 0) {
         buffer[bytes_read] = '\0';
         std::lock_guard<std::mutex> lock(output_mtx_);
         output_ += buffer;
@@ -213,20 +249,6 @@ inline bool CommandHandler::readCommandOutput()
     }
 
     return false;
-}
-
-inline void CommandHandler::killChildProcess()
-{
-    if (state_.load() != CommandState::RUNNING) {
-        return;
-    }
-    
-    close(pipefd_[0]);  // Close read end of the pipe
-    kill(m_child_pid_, SIGKILL);
-    
-    int status;
-    
-    waitpid(m_child_pid_, &status, 0);
 }
 
 }  // namespace rover_safety

@@ -37,6 +37,7 @@ include_directories(include)
 add_library(${PROJECT_NAME}_core STATIC
     src/domain/battery_safety_policy.cpp
     src/domain/safety_health.cpp
+    src/domain/shutdown_sequence.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -51,6 +52,14 @@ target_link_libraries(${PROJECT_NAME}_diagnostics PUBLIC
     ${behaviortree_cpp_TARGETS}
     ${diagnostic_msgs_TARGETS}
     ${diagnostic_updater_TARGETS}
+)
+
+# Infrastructure: bash command the shutdown tree runs to power off the ROS controller.
+add_library(${PROJECT_NAME}_shutdown_command STATIC
+    src/infrastructure/shutdown_command.cpp
+)
+target_include_directories(${PROJECT_NAME}_shutdown_command PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 # ------------------------------------- Plugins -------------------------------------- #
@@ -69,6 +78,10 @@ list(APPEND plugin_libs call_set_led_animation_service_bt_node)
 add_library(execute_command_bt_node SHARED
     src/plugins/action/execute_command_node.cpp)
 list(APPEND plugin_libs execute_command_bt_node)
+
+add_library(shutdown_hosts_from_file_bt_node SHARED
+    src/plugins/action/shutdown_hosts_from_file_node.cpp)
+list(APPEND plugin_libs shutdown_hosts_from_file_bt_node)
 
 add_library(signal_shutdown_bt_node SHARED
     src/plugins/action/signal_shutdown_node.cpp)
@@ -106,6 +119,8 @@ add_executable(${PROJECT_NAME}_node src/safety_main.cpp
 
 target_link_libraries(${PROJECT_NAME}_node
     nav2_ros_common::nav2_ros_common
+    ${ament_index_cpp_TARGETS}
+    ${std_srvs_TARGETS}
     ${behaviortree_cpp_TARGETS}
     ${geometry_msgs_TARGETS}
     ${rover_msgs_TARGETS}
@@ -126,6 +141,7 @@ target_link_libraries(${PROJECT_NAME}_node
     safety_parameters
     ${PROJECT_NAME}_core
     ${PROJECT_NAME}_diagnostics
+    ${PROJECT_NAME}_shutdown_command
 )
 
 add_executable(led_safety_node src/led_safety_main.cpp
@@ -164,22 +180,65 @@ install(DIRECTORY behavior_trees config launch
     DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS scripts/shutdown_ros_controller.sh
+    DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY include/ 
     DESTINATION include/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
+    find_package(ament_cmake_gmock REQUIRED)
     find_package(ament_cmake_gtest REQUIRED)
 
+    # ---------------------------------- Unit ---------------------------------- #
     ament_add_gtest(test_battery_safety_policy test/unit/test_battery_safety_policy.cpp)
     target_link_libraries(test_battery_safety_policy ${PROJECT_NAME}_core)
 
     ament_add_gtest(test_safety_health test/unit/test_safety_health.cpp)
     target_link_libraries(test_safety_health ${PROJECT_NAME}_core)
 
+    ament_add_gtest(test_shutdown_sequence test/unit/test_shutdown_sequence.cpp)
+    target_link_libraries(test_shutdown_sequence ${PROJECT_NAME}_core)
+
+    ament_add_gtest(test_shutdown_command test/unit/test_shutdown_command.cpp)
+    target_link_libraries(test_shutdown_command ${PROJECT_NAME}_shutdown_command)
+
     ament_add_gtest(test_safety_diagnostics test/unit/test_safety_diagnostics.cpp)
     target_link_libraries(test_safety_diagnostics ${PROJECT_NAME}_diagnostics)
 
+    # BT plugins that need no ROS graph.
+    set(PLUGIN_TEST_LIBRARIES
+        ${behaviortree_cpp_TARGETS}
+        ${rclcpp_TARGETS}
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        yaml-cpp
+    )
+
+    ament_add_gtest(test_execute_command_node test/unit/plugins/test_execute_command_node.cpp
+                    TIMEOUT 60)
+    target_link_libraries(test_execute_command_node execute_command_bt_node ${PLUGIN_TEST_LIBRARIES})
+
+    ament_add_gtest(test_signal_shutdown_node test/unit/plugins/test_signal_shutdown_node.cpp)
+    target_link_libraries(test_signal_shutdown_node signal_shutdown_bt_node ${PLUGIN_TEST_LIBRARIES})
+
+    ament_add_gtest(test_shutdown_host test/unit/plugins/test_shutdown_host.cpp
+                    TIMEOUT 60)
+    target_link_libraries(test_shutdown_host ${PLUGIN_TEST_LIBRARIES})
+
+    ament_add_gmock(test_shutdown_hosts_node test/unit/plugins/test_shutdown_hosts_node.cpp)
+    target_link_libraries(test_shutdown_hosts_node ${PLUGIN_TEST_LIBRARIES})
+
+    ament_add_gtest(test_shutdown_hosts_from_file_node
+                    test/unit/plugins/test_shutdown_hosts_from_file_node.cpp
+                    TIMEOUT 60)
+    target_link_libraries(test_shutdown_hosts_from_file_node
+        shutdown_hosts_from_file_bt_node ${PLUGIN_TEST_LIBRARIES})
+    target_include_directories(test_shutdown_hosts_from_file_node PRIVATE ${rover_utils_INCLUDE_DIRS})
+
+    # ------------------------------- Integration ------------------------------ #
     ament_add_gtest(test_call_trigger_service test/integration/test_call_trigger_service.cpp
                     TIMEOUT 60)
     target_link_libraries(test_call_trigger_service call_trigger_service_bt_node)
@@ -188,6 +247,58 @@ if(BUILD_TESTING)
         ${nav2_behavior_tree_TARGETS}
         ${rclcpp_TARGETS}
         ${std_srvs_TARGETS}
+    )
+
+    # Loads the plugins by name like the node does, so their build directory must be on the
+    # library path; the btproj comes straight from the source tree.
+    ament_add_gtest(test_shutdown_tree test/integration/test_shutdown_tree.cpp
+                    TIMEOUT 60
+                    APPEND_LIBRARY_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+    add_dependencies(test_shutdown_tree ${plugin_libs})
+    target_compile_definitions(test_shutdown_tree PRIVATE
+        ROVER_SAFETY_BT_PROJECT="${CMAKE_CURRENT_SOURCE_DIR}/behavior_trees/RoverSafetyBT.btproj"
+        ROVER_SAFETY_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/config/rover_safety.yaml"
+        ROVER_SAFETY_SHUTDOWN_HOSTS="${CMAKE_CURRENT_SOURCE_DIR}/config/shutdown_hosts.yaml")
+    target_link_libraries(test_shutdown_tree
+        ${behaviortree_cpp_TARGETS}
+        ${nav2_behavior_tree_TARGETS}
+        nav2_ros_common::nav2_ros_common
+        ${rclcpp_TARGETS}
+        ${std_srvs_TARGETS}
+        ${PROJECT_NAME}_shutdown_command
+        yaml-cpp
+    )
+
+    # The real rover_safety_node, in-process, against a fake hardware interface.
+    ament_add_gtest(test_safety_node_shutdown
+                    test/integration/test_safety_node_shutdown.cpp
+                    src/safety_node.cpp
+                    TIMEOUT 120
+                    APPEND_LIBRARY_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+    add_dependencies(test_safety_node_shutdown ${plugin_libs})
+    target_compile_definitions(test_safety_node_shutdown PRIVATE
+        ROVER_SAFETY_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(test_safety_node_shutdown PRIVATE ${rover_utils_INCLUDE_DIRS})
+    target_link_libraries(test_safety_node_shutdown
+        nav2_ros_common::nav2_ros_common
+        ${ament_index_cpp_TARGETS}
+        ${behaviortree_cpp_TARGETS}
+        ${diagnostic_updater_TARGETS}
+        ${rover_msgs_TARGETS}
+        ${rclcpp_TARGETS}
+        ${sensor_msgs_TARGETS}
+        ${std_srvs_TARGETS}
+        safety_parameters
+        ${PROJECT_NAME}_core
+        ${PROJECT_NAME}_diagnostics
+        ${PROJECT_NAME}_shutdown_command
+    )
+
+    ament_add_test(test_shutdown_script
+        GENERATE_RESULT_FOR_RETURN_CODE_ZERO
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test/integration/test_shutdown_script.sh
+                ${CMAKE_CURRENT_SOURCE_DIR}/scripts/shutdown_ros_controller.sh
+        TIMEOUT 60
     )
 endif()
 

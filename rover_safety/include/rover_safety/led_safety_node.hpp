@@ -104,7 +104,7 @@ private:
 
     double battery_percent_;
     
-    BT::BehaviorTreeFactory factory_;
+    std::unique_ptr<BT::BehaviorTreeFactory> factory_;
 
     using SteadyTime = std::chrono::steady_clock::time_point;
     std::optional<SteadyTime> last_battery_stamp_;

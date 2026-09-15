@@ -18,27 +18,22 @@
 #include <any>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <chrono>
 
+#include <ament_index_cpp/get_package_prefix.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "rover_safety/behavior_tree_utils.hpp"
 #include "rover_safety/domain/safety_health.hpp"
 #include "rover_safety/infrastructure/safety_diagnostics.hpp"
-
-// Actions
-#include "rover_safety/plugins/action/call_set_bool_service_node.hpp"
-#include "rover_safety/plugins/action/call_trigger_service_node.hpp"
-#include "rover_safety/plugins/action/execute_command_node.hpp"
-#include "rover_safety/plugins/action/signal_shutdown_node.hpp"
-// Decorators
-#include "rover_safety/plugins/decorator/tick_after_timeout_node.hpp"
+#include "rover_safety/infrastructure/shutdown_command.hpp"
 
 namespace rover_safety
 {
@@ -76,6 +71,7 @@ SafetyNode::SafetyNode(
 , param_listener_(std::make_shared<safety::ParamListener>(this->get_node_parameters_interface()))
 , params_(param_listener_->get_params())
 , battery_thresholds_(params_.battery.temp.critical, params_.battery.temp.fatal)
+, shutdown_sequence_(std::chrono::duration<double>(params_.shutdown.retry_backoff))
 {
     // Created here, not in on_configure: diagnostics must report an unconfigured node too, and a
     // re-configure must not declare diagnostic_updater.period twice.
@@ -84,6 +80,7 @@ SafetyNode::SafetyNode(
     diagnostic_updater_->add("Safety inputs", this, &SafetyNode::diagnoseInputs);
     diagnostic_updater_->add("Battery safety verdict", this, &SafetyNode::diagnoseBatteryVerdict);
     diagnostic_updater_->add("Safety behavior tree", this, &SafetyNode::diagnoseBehaviorTree);
+    diagnostic_updater_->add("Shutdown", this, &SafetyNode::diagnoseShutdown);
 
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
 }
@@ -91,7 +88,22 @@ SafetyNode::SafetyNode(
 nav2::CallbackReturn SafetyNode::on_configure(const rclcpp_lifecycle::State & previous_state)
 {
     (void)previous_state;
-    init();
+
+    if (configured_) {
+        return nav2::CallbackReturn::SUCCESS;
+    }
+
+    try {
+        init();
+    } catch (const std::exception & e) {
+        // A missing plugin library, a bad tree project or an unavailable service throws while the
+        // trees are built. Stay unconfigured so the transition can be retried.
+        RCLCPP_ERROR(this->get_logger(), "Configuration failed: %s", e.what());
+        safety_tree_timer_.reset();
+        shutdown_service_.reset();
+        return nav2::CallbackReturn::FAILURE;
+    }
+
     return nav2::CallbackReturn::SUCCESS;
 }
 
@@ -106,12 +118,24 @@ void SafetyNode::init()
 
     const auto bt_server_port = this->get_parameter("bt_server_port").as_int();
     const auto safety_initial_blackboard = createSafetyInitialBlackboard();
-    
+
+    // A retried configure needs a fresh factory, since plugins and trees register only once. It is
+    // recreated, not move-assigned: a move-assigned BT::BehaviorTreeFactory (BT.CPP 4.10) crashes
+    // while parsing tree files.
+    shutdown_tree_.reset();
+    safety_tree_.reset();
+    factory_ = std::make_unique<BT::BehaviorTreeFactory>();
     safety_tree_ = std::make_unique<BehaviorTreeSafety>(
         this->shared_from_this(), "RoverSafety", safety_initial_blackboard, bt_server_port);
     registerBehaviorTree();
-    safety_tree_->init(factory_);
-    
+    safety_tree_->init(*factory_);
+
+    shutdown_command_ = resolveShutdownCommand();
+    shutdown_tree_ = std::make_unique<BehaviorTreeSafety>(
+        this->shared_from_this(), "RoverShutdown", createShutdownInitialBlackboard(),
+        params_.shutdown.bt_server_port);
+    shutdown_tree_->init(*factory_);
+
     using namespace std::placeholders;
 
     // Only the latest reading matters for the safety decision. Publishers are volatile,
@@ -138,6 +162,15 @@ void SafetyNode::init()
     safety_tree_timer_ = this->create_wall_timer(
         timer_period, std::bind(&SafetyNode::safetyTreeTimerCallback, this));
 
+    if (params_.shutdown.service_enabled) {
+        shutdown_service_ = this->create_service<TriggerSrv>(
+            "~/shutdown", std::bind(&SafetyNode::shutdownServiceCallback, this, _1, _2, _3));
+    }
+
+    RCLCPP_INFO_STREAM(
+        this->get_logger(), "Shutdown command: '" << shutdown_command_ << "'; service ~/shutdown "
+        << (params_.shutdown.service_enabled ? "enabled" : "disabled") << ".");
+
     configured_ = true;
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
 }
@@ -146,16 +179,8 @@ void SafetyNode::registerBehaviorTree()
 {
     const auto bt_project_path = this->params_.bt_project_path;
 
-    // TODO: Register form config file
-    // Actions
-    factory_.registerNodeType<CallSetBoolService>("CallSetBoolService");
-    factory_.registerNodeType<CallTriggerService>("CallTriggerService");
-    factory_.registerNodeType<ExecuteCommand>("ExecuteCommand");
-    factory_.registerNodeType<SignalShutdown>("SignalShutdown");
-    // Decorators
-    factory_.registerNodeType<SafetyBtTickAfterTimeout>("SafetyBtTickAfterTimeout");
-    
-    factory_.registerBehaviorTreeFromFile(bt_project_path);
+    rover_safety::registerBehaviorTree(
+        *factory_, bt_project_path, params_.plugin_libs, params_.ros_plugin_libs);
 
     RCLCPP_INFO_STREAM(this->get_logger(), "BehaviorTree registered from path '" << bt_project_path << "'");
 }
@@ -180,6 +205,37 @@ std::map<std::string, std::any> SafetyNode::createSafetyInitialBlackboard()
     RCLCPP_INFO(this->get_logger(), "Blackboard created.");
 
     return safety_initial_bb;
+}
+
+std::map<std::string, std::any> SafetyNode::createShutdownInitialBlackboard()
+{
+    const auto server_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double>(params_.ros_communication_timeout.response));
+
+    return {
+        {"SHUTDOWN_HOSTS_FILE", params_.shutdown_hosts_path},
+        {"SHUTDOWN_COMMAND_TIMEOUT", static_cast<float>(params_.shutdown.command_timeout)},
+        // Replaced with the reason by requestShutdown(); never run as is.
+        {"SHUTDOWN_LOCALHOST_COMMAND",
+            infrastructure::buildShutdownCommand(shutdown_command_, "unknown")},
+        {"server_timeout", server_timeout},
+        {"bt_loop_duration", std::chrono::milliseconds(10)},
+        {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
+    };
+}
+
+std::string SafetyNode::resolveShutdownCommand() const
+{
+    if (!params_.shutdown.command.empty()) {
+        return params_.shutdown.command;
+    }
+
+    std::filesystem::path prefix;
+    ament_index_cpp::get_package_prefix("rover_safety", prefix);
+
+    // The tree trips the E-Stop itself before powering off.
+    const auto script = prefix / "lib" / "rover_safety" / kShutdownScript;
+    return infrastructure::shellQuote(script.string()) + " --no-e-stop";
 }
 
 void SafetyNode::batteryStateSubscriberCallback(const BatteryStateMsg::SharedPtr battery_state)
@@ -252,6 +308,18 @@ bool SafetyNode::systemReady()
 
 void SafetyNode::safetyTreeTimerCallback()
 {
+    switch (shutdown_sequence_.state()) {
+        case domain::ShutdownState::InProgress:
+            tickShutdownTree();
+            return;
+        case domain::ShutdownState::Succeeded:
+            // Powering off: the safety tree stays halted.
+            return;
+        case domain::ShutdownState::Idle:
+        case domain::ShutdownState::Failed:
+            break;
+    }
+
     system_ready_ = systemReady();
 
     if (!system_ready_) {
@@ -263,6 +331,85 @@ void SafetyNode::safetyTreeTimerCallback()
     if (safety_tree_->getTreeStatus() == BT::NodeStatus::FAILURE) {
         RCLCPP_WARN(this->get_logger(), "Safety behavior tree returned FAILURE status");
     }
+
+    consumeShutdownSignal();
+}
+
+void SafetyNode::consumeShutdownSignal()
+{
+    std::pair<bool, std::string> signal_shutdown;
+
+    if (!safety_tree_->getBlackboard()->get<std::pair<bool, std::string>>("signal_shutdown", signal_shutdown) ||
+        !signal_shutdown.first) {
+        return;
+    }
+
+    // Consumed: SignalShutdown must fire again to request another attempt.
+    safety_tree_->getBlackboard()->set<std::pair<bool, std::string>>(
+        "signal_shutdown", std::make_pair(false, std::string()));
+
+    requestShutdown(
+        signal_shutdown.second.empty() ? std::string("Requested by the safety behavior tree.") :
+                                         signal_shutdown.second);
+}
+
+domain::ShutdownRequestResult SafetyNode::requestShutdown(const std::string & reason)
+{
+    const auto result = shutdown_sequence_.request(reason, std::chrono::steady_clock::now());
+
+    if (result != domain::ShutdownRequestResult::Started) {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 5000, "Shutdown request refused (%s): %s",
+            reason.c_str(), domain::toString(result));
+        return result;
+    }
+
+    RCLCPP_WARN(
+        this->get_logger(), "Shutting down the ROS controller (attempt %u): %s",
+        shutdown_sequence_.attempts(), reason.c_str());
+
+    safety_tree_->haltTree();
+    shutdown_tree_->haltTree();
+    shutdown_tree_->getBlackboard()->set<std::string>(
+        "SHUTDOWN_LOCALHOST_COMMAND", infrastructure::buildShutdownCommand(shutdown_command_, reason));
+
+    return result;
+}
+
+void SafetyNode::tickShutdownTree()
+{
+    shutdown_tree_->tickOnce();
+
+    const auto status = shutdown_tree_->getTreeStatus();
+
+    if (status == BT::NodeStatus::RUNNING) {
+        return;
+    }
+
+    const bool succeeded = status == BT::NodeStatus::SUCCESS;
+
+    shutdown_sequence_.finish(
+        succeeded, succeeded ? std::string() : "Power-off command failed; see the rover_safety_node log.",
+        std::chrono::steady_clock::now());
+
+    if (succeeded) {
+        RCLCPP_WARN(this->get_logger(), "Power-off requested; the ROS controller is going down.");
+    } else {
+        RCLCPP_ERROR(
+            this->get_logger(), "Shutdown failed. A new request is accepted after %.1f s.",
+            params_.shutdown.retry_backoff);
+    }
+}
+
+void SafetyNode::shutdownServiceCallback(
+    const std::shared_ptr<rmw_request_id_t> /*request_header*/,
+    const std::shared_ptr<TriggerSrv::Request> /*request*/,
+    std::shared_ptr<TriggerSrv::Response> response)
+{
+    const auto result = requestShutdown("Requested via the ~/shutdown service.");
+
+    response->success = result == domain::ShutdownRequestResult::Started;
+    response->message = domain::toString(result);
 }
 
 void SafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status)
@@ -299,6 +446,11 @@ void SafetyNode::diagnoseBatteryVerdict(diagnostic_updater::DiagnosticStatusWrap
         infrastructure::toDiagnosticLevel(domain::verdictHealthLevel(decision.verdict)),
         decision.verdict == domain::SafetyVerdict::None ?
             std::string("Battery within safety limits.") : decision.reason);
+}
+
+void SafetyNode::diagnoseShutdown(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    infrastructure::fillShutdownStatus(shutdown_sequence_, status);
 }
 
 void SafetyNode::diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status)

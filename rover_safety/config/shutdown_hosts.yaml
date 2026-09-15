@@ -1,0 +1,12 @@
+# Hosts rover_safety_node asks to shut down before it powers off the ROS controller
+# (RoverShutdown tree, ShutdownHostsFromFile). Each host must run an HTTP server that accepts
+#   GET http://<ip>:<port>/shutdown?ts=<unix seconds>&sig=<hex HMAC-SHA256(secret, "/shutdown|<ts>")>
+# answers 200 and then powers off. The node waits until the host stops answering ping or
+# `timeout` seconds pass. Unreachable hosts are skipped.
+#
+# hosts:
+#   - ip: 192.168.77.201      # REAR_LED_BMS_BLE_READER (required)
+#     port: 3003              # optional, default 3003
+#     secret: change-me       # optional, HMAC key shared with the host
+#     timeout: 10.0           # optional, default 5.0 s
+hosts: []

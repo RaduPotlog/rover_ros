@@ -24,6 +24,7 @@
 #include <diagnostic_updater/diagnostic_status_wrapper.hpp>
 
 #include "rover_safety/domain/safety_health.hpp"
+#include "rover_safety/domain/shutdown_sequence.hpp"
 
 namespace rover_safety::infrastructure
 {
@@ -50,6 +51,15 @@ void fillSafetyInputsStatus(
 void fillBehaviorTreeStatus(
     bool configured, bool ticking, BT::NodeStatus tree_status,
     diagnostic_updater::DiagnosticStatusWrapper & status);
+
+/**
+ * Formats the ROS controller shutdown state:
+ *  - idle -> OK;
+ *  - in progress or power-off requested -> WARN;
+ *  - failed -> ERROR, with the failure detail.
+ */
+void fillShutdownStatus(
+    const domain::ShutdownSequence & sequence, diagnostic_updater::DiagnosticStatusWrapper & status);
 
 }  // namespace rover_safety::infrastructure
 

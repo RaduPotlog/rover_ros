@@ -94,4 +94,32 @@ void fillBehaviorTreeStatus(
     }
 }
 
+void fillShutdownStatus(
+    const domain::ShutdownSequence & sequence, diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    status.add("State", domain::toString(sequence.state()));
+    status.add("Attempts", sequence.attempts());
+
+    const auto level = toDiagnosticLevel(sequence.healthLevel());
+
+    switch (sequence.state()) {
+        case domain::ShutdownState::Idle:
+            status.summary(level, "No shutdown requested.");
+            break;
+        case domain::ShutdownState::InProgress:
+            status.add("Reason", sequence.reason());
+            status.summary(level, "Shutting down the ROS controller: " + sequence.reason());
+            break;
+        case domain::ShutdownState::Succeeded:
+            status.add("Reason", sequence.reason());
+            status.summary(level, "Power-off requested: " + sequence.reason());
+            break;
+        case domain::ShutdownState::Failed:
+            status.add("Reason", sequence.reason());
+            status.add("Error", sequence.detail());
+            status.summary(level, "Shutdown failed: " + sequence.detail());
+            break;
+    }
+}
+
 }  // namespace rover_safety::infrastructure
