@@ -67,10 +67,10 @@ Visualization Manager:
           Description Source: Topic
           Description Topic:
             Depth: 5
-            Durability Policy: Volatile
+            Durability Policy: Transient Local
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /rover/robot_description
+            Value: /<namespace>/robot_description
           Enabled: true
           Links:
             All Links Enabled: true
@@ -82,7 +82,7 @@ Visualization Manager:
             Inertia: false
             Mass: false
           Name: RobotModel
-          TF Prefix: ""
+          TF Prefix: <namespace>
           Update Interval: 0
           Value: true
           Visual Enabled: true
@@ -93,37 +93,37 @@ Visualization Manager:
           Frame Timeout: 15
           Frames:
             All Enabled: true
-            rover/base_footprint:
+            <namespace>/base_footprint:
               Value: true
-            rover/base_link:
+            <namespace>/base_link:
               Value: true
-            rover/body_link:
+            <namespace>/body_link:
               Value: true
-            rover/fl_wheel_base_link:
+            <namespace>/fl_wheel_base_link:
               Value: true
-            rover/fl_wheel_link:
+            <namespace>/fl_wheel_link:
               Value: true
-            rover/fr_wheel_base_link:
+            <namespace>/fr_wheel_base_link:
               Value: true
-            rover/fr_wheel_link:
+            <namespace>/fr_wheel_link:
               Value: true
-            rover/gps_link:
+            <namespace>/gps_link:
               Value: true
-            rover/imu_link:
+            <namespace>/imu_link:
               Value: true
-            rover/lidar_link:
+            <namespace>/lidar_link:
               Value: true
-            rover/map:
+            <namespace>/map:
               Value: true
-            rover/odom:
+            <namespace>/odom:
               Value: true
-            rover/rl_wheel_base_link:
+            <namespace>/rl_wheel_base_link:
               Value: true
-            rover/rl_wheel_link:
+            <namespace>/rl_wheel_link:
               Value: true
-            rover/rr_wheel_base_link:
+            <namespace>/rr_wheel_base_link:
               Value: true
-            rover/rr_wheel_link:
+            <namespace>/rr_wheel_link:
               Value: true
           Marker Scale: 1
           Name: TF
@@ -131,29 +131,29 @@ Visualization Manager:
           Show Axes: true
           Show Names: false
           Tree:
-            rover/map:
-              rover/odom:
-                rover/base_link:
-                  rover/body_link:
-                    rover/base_footprint:
+            <namespace>/map:
+              <namespace>/odom:
+                <namespace>/base_link:
+                  <namespace>/body_link:
+                    <namespace>/base_footprint:
                       {}
-                    rover/fl_wheel_base_link:
-                      rover/fl_wheel_link:
+                    <namespace>/fl_wheel_base_link:
+                      <namespace>/fl_wheel_link:
                         {}
-                    rover/fr_wheel_base_link:
-                      rover/fr_wheel_link:
+                    <namespace>/fr_wheel_base_link:
+                      <namespace>/fr_wheel_link:
                         {}
-                    rover/gps_link:
+                    <namespace>/gps_link:
                       {}
-                    rover/imu_link:
+                    <namespace>/imu_link:
                       {}
-                    rover/lidar_link:
+                    <namespace>/lidar_link:
                       {}
-                    rover/rl_wheel_base_link:
-                      rover/rl_wheel_link:
+                    <namespace>/rl_wheel_base_link:
+                      <namespace>/rl_wheel_link:
                         {}
-                    rover/rr_wheel_base_link:
-                      rover/rr_wheel_link:
+                    <namespace>/rr_wheel_base_link:
+                      <namespace>/rr_wheel_link:
                         {}
           Update Interval: 0
           Value: true
@@ -194,7 +194,7 @@ Visualization Manager:
             Filter size: 10
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /rover/odom
+            Value: /<namespace>/odom
           Value: true
       Enabled: true
       Name: Robot
@@ -223,7 +223,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /imu/data
+        Value: /<namespace>/imu/data
       Value: false
       fixed_frame_orientation: true
     - Alpha: 0.699999988079071
@@ -240,13 +240,13 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /local_costmap/stvl_layer
+        Value: /<namespace>/local_costmap/stvl_layer
       Update Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /local_costmap/stvl_layer_updates
+        Value: /<namespace>/local_costmap/stvl_layer_updates
       Use Timestamp: false
       Value: false
     - Alpha: 1
@@ -275,12 +275,12 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /plan
+        Value: /<namespace>/plan
       Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: rover/odom
+    Fixed Frame: <namespace>/odom
     Frame Rate: 30
   Name: root
   Tools:
