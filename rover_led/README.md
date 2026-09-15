@@ -64,27 +64,40 @@ These are lifecycle `udp_sender_node_exe` instances. Each one subscribes to
 
 ## Animations
 
-`config/rover_a1_animations.yaml` describes the hardware and the animation catalog:
+`config/rover_a1_animations.yaml` describes the hardware and the animation catalog. It is a port
+of Husarion Panther's `panther_animations.yaml`: the front bumper is channel 1, the rear bumper is
+channel 2, and each bumper is one full-width segment (the rear one reversed). Front and rear play
+different images for the same state, and directional animations such as blinkers work.
 
 ```yaml
 panels:            # physical strips: UDP channel + LED count
   - channel: 1
     number_of_leds: 40
 segments:          # virtual strips on a panel; a reversed range runs backwards
-  - name: front_1
+  - name: front
     channel: 1
-    led_range: 0-19
+    led_range: 0-39
+  - name: rear
+    channel: 2
+    led_range: 39-0
 segments_map:      # named groups of segments
-  all: [front_1, front_2, rear_1, rear_2]
+  all: [front, rear]
+  front: [front]
+  rear: [rear]
 led_animations:
   - id: 0          # must match the rover_msgs/LedAnimation constant
     name: E_STOP
     priority: 3    # layer, see below
     animations:
       - type: rover_led::ImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/e_stop.png
+          image: $(find rover_led)/animations/rover_a1/estop_front.png
+          duration: 6
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/estop_rear.png
           duration: 6
 ```
 

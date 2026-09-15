@@ -219,7 +219,7 @@ TEST(YamlAnimationCatalog, ParsesTheShippedRoverA1Config)
     const YamlAnimationCatalog catalog(config["led_animations"], layout.segments_map);
 
     EXPECT_EQ(layout.panels.size(), 2u);
-    EXPECT_EQ(layout.segments.size(), 4u);
+    EXPECT_EQ(layout.segments.size(), 2u);
     EXPECT_TRUE(catalog.find(0));
     EXPECT_EQ(catalog.find(2)->priority, 0);
 }
@@ -231,9 +231,8 @@ TEST(YamlAnimationCatalog, ShippedAnimationsUseRoverLedPluginsAndImages)
     const auto layout = parseLedLayout(config);
     const YamlAnimationCatalog catalog(config["led_animations"], layout.segments_map);
 
-    // Every id rover_safety requests (rover_msgs/LedAnimation E_STOP ..
-    // BATTERY_NOMINAL) must exist.
-    for (std::size_t id = 0; id <= 10; id++) {
+    // Every rover_msgs/LedAnimation constant (E_STOP .. FLOOD_LIGHT) must exist.
+    for (std::size_t id = 0; id <= 17; id++) {
         EXPECT_TRUE(catalog.find(id)) << "missing animation id " << id;
     }
 

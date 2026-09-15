@@ -1,24 +1,23 @@
+# Panther-style layout: one full-width segment per bumper.
+# Front bumper = channel 1, rear bumper = channel 2 (reversed, as on Panther).
 panels:
   - channel: 1
     number_of_leds: 40
   - channel: 2
     number_of_leds: 40
+
 segments:
-  - name: front_1
+  - name: front
     channel: 1
-    led_range: 0-19
-  - name: front_2
-    channel: 1
-    led_range: 39-20
-  - name: rear_1
+    led_range: 0-39
+  - name: rear
     channel: 2
-    led_range: 0-19
-  - name: rear_2
-    channel: 2
-    led_range: 39-20
+    led_range: 39-0
 
 segments_map:
-  all: [front_1, front_2, rear_1, rear_2,]
+  all: [front, rear]
+  front: [front]
+  rear: [rear]
 
 led_animations:
   - id: 0
@@ -26,21 +25,31 @@ led_animations:
     priority: 3
     animations:
       - type: rover_led::ImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/e_stop.png
+          image: $(find rover_led)/animations/rover_a1/estop_front.png
           duration: 6
-      
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/estop_rear.png
+          duration: 6
+
   - id: 1
     name: READY
     priority: 3
     animations:
       - type: rover_led::ImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/ready.png
+          image: $(find rover_led)/animations/rover_a1/ready_front.png
           duration: 6
-      
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/ready_rear.png
+          duration: 6
+
   - id: 2
     name: ERROR
     priority: 0
@@ -63,24 +72,27 @@ led_animations:
           duration: 1
           repeat: 1
 
-  # Shown while the robot is driven. Same steady glow as READY, tinted blue.
   - id: 4
     name: MANUAL_ACTION
     priority: 3
     animations:
       - type: rover_led::ImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/ready.png
+          image: $(find rover_led)/animations/rover_a1/manual_action_front.png
           duration: 6
-          color: 0x0080FF
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/manual_action_rear.png
+          duration: 6
 
   - id: 5
     name: LOW_BATTERY
     priority: 2
     animations:
       - type: rover_led::MovingImageAnimation
-        segments: all
+        segments: front
         animation:
           image: $(find rover_led)/animations/rover_a1/low_battery.png
           duration: 10
@@ -88,13 +100,24 @@ led_animations:
           center_offset: 24
           object_width: 2
           splash_duration: 10.0
+      - type: rover_led::MovingImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/low_battery.png
+          duration: 10
+          repeat: 1
+          center_offset: 24
+          object_width: 2
+          splash_duration: 10.0
+          image_mirrored: true
+          position_mirrored: true
 
   - id: 6
     name: CRITICAL_BATTERY
     priority: 2
     animations:
       - type: rover_led::MovingImageAnimation
-        segments: all
+        segments: front
         animation:
           image: $(find rover_led)/animations/rover_a1/critical_battery.png
           duration: 10
@@ -102,43 +125,81 @@ led_animations:
           center_offset: 24
           object_width: 2
           splash_duration: 10.0
+      - type: rover_led::MovingImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/critical_battery.png
+          duration: 10
+          repeat: 1
+          center_offset: 24
+          object_width: 2
+          splash_duration: 10.0
+          image_mirrored: true
+          position_mirrored: true
 
   - id: 7
     name: CHARGING_BATTERY
     priority: 2
     animations:
       - type: rover_led::MovingImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/charging_battery.png
+          image: $(find rover_led)/animations/rover_a1/charging_battery_front.png
           duration: 10
           repeat: 1
           center_offset: 38
           object_width: 1
           splash_duration: 10.0
+      - type: rover_led::MovingImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/charging_battery_rear.png
+          duration: 10
+          repeat: 1
+          center_offset: 38
+          object_width: 1
+          splash_duration: 10.0
+          image_mirrored: true
+          position_mirrored: true
 
   - id: 8
     name: BATTERY_CHARGED
     priority: 2
     animations:
       - type: rover_led::MovingImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/battery_charged.png
+          image: $(find rover_led)/animations/rover_a1/battery_charged_front.png
           duration: 10
           repeat: 1
           center_offset: 38
           object_width: 1
           splash_duration: 10.0
+      - type: rover_led::MovingImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/battery_charged_rear.png
+          duration: 10
+          repeat: 1
+          center_offset: 38
+          object_width: 1
+          splash_duration: 10.0
+          image_mirrored: true
+          position_mirrored: true
 
   - id: 9
     name: CHARGER_INSERTED
     priority: 1
     animations:
       - type: rover_led::ImageAnimation
-        segments: all
+        segments: front
         animation:
-          image: $(find rover_led)/animations/rover_a1/charger_inserted.png
+          image: $(find rover_led)/animations/rover_a1/charger_inserted_front.png
+          duration: 8
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/charger_inserted_rear.png
           duration: 8
 
   - id: 10
@@ -151,3 +212,105 @@ led_animations:
           image: $(find rover_led)/animations/rover_a1/empty.png
           duration: 1
           repeat: 1
+
+  - id: 11
+    name: AUTONOMOUS_READY
+    priority: 3
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: front
+        animation:
+          image: $(find rover_led)/animations/rover_a1/autonomous_ready_front.png
+          duration: 6
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/autonomous_ready_rear.png
+          duration: 6
+
+  - id: 12
+    name: AUTONOMOUS_ACTION
+    priority: 3
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: front
+        animation:
+          image: $(find rover_led)/animations/rover_a1/autonomous_action_front.png
+          duration: 6
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/autonomous_action_rear.png
+          duration: 6
+
+  - id: 13
+    name: GOAL_ACHIEVED
+    priority: 1
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: front
+        animation:
+          image: $(find rover_led)/animations/rover_a1/goal_achieved_front.png
+          duration: 4
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/goal_achieved_rear.png
+          duration: 4
+
+  - id: 14
+    name: BLINKER_LEFT
+    priority: 1
+    animations:
+      - type: rover_led::MovingImageAnimation
+        segments: all
+        animation:
+          image: $(find rover_led)/animations/rover_a1/blinker.png
+          duration: 2
+          repeat: 3
+          center_offset: 17
+          object_width: 1
+          default_image_position: 0.2
+          splash_duration: 2.0
+          image_mirrored: true
+          position_mirrored: true
+
+  - id: 15
+    name: BLINKER_RIGHT
+    priority: 1
+    animations:
+      - type: rover_led::MovingImageAnimation
+        segments: all
+        animation:
+          image: $(find rover_led)/animations/rover_a1/blinker.png
+          duration: 2
+          repeat: 3
+          center_offset: 17
+          object_width: 1
+          default_image_position: 0.2
+          splash_duration: 2.0
+
+  - id: 16
+    name: GOAL_FAILED
+    priority: 1
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: front
+        animation:
+          image: $(find rover_led)/animations/rover_a1/goal_failed_front.png
+          duration: 4
+      - type: rover_led::ImageAnimation
+        segments: rear
+        animation:
+          image: $(find rover_led)/animations/rover_a1/goal_failed_rear.png
+          duration: 4
+
+  - id: 17
+    name: FLOOD_LIGHT
+    priority: 3
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: all
+        animation:
+          image: $(find rover_led)/animations/rover_a1/flood_light.png
+          duration: 3
