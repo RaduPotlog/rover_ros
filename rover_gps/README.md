@@ -65,7 +65,7 @@ afterwards: it computes its transform only once.
 | `min_rate_ratio` | `0.5` | WARN below `expected_rate_hz * min_rate_ratio`. |
 | `fix_timeout_s` | `3.0` | ERROR when no fix arrives for this long. |
 | `warn_horizontal_std_m` / `error_horizontal_std_m` | `5.0` / `20.0` | Accuracy thresholds [m]. |
-| `publish_heading` | `false` | Set by the launch file from `ROVER_EKF_USE_GPS`. |
+| `publish_heading` | `false` | Set by the launch file from `ROVER_USE_GPS`. |
 | `heading_frame_id` | `base_link` | Set by the launch file to `<namespace>/base_link`. |
 | `min_heading_std_rad` | `0.05` | Lower bound of the published yaw std. |
 | `alignment.min_segment_length_m` | `3.0` | Straight distance per measurement [m]. |
@@ -94,7 +94,7 @@ ros2 launch rover_gps rover_gps.launch.py namespace:=rover publish_heading:=fals
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace and TF prefix. |
-| `publish_heading` | `$ROVER_EKF_USE_GPS`, else `false` | Accepts `true`/`1`/`yes`/`on` (any case). |
+| `publish_heading` | `$ROVER_USE_GPS`, else `false` | Accepts `true`/`1`/`yes`/`on` (any case). |
 | `rover_gps_config_path` | `config/rover_gps.yaml` | Parameter file for both nodes. |
 | `common_dir_path` | empty | If set, the default config is read from `<common_dir_path>/rover_gps/config/`. |
 | `log_level` | `INFO` | Logging level. |

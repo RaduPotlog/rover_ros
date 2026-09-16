@@ -50,12 +50,12 @@ def generate_launch_description():
         description="Add namespace to all launched nodes",
     )
 
-    # Not restricted with `choices`: the value usually comes straight from the ROVER_EKF_USE_GPS
+    # Not restricted with `choices`: the value usually comes straight from the ROVER_USE_GPS
     # balena variable, so any of true/1/yes/on (any case) enables it.
     publish_heading = LaunchConfiguration("publish_heading")
     declare_publish_heading_arg = DeclareLaunchArgument(
         "publish_heading",
-        default_value=EnvironmentVariable("ROVER_EKF_USE_GPS", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
         description="Publish gps/heading_imu for navsat_transform_node (true when GPS is fused).",
     )
     publish_heading_bool = PythonExpression(

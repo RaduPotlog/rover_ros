@@ -83,12 +83,12 @@ def generate_launch_description():
         description="Add namespace to all launched nodes.",
     )
 
-    # ROVER_EKF_USE_GPS (balenaCloud variable, normalized to true/false by rovera1_app's start.sh)
+    # ROVER_USE_GPS (balenaCloud variable, normalized to true/false by rovera1_app's start.sh)
     # selects the localization: false = wheels + IMU; true = wheels + IMU + GPS (dual EKF).
     use_gps = LaunchConfiguration("use_gps")
     declare_use_gps_arg = DeclareLaunchArgument(
         "use_gps",
-        default_value=EnvironmentVariable("ROVER_EKF_USE_GPS", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
         description="Fuse the RUTX11 GPS into localization (true/false).",
     )
 
