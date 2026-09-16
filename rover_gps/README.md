@@ -9,7 +9,7 @@ to fuse GPS.
 
 | Node | Package / executable | Role |
 |------|----------------------|------|
-| `rover_gps_driver` | `nmea_navsat_driver` / `nmea_socket_driver` ([rover_nmea_navsat_driver](https://github.com/RaduPotlog/rover_nmea_navsat_driver), branch `ros2`) | Listens for NMEA on UDP `0.0.0.0:10110` and publishes `gps/fix`. |
+| `rover_gps_driver` | `nmea_navsat_driver` / `nmea_socket_driver` ([rover_nmea_navsat_driver](https://github.com/RaduPotlog/rover_nmea_navsat_driver), branch `master`) | Listens for NMEA on UDP `0.0.0.0:10110` and publishes `gps/fix`. |
 | `rover_gps_node` | `rover_gps` / `rover_gps_node` | GPS health diagnostics and the odom → ENU heading alignment. |
 
 ## Interfaces (`rover_gps_node`)
