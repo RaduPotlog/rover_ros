@@ -10,7 +10,7 @@ repositories:
   rover_crsf_receiver:
     type: git
     url: https://github.com/RaduPotlog/rover_crsf_receiver
-    version: lyrical
+    version: master
   rover_arch:
     type: git
     url: https://github.com/RaduPotlog/rover_arch
@@ -22,7 +22,7 @@ repositories:
   rover_transport:
     type: git
     url: https://github.com/RaduPotlog/rover_transport
-    version: lyrical
+    version: master
   rover_network_monitor:
     type: git
     url: https://github.com/RaduPotlog/rover_network_monitor.git
@@ -30,4 +30,4 @@ repositories:
   rover_nmea_navsat_driver:
     type: git
     url: https://github.com/RaduPotlog/rover_nmea_navsat_driver.git
-    version: ros2
+    version: master
