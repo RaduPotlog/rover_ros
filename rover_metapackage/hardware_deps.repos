@@ -35,3 +35,7 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_nmea_navsat_driver.git
     version: master
+  rover_rslidar_sdk:
+    type: git
+    url: https://github.com/RaduPotlog/rover_rslidar_sdk.git
+    version: master

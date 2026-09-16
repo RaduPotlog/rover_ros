@@ -92,6 +92,19 @@ def generate_launch_description():
         description="Fuse the RUTX11 GPS into localization (true/false).",
     )
 
+    # ROVER_USE_LIDAR (balenaCloud variable) gates the RoboSense RS16 driver, so rovers
+    # without the sensor fitted do not run it. Not restricted with `choices`: the value comes
+    # straight from the environment, so any of true/1/yes/on (any case) enables it.
+    use_lidar = LaunchConfiguration("use_lidar")
+    declare_use_lidar_arg = DeclareLaunchArgument(
+        "use_lidar",
+        default_value=EnvironmentVariable("ROVER_USE_LIDAR", default_value="false"),
+        description="Start the RoboSense RS16 lidar driver (true/false).",
+    )
+    use_lidar_bool = PythonExpression(
+        ["'", use_lidar, "'.strip().lower() in ('true', '1', 'yes', 'on')"]
+    )
+
     rover_model_name = EnvironmentVariable(name="ROBOT_MODEL_NAME", default_value="rover_a1")
     rover_serial_no = EnvironmentVariable(name="ROBOT_SERIAL_NO", default_value="A1-2026-01")
     rover_version = EnvironmentVariable(name="ROBOT_VERSION", default_value="1.0")
@@ -233,6 +246,20 @@ def generate_launch_description():
         }.items(),
     )
 
+    rover_lidar_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("rover_lidar"), "launch", "rover_lidar.launch.py"]
+            )
+        ),
+        condition=IfCondition(use_lidar_bool),
+        launch_arguments={
+            "log_level": log_level,
+            "namespace": namespace,
+            "common_dir_path": common_dir_path,
+        }.items(),
+    )
+
     rover_bringup_common_dir = PythonExpression(
         [
             "'",
@@ -286,6 +313,7 @@ def generate_launch_description():
             rover_gps_launch,
             rover_crfs_teleop_launch,
             rover_twist_mux_launch,
+            rover_lidar_launch,
         ],
     )
 
@@ -305,6 +333,7 @@ def generate_launch_description():
         declare_log_level_arg,
         declare_namespace_arg,
         declare_use_gps_arg,
+        declare_use_lidar_arg,
         welcome_info,
         incorrect_hw_config_action,
         incorrect_os_version_action,

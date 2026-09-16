@@ -33,6 +33,10 @@
       type: diagnostic_aggregator/GenericAnalyzer
       path: GPS
       find_and_remove_prefix: [ 'rover_gps_node: ' ]
+    lidar:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Lidar
+      find_and_remove_prefix: [ 'rover_lidar_node: ' ]
     lighting:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lighting

@@ -13,6 +13,9 @@
   <!-- RUTX11 GPS: rover_gps launches the rover_nmea_navsat_driver fork (hardware_deps.repos). -->
   <depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_gps</depend>
   <depend condition="$ROVER_ROS_BUILD_TYPE == hardware">nmea_navsat_driver</depend>
+  <!-- RS16 lidar: rover_lidar launches the rover_rslidar_sdk fork (hardware_deps.repos). -->
+  <depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_lidar</depend>
+  <depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_rslidar_sdk</depend>
   <depend condition="$ROVER_ROS_BUILD_TYPE == simulation">rover_gazebo</depend>
   
   <export>

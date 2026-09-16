@@ -1,0 +1,32 @@
+# ROS parameters for the two rover-owned nodes in launch/rover_lidar.launch.py.
+# The driver itself is configured in config/rslidar.yaml (not a ROS parameter file).
+#
+# `<namespace>/` is replaced by the launch file with the rover namespace plus a slash,
+# or with nothing when unnamespaced.
+
+# Flattens the RS16 point cloud into the <namespace>/scan LaserScan that Nav 2 costmaps
+# consume, mirroring what the Gazebo bridge publishes in simulation.
+/**/rover_pointcloud_to_laserscan:
+  ros__parameters:
+    target_frame: <namespace>/lidar_link
+    transform_tolerance: 0.01
+    # Horizontal slice of the RS16's +/-15 deg fan, taken around the lidar's own origin.
+    min_height: -0.25
+    max_height: 0.25
+    angle_min: -3.141592653589793
+    angle_max: 3.141592653589793
+    angle_increment: 0.008726646259971648   # 0.5 deg
+    scan_time: 0.1                          # 10 Hz, the RS16 default spin rate
+    range_min: 0.2
+    range_max: 20.0        # costmap-sized, not the sensor's 100 m
+    use_inf: true
+
+# Publishes lidar health to /diagnostics; rover_diag_manager aggregates it under Rover/Lidar.
+/**/rover_lidar_node:
+  ros__parameters:
+    pointcloud_topic: rslidar_points
+    expected_rate_hz: 10.0
+    min_rate_ratio: 0.5    # below 5 Hz is a warning
+    cloud_timeout_s: 2.0   # no cloud for this long is an error (lidar unplugged / wrong subnet)
+    min_points_warn: 1000  # a nearly empty cloud usually means a blocked or blinded sensor
+    publish_frequency: 1.0

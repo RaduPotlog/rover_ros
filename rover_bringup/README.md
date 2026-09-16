@@ -31,6 +31,7 @@ It prints the rover banner (`rover_utils.messages.welcome_msg`) and then:
    - `rover_gps` (RUTX11 NMEA driver, GPS diagnostics, GNSS heading alignment)
    - `rover_crfs_teleop`
    - `rover_twist_mux`
+   - `rover_lidar` (RoboSense RS16 driver, `scan` bridge, lidar diagnostics; only with `use_lidar:=true`)
 
 Every included launch file receives `namespace`, `log_level` and, where supported,
 `common_dir_path`.
@@ -43,11 +44,13 @@ Every included launch file receives `namespace`, `log_level` and, where supporte
 | `disable_manager` | `False` | `True` skips `rover_safety`. |
 | `exit_on_wrong_hw` | `false` | Exit instead of idling when the hardware configuration is incorrect. |
 | `use_gps` | `$ROVER_EKF_USE_GPS`, else `false` | `true`: localization fuses wheels + IMU + GPS (dual EKF, `map → odom`). `false`: wheels + IMU only. |
+| `use_lidar` | `$ROVER_USE_LIDAR`, else `false` | `true`: start the RS16 lidar driver and publish `scan`. Leave `false` on rovers with no lidar fitted. |
 
 | Environment variable | Default | Effect |
 |----------------------|---------|--------|
 | `ROVER_NAMESPACE` | empty | Default for `namespace`. |
 | `ROVER_EKF_USE_GPS` | `false` | Default for `use_gps` (set as a balenaCloud variable; `start.sh` normalizes it to `true`/`false`). |
+| `ROVER_USE_LIDAR` | `false` | Default for `use_lidar` (balenaCloud variable). Any of `true`/`1`/`yes`/`on`, any case, enables it. |
 | `ROBOT_MODEL_NAME` / `ROBOT_SERIAL_NO` / `ROBOT_VERSION` | `rover_a1` / `A1-2026-01` / `1.0` | Shown in the banner. |
 | `ROBOT_HW_CONFIG_CORRECT` | `true` | Gate for starting the driver stack. |
 | `SYSTEM_BUILD_VERSION` | `v1.0.0` | OS version compared against the minimum. |
