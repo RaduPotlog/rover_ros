@@ -21,7 +21,7 @@
     warn_horizontal_std_m: 5.0
     error_horizontal_std_m: 20.0
 
-    # Heading output (publish_heading is set by the launch file from EKF_USE_GPS)
+    # Heading output (publish_heading is set by the launch file from ROVER_EKF_USE_GPS)
     min_heading_std_rad: 0.05
 
     # Odom -> ENU yaw alignment from GNSS course while driving straight

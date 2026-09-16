@@ -42,12 +42,12 @@ Every included launch file receives `namespace`, `log_level` and, where supporte
 | `common_dir_path` | empty | Directory with per-package config overrides (`<dir>/<package>/config/...`). |
 | `disable_manager` | `False` | `True` skips `rover_safety`. |
 | `exit_on_wrong_hw` | `false` | Exit instead of idling when the hardware configuration is incorrect. |
-| `use_gps` | `$EKF_USE_GPS`, else `false` | `true`: localization fuses wheels + IMU + GPS (dual EKF, `map → odom`). `false`: wheels + IMU only. |
+| `use_gps` | `$ROVER_EKF_USE_GPS`, else `false` | `true`: localization fuses wheels + IMU + GPS (dual EKF, `map → odom`). `false`: wheels + IMU only. |
 
 | Environment variable | Default | Effect |
 |----------------------|---------|--------|
 | `ROVER_NAMESPACE` | empty | Default for `namespace`. |
-| `EKF_USE_GPS` | `false` | Default for `use_gps` (set as a balenaCloud variable; `start.sh` normalizes it to `true`/`false`). |
+| `ROVER_EKF_USE_GPS` | `false` | Default for `use_gps` (set as a balenaCloud variable; `start.sh` normalizes it to `true`/`false`). |
 | `ROBOT_MODEL_NAME` / `ROBOT_SERIAL_NO` / `ROBOT_VERSION` | `rover_a1` / `A1-2026-01` / `1.0` | Shown in the banner. |
 | `ROBOT_HW_CONFIG_CORRECT` | `true` | Gate for starting the driver stack. |
 | `SYSTEM_BUILD_VERSION` | `v1.0.0` | OS version compared against the minimum. |

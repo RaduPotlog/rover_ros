@@ -29,12 +29,12 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     
-    # Not restricted with `choices`: the value usually comes straight from the EKF_USE_GPS
+    # Not restricted with `choices`: the value usually comes straight from the ROVER_EKF_USE_GPS
     # balena variable, so any of true/1/yes/on (any case) enables GPS fusion.
     fuse_gps = LaunchConfiguration("fuse_gps")
     declare_fuse_gps_arg = DeclareLaunchArgument(
         "fuse_gps",
-        default_value=EnvironmentVariable("EKF_USE_GPS", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_EKF_USE_GPS", default_value="false"),
         description=(
             "Fuse GPS: adds rover_ekf_global_node (map -> odom) and rover_navsat_transform_node "
             "and loads the _with_gps config. The GPS driver itself is started by rover_gps."

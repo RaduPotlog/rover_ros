@@ -1,20 +1,20 @@
 # rover_localization
 
 Fuses the rover's wheel odometry and IMU (and optionally the RUTX11 GPS) with
-`robot_localization` EKFs. The `EKF_USE_GPS` environment variable (the `fuse_gps` argument)
+`robot_localization` EKFs. The `ROVER_EKF_USE_GPS` environment variable (the `fuse_gps` argument)
 selects between two modes:
 
 | Mode | Nodes | Transforms |
 |------|-------|------------|
-| `EKF_USE_GPS=false` (default) | `rover_ekf_node`: wheels + IMU yaw rate | `<ns>/odom → <ns>/base_link` |
-| `EKF_USE_GPS=true` | `rover_ekf_node` (unchanged), `rover_ekf_global_node`: wheels + IMU yaw rate + GPS position, `rover_navsat_transform_node` | also `<ns>/map → <ns>/odom` |
+| `ROVER_EKF_USE_GPS=false` (default) | `rover_ekf_node`: wheels + IMU yaw rate | `<ns>/odom → <ns>/base_link` |
+| `ROVER_EKF_USE_GPS=true` | `rover_ekf_node` (unchanged), `rover_ekf_global_node`: wheels + IMU yaw rate + GPS position, `rover_navsat_transform_node` | also `<ns>/map → <ns>/odom` |
 
 With GPS, `odom` stays continuous for local control, and GPS corrections show up only in
 `map → odom`. The GPS driver, its diagnostics and the ENU heading (`gps/heading_imu`) come from
 `rover_gps`.
 
 > Do not run AMCL (`rover_orchestrator/rover_navigation/launch/localization.launch.py`) together
-> with `EKF_USE_GPS=true`: both publish `map → odom`.
+> with `ROVER_EKF_USE_GPS=true`: both publish `map → odom`.
 
 ## Interfaces
 
@@ -72,7 +72,7 @@ The filters run at 50 Hz in 2D mode (`two_d_mode: true`).
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `use_ekf` | `False` | Start the EKFs. `rover_bringup` and `rover_gazebo` pass `True`. |
-| `fuse_gps` | `$EKF_USE_GPS`, else `false` | GPS mode (`true`/`1`/`yes`/`on`, any case). Selects the `_with_gps` config. `rover_bringup` passes its `use_gps`; `rover_gazebo` passes `False`. |
+| `fuse_gps` | `$ROVER_EKF_USE_GPS`, else `false` | GPS mode (`true`/`1`/`yes`/`on`, any case). Selects the `_with_gps` config. `rover_bringup` passes its `use_gps`; `rover_gazebo` passes `False`. |
 | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace and TF prefix. |
 | `localization_mode` | `rel` | `rel`: relative to the start pose; `enu`: East-North-Up orientation. Selects `config/<mode>_localization[_with_gps].yaml`. |
 | `localization_config_path` | `config/<mode>_localization[_with_gps].yaml` | Explicit EKF config. |
@@ -82,7 +82,7 @@ The filters run at 50 Hz in 2D mode (`two_d_mode: true`).
 
 ```bash
 ros2 launch rover_localization rover_localization.launch.py use_ekf:=True
-EKF_USE_GPS=true ros2 launch rover_localization rover_localization.launch.py use_ekf:=True
+ROVER_EKF_USE_GPS=true ros2 launch rover_localization rover_localization.launch.py use_ekf:=True
 ros2 topic echo /rover/odom
 ```
 

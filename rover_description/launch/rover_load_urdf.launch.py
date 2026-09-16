@@ -119,28 +119,28 @@ def generate_launch_description():
 
     # IMU mount pose relative to body_link (x forward, y left, z up):
     # centerline, 90 mm to the rear, 200 mm up.
-    imu_pos_x = _env_float("ROBOT_IMU_LOCALIZATION_X", "-0.09")
-    imu_pos_y = _env_float("ROBOT_IMU_LOCALIZATION_Y", "0.0")
-    imu_pos_z = _env_float("ROBOT_IMU_LOCALIZATION_Z", "0.2")
-    imu_rot_r = _env_float("ROBOT_IMU_ORIENTATION_R", "0.0")
-    imu_rot_p = _env_float("ROBOT_IMU_ORIENTATION_P", "0.0")
-    imu_rot_y = _env_float("ROBOT_IMU_ORIENTATION_Y", "0.0")
+    imu_pos_x = _env_float("ROVER_IMU_LOCALIZATION_X", "-0.09")
+    imu_pos_y = _env_float("ROVER_IMU_LOCALIZATION_Y", "0.0")
+    imu_pos_z = _env_float("ROVER_IMU_LOCALIZATION_Z", "0.2")
+    imu_rot_r = _env_float("ROVER_IMU_ORIENTATION_R", "0.0")
+    imu_rot_p = _env_float("ROVER_IMU_ORIENTATION_P", "0.0")
+    imu_rot_y = _env_float("ROVER_IMU_ORIENTATION_Y", "0.0")
 
-    lidar_pos_x = _env_float("ROBOT_LIDAR_LOCALIZATION_X", "0.0")
-    lidar_pos_y = _env_float("ROBOT_LIDAR_LOCALIZATION_Y", "0.0")
-    lidar_pos_z = _env_float("ROBOT_LIDAR_LOCALIZATION_Z", "0.0")
-    lidar_rot_r = _env_float("ROBOT_LIDAR_ORIENTATION_R", "0.0")
-    lidar_rot_p = _env_float("ROBOT_LIDAR_ORIENTATION_P", "0.0")
-    lidar_rot_y = _env_float("ROBOT_LIDAR_ORIENTATION_Y", "0.0")
+    lidar_pos_x = _env_float("ROVER_LIDAR_LOCALIZATION_X", "0.0")
+    lidar_pos_y = _env_float("ROVER_LIDAR_LOCALIZATION_Y", "0.0")
+    lidar_pos_z = _env_float("ROVER_LIDAR_LOCALIZATION_Z", "0.0")
+    lidar_rot_r = _env_float("ROVER_LIDAR_ORIENTATION_R", "0.0")
+    lidar_rot_p = _env_float("ROVER_LIDAR_ORIENTATION_P", "0.0")
+    lidar_rot_y = _env_float("ROVER_LIDAR_ORIENTATION_Y", "0.0")
 
     # GNSS antenna mount pose relative to body_link. Measure it on the rover and set the
     # variables; until then the antenna is assumed at the body origin.
-    gps_pos_x = _env_float("ROBOT_GPS_LOCALIZATION_X", "0.0")
-    gps_pos_y = _env_float("ROBOT_GPS_LOCALIZATION_Y", "0.0")
-    gps_pos_z = _env_float("ROBOT_GPS_LOCALIZATION_Z", "0.0")
-    gps_rot_r = _env_float("ROBOT_GPS_ORIENTATION_R", "0.0")
-    gps_rot_p = _env_float("ROBOT_GPS_ORIENTATION_P", "0.0")
-    gps_rot_y = _env_float("ROBOT_GPS_ORIENTATION_Y", "0.0")
+    gps_pos_x = _env_float("ROVER_GPS_LOCALIZATION_X", "0.0")
+    gps_pos_y = _env_float("ROVER_GPS_LOCALIZATION_Y", "0.0")
+    gps_pos_z = _env_float("ROVER_GPS_LOCALIZATION_Z", "0.0")
+    gps_rot_r = _env_float("ROVER_GPS_ORIENTATION_R", "0.0")
+    gps_rot_p = _env_float("ROVER_GPS_ORIENTATION_P", "0.0")
+    gps_rot_y = _env_float("ROVER_GPS_ORIENTATION_Y", "0.0")
 
     urdf_file = PythonExpression(["'", robot_model, ".urdf.xacro'"])
     robot_description_content = Command(
