@@ -11,9 +11,12 @@ endif()
 
 set(PACKAGE_DEPENDENCIES
     rclcpp
+    rclcpp_lifecycle
     builtin_interfaces
     diagnostic_msgs
     diagnostic_updater
+    geometry_msgs
+    lifecycle_msgs
     nav_msgs
     rcl_interfaces
     sensor_msgs
@@ -30,8 +33,13 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/geo_math.cpp
             src/domain/gps_health_evaluator.cpp
             src/domain/heading_alignment_estimator.cpp
+            src/domain/nmea/nmea_checksum.cpp
+            src/domain/nmea/nmea_sentence.cpp
+            src/domain/nmea/nmea_parser.cpp
+            src/domain/nmea/nmea_fix_assembler.cpp
             src/application/monitor_gps_use_case.cpp
             src/application/align_heading_use_case.cpp
+            src/application/ingest_nmea_use_case.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -40,16 +48,23 @@ target_include_directories(${PROJECT_NAME}_core PUBLIC
 # Infrastructure: ROS 2 adapters.
 add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/gps_msg_conversions.cpp
+            src/infrastructure/nmea_msg_conversions.cpp
             src/infrastructure/ros2_gps_health_publisher.cpp
             src/infrastructure/ros2_heading_publisher.cpp
+            src/infrastructure/ros2_nmea_publisher.cpp
             src/infrastructure/rover_gps_node.cpp
+            src/infrastructure/rover_gps_driver_node.cpp
+            src/infrastructure/udp_nmea_receiver.cpp
 )
 target_link_libraries(${PROJECT_NAME}_ros ${PROJECT_NAME}_core)
 target_link_libraries(${PROJECT_NAME}_ros
     ${rclcpp_TARGETS}
+    ${rclcpp_lifecycle_TARGETS}
     ${builtin_interfaces_TARGETS}
     ${diagnostic_msgs_TARGETS}
     ${diagnostic_updater_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${lifecycle_msgs_TARGETS}
     ${nav_msgs_TARGETS}
     ${rcl_interfaces_TARGETS}
     ${sensor_msgs_TARGETS}
@@ -59,9 +74,14 @@ target_link_libraries(${PROJECT_NAME}_ros
 add_executable(${PROJECT_NAME}_node src/rover_gps.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
 
+# The NMEA-over-UDP GNSS driver, replacing nmea_navsat_driver/nmea_socket_driver.
+add_executable(${PROJECT_NAME}_driver_node src/rover_gps_driver.cpp)
+target_link_libraries(${PROJECT_NAME}_driver_node ${PROJECT_NAME}_ros)
+
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
-install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS ${PROJECT_NAME}_node ${PROJECT_NAME}_driver_node
+        DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
@@ -83,9 +103,31 @@ if(BUILD_TESTING)
   ament_add_gtest(test_gps_msg_conversions test/unit/test_gps_msg_conversions.cpp)
   target_link_libraries(test_gps_msg_conversions ${PROJECT_NAME}_ros)
 
+  # NMEA driver: pure protocol and application logic.
+  ament_add_gtest(test_nmea_checksum test/unit/test_nmea_checksum.cpp)
+  target_link_libraries(test_nmea_checksum ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_nmea_parser test/unit/test_nmea_parser.cpp)
+  target_link_libraries(test_nmea_parser ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_nmea_fix_assembler test/unit/test_nmea_fix_assembler.cpp)
+  target_link_libraries(test_nmea_fix_assembler ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_ingest_nmea_use_case test/unit/test_ingest_nmea_use_case.cpp)
+  target_link_libraries(test_ingest_nmea_use_case ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_nmea_msg_conversions test/unit/test_nmea_msg_conversions.cpp)
+  target_link_libraries(test_nmea_msg_conversions ${PROJECT_NAME}_ros)
+
   ament_add_gtest(test_rover_gps_node test/integration/test_rover_gps_node.cpp
                   TIMEOUT 60)
   target_link_libraries(test_rover_gps_node ${PROJECT_NAME}_ros)
+
+  # Drives the lifecycle driver node against a real loopback UDP socket.
+  ament_add_gtest(test_rover_gps_driver_node test/integration/test_rover_gps_driver_node.cpp
+                  TIMEOUT 120)
+  target_link_libraries(test_rover_gps_driver_node ${PROJECT_NAME}_ros)
+  target_link_libraries(test_rover_gps_driver_node ${lifecycle_msgs_TARGETS})
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})

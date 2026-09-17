@@ -23,6 +23,7 @@ from launch.substitutions import (
     PythonExpression,
 )
 from launch_ros.actions import Node
+from launch_ros.actions.lifecycle_node import LifecycleNode
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -86,9 +87,11 @@ def generate_launch_description():
         ["'", namespace, "/base_link' if '", namespace, "' else 'base_link'"]
     )
 
-    rover_gps_driver_node = Node(
-        package="nmea_navsat_driver",
-        executable="nmea_socket_driver",
+    # Lifecycle node, brought straight to active: it owns the UDP socket, so deactivating it
+    # frees port 10110 for debugging (see README) without killing the process.
+    rover_gps_driver_node = LifecycleNode(
+        package="rover_gps",
+        executable="rover_gps_driver_node",
         name="rover_gps_driver",
         namespace=namespace,
         parameters=[rover_gps_config_path, {"tf_prefix": namespace}],
@@ -98,6 +101,7 @@ def generate_launch_description():
             ("heading", "gps/heading"),
             ("time_reference", "gps/time_reference"),
         ],
+        autostart=True,
         arguments=[
             "--ros-args",
             "--log-level",

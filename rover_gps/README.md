@@ -1,15 +1,15 @@
 # rover_gps
 
 GNSS integration for Rover A1. The Teltonika RUTX11 router has the GNSS receiver and forwards
-its NMEA sentences over UDP. This package starts the NMEA driver for that stream, reports GPS
-health on `diagnostics`, and provides the absolute (ENU) heading that `rover_localization` needs
-to fuse GPS.
+its NMEA sentences over UDP. This package parses that stream, reports GPS health on
+`diagnostics`, and provides the absolute (ENU) heading that `rover_localization` needs to fuse
+GPS.
 
 ## Nodes
 
 | Node | Package / executable | Role |
 |------|----------------------|------|
-| `rover_gps_driver` | `nmea_navsat_driver` / `nmea_socket_driver` ([rover_nmea_navsat_driver](https://github.com/RaduPotlog/rover_nmea_navsat_driver), branch `master`) | Listens for NMEA on UDP `0.0.0.0:10110` and publishes `gps/fix`. |
+| `rover_gps_driver` | `rover_gps` / `rover_gps_driver_node` | **Lifecycle.** Listens for NMEA on UDP `0.0.0.0:10110` and publishes `gps/fix`. |
 | `rover_gps_node` | `rover_gps` / `rover_gps_node` | GPS health diagnostics and the odom → ENU heading alignment. |
 
 ## Interfaces (`rover_gps_node`)
@@ -23,7 +23,33 @@ to fuse GPS.
 | pub | `diagnostics` | hardware id `RoverGps`, tasks `GPS fix` and `Heading alignment` (`/Rover/GPS` in `diagnostics_agg`) |
 
 The driver also publishes `gps/vel`, `gps/heading` (only if the receiver sends HDT) and
-`gps/time_reference`.
+`gps/time_reference`. All four are reliable, depth 10 — reliable rather than sensor-data
+best-effort so that reliable subscribers such as `navsat_transform_node` still match.
+
+### The driver
+
+`rover_gps_driver_node` is a C++17 port of `nmea_navsat_driver`'s `nmea_socket_driver`, which it
+replaces; the Python package is gone. Parameter and topic names are unchanged, so the config file
+and the launch remappings are the same as before.
+
+It is a lifecycle node because it owns the UDP socket: the socket is bound in `on_activate` and
+released in `on_deactivate`. The launch file sets `autostart=True`, so it comes up active.
+
+Behaviour matches the Python driver, including two quirks kept deliberately because
+`rover_localization` is tuned to them: the altitude covariance carries an extra factor of two
+(upstream marks it `FIXME`), and the HDT heading is published as-is, not rotated into ENU.
+Four things are fixed rather than reproduced:
+
+- **Multi-sentence datagrams.** Upstream trimmed the whole datagram and split on `\n`, leaving a
+  `\r` on every line but the last; its end-anchored regex then rejected those lines. Each line is
+  trimmed here, so a datagram carrying GGA + VTG yields both.
+- **GST altitude error.** `alt_std_dev` is the last field, so upstream parsed it together with the
+  `*XX` checksum and always got NaN, discarding the receiver's altitude estimate. The checksum is
+  stripped before the fields are split.
+- **Truncated sentences.** Upstream indexed the field list blindly and raised `IndexError`, which
+  killed its receive loop. Missing fields become NaN / 0 here.
+- **HDT edge cases.** Upstream tested the heading for truthiness, which dropped a valid `0` (due
+  north) and let NaN through. The test is on NaN instead.
 
 ### `GPS fix` diagnostic
 
@@ -80,8 +106,10 @@ afterwards: it computes its transform only once.
 
 All parameters are read-only; invalid values or `warn > error` stop the node at startup.
 
-Driver parameters (`rover_gps_driver`): `ip` `0.0.0.0`, `port` `10110`, `frame_id` `gps_link`
-(prefixed with the namespace through `tf_prefix`), `useRMC` `false`. `gps_link` is defined in
+Driver parameters (`rover_gps_driver`): `ip` `0.0.0.0`, `port` `10110`, `buffer_size` `4096`,
+`timeout_sec` `2`, `frame_id` `gps_link` (prefixed with the namespace through `tf_prefix`),
+`time_ref_source` `gps`, `useRMC` `false`, and `epe_quality0/1/2/4/5/9` — the default position
+error per GGA fix quality, which sets the fix covariance together with HDOP. `gps_link` is defined in
 `rover_description`. Its offset comes from `ROVER_GPS_LOCALIZATION_{X,Y,Z}` and
 `ROVER_GPS_ORIENTATION_{R,P,Y}` and defaults to the body origin.
 
@@ -123,10 +151,13 @@ It can be overridden with `RUTX11_HOST`, `RUTX11_USER`, `ROVER_HOST`, `NMEA_PORT
 **Services → GPS → NMEA → NMEA forwarding**. The antenna must see the sky: without a fix the
 router still forwards GGA, and `GPS fix` reports WARN "No GNSS fix.".
 
-Check that NMEA arrives on the rover (stop `rover_gps_driver` first, since it holds the port):
+Check that NMEA arrives on the rover. The driver holds the port while it is active, so
+deactivate it first — no need to kill it:
 
 ```bash
+ros2 lifecycle set /rover_gps_driver deactivate
 nc -ul 10110
+ros2 lifecycle set /rover_gps_driver activate
 ```
 
 ## Layout
@@ -134,13 +165,21 @@ nc -ul 10110
 ```
 domain/          GnssFix/OdometrySample value types, geo math (ENU offset, angle wrap, circular
                  stats), GpsHealthEvaluator, HeadingAlignmentEstimator, output ports — no ROS
+domain/nmea/     NMEA 0183: checksum, sentence value types, parser (GGA/RMC/VTG/GST/HDT),
+                 NmeaFixAssembler (sentences → fix/velocity/heading/time) — no ROS
 application/     MonitorGpsUseCase (fix → health report), AlignHeadingUseCase (fix + odom →
-                 alignment → ENU heading)
+                 alignment → ENU heading), IngestNmeaUseCase (sentence → checksum → parse →
+                 assemble → output port)
 infrastructure/  RoverGpsNode (composition root, parameters, subscriptions, reset service),
-                 Ros2GpsHealthPublisher / Ros2HeadingPublisher (topics, diagnostics), msg conversions
+                 RoverGpsDriverNode (lifecycle, UDP receive thread), UdpNmeaReceiver (POSIX socket),
+                 Ros2GpsHealthPublisher / Ros2HeadingPublisher / Ros2NmeaPublisher, msg conversions
 ```
 
 The unit tests in `test/unit/` cover the domain, the use cases and the message mapping without
-a ROS graph. `test/integration/test_rover_gps_node.cpp` runs the real node in-process and
-checks the STALE → OK diagnostics, the heading output after alignment, the reset service and
-threshold validation. Run them with `colcon test --packages-select rover_gps`.
+a ROS graph — including the NMEA checksum, parser and fix assembler, which had no tests at all
+while the driver was the vendored Python package.
+`test/integration/test_rover_gps_node.cpp` runs the real node in-process and checks the
+STALE → OK diagnostics, the heading output after alignment, the reset service and threshold
+validation. `test/integration/test_rover_gps_driver_node.cpp` drives the driver through its
+lifecycle against a real loopback UDP socket and checks that a datagram becomes a `NavSatFix`
+and that deactivating releases the port. Run them with `colcon test --packages-select rover_gps`.

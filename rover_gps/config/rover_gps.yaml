@@ -1,7 +1,8 @@
 # Shared by both nodes in launch/rover_gps.launch.py.
 
-# rover_gps_driver (nmea_navsat_driver/nmea_socket_driver): receives the NMEA sentences the
+# rover_gps_driver (rover_gps/rover_gps_driver_node): receives the NMEA sentences the
 # RUTX11 forwards over UDP (GPS > NMEA > NMEA forwarding -> <rover IP>:10110, UDP).
+# Lifecycle node; the launch file brings it straight to active.
 /**/rover_gps_driver:
   ros__parameters:
     ip: "0.0.0.0"          # listen on every interface; the RUTX11 sends to the rover LAN address

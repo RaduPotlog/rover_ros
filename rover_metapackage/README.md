@@ -20,7 +20,7 @@ in the `rover_bringup` banner.
 
 | File | Repositories |
 |------|--------------|
-| `hardware_deps.repos` | `rover_modbus`, `rover_cppuprofile`, `rover_arch`, `rover_foxglove`, `rover_transport`, `rover_network_monitor`, `rover_cockpit_ros2_diagnostics`, `rover_nmea_navsat_driver`, `rover_rslidar_sdk` (all `master`) |
+| `hardware_deps.repos` | `rover_modbus`, `rover_cppuprofile`, `rover_arch`, `rover_foxglove`, `rover_transport`, `rover_network_monitor`, `rover_cockpit_ros2_diagnostics`, `rover_rslidar_sdk` (all `master`) |
 | `simulation_deps.repos` | none (empty) |
 
 ```bash

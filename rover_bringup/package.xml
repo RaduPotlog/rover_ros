@@ -15,7 +15,7 @@
   <!-- Rover dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_controller</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_localization</exec_depend>
-  <!-- RUTX11 GPS: rover_gps launches the rover_nmea_navsat_driver fork (hardware_deps.repos). -->
+  <!-- RUTX11 GPS: rover_gps parses the NMEA the router forwards over UDP. -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_gps</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_diag_manager</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_twist_mux</exec_depend>
