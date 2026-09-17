@@ -2,7 +2,7 @@
 
 Serial port (UART) access for ROS 2 on standalone ASIO via `io_context`. The package provides:
 
-- a ROS-independent `serial_driver` library, used directly by `crsf_receiver`;
+- a ROS-independent `serial_driver` library, used directly by `rover_crsf_teleop` (via its `serial_bridge` node);
 - a lifecycle bridge node that exposes a port as byte-array topics.
 
 ## Node `serial_bridge` (`drivers::serial_driver::SerialBridgeNode`)

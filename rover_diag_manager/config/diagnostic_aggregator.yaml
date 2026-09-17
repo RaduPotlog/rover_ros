@@ -44,7 +44,7 @@
     teleop:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Teleop
-      find_and_remove_prefix: [ 'rover_crfs_teleop_node: ' ]
+      find_and_remove_prefix: [ 'rover_crsf_teleop_node: ' ]
     motion:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Motion

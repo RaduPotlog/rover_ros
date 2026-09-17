@@ -39,7 +39,7 @@ Reference datasheets: `docs/DCC1000_reference.pdf` (motor controller),
 | pub | `diagnostics` | hardware id `Rover System`: driver and safety controller status |
 
 Consumers: `rover_safety` (driver state, GPIO, e-stop set), `rover_twist_mux`'s
-`rover_motion_lock_node` (GPIO), `rover_crfs_teleop` (e-stop services) and the Foxglove
+`rover_motion_lock_node` (GPIO), `rover_crsf_teleop` (e-stop services) and the Foxglove
 dashboard.
 
 ```bash
