@@ -7,21 +7,9 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_cppuprofile
     version: master
-  rover_crsf_receiver:
-    type: git
-    url: https://github.com/RaduPotlog/rover_crsf_receiver
-    version: master
   rover_arch:
     type: git
     url: https://github.com/RaduPotlog/rover_arch
-    version: master
-  rover_foxglove:
-    type: git
-    url: https://github.com/RaduPotlog/rover_foxglove
-    version: master
-  rover_transport:
-    type: git
-    url: https://github.com/RaduPotlog/rover_transport
     version: master
   rover_network_monitor:
     type: git
@@ -30,12 +18,4 @@ repositories:
   rover_cockpit_ros2_diagnostics:
     type: git
     url: https://github.com/RaduPotlog/rover_cockpit_ros2_diagnostics.git
-    version: master
-  rover_nmea_navsat_driver:
-    type: git
-    url: https://github.com/RaduPotlog/rover_nmea_navsat_driver.git
-    version: master
-  rover_rslidar_sdk:
-    type: git
-    url: https://github.com/RaduPotlog/rover_rslidar_sdk.git
     version: master

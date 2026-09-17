@@ -1,0 +1,13 @@
+build/
+*.pyc
+*.pyo
+*.swp
+.Python
+bin
+include
+lib
+log
+install
+.idea
+dist
+nmea_navsat_driver.egg-info/
