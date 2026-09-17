@@ -1,7 +1,0 @@
-<launch>
-  <node pkg="rover_rslidar_sdk" name="rover_rslidar_sdk_node" type="rover_rslidar_sdk_node" output="screen">
-    <param name="config_path" value=""/>
-  </node>
-  <!-- rviz -->
-  <node pkg="rviz" name="rviz" type="rviz" args="-d $(find rover_rslidar_sdk)/rviz/rviz.rviz" />
-</launch>
