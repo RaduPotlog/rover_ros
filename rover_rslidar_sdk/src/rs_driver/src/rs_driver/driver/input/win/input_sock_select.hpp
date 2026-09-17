@@ -214,7 +214,7 @@ inline int InputSock::createSocket(uint16_t port, const std::string& hostIp, con
     }
     socklen_t opt_len = sizeof(uint32_t);
     // get original value
-    if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &before_set_val, &opt_len) == -1)
+    if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *)&before_set_val, &opt_len) == -1)
     {
       perror("getsockopt before");
       return -1;
@@ -222,14 +222,14 @@ inline int InputSock::createSocket(uint16_t port, const std::string& hostIp, con
     RS_INFO << "Original receive buffer size: " << before_set_val << " bytes" << RS_REND;
 
     // set new value
-    if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &opt_val, opt_len) == -1)
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *)&opt_val, opt_len) == -1)
     {
       perror("setsockopt");
       return -1;
     }
 
     // get new value
-    if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &after_set_val, &opt_len) == -1)
+    if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *)&after_set_val, &opt_len) == -1)
     {
       perror("getsockopt after");
       return -1;
@@ -291,13 +291,22 @@ inline void InputSock::recvPacket()
       perror("select: ");
       break;
     }
-
+    int ret = 0;
     for (int i = 0; i < 3; i++)
     {
       if ((fds_[i] >= 0) && FD_ISSET(fds_[i], &rfds))
       {
         std::shared_ptr<Buffer> pkt = cb_get_pkt_(pkt_buf_len_);
-        int ret = recvfrom(fds_[i], (char*)pkt->buf(), (int)pkt->bufSize(), 0, NULL, NULL);
+        try
+        {
+          ret = recvfrom(fds_[i], (char*)pkt->buf(),(int)pkt->bufSize(), 0, NULL, NULL);
+        }
+        catch (const std::exception& e)
+        {
+          RS_ERROR << "fd[" << i << "] , recvfrom exception:" << e.what() << RS_REND;
+          continue;
+        }
+
         if (ret < 0)
         {
           perror("recvfrom: ");

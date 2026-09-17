@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5)
 
 cmake_policy(SET CMP0048 NEW) # CMake 3.6 required
 
@@ -6,7 +6,7 @@ if(WIN32)
   cmake_policy(SET CMP0074 NEW) # CMake 3.12 required
 endif(WIN32)
 
-project(rs_driver VERSION 1.5.18)
+project(rs_driver VERSION 1.5.20)
 
 #========================
 #  Project setup
@@ -21,7 +21,7 @@ endif()
 option(DISABLE_PCAP_PARSE         "Disable PCAP file parse" OFF) 
 option(ENABLE_TRANSFORM           "Enable transform functions" OFF)
 
-option(ENABLE_MODIFY_RECVBUF       "Enable modify size of RCVBUF" OFF)
+option(ENABLE_MODIFY_RECVBUF       "Enable modify size of RCVBUF" ON)
 option(ENABLE_WAIT_IF_QUEUE_EMPTY "Enable waiting for a while in handle thread if the queue is empty" OFF)
 option(ENABLE_EPOLL_RECEIVE       "Receive packets with epoll() instead of select()" OFF)
 
@@ -77,9 +77,9 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
 
-message(STATUS =============================================================)
-message(STATUS "CMake run for ${COMPILER}")
-message(STATUS =============================================================)
+message(=============================================================)
+message("-- CMake run for ${COMPILER}")
+message(=============================================================)
 
 #========================
 #  Path Setup
@@ -106,18 +106,18 @@ endif(WIN32)
 
 if(${ENABLE_EPOLL_RECEIVE})
 
-  message(STATUS =============================================================)
-  message(STATUS "Enable Epoll Receive")
-  message(STATUS =============================================================)
+  message(=============================================================)
+  message("-- Enable Epoll Receive")
+  message(=============================================================)
 
   add_definitions("-DENABLE_EPOLL_RECEIVE")
 endif(${ENABLE_EPOLL_RECEIVE})
 
 if(${DISABLE_PCAP_PARSE})
 
-  message(STATUS =============================================================)
-  message(STATUS "Disable PCAP parse")
-  message(STATUS =============================================================)
+  message(=============================================================)
+  message("-- Disable PCAP parse")
+  message(=============================================================)
 
   add_definitions("-DDISABLE_PCAP_PARSE")
 
@@ -136,9 +136,9 @@ endif(${DISABLE_PCAP_PARSE})
 
 if(${ENABLE_TRANSFORM})
 
-  message(STATUS =============================================================)
-  message(STATUS "Enable Transform Fucntions")
-  message(STATUS =============================================================)
+  message(=============================================================)
+  message("-- Enable Transform Fucntions")
+  message(=============================================================)
 
   add_definitions("-DENABLE_TRANSFORM")
 
