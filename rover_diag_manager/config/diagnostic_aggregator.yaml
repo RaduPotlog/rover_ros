@@ -36,7 +36,7 @@
     lidar:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lidar
-      find_and_remove_prefix: [ 'rover_lidar_node: ' ]
+      find_and_remove_prefix: [ 'rover_rs16_lidar_node: ' ]
     lighting:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lighting

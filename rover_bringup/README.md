@@ -31,7 +31,7 @@ It prints the rover banner (`rover_utils.messages.welcome_msg`) and then:
    - `rover_gps` (RUTX11 NMEA driver, GPS diagnostics, GNSS heading alignment)
    - `rover_crfs_teleop`
    - `rover_twist_mux`
-   - `rover_lidar` (RoboSense RS16 driver, `scan` bridge, lidar diagnostics; only with `use_lidar:=true`)
+   - `rover_rs16_lidar` (RoboSense RS16 driver, `scan` bridge, lidar diagnostics; only with `use_lidar:=true`)
 
 Every included launch file receives `namespace`, `log_level` and, where supported,
 `common_dir_path`.

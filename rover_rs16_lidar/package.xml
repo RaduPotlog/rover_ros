@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rover_rs16_lidar</name>
+  <version>1.0.0</version>
+  <description>RoboSense RS16 LiDAR for the rover: the driver itself (vendored header-only rs_driver), the PointCloud2 to LaserScan projection feeding Nav 2, and lidar stream health diagnostics - one node, one configuration file.</description>
+  <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>diagnostic_updater</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>sensor_msgs</depend>
+  <!-- rs_driver's PCAP input; the driver itself is vendored under 3rdparty/ -->
+  <depend>libpcap</depend>
+
+  <!-- used by launch/rover_rs16_lidar.launch.py -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <!-- nav2_common.launch.ReplaceString resolves <namespace> in the config file -->
+  <exec_depend>nav2_common</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -246,10 +246,10 @@ def generate_launch_description():
         }.items(),
     )
 
-    rover_lidar_launch = IncludeLaunchDescription(
+    rover_rs16_lidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("rover_lidar"), "launch", "rover_lidar.launch.py"]
+                [FindPackageShare("rover_rs16_lidar"), "launch", "rover_rs16_lidar.launch.py"]
             )
         ),
         condition=IfCondition(use_lidar_bool),
@@ -313,7 +313,7 @@ def generate_launch_description():
             rover_gps_launch,
             rover_crfs_teleop_launch,
             rover_twist_mux_launch,
-            rover_lidar_launch,
+            rover_rs16_lidar_launch,
         ],
     )
 
