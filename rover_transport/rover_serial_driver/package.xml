@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rover_serial_driver</name>
+  <version>2.0.0</version>
+  <description>
+    A lifecycle node that owns a UART and bridges it to two topics: raw bytes read from the
+    device are published on serial_read, and bytes received on serial_write are written
+    back to the device while the node is active. Forked from transport_drivers'
+    serial_driver (v1.2.0); see README.md for provenance.
+  </description>
+  <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
+  <license>Apache License 2.0</license>
+
+  <author email="opensource@apex.ai">Apex.AI, Inc.</author>
+  <author email="esteve@apache.org">Esteve Fernandez</author>
+  <author>LeoDrive</author>
+  <author>The Autoware Foundation</author>
+  <author>Trimble</author>
+
+  <url type="repository">https://github.com/ros-drivers/transport_drivers</url>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rover_asio_cmake_module</buildtool_depend>
+
+  <depend>asio</depend>
+  <depend>lifecycle_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>rover_io_context</depend>
+  <depend>std_msgs</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

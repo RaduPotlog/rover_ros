@@ -2,7 +2,7 @@
 
 Drives the rover's two SK9822 LED panels (front and rear bumper). A controller renders layered
 image animations into one RGBA frame per panel. A driver encodes those frames into SK9822
-packets, and `udp_driver` sends them to the LED board over UDP.
+packets, and `rover_udp_driver` sends them to the LED board over UDP.
 
 ```
 led/set_animation ──► rover_led_controller ──led/channel_<n>_frame──► rover_led_driver
@@ -56,9 +56,9 @@ Parameters (`src/led_driver_parameters.yaml`, values in `config/rover_a1_driver.
 | `led_control_handshake` | `false` | Request control from `hardware/led_control_enable` on activation |
 | `autostart` | `true` | Configure and activate on startup |
 
-### rover_udp_led_channel_{1,2}_sender_node (`udp_driver`)
+### rover_udp_led_channel_{1,2}_sender_node (`rover_udp_driver`)
 
-These are lifecycle `udp_sender_node_exe` instances. Each one subscribes to
+These are lifecycle `rover_udp_sender_node` instances. Each one subscribes to
 `udp_write/led_channel_<n>` and sends to the address in
 `config/rover_a1_udp_led_channel_<n>.yaml` (`192.168.77.201`, port `3333`).
 

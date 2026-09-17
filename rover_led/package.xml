@@ -13,6 +13,10 @@
   <depend>diagnostic_updater</depend>
   <depend>generate_parameter_library</depend>
   <depend>udp_msgs</depend>
+
+  <!-- Runtime only: this package's launch file starts two rover_udp_driver sender
+       nodes to own the LED UDP sockets, but links none of its code. -->
+  <exec_depend>rover_udp_driver</exec_depend>
   <depend>rover_msgs</depend>
   <depend>rover_utils</depend>
   <depend>libpng-dev</depend>

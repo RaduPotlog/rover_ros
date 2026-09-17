@@ -126,10 +126,10 @@ def generate_launch_description():
     driver_udp_channel_1_config_path = PathJoinSubstitution([rover_led_pkg, "config", driver_udp_channel_1_config])
     
     rover_udp_led_channel_1_sender_node = LifecycleNode(
-        package='udp_driver',
+        package='rover_udp_driver',
         name="rover_udp_led_channel_1_sender_node",
         namespace=namespace,
-        executable='udp_sender_node_exe',
+        executable='rover_udp_sender_node',
         parameters=[driver_udp_channel_1_config_path],
         remappings=[
             ('udp_write', 'udp_write/led_channel_1')
@@ -142,10 +142,10 @@ def generate_launch_description():
     driver_udp_channel_2_config_path = PathJoinSubstitution([rover_led_pkg, "config", driver_udp_channel_2_config])
     
     rover_udp_led_channel_2_sender_node = LifecycleNode(
-        package='udp_driver',
+        package='rover_udp_driver',
         name="rover_udp_led_channel_2_sender_node",
         namespace=namespace,
-        executable='udp_sender_node_exe',
+        executable='rover_udp_sender_node',
         parameters=[driver_udp_channel_2_config_path],
         remappings=[
             ('udp_write', 'udp_write/led_channel_2')

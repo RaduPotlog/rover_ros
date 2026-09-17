@@ -110,13 +110,13 @@ void RoverCrsfTeleopNode::declareParameters()
     declare_parameter<int>("link_quality_lost_below", link_defaults.lq_lost_below);
     declare_parameter<int>("link_quality_recovered_at", link_defaults.lq_recovered_at);
 
-    // The UART is opened by serial_driver's serial_bridge node, which the launch file starts.
+    // The UART is opened by rover_serial_driver's rover_serial_bridge_node, which the launch file starts.
     // These two are read by the LAUNCH FILE and handed to that node; this node declares them so
     // they live in one config file and are introspectable with `ros2 param get`.
     declare_parameter<std::string>("serial_device", "/dev/ttyUSB0");
     declare_parameter<int>("serial_baudrate", 460800);
 
-    // Topic carrying raw bytes from serial_bridge (its `serial_read`, remapped by the launch
+    // Topic carrying raw bytes from rover_serial_bridge_node (its `serial_read`, remapped by the launch
     // file). Must match that remap.
     declare_parameter<std::string>("serial_topic", "rc/raw");
 
@@ -267,7 +267,7 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
         rc_link_publisher_ = create_publisher<rover_msgs::msg::RcLinkStatus>(kRcLinkTopic, echo_qos);
     }
 
-    // Matches serial_bridge's publisher (rclcpp::QoS{100}, reliable). Reliable is right here:
+    // Matches rover_serial_bridge_node's publisher (rclcpp::QoS{100}, reliable). Reliable is right here:
     // unlike a decoded RC frame, a dropped BYTE chunk desynchronises the parser until the next
     // sync byte, so the transport must not be the thing dropping it.
     //
@@ -287,7 +287,7 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
         });
 
     RCLCPP_INFO(
-        get_logger(), "Decoding CRSF from '%s' (serial_bridge opens %s at %ld baud).",
+        get_logger(), "Decoding CRSF from '%s' (rover_serial_bridge_node opens %s at %ld baud).",
         serial_topic.c_str(), get_parameter("serial_device").as_string().c_str(),
         static_cast<long>(get_parameter("serial_baudrate").as_int()));
 
@@ -440,11 +440,11 @@ void RoverCrsfTeleopNode::diagnoseChannelsRate(diagnostic_updater::DiagnosticSta
 void RoverCrsfTeleopNode::diagnoseSerialLink(diagnostic_updater::DiagnosticStatusWrapper & status)
 {
     // Distinct from "RC link": that one judges whether the RC signal is good enough to drive on;
-    // this one judges whether bytes are reaching us from serial_bridge at all. They fail for
+    // this one judges whether bytes are reaching us from rover_serial_bridge_node at all. They fail for
     // different reasons - a receiver out of range versus an unplugged dongle or a bridge stuck
     // in `unconfigured` - and the operator needs to tell them apart.
     status.add("Topic", get_parameter("serial_topic").as_string());
-    status.add("Device (opened by serial_bridge)", get_parameter("serial_device").as_string());
+    status.add("Device (opened by rover_serial_bridge_node)", get_parameter("serial_device").as_string());
     status.add("Baud rate", get_parameter("serial_baudrate").as_int());
     status.add("Bytes received", static_cast<int>(serial_bytes_received_));
     status.add("CRSF frames decoded", static_cast<int>(decoded_frames_));
@@ -456,7 +456,7 @@ void RoverCrsfTeleopNode::diagnoseSerialLink(diagnostic_updater::DiagnosticStatu
         // nobody plugged the receiver in.
         status.summary(
             diagnostic_msgs::msg::DiagnosticStatus::WARN,
-            "No bytes yet - is serial_bridge running and active?");
+            "No bytes yet - is rover_serial_bridge_node running and active?");
         return;
     }
 

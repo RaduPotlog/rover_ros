@@ -2,7 +2,7 @@
   ros__parameters:
 
     # --- CRSF receiver serial link -----------------------------------------------------------
-    # The UART is owned by serial_driver's serial_bridge node, which this package's launch file
+    # The UART is owned by rover_serial_driver's rover_serial_bridge_node node, which this package's launch file
     # starts; this node only decodes the bytes that node publishes. serial_device and
     # serial_baudrate are read by the LAUNCH FILE and handed to the bridge, so changing them here
     # changes what the bridge opens.
@@ -10,7 +10,7 @@
     # 460800 is what the A1's receiver is flashed for, and ASIO supports it natively
     # (asio/impl/serial_port_base.ipp -> B460800), which is why no custom-baudrate ioctl is
     # needed any more. CRSF's own default of 420000 is NOT in ASIO's table: if the receiver is
-    # ever reflashed to 420000, serial_bridge will not be able to open it at all. Keep it at
+    # ever reflashed to 420000, rover_serial_bridge_node will not be able to open it at all. Keep it at
     # 460800.
     #
     # Prefer a stable path: `ls -l /dev/serial/by-id/`. ttyUSBn is assigned in enumeration order
@@ -18,7 +18,7 @@
     serial_device: /dev/ttyUSB0
     serial_baudrate: 460800
 
-    # Topic carrying raw bytes from serial_bridge - its `serial_read`, remapped by the launch
+    # Topic carrying raw bytes from rover_serial_bridge_node - its `serial_read`, remapped by the launch
     # file. Must match that remap. Subscribed with reliable QoS, depth 100: a dropped byte chunk
     # desynchronises the CRSF parser until the next sync byte, so the transport must not be what
     # drops it.

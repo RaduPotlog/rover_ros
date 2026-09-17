@@ -1,6 +1,6 @@
 # Shared by both nodes in launch/rover_battery.launch.py.
 
-# rover_udp_battery_receiver_node (udp_driver): BMS bridge endpoint.
+# rover_udp_battery_receiver_node (rover_udp_driver): BMS bridge endpoint.
 /**/rover_udp_battery_receiver_node:
   ros__parameters:
     ip: "192.168.1.201"

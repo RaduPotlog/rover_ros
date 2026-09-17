@@ -1,0 +1,14 @@
+# Example parameters for rover_serial_bridge_node.
+#
+# Carried over from transport_drivers' serial_driver/params/example.params.yaml (v1.2.0).
+# Parameter names and accepted values are unchanged from upstream:
+#   flow_control: none | hardware | software
+#   parity:       none | odd | even
+#   stop_bits:    "1" | "1.0" | "1.5" | "2" | "2.0"
+/**:
+  ros__parameters:
+    device_name: /dev/ttyACM0
+    baud_rate: 115200
+    flow_control: none
+    parity: none
+    stop_bits: "1"

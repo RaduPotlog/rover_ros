@@ -39,7 +39,7 @@ namespace rover_crsf_teleop
 // ROS adapter for TeleopUseCase: raw CRSF bytes in, teleop_elrs_cmd_vel_stamped and the hardware
 // interface's E-Stop services out.
 //
-// The UART itself belongs to serial_driver's serial_bridge node, which this package's launch
+// The UART itself belongs to rover_serial_driver's rover_serial_bridge_node node, which this package's launch
 // file starts; this node subscribes to the byte stream that node publishes and decodes CRSF
 // from it. Decoding here rather than in a separate process means the decode runs on the
 // executor thread - the same thread as the control timer - so TeleopUseCase keeps its
@@ -58,7 +58,7 @@ namespace rover_crsf_teleop
 // Diagnostics (hardware ID "RC Receiver"), published in every lifecycle state:
 //   - "RC link":          the LinkMonitor verdict that gates the command, with ages / LQ / switches
 //                         (WARN while waiting for the first frame and while the link is lost);
-//   - "RC serial link":   whether the byte stream from serial_bridge is arriving and decoding
+//   - "RC serial link":   whether the byte stream from rover_serial_bridge_node is arriving and decoding
 //                         (WARN when it is silent - which is how a dead bridge becomes visible);
 //   - "E-Stop requests":  reachability and last outcome of the hardware interface E-Stop services;
 //   - "RC channels rate": decoded CRSF frame rate against rc_channels_expected_hz (WARN at
@@ -115,7 +115,7 @@ private:
     std::shared_ptr<Ros2VelocityCommandPublisher> velocity_publisher_;
     std::shared_ptr<Ros2TriggerSafetySwitch> safety_switch_;
 
-    // Raw CRSF bytes from serial_bridge.
+    // Raw CRSF bytes from rover_serial_bridge_node.
     rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr serial_subscriber_;
 
     crsf::CrsfParser parser_;

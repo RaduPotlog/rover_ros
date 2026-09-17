@@ -57,10 +57,10 @@ def generate_launch_description():
     )
 
     rover_udp_battery_receiver_node = LifecycleNode(
-        package='udp_driver',
+        package='rover_udp_driver',
         name="rover_udp_battery_receiver_node",
         namespace=namespace,
-        executable='udp_receiver_node_exe',
+        executable='rover_udp_receiver_node',
         parameters=[rover_battery_config_path],
         remappings=[
             ('udp_read', 'rover_battery_udp_data')

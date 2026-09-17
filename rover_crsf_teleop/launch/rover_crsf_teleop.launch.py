@@ -18,7 +18,7 @@
 RC teleop bring-up: the serial bridge that owns the UART, and the teleop node that decodes CRSF
 from it.
 
-The UART is deliberately not opened by the teleop node. serial_driver's serial_bridge already
+The UART is deliberately not opened by the teleop node. rover_serial_driver's rover_serial_bridge_node already
 does it, is lifecycle-managed, and is maintained upstream; the teleop node subscribes to the raw
 bytes it publishes. That also keeps asio out of this package entirely.
 """
@@ -80,8 +80,8 @@ def _launch_setup(context, *args, **kwargs):
     # `serial_read` is remapped to rc/raw because the default name is generic and this rover has
     # other serial devices; the teleop node's `serial_topic` parameter must match.
     serial_bridge_node = LifecycleNode(
-        package='serial_driver',
-        executable='serial_bridge',
+        package='rover_serial_driver',
+        executable='rover_serial_bridge_node',
         name='rover_crsf_serial_bridge',
         namespace=namespace,
         parameters=[{

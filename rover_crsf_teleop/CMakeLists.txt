@@ -42,8 +42,8 @@ target_include_directories(${PROJECT_NAME}_core PUBLIC
 )
 set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Infrastructure: the ROS adapters and the lifecycle node. No serial_driver / io_context / asio
-# here - the UART belongs to serial_driver's serial_bridge node, which the launch file starts,
+# Infrastructure: the ROS adapters and the lifecycle node. No rover_serial_driver / rover_io_context / asio
+# here - the UART belongs to rover_serial_driver's rover_serial_bridge_node, which the launch file starts,
 # so this package links none of its code.
 add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/rc_message_conversions.cpp

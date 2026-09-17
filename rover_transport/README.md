@@ -1,72 +1,34 @@
-# transport_drivers
+# rover_transport
 
-A set of ROS2 drivers for transport-layer protocols. Currently utilizes the stand-alone ASIO library for most transport-layer functionality.
+The rover'"'"'s transport layer: a hard fork of
+[ros-drivers/transport_drivers](https://github.com/ros-drivers/transport_drivers) v1.2.0,
+relayouted into this workspace'"'"'s Clean Architecture convention.
 
-## Supported Drivers:
+| Package | Role |
+|---------|------|
+| [`rover_asio_cmake_module`](rover_asio_cmake_module/) | `find_package(ASIO)` support. No code. |
+| [`rover_io_context`](rover_io_context/) | Shared ports, byte bridges and the ASIO thread pool. No ROS dependency. |
+| [`rover_serial_driver`](rover_serial_driver/) | UART <-> `serial_read` / `serial_write`. |
+| [`rover_udp_driver`](rover_udp_driver/) | UDP <-> `udp_read` / `udp_write`. |
 
-* **UDP Driver**
+Each package'"'"'s README lists what changed from upstream. Several real defects were fixed
+along the way - two use-after-frees in the async send paths, a receiver that stopped on a
+zero-length datagram, and a `-O0` flag that leaked onto every consumer.
 
-A package which encapsulates basic receving and sending of udp data.
+## Provenance
 
-Provided within this package are the following executabes:
-- udp_receiver_node_exe: can receive UDP data
-- udp_sender_node_exe: can send UDP data asynchronosouly
-- udp_bridge_node_exe: combined both receiver and sender nodes into one
+Forked from [ros-drivers/transport_drivers](https://github.com/ros-drivers/transport_drivers)
+**v1.2.0** (Apache-2.0; LeoDrive, The Autoware Foundation, Apex.AI, Trimble, TierIV,
+Evan Flynn). Relayouted into this workspace's Clean Architecture layout, renamed to the
+`rover_` prefix and re-namespaced from `drivers::` to `rover::transport::`.
 
-Provided within this package also is a `udp_driver` library without the ROS2 dependencies which could be used elsewhere.
-    
-* **Serial Driver**
+**Upstream is no longer merged - this is a hard fork.** Upstream has no release for ROS 2
+`lyrical`, which is why it was vendored in the first place; port fixes by hand.
 
-A package which which encapsulates basic receiving and sending of serial data.
+Topic names (`serial_read`, `serial_write`, `udp_read`, `udp_write`) and parameter names
+(`device_name`, `baud_rate`, `flow_control`, `parity`, `stop_bits`, `ip`, `port`) are
+**unchanged from upstream**, so upstream documentation still describes the wire interface.
 
-Provided within this package is the following executabe:
-- serial_bridge: combined both receiver and sender nodes into one
-
-Provided within this package also is a `serial_driver` library without the ROS2 dependencies which could be used elsewhere.
-
-* **IO Context**
-
-A library to write synchronous and asynchronous networking applications.
-
-
-## Quick start
-
-Clone the repo into your workspace, normally with the structure `workspace/src/<clone-repo-here>`:
-
-```
-git clone https://github.com/ros-drivers/transport_drivers.git
-```
-
-Install dependencies using `rosdep` from your top-level workspace directory:
-
-```
-rosdep install --from-paths src --ignore-src -r -y
-```
-
-Once you have the repository cloned and dependencies installed, you can now go ahead and compile:
-
-```
-colcon build
-```
-
-After successful compilation, you should be able to source your newly built packages:
-
-```
-source install/setup.bash
-```
-
-...and now you should be able to run your newly built executables. Here is how you would launch the `udp_driver` bridge node:
-
-```
-ros2 run udp_driver udp_bridge_node_exe --ros-args --params-file ./src/transport_drivers/udp_driver/params/example_udp_params.yaml
-```
-
-## Testing
-
-Comprehensive unit tests have been written for every package within this repository.
-
-To run them yourself, use the normal command from your top-level workspace directory:
-
-```
-colcon test
-```
+> The exact upstream commit is not recoverable from this tree - it carried no VCS metadata
+> and no vcs manifest entry; every `package.xml` read `1.2.0`. Resolve the sha of the
+> `1.2.0` tag and record it here.

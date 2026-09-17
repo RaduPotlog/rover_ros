@@ -6,7 +6,7 @@ Decodes BMS telemetry received over UDP and publishes the rover's battery state.
 
 | Direction | Name | Type |
 |-----------|------|------|
-| in  | `rover_battery_udp_data` | `udp_msgs/UdpPacket` (from `udp_driver`, 392-byte BMS payload sent by the ESP32 `rover_led_bms_ble_controller`) |
+| in  | `rover_battery_udp_data` | `udp_msgs/UdpPacket` (from `rover_udp_driver`, 392-byte BMS payload sent by the ESP32 `rover_led_bms_ble_controller`) |
 | out | `rover_battery/battery_status` | `sensor_msgs/BatteryState` — used by `rover_safety` |
 | out | `rover_battery/charging_status` | `rover_msgs/ChargingStatus` |
 | out | `diagnostics` | hardware id `RoverBattery`, tasks `Battery errors`, `Battery status` (voltage, current, SoC, charge, design capacity, temperature, charge state, health, cell min / max) |

@@ -26,7 +26,7 @@
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_led</exec_depend>
   <!-- RS16 lidar: driver, LaserScan projection and health diagnostics in one node. -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_rs16_lidar</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">udp_driver</exec_depend>
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_udp_driver</exec_depend>
 
   <!-- Rover foxglove bridge dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">foxglove_bridge</exec_depend>

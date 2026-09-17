@@ -4,7 +4,7 @@
   <name>rover_crsf_teleop</name>
   <version>2.0.0</version>
   <description>CRSF (ExpressLRS) RC teleop for the rover: decodes the receiver's CRSF stream from
-    serial_driver's serial bridge, maps sticks to cmd_vel and switches to the SW E-Stop, with an
+    rover_serial_driver's serial bridge, maps sticks to cmd_vel and switches to the SW E-Stop, with an
     RC link failsafe.</description>
   <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
   <license>Apache License 2.0</license>
@@ -17,16 +17,16 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>std_srvs</depend>
-  <!-- UInt8MultiArray: the raw byte stream published by serial_bridge. -->
+  <!-- UInt8MultiArray: the raw byte stream published by rover_serial_bridge_node. -->
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <!-- RcChannels / RcLinkStatus, echoed on rc/channels and rc/link for tuning. -->
   <depend>rover_msgs</depend>
 
-  <!-- Runtime only: this package's launch file starts serial_driver's serial_bridge node to own
-       the UART, but links none of its code - so no asio and no io_context in this build, and the
+  <!-- Runtime only: this package's launch file starts rover_serial_driver's serial bridge node to own
+       the UART, but links none of its code - so no asio and no rover_io_context in this build, and the
        hardware condition the old crsf_receiver dependency used still applies. -->
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">serial_driver</exec_depend>
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_serial_driver</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>

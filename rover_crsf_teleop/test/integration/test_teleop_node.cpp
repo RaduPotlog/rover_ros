@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Integration test: RoverCrsfTeleopNode on real ROS topics and services. A helper node plays
-// serial_driver's serial_bridge (raw CRSF bytes on rc/raw at 50 Hz), the hardware interface (the
+// rover_serial_driver's rover_serial_bridge_node (raw CRSF bytes on rc/raw at 50 Hz), the hardware interface (the
 // three E-Stop Trigger services) and twist_mux (subscribes to the cmd_vel output).
 //
 // Driving the node with encoded bytes rather than decoded messages means this test now covers
@@ -112,7 +112,7 @@ public:
     explicit RoverHarness(const rclcpp::Node::SharedPtr & node)
     : node_(node)
     {
-        // Matches serial_bridge's publisher QoS, which is what the node subscribes with.
+        // Matches rover_serial_bridge_node's publisher QoS, which is what the node subscribes with.
         serial_pub_ = node_->create_publisher<std_msgs::msg::UInt8MultiArray>("rc/raw", rclcpp::QoS(100));
 
         cmd_vel_sub_ = node_->create_subscription<Twist>(

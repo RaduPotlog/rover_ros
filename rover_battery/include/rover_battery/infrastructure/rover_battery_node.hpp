@@ -31,7 +31,7 @@ namespace rover_battery
 
 /**
  * @brief Composition root: decodes BMS UDP packets and drives MonitorBatteryUseCase.
- * @details Plain (non-lifecycle) node on purpose — the BMS link is owned by the udp_driver
+ * @details Plain (non-lifecycle) node on purpose — the BMS link is owned by the rover_udp_driver
  *          lifecycle node; this node only transforms its output.
  */
 class RoverBatteryNode : public rclcpp::Node

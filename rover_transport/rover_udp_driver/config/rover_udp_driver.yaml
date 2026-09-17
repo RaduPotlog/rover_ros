@@ -1,0 +1,8 @@
+# Example parameters for rover_udp_receiver_node / rover_udp_sender_node.
+#
+# Carried over from transport_drivers' udp_driver/params/udp_params.yml (v1.2.0).
+# Parameter names are unchanged from upstream.
+/**:
+  ros__parameters:
+    ip: "192.168.99.101"
+    port: 3333
