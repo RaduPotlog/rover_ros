@@ -175,10 +175,10 @@ def generate_launch_description():
         }.items(),
     )
 
-    rover_crfs_teleop_launch = IncludeLaunchDescription(
+    rover_crsf_teleop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("rover_crfs_teleop"), "launch", "rover_crfs_teleop.launch.py"]
+                [FindPackageShare("rover_crsf_teleop"), "launch", "rover_crsf_teleop.launch.py"]
             )
         ),
         launch_arguments={
@@ -311,7 +311,7 @@ def generate_launch_description():
             rover_safety_launch,
             rover_ekf_launch,
             rover_gps_launch,
-            rover_crfs_teleop_launch,
+            rover_crsf_teleop_launch,
             rover_twist_mux_launch,
             rover_rs16_lidar_launch,
         ],

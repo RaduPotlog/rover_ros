@@ -29,7 +29,7 @@ It prints the rover banner (`rover_utils.messages.welcome_msg`) and then:
    - `rover_safety` (skipped with `disable_manager:=True`)
    - `rover_localization` (with `use_ekf:=True` and `fuse_gps:=<use_gps>`)
    - `rover_gps` (RUTX11 NMEA driver, GPS diagnostics, GNSS heading alignment)
-   - `rover_crfs_teleop`
+   - `rover_crsf_teleop`
    - `rover_twist_mux`
    - `rover_rs16_lidar` (RoboSense RS16 driver, `scan` bridge, lidar diagnostics; only with `use_lidar:=true`)
 

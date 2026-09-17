@@ -28,6 +28,8 @@ rosidl_generate_interfaces(
     "msg/LedLayerState.msg"
     "msg/LedSegmentState.msg"
     "msg/LedState.msg"
+    "msg/RcChannels.msg"
+    "msg/RcLinkStatus.msg"
 
     "srv/SetLedBrightness.srv"
     "srv/SetLedAnimation.srv"

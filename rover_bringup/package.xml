@@ -19,7 +19,7 @@
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_gps</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_diag_manager</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_twist_mux</exec_depend>
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_crfs_teleop</exec_depend>
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_crsf_teleop</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_battery</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_utils</exec_depend>
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rover_safety</exec_depend>

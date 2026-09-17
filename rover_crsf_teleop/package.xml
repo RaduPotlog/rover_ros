@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rover_crsf_teleop</name>
+  <version>2.0.0</version>
+  <description>CRSF (ExpressLRS) RC teleop for the rover: decodes the receiver's CRSF stream from
+    serial_driver's serial bridge, maps sticks to cmd_vel and switches to the SW E-Stop, with an
+    RC link failsafe.</description>
+  <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>diagnostic_msgs</depend>
+  <depend>diagnostic_updater</depend>
+  <depend>lifecycle_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>std_srvs</depend>
+  <!-- UInt8MultiArray: the raw byte stream published by serial_bridge. -->
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <!-- RcChannels / RcLinkStatus, echoed on rc/channels and rc/link for tuning. -->
+  <depend>rover_msgs</depend>
+
+  <!-- Runtime only: this package's launch file starts serial_driver's serial_bridge node to own
+       the UART, but links none of its code - so no asio and no io_context in this build, and the
+       hardware condition the old crsf_receiver dependency used still applies. -->
+  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">serial_driver</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>rclpy</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

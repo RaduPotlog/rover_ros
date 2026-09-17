@@ -26,7 +26,7 @@ same controllers and EKF as the real rover, a ROS–Gazebo bridge and RViz.
 | `gz_gui` | `config/teleop.config` | Gazebo GUI layout; `{namespace}` in the file is replaced with `namespace`. |
 | `log_level` | `INFO` | Logging level. |
 
-`rover_safety`, `rover_led`, `rover_twist_mux`, `rover_battery`, `rover_crfs_teleop` and
+`rover_safety`, `rover_led`, `rover_twist_mux`, `rover_battery`, `rover_crsf_teleop` and
 `rover_diag_manager` are not started in simulation. Velocity commands go straight to `cmd_vel`.
 
 ## Config Files
