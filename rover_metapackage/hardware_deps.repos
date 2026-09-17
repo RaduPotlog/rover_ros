@@ -7,15 +7,3 @@ repositories:
     type: git
     url: https://github.com/RaduPotlog/rover_cppuprofile
     version: master
-  rover_arch:
-    type: git
-    url: https://github.com/RaduPotlog/rover_arch
-    version: master
-  rover_network_monitor:
-    type: git
-    url: https://github.com/RaduPotlog/rover_network_monitor.git
-    version: master
-  rover_cockpit_ros2_diagnostics:
-    type: git
-    url: https://github.com/RaduPotlog/rover_cockpit_ros2_diagnostics.git
-    version: master
