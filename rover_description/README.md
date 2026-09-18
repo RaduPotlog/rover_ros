@@ -78,7 +78,9 @@ negated axis. `rover_drive_controller`'s `left_wheel_names` are correspondingly 
 
   Note that `wheel_separation_multiplier: 1.5` in that controller config is **not** geometry -
   it is the usual empirical skid-steer correction (a 4-wheel skid-steer's effective track
-  exceeds its physical track), so it is not expected to match anything here.
+  exceeds its physical track), so it is not expected to match anything here. The 1.5 was
+  set by hand; measure it with `rover_controller`'s `wheel_odom_calibration` tool (see
+  "Drive-train tuning" in `rover_controller/README.md`) and record the date and surface.
 
 - `battery.yaml` - Simulated battery (Gazebo `LinearBatteryPlugin`) configuration.
 

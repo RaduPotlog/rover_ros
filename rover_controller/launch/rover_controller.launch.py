@@ -32,6 +32,7 @@ from launch.substitutions import (
 from launch_ros.actions import Node, SetParameter
 from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
+import yaml
 
 def spawner_exit_handler(controller_name, next_action=None):
     """Continue only after successful activation of a mandatory controller."""
@@ -44,6 +45,27 @@ def spawner_exit_handler(controller_name, next_action=None):
         return [next_action] if next_action is not None else []
 
     return on_exit
+
+
+def chained_wheel_controllers(config_path):
+    """Controllers the drive controller writes into, from its '<controller>/<joint>' wheel names.
+
+    diff_drive_controller claims '<wheel name>/velocity'. A wheel name of the form
+    '<controller>/<joint>' points at another controller's reference interface (the wheel PIDs),
+    which must be spawned and activated together with the drive controller.
+    """
+    with open(config_path, encoding='utf-8') as config_file:
+        config = yaml.safe_load(config_file) or {}
+    drive = (config.get('/**', config).get('rover_drive_controller', {})
+             .get('ros__parameters', {}))
+    wheels = list(drive.get('left_wheel_names', [])) + list(drive.get('right_wheel_names', []))
+    chained = []
+    for wheel in wheels:
+        if '/' in wheel:
+            controller = wheel.split('/', 1)[0]
+            if controller not in chained:
+                chained.append(controller)
+    return chained
 
 
 def generate_launch_description():
@@ -207,9 +229,10 @@ def generate_launch_description():
             'rcl', log_level
         ).perform(context)
 
-        def make_spawner(controller_name, include_log_args=False):
+        def make_spawner(controller_name, include_log_args=False, group=()):
             arguments = [
                 controller_name,
+                *group,
                 '--controller-manager',
                 'controller_manager',
                 '--controller-manager-timeout',
@@ -217,6 +240,9 @@ def generate_launch_description():
                 '--param-file',
                 config_path,
             ]
+            if group:
+                # One switch request, so controller_manager orders the chain (PIDs first).
+                arguments.append('--activate-as-group')
             if include_log_args:
                 arguments.extend([
                     '--ros-args',
@@ -234,7 +260,8 @@ def generate_launch_description():
             )
 
         drive_controller_spawner = make_spawner(
-            'rover_drive_controller', include_log_args=True
+            'rover_drive_controller', include_log_args=True,
+            group=chained_wheel_controllers(config_path),
         )
         joint_state_broadcaster_spawner = make_spawner(
             'rover_joint_state_broadcaster'

@@ -43,3 +43,32 @@ def test_drive_controller_matches_description(wheel_type):
     drive = controller['/**']['rover_drive_controller']['ros__parameters']
     assert drive['wheel_radius'] == pytest.approx(wheel['wheel_radius'])
     assert drive['wheel_separation'] == pytest.approx(wheel['wheel_separation'])
+
+
+@pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
+def test_drive_controller_chains_through_declared_wheel_pids(wheel_type):
+    """Every '<pid>/<joint>' wheel name must point at a declared PID for that joint."""
+    config = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')['/**']
+    manager = config['controller_manager']['ros__parameters']
+    drive = config['rover_drive_controller']['ros__parameters']
+    wheels = drive['left_wheel_names'] + drive['right_wheel_names']
+    assert len(wheels) == 2 * drive['wheels_per_side']
+    for wheel in wheels:
+        pid_name, joint = wheel.split('/', 1)
+        assert manager[pid_name]['type'] == 'pid_controller/PidController'
+        pid = config[pid_name]['ros__parameters']
+        assert pid['dof_names'] == [joint]
+        assert pid['command_interface'] == 'velocity'
+        assert pid['reference_and_state_interfaces'] == ['velocity']
+        # Feed-forward carries the open-loop command; PI only trims it.
+        assert pid['gains'][joint]['feedforward_gain'] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
+def test_calibration_multipliers_are_plausible(wheel_type):
+    """Skid-steer separation multipliers are > 1; radius multipliers stay near 1."""
+    drive = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')[
+        '/**']['rover_drive_controller']['ros__parameters']
+    assert 1.0 <= drive['wheel_separation_multiplier'] <= 2.5
+    for side in ('left', 'right'):
+        assert 0.9 <= drive[f'{side}_wheel_radius_multiplier'] <= 1.1

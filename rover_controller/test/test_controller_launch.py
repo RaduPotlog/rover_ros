@@ -172,6 +172,43 @@ def test_spawner_sequence(controller_launch, monkeypatch, tmp_path, failed):
                         [f'{failed} spawner failed with exit code 7'])
 
 
+def test_chained_wheel_controllers(controller_launch, tmp_path):
+    bundled = (Path(get_package_share_directory('rover_controller')) /
+               'config/wheel_01_controller.yaml')
+    assert controller_launch.chained_wheel_controllers(str(bundled)) == [
+        'pid_controller_rl_wheel_base_to_rl_wheel_joint',
+        'pid_controller_fl_wheel_base_to_fl_wheel_joint',
+        'pid_controller_rr_wheel_base_to_rr_wheel_joint',
+        'pid_controller_fr_wheel_base_to_fr_wheel_joint',
+    ]
+    plain = tmp_path / 'plain.yaml'
+    plain.write_text(yaml.safe_dump({'/**': {'rover_drive_controller': {'ros__parameters': {
+        'left_wheel_names': ['left_wheel_joint'], 'right_wheel_names': ['right_wheel_joint']}}}}))
+    assert controller_launch.chained_wheel_controllers(str(plain)) == []
+
+
+def test_drive_spawner_activates_wheel_pids_as_group(controller_launch, monkeypatch):
+    nodes = []
+    original_node = controller_launch.Node
+
+    def capture_node(**kwargs):
+        nodes.append(kwargs)
+        return original_node(**kwargs)
+
+    monkeypatch.setattr(controller_launch, 'Node', capture_node)
+    context = LaunchContext()
+    context.launch_configurations.update(namespace='', use_sim='False', robot_model='rover_a1')
+    for action in controller_launch.generate_launch_description().entities:
+        if isinstance(action, (DeclareLaunchArgument, SetLaunchConfiguration, OpaqueFunction)):
+            action.execute(context)
+    drive = next(args['arguments'] for args in nodes if args['executable'] == 'spawner' and
+                 args['arguments'][0] == 'rover_drive_controller')
+    assert '--activate-as-group' in drive
+    assert [a for a in drive if str(a).startswith('pid_controller_')] == \
+        controller_launch.chained_wheel_controllers(
+            resolve(context, drive[drive.index('--param-file') + 1]))
+
+
 def test_real_controller_accepts_override(controller_launch, monkeypatch, tmp_path):
     """Activate diff_drive on GenericSystem and read back the namespaced override."""
     monkeypatch.setenv('RMW_IMPLEMENTATION', 'rmw_zenoh_cpp')

@@ -1,6 +1,7 @@
-# Wheel PID controllers below are experimental and are NOT spawned.
-# Activation requires deliberate reference-interface chaining to avoid competing
-# with rover_drive_controller for physical wheel velocity command interfaces.
+# Wheel-speed loop: rover_drive_controller -> pid_controller_<wheel> -> hardware.
+# diff_drive writes each PID's reference interface (its wheel names are
+# "<pid controller>/<joint>"), and each PID closes the loop on the encoder velocity.
+# The launch file spawns the PIDs named there together with the drive controller.
 /**:
   controller_manager:
     ros__parameters:
@@ -19,15 +20,19 @@
    
       pid_controller_rl_wheel_base_to_rl_wheel_joint:
         type: pid_controller/PidController
+        node_options_args: ["-r", "~/transition_event:=_pid_controller_rl_wheel_base_to_rl_wheel_joint/transition_event"]
 
       pid_controller_rr_wheel_base_to_rr_wheel_joint:
         type: pid_controller/PidController
+        node_options_args: ["-r", "~/transition_event:=_pid_controller_rr_wheel_base_to_rr_wheel_joint/transition_event"]
 
       pid_controller_fl_wheel_base_to_fl_wheel_joint:
         type: pid_controller/PidController
+        node_options_args: ["-r", "~/transition_event:=_pid_controller_fl_wheel_base_to_fl_wheel_joint/transition_event"]
 
       pid_controller_fr_wheel_base_to_fr_wheel_joint:
         type: pid_controller/PidController
+        node_options_args: ["-r", "~/transition_event:=_pid_controller_fr_wheel_base_to_fr_wheel_joint/transition_event"]
             
       rover_drive_controller:
         type: diff_drive_controller/DiffDriveController
@@ -40,6 +45,12 @@
         node_options_args: ["-r", "~/imu:=imu/data",
                             "-r", "~/transition_event:=_rover_imu_broadcaster/transition_event"]
 
+  # Wheel PID gains (all four identical). Units: rad/s in, rad/s out.
+  # The hardware command is already rad/s scaled to duty (open loop), so feedforward_gain 1.0
+  # carries the bulk and PI only trims load/battery/slip error. p = i = 0 with feedforward 1.0
+  # is exactly the old open-loop behaviour - use it for A/B runs:
+  #   ros2 param set <ns>/pid_controller_<wheel> gains.<joint>.p 0.0   (and .i)
+  # u_clamp is the hardware full-duty speed (2800 rpm / 23.3 = 12.58 rad/s).
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
@@ -52,7 +63,7 @@
         - velocity
         
       gains:
-        rl_wheel_base_to_rl_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
+        rl_wheel_base_to_rl_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
 
   pid_controller_rr_wheel_base_to_rr_wheel_joint:
     ros__parameters:
@@ -66,7 +77,7 @@
         - velocity
         
       gains:
-        rr_wheel_base_to_rr_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
+        rr_wheel_base_to_rr_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
 
   pid_controller_fl_wheel_base_to_fl_wheel_joint:
     ros__parameters:
@@ -80,7 +91,7 @@
         - velocity
         
       gains:
-        fl_wheel_base_to_fl_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
+        fl_wheel_base_to_fl_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
 
   pid_controller_fr_wheel_base_to_fr_wheel_joint:
     ros__parameters:
@@ -94,7 +105,7 @@
         - velocity
         
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 0.4, "i": 0.8, "d": 0.001, "i_clamp_min": -5.0, "i_clamp_max": 5.0, "antiwindup": true, "feedforward_gain": 0.0}
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
 
   rover_imu_broadcaster:
     ros__parameters:
@@ -107,8 +118,12 @@
   rover_drive_controller:
     ros__parameters:
 
-      left_wheel_names: ["rl_wheel_base_to_rl_wheel_joint", "fl_wheel_base_to_fl_wheel_joint"]
-      right_wheel_names: ["rr_wheel_base_to_rr_wheel_joint", "fr_wheel_base_to_fr_wheel_joint"]
+      # Chained through the wheel PIDs: "<pid controller>/<joint>" -> the PID's reference
+      # (command) and state interfaces. Plain joint names here drive the wheels open loop.
+      left_wheel_names: ["pid_controller_rl_wheel_base_to_rl_wheel_joint/rl_wheel_base_to_rl_wheel_joint",
+                         "pid_controller_fl_wheel_base_to_fl_wheel_joint/fl_wheel_base_to_fl_wheel_joint"]
+      right_wheel_names: ["pid_controller_rr_wheel_base_to_rr_wheel_joint/rr_wheel_base_to_rr_wheel_joint",
+                          "pid_controller_fr_wheel_base_to_fr_wheel_joint/fr_wheel_base_to_fr_wheel_joint"]
 
       wheels_per_side: 2
       # Must match rover_description/config/wheel_01.yaml (enforced by test/test_wheel_geometry.py)
