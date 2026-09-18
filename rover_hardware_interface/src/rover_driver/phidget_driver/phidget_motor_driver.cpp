@@ -224,6 +224,20 @@ void PhidgetMotorDriver::initialize()
             std::to_string(channel_));
     }
 
+    // Read back what the device actually runs at (DCC1000: 50 ms minimum) - the stale-velocity
+    // timeout is derived from it.
+    uint32_t dataInterval = minDataInterval;
+
+    if (PhidgetEncoder_getDataInterval(encoder_handle_, &dataInterval) != EPHIDGET_OK) {
+        dataInterval = minDataInterval;
+    }
+
+    encoder_stale_timeout_ns_.store(encoderStaleTimeout(dataInterval).count(),
+        std::memory_order_relaxed);
+
+    RCLCPP_INFO(logger_, "Motor channel %d encoder data interval = %u ms (stale timeout %u ms)",
+        channel_, dataInterval, 3u * dataInterval);
+
     ret = PhidgetEncoder_setOnPositionChangeHandler(encoder_handle_, positionChangeHandler, this);
 
     if (ret != EPHIDGET_OK) {
@@ -413,12 +427,19 @@ MotorDriverState PhidgetMotorDriver::readState()
     if (last_encoder_event_ns == 0 ||
         isCommTimedOut(
             std::chrono::steady_clock::time_point(std::chrono::nanoseconds(last_encoder_event_ns)),
-            std::chrono::steady_clock::now(), kEncoderStaleTimeout))
+            std::chrono::steady_clock::now(),
+            std::chrono::nanoseconds(encoder_stale_timeout_ns_.load(std::memory_order_relaxed))))
     {
         state_snapshot_.vel = 0.0;
     }
 
     return state_snapshot_;
+}
+
+std::chrono::nanoseconds PhidgetMotorDriver::encoderStaleTimeout(
+    const std::uint32_t data_interval_ms)
+{
+    return std::chrono::milliseconds(3u * data_interval_ms);
 }
 
 double PhidgetMotorDriver::encoderCountsToMotorRpm(

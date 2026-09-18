@@ -84,4 +84,13 @@ TEST(PhidgetMotorDriverEncoderTest, InvalidIntervalGivesZero)
     EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(100, 1.0, 0.0f), 0.0);
 }
 
+TEST(PhidgetMotorDriverEncoderTest, StaleTimeoutSpansSeveralEncoderIntervals)
+{
+    using std::chrono::milliseconds;
+    // DCC1000 minimum encoder interval: a turning wheel must survive a late event.
+    EXPECT_EQ(PhidgetMotorDriver::encoderStaleTimeout(50), milliseconds(150));
+    EXPECT_EQ(PhidgetMotorDriver::encoderStaleTimeout(200), milliseconds(600));
+    EXPECT_GT(PhidgetMotorDriver::encoderStaleTimeout(50), milliseconds(2 * 50));
+}
+
 }  // namespace rover_hardware_interface

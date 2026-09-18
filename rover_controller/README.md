@@ -42,7 +42,11 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
 
 1. **Wheel-speed loop.** Run the step-response tool with the wheels off the ground
    first, then on the ground. Tune the PID gains until overshoot stays under 10 %
-   and steady-state error under 3 %.
+   and steady-state error under 3 %. The DCC1000 encoders report at most every
+   50 ms (20 Hz), while the controllers run at 100 Hz, so each PID gets a new
+   measurement only every ~5 cycles. Keep the PI gains modest, and read measured
+   dead times as accurate to about 50 ms. The driver logs each channel's actual
+   encoder interval at startup.
 
    ```bash
    ros2 run rover_controller wheel_step_response --ros-args -r __ns:=/<ns> -p enable_motion:=true

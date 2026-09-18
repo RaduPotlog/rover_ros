@@ -117,10 +117,12 @@ public:
     static double encoderCountsToMotorRpm(
         const std::int64_t delta_counts, const double dt_s, const float lines);
 
-    // How long without an encoder event before the reported speed is forced to 0. The encoder
-    // callback only fires when the position changes, so without this a wheel that stops keeps
-    // reporting its last non-zero speed.
-    static constexpr std::chrono::milliseconds kEncoderStaleTimeout{50};
+    // How long without an encoder event before the reported speed is forced to 0, for an encoder
+    // reporting every `data_interval_ms`. Without it a wheel that stops keeps reporting its last
+    // non-zero speed if the callback doesn't fire at standstill. 3x the interval so one or two
+    // late/missed events don't zero the speed of a turning wheel - the DCC1000 encoder can't
+    // report faster than every 50 ms, so the timeout must never be near a single interval.
+    static std::chrono::nanoseconds encoderStaleTimeout(const std::uint32_t data_interval_ms);
 
 private:
 
@@ -199,6 +201,10 @@ private:
 
     // steady_clock ns of the last encoder event; written on the SDK thread, read in readState().
     std::atomic<std::int64_t> last_encoder_event_ns_{0};
+
+    // encoderStaleTimeout() of the interval the encoder actually runs at; set in initialize().
+    std::atomic<std::int64_t> encoder_stale_timeout_ns_{
+        encoderStaleTimeout(50).count()};
 
     bool direction_reversed_;
 

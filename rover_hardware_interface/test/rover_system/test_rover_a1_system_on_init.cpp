@@ -218,7 +218,8 @@ TEST(RoverA1SystemOnInit, FailsWithUnparsableMotorFailsafeTimeoutMs)
     EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
 }
 
-// motor_acceleration is optional too (default kDefaultMotorAcceleration), but must be > 0.
+// motor_acceleration is optional too (default kDefaultMotorAcceleration), but must be within
+// the DCC1000's 0.5-10000 duty/s.
 TEST(RoverA1SystemOnInit, SucceedsWithMotorAccelerationOverride)
 {
     RoverA1System system;
@@ -235,6 +236,17 @@ TEST(RoverA1SystemOnInit, FailsWithNonPositiveMotorAcceleration)
     info.hardware_parameters["motor_acceleration"] = "0.0";
 
     EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
+}
+
+TEST(RoverA1SystemOnInit, FailsWithMotorAccelerationOutsideDeviceRange)
+{
+    for (const char * value : {"0.3", "20000"}) {
+        RoverA1System system;
+        auto info = buildValidHardwareInfo();
+        info.hardware_parameters["motor_acceleration"] = value;
+
+        EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR) << value;
+    }
 }
 
 }  // namespace rover_hardware_interface

@@ -485,9 +485,12 @@ void RoverSystem::readDrivetrainSettings()
             ? kDefaultMotorAcceleration
             : std::stof(info_.hardware_parameters.at("motor_acceleration"));
 
-    if (drivetrain_settings_.motor_acceleration <= 0.0f) {
+    // DCC1000 accepts 0.5-10000 duty/s; reject here rather than fail later in the SDK call.
+    if (drivetrain_settings_.motor_acceleration < 0.5f ||
+        drivetrain_settings_.motor_acceleration > 10000.0f)
+    {
         throw std::runtime_error(
-            "motor_acceleration must be > 0, got " +
+            "motor_acceleration must be in [0.5, 10000] duty/s, got " +
             std::to_string(drivetrain_settings_.motor_acceleration) + ".");
     }
 }
