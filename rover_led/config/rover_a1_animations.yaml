@@ -1,13 +1,14 @@
 # Panther-style layout: one full-width segment per bumper.
-# Front bumper = channel 1: one straight strip, LED 0 on the robot's right.
-# Rear bumper = channel 2: 2 rows x 20 LEDs wired in series. Seen from behind, LED 0
-# is on the right, row 1 (0-19) runs right->left and row 2 (20-39) comes back
-# left->right. "rows: 2" folds the 40-LED segment into that layout: segment LEDs
-# 2k and 2k+1 are the two LEDs of column k counted from the right. So on both
-# bumpers segment LED 0 is the robot's right, and one image works for both.
+# Both bumpers are 2 rows x 20 LEDs wired in series, with LED 0 on the robot's right:
+#   front = channel 1, seen from the front:  0 ... 19  over  39 ... 20
+#   rear  = channel 2, seen from behind:    19 ...  0  over  20 ... 39
+# "rows: 2" folds each 40-LED segment into that layout: segment LEDs 2k and 2k+1
+# are the two LEDs of column k counted from the robot's right. So on both bumpers
+# segment LED 0 is the robot's right, and one image works for both.
 panels:
   - channel: 1
     number_of_leds: 40
+    rows: 2
   - channel: 2
     number_of_leds: 40
     rows: 2

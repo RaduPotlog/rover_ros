@@ -14,9 +14,9 @@
 
 // Renders BLINKER_LEFT / BLINKER_RIGHT from the shipped rover_a1 config through
 // the same use cases as rover_led_controller, and checks they light opposite
-// sides of each bumper. The rear panel is 2 rows x 20 LEDs in series (see
-// rover_a1_animations.yaml); frames are in wire order, so the rear sides are
-// checked by physical column.
+// sides of each bumper. Both panels are 2 rows x 20 LEDs in series (see
+// rover_a1_animations.yaml); frames are in wire order, so sides are checked by
+// physical column.
 
 #include <cstddef>
 #include <cstdint>
@@ -51,9 +51,9 @@ constexpr float kControllerFrequency = 50.0f;
 
 using LitLeds = std::map<std::size_t, std::set<std::size_t>>;
 
-// Rear panel seen from behind: row 1 (LEDs 0-19) runs right->left from LED 0,
-// row 2 (LEDs 20-39) comes back left->right. Column 0 is the robot's right.
-std::size_t rearColumnFromRight(const std::size_t led)
+// Both panels: row 1 (LEDs 0-19) runs away from LED 0 on the robot's right,
+// row 2 (LEDs 20-39) comes back. Column 0 is the robot's right.
+std::size_t columnFromRobotRight(const std::size_t led)
 {
     return led < 20 ? led : 39 - led;
 }
@@ -151,10 +151,7 @@ LitLeds playAndCollectLitLeds(const std::size_t animation_id)
 
 }  // namespace
 
-using ::testing::Each;
-using ::testing::Ge;
 using ::testing::IsEmpty;
-using ::testing::Lt;
 using ::testing::Not;
 
 TEST(ShippedBlinkers, LeftAndRightLightOppositeEndsOfEachBumper)
@@ -174,23 +171,22 @@ TEST(ShippedBlinkers, LeftAndRightLightOppositeEndsOfEachBumper)
         }
     }
 
-    // Front is one straight strip, LED 0 on the robot's right.
-    EXPECT_THAT(right.at(kFrontChannel), Each(Lt(20u)));
-    EXPECT_THAT(left.at(kFrontChannel), Each(Ge(20u)));
+    // Each blinker lights its own side of the robot on both rows of both panels.
+    for (const auto channel : {kFrontChannel, kRearChannel}) {
+        for (const auto & [lit, on_right] : {std::pair{right, true}, std::pair{left, false}}) {
+            bool first_row = false;
+            bool second_row = false;
 
-    // Rear: each blinker lights its own side on both rows.
-    for (const auto & [lit, on_right] : {std::pair{right, true}, std::pair{left, false}}) {
-        bool first_row = false;
-        bool second_row = false;
+            for (const auto led : lit.at(channel)) {
+                EXPECT_EQ(columnFromRobotRight(led) < 10, on_right)
+                    << "LED " << led << " on channel " << channel << " is on the wrong side for BLINKER_"
+                    << (on_right ? "RIGHT" : "LEFT");
+                (led < 20 ? first_row : second_row) = true;
+            }
 
-        for (const auto led : lit.at(kRearChannel)) {
-            EXPECT_EQ(rearColumnFromRight(led) < 10, on_right)
-                << "rear LED " << led << " is on the wrong side for BLINKER_"
-                << (on_right ? "RIGHT" : "LEFT");
-            (led < 20 ? first_row : second_row) = true;
+            EXPECT_TRUE(first_row && second_row)
+                << "BLINKER_" << (on_right ? "RIGHT" : "LEFT") << " does not light both rows of channel "
+                << channel;
         }
-
-        EXPECT_TRUE(first_row && second_row)
-            << "BLINKER_" << (on_right ? "RIGHT" : "LEFT") << " does not light both rear rows";
     }
 }

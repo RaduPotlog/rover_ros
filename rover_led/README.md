@@ -71,19 +71,21 @@ of Husarion Panther's `panther_animations.yaml`: the front bumper is channel 1, 
 channel 2, and each bumper is one full-width segment. Front and rear play different images for the
 same state, and directional animations such as blinkers work.
 
-The rear panel is physically 2 rows × 20 LEDs wired in series: seen from behind, LED 0 is on the
-right, row 1 (0–19) runs right→left and row 2 (20–39) comes back left→right. The panel's `rows: 2`
-folds the logical 40-LED frame into that wiring (logical LEDs 2k and 2k+1 are the two LEDs of
-column k), so on both bumpers segment LED 0 is the robot's right and every animation, blinkers
-included, lights the same physical side front and rear.
+Both panels are physically 2 rows × 20 LEDs wired in series, with LED 0 on the robot's right:
+seen from the front the front panel reads 0–19 over 39–20, and seen from behind the rear panel
+reads 19–0 over 20–39. Each panel's `rows: 2` folds the logical 40-LED frame into that wiring
+(logical LEDs 2k and 2k+1 are the two LEDs of column k from the robot's right), so on both bumpers
+segment LED 0 is the robot's right and every animation, blinkers included, lights the same physical
+side front and rear.
 
 ```yaml
 panels:            # physical strips: UDP channel + LED count
   - channel: 1
     number_of_leds: 40
+    rows: 2        # optional: strip folded into serpentine rows (default 1)
   - channel: 2
     number_of_leds: 40
-    rows: 2        # optional: strip folded into serpentine rows (default 1)
+    rows: 2
 segments:          # virtual strips on a panel; a reversed range runs backwards
   - name: front
     channel: 1
