@@ -62,7 +62,7 @@ Parameters (`src/led_driver_parameters.yaml`, values in `config/rover_a1_driver.
 
 These are lifecycle `rover_udp_sender_node` instances. Each one subscribes to
 `udp_write/led_channel_<n>` and sends to the address in
-`config/rover_a1_udp_led_channel_<n>.yaml` (`192.168.77.201`, port `3333`).
+`config/rover_a1_udp_led_channel_<n>.yaml` (channel 1 → `192.168.77.202`, channel 2 → `192.168.77.201`, port `3333`).
 
 ## Animations
 

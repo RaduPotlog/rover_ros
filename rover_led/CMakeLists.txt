@@ -188,6 +188,10 @@ if(BUILD_TESTING)
                      test/unit/infrastructure/test_yaml_led_config.cpp led_controller_node_component)
   target_compile_definitions(test_yaml_led_config PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
+  rover_led_add_test(test_shipped_blinkers
+                     test/unit/infrastructure/test_shipped_blinkers.cpp led_controller_node_component)
+  target_compile_definitions(test_shipped_blinkers PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
   rover_led_add_test(test_led_controller_diagnostics
                      test/unit/infrastructure/test_led_controller_diagnostics.cpp
                      led_controller_node_component)
