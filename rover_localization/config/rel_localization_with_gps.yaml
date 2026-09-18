@@ -2,9 +2,11 @@
 #   rover_ekf_node              odom -> base_link   wheels + IMU yaw rate      (same as rel_localization.yaml)
 #   rover_ekf_global_node       map  -> odom        wheels + IMU yaw rate + GPS position
 #   rover_navsat_transform_node gps/fix + gps/heading_imu + odometry/global -> odometry/gps
-# rover_gps_node publishes gps/heading_imu only after it aligned the odom yaw to ENU from the
-# GNSS course while driving straight; until then navsat_transform has no transform, and the
-# global filter runs on wheels + IMU only.
+#   rover_gps_heading_node      gps/fix + odom -> gps/heading_imu (ENU heading from GNSS course)
+# gps/fix comes from the sensor payload (rover-a1-sensors container). rover_gps_heading_node
+# publishes gps/heading_imu only after it aligned the odom yaw to ENU from the GNSS course while
+# driving straight; until then navsat_transform has no transform, and the global filter runs on
+# wheels + IMU only.
 /**:
   rover_ekf_node:
     ros__parameters:
@@ -233,7 +235,7 @@
       frequency: 10.0
       # Wait for the filters and the first fixes before computing the transform.
       delay: 3.0
-      # gps/heading_imu (rover_gps) is already an ENU heading derived from GNSS course, so no
+      # gps/heading_imu (rover_gps_heading_node) is already an ENU heading derived from GNSS course, so no
       # magnetic declination and no IMU mounting offset apply.
       magnetic_declination_radians: 0.0
       yaw_offset: 0.0
@@ -242,3 +244,20 @@
       publish_filtered_gps: true
       use_odometry_yaw: false
       wait_for_datum: false
+
+  rover_gps_heading_node:
+    ros__parameters:
+      # publish_heading and heading_frame_id (<namespace>/base_link) are set by the launch file.
+      min_heading_std_rad: 0.05   # lower bound of the published yaw std
+
+      # Odom -> ENU yaw alignment from GNSS course while driving straight
+      alignment:
+        min_segment_length_m: 3.0
+        min_speed_m_s: 0.3
+        max_yaw_rate_rad_s: 0.1
+        max_yaw_change_rad: 0.1
+        max_horizontal_std_m: 5.0
+        max_fix_gap_s: 2.5
+        max_odometry_age_s: 0.5
+        required_segments: 3
+        max_offset_std_rad: 0.1
