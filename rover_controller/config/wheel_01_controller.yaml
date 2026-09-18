@@ -136,9 +136,10 @@
       cmd_vel_timeout: 0.5
       publish_limited_velocity: true
 
-      max_output: 12.0
-      min_output: -12.0
-
+      # linear.x and angular.z are limited independently, so the outer wheel rim speed is
+      #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.4695
+      # Keep that <= 1.8 m/s (10.9 rad/s): under the URDF joint limit (10.958 rad/s) and
+      # ~10% under the 2 m/s wheel maximum (hardware clamps at 2800 rpm / 23.3 = 12.58 rad/s).
       linear:
         x:
           max_velocity: 1.0 # m/s
@@ -152,8 +153,8 @@
 
       angular:
         z:
-          max_velocity: 2.0 # rad/s
-          min_velocity: -2.0 # rad/s
+          max_velocity: 1.7 # rad/s
+          min_velocity: -1.7 # rad/s
           max_acceleration: 3.74 # rad/s^2
           max_deceleration: -3.74 # rad/s^2
           max_acceleration_reverse: -3.74 # rad/s^2
