@@ -1,0 +1,490 @@
+{
+  "configById": {
+    "Image!2zxrowa": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 60,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/rover/move_base_simple/goal",
+        "pointTopic": "/rover/clicked_point",
+        "poseEstimateTopic": "/rover/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "synchronize": false,
+      "imageMode": {
+        "imageTopic": "/rover/led/channel_1_frame"
+      }
+    },
+    "Image!27i71en": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 60,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/rover/move_base_simple/goal",
+        "pointTopic": "/rover/clicked_point",
+        "poseEstimateTopic": "/rover/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "synchronize": false,
+      "imageMode": {
+        "imageTopic": "/rover/led/channel_2_frame"
+      }
+    },
+    "Stack!1s3ez02": {
+      "panels": [
+        {
+          "panelId": "Image!2zxrowa",
+          "size": 0.25
+        },
+        {
+          "panelId": "Image!27i71en",
+          "size": 0.25
+        }
+      ]
+    },
+    "RosOut!c5eeu": {
+      "minLogLevel": 1,
+      "preload": true,
+      "searchTerms": [],
+      "nameFilter": {},
+      "fontSize": 12,
+      "showLevel": true,
+      "showDate": true,
+      "showTime": true,
+      "showTimezone": true,
+      "showName": true,
+      "showSourceLocation": true
+    },
+    "Plot!3l2jzfi": {
+      "paths": [
+        {
+          "value": "/rover/system_status.avg_load_percent",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "showLine": true,
+          "color": "#4e98e2",
+          "id": "9b302063-8277-49fd-8e8d-34af3a65a5f5"
+        }
+      ]
+    },
+    "Plot!2i966dm": {
+      "yAxisLabel": "",
+      "paths": [
+        {
+          "value": "/rover/joint_states.velocity[1]",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "color": "#4e98e2",
+          "id": "5d277697-7a20-4d76-8f4e-e51a9d8d0b5f",
+          "dynamicLabelField": "",
+          "label": "FR"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/rover/joint_states.velocity[0]",
+          "enabled": true,
+          "color": "#f5774d",
+          "id": "ffafcee0-7f0f-49bb-8d00-8de98f989ae9",
+          "label": "FL"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/rover/joint_states.velocity[3]",
+          "enabled": true,
+          "color": "#f7df71",
+          "id": "aed83021-561c-4b69-b348-54b8a17876f9",
+          "label": "RR"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/rover/joint_states.velocity[2]",
+          "enabled": true,
+          "color": "#5cd6a9",
+          "id": "3d8c2555-1e70-4e7e-80d8-6b14d3cd93c4",
+          "label": "RL"
+        }
+      ],
+      "foxglovePanelTitle": "ddsasd",
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "showLegend": true
+    },
+    "RawMessages!ql9qq3": {
+      "defaultExpanded": false,
+      "topicPath": "/rover/joint_states",
+      "diffEnabled": false
+    },
+    "RawMessages!e9nfl6": {
+      "defaultExpanded": false,
+      "topicPath": "/rover/diagnostics",
+      "diffEnabled": false
+    },
+    "Indicator!1ja73dx": {
+      "path": "/rover/hardware_interface/gpio_state.gpio_pin_sw_e_stop_user_button",
+      "style": "bulb",
+      "fontSize": 36,
+      "fallbackColor": "#ff0000",
+      "fallbackLabel": "PRESSED",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "false",
+          "color": "#33ff00",
+          "label": "READY"
+        }
+      ],
+      "foxglovePanelTitle": "SW-E-STOP Button"
+    },
+    "CallService!dze8fj": {
+      "requestPayload": "{}",
+      "layout": "vertical",
+      "timeoutSeconds": 10,
+      "serviceName": "/rover/hardware_interface/sw_user_e_stop_reset",
+      "editingMode": false,
+      "buttonText": "SW_USER_E_STOP_ACTUATE",
+      "buttonColor": "#33f247",
+      "foxglovePanelTitle": "SW-E-STOP Button"
+    },
+    "CallService!4ayccr2": {
+      "requestPayload": "{}",
+      "layout": "vertical",
+      "timeoutSeconds": 10,
+      "serviceName": "/rover/hardware_interface/sw_user_e_stop_set",
+      "editingMode": false,
+      "buttonText": "SW_USER_E_STOP_PRESS",
+      "buttonColor": "#ff0000",
+      "foxglovePanelTitle": "SW-E-STOP Button"
+    },
+    "Indicator!3nvxjn7": {
+      "path": "/rover/hardware_interface/gpio_state.gpio_pin_sw_e_stop_latch_status",
+      "style": "bulb",
+      "fontSize": 36,
+      "fallbackColor": "#00ff1a",
+      "fallbackLabel": "TRUE",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#e34b4b",
+          "label": "FALSE"
+        }
+      ],
+      "foxglovePanelTitle": "SW-E-STOP-LATCH STATUS"
+    },
+    "CallService!r2rx5z": {
+      "requestPayload": "{}",
+      "layout": "vertical",
+      "timeoutSeconds": 10,
+      "editingMode": false,
+      "serviceName": "/rover/hardware_interface/sw_e_stop_latch_reset",
+      "foxglovePanelTitle": "SW-E-STOP-LATCH RESET",
+      "buttonText": "SW-E-STOP-LATCH RESET",
+      "buttonColor": "#33f24d"
+    },
+    "Indicator!25x422y": {
+      "path": "/rover/hardware_interface/gpio_state.gpio_pin_hw_e_stop_user_button",
+      "style": "bulb",
+      "fontSize": 30,
+      "fallbackColor": "#ff0000",
+      "fallbackLabel": "SET",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "false",
+          "color": "#33ff00",
+          "label": "READY"
+        }
+      ],
+      "foxglovePanelTitle": "HW-E-STOP Button"
+    },
+    "Indicator!6s1jl": {
+      "path": "/rover/hardware_interface/gpio_state.gpio_pin_motor_contactor_engaged",
+      "style": "bulb",
+      "fontSize": 30,
+      "fallbackColor": "#ff0000",
+      "fallbackLabel": "NOT READY",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#00ff1a",
+          "label": "READY"
+        }
+      ],
+      "foxglovePanelTitle": "Motor Contactor Engaged Status"
+    },
+    "Indicator!2lcrs0u": {
+      "path": "/rover/hardware_interface/gpio_state.gpio_pin_cpu_wdg_heartbeat",
+      "style": "bulb",
+      "fontSize": 30,
+      "fallbackColor": "#ff0000",
+      "fallbackLabel": "FALSE",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#68e24a",
+          "label": "TRUE"
+        }
+      ],
+      "foxglovePanelTitle": "Watchdog"
+    },
+    "Indicator!mid9o6": {
+      "path": "/rover/hardware_interface/gpio_state.gpio_pin_sw_e_stop_motor_driver_fault",
+      "style": "bulb",
+      "fontSize": 36,
+      "fallbackColor": "#00ff32",
+      "fallbackLabel": "FALSE",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#e34b4b",
+          "label": "TRUE"
+        }
+      ],
+      "foxglovePanelTitle": "MOTOR DRIVER FAULT"
+    },
+    "Indicator!4j5axg9": {
+      "path": "/rover/motion_lock.data",
+      "style": "bulb",
+      "fontSize": 36,
+      "fallbackColor": "#ff0000",
+      "fallbackLabel": "FALSE",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "true",
+          "color": "#00ff48",
+          "label": "TRUE"
+        }
+      ],
+      "foxglovePanelTitle": "MOTION_LOCK"
+    },
+    "Gauge!2x8cm1e": {
+      "path": "/rover/rover_battery/battery_status.temperature",
+      "style": "dial",
+      "minValue": 0,
+      "maxValue": 60,
+      "tickInterval": 10,
+      "showTicks": true,
+      "colorMap": "red-yellow-green",
+      "colorMode": "gradient",
+      "gradient": [
+        "#00ff05ff",
+        "#ff0000ff"
+      ],
+      "reverse": false,
+      "reverseDirection": false,
+      "foxglovePanelTitle": "Battery Temp"
+    },
+    "Gauge!410rqfx": {
+      "path": "/rover/rover_battery/battery_status.current",
+      "style": "dial",
+      "minValue": -10,
+      "maxValue": 10,
+      "tickInterval": 1,
+      "showTicks": true,
+      "colorMap": "red-yellow-green",
+      "colorMode": "colormap",
+      "gradient": [
+        "#0000ff",
+        "#ff00ff"
+      ],
+      "reverse": true,
+      "reverseDirection": true
+    },
+    "Gauge!2p2ph1m": {
+      "path": "/rover/rover_battery/battery_status.percentage",
+      "style": "bar",
+      "minValue": 0,
+      "maxValue": 1,
+      "tickInterval": 0.2,
+      "showTicks": true,
+      "colorMap": "rainbow",
+      "colorMode": "colormap",
+      "gradient": [
+        "#0000ff",
+        "#ff00ff"
+      ],
+      "reverse": true,
+      "reverseDirection": false
+    },
+    "virtual-joystick.Virtual Joystick!1g1w7co": {
+      "publishRate": 10,
+      "maxLinearSpeed": 2,
+      "maxAngularSpeed": 2,
+      "topic": "/rover/teleop_foxglove_cmd_vel_stamped",
+      "messageSchema": "geometry_msgs/msg/TwistStamped"
+    },
+    "DiagnosticStatusPanel!41058qk": {
+      "topicToRender": "/rover/diagnostics",
+      "selectedHardwareId": "ros2_control"
+    }
+  },
+  "globalVariables": {
+    "ns": "rover"
+  },
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": {
+      "first": {
+        "first": {
+          "first": {
+            "first": "Stack!1s3ez02",
+            "second": "RosOut!c5eeu",
+            "direction": "column"
+          },
+          "second": "Plot!3l2jzfi",
+          "direction": "row",
+          "splitPercentage": 60.93344857389802
+        },
+        "second": "Plot!2i966dm",
+        "direction": "row",
+        "splitPercentage": 82.50458348061741
+      },
+      "second": {
+        "first": "RawMessages!ql9qq3",
+        "second": "RawMessages!e9nfl6",
+        "direction": "column"
+      },
+      "direction": "row",
+      "splitPercentage": 68.40713813615334
+    },
+    "second": {
+      "first": {
+        "first": {
+          "first": {
+            "first": {
+              "first": "Indicator!1ja73dx",
+              "second": "CallService!dze8fj",
+              "direction": "column",
+              "splitPercentage": 52.94117647058824
+            },
+            "second": "CallService!4ayccr2",
+            "direction": "column",
+            "splitPercentage": 68.0591164681927
+          },
+          "second": {
+            "first": {
+              "first": {
+                "first": {
+                  "first": "Indicator!3nvxjn7",
+                  "second": "CallService!r2rx5z",
+                  "direction": "column"
+                },
+                "second": "Indicator!25x422y",
+                "direction": "row",
+                "splitPercentage": 54.33673469387753
+              },
+              "second": "Indicator!6s1jl",
+              "direction": "row",
+              "splitPercentage": 63.92092257001648
+            },
+            "second": {
+              "first": "Indicator!2lcrs0u",
+              "second": {
+                "first": "Indicator!mid9o6",
+                "second": "Indicator!4j5axg9",
+                "direction": "row",
+                "splitPercentage": 49.06668061433009
+              },
+              "direction": "row",
+              "splitPercentage": 30.68181818181821
+            },
+            "direction": "row",
+            "splitPercentage": 51.8103448275862
+          },
+          "direction": "row",
+          "splitPercentage": 17.261055634807416
+        },
+        "second": {
+          "first": {
+            "first": {
+              "first": "Gauge!2x8cm1e",
+              "second": "Gauge!410rqfx",
+              "direction": "row",
+              "splitPercentage": 46.9951923076923
+            },
+            "second": "Gauge!2p2ph1m",
+            "direction": "row",
+            "splitPercentage": 66.7535853976532
+          },
+          "second": "virtual-joystick.Virtual Joystick!1g1w7co",
+          "direction": "row",
+          "splitPercentage": 66.307415288918
+        },
+        "direction": "column",
+        "splitPercentage": 52.641578781770335
+      },
+      "second": "DiagnosticStatusPanel!41058qk",
+      "direction": "row",
+      "splitPercentage": 68.27033218785796
+    },
+    "direction": "column",
+    "splitPercentage": 48.25890915413552
+  }
+}
