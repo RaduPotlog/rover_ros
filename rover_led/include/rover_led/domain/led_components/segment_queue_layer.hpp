@@ -40,6 +40,10 @@ public:
 
     void updateAnimation() override;
 
+    // Also drops queued copies of the animation; a stopped current animation
+    // hands over to the next queued one.
+    bool stopAnimation(const std::size_t id) override;
+
     static constexpr std::size_t kMaxQueueSize = 10;
 
 protected:

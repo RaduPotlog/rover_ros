@@ -98,6 +98,7 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
 
     set_animation_use_case_ = std::make_unique<SetAnimationUseCase>(
         catalog, animation_factory_, segments, controller_freq);
+    stop_animation_use_case_ = std::make_unique<StopAnimationUseCase>(catalog, segments);
     render_tick_use_case_ = std::make_unique<RenderTickUseCase>(segments, panels);
     get_led_state_use_case_ = std::make_unique<GetLedStateUseCase>(segments);
 
@@ -112,6 +113,8 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
 
     set_led_animation_server_ = this->create_service<SetLedAnimationSrv>(
         "led/set_animation", std::bind(&LedControllerNode::setLedAnimationCallback, this, _1, _2));
+    stop_led_animation_server_ = this->create_service<StopLedAnimationSrv>(
+        "led/stop_animation", std::bind(&LedControllerNode::stopLedAnimationCallback, this, _1, _2));
 
     controller_timer_ = this->create_wall_timer(
         std::chrono::microseconds(static_cast<std::uint64_t>(1e6 / controller_freq)),
@@ -188,6 +191,33 @@ void LedControllerNode::setLedAnimationCallback(
         response->message = e.what();
         diagnostics_.last_rejected_request =
             "id " + std::to_string(request->animation.id) + ": " + response->message;
+    }
+}
+
+void LedControllerNode::stopLedAnimationCallback(
+    const StopLedAnimationSrv::Request::SharedPtr & request,
+    StopLedAnimationSrv::Response::SharedPtr response)
+{
+    try {
+        const auto result = stop_animation_use_case_->execute(request->id);
+
+        if (result.stopped_segments.empty()) {
+            response->success = false;
+            response->message = "'" + result.name + "' is not playing.";
+            return;
+        }
+
+        std::string segments;
+
+        for (const auto & segment : result.stopped_segments) {
+            segments += (segments.empty() ? "" : ", ") + segment;
+        }
+
+        response->success = true;
+        response->message = "Stopped '" + result.name + "' on " + segments + ".";
+    } catch (const std::exception & e) {
+        response->success = false;
+        response->message = e.what();
     }
 }
 

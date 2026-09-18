@@ -62,6 +62,10 @@ public:
 
     void updateAnimation();
 
+    // Stops the animation with this catalog id on the given priority layer.
+    // Returns false if that layer isn't playing (or queueing) it.
+    bool stopAnimation(const std::size_t id, const std::uint8_t priority);
+
     bool isAnimationFinished(AnimationPriority layer) const;
 
     std::vector<std::uint8_t> getAnimationFrame() const;

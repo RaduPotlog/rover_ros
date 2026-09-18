@@ -34,6 +34,7 @@ rosidl_generate_interfaces(
     "srv/SetLedBrightness.srv"
     "srv/SetLedAnimation.srv"
     "srv/SetLedImageAnimation.srv"
+    "srv/StopLedAnimation.srv"
 
     DEPENDENCIES
         std_msgs

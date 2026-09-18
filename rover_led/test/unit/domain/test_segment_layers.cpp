@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -178,4 +181,109 @@ TEST(SegmentQueueLayer, StatusCountsQueuedAnimations)
     layer.updateAnimation();
     layer.updateAnimation();
     EXPECT_EQ(layer.getStatus()->queued, 1u);
+}
+
+namespace
+{
+
+std::shared_ptr<rover_led::test::StubAnimation> makeStubWithId(const std::size_t id, const Rgba color = {0, 0, 0, 255})
+{
+    auto animation = makeStub(1, color);
+    animation->setInfo({id, "STUB_" + std::to_string(id), ""});
+
+    return animation;
+}
+
+}  // namespace
+
+TEST(SegmentLayer, StopsTheMatchingRepeatingAnimation)
+{
+    SegmentLayer layer(1, false);
+    layer.setAnimation(makeStubWithId(7, {9, 0, 0, 255}), true);
+    layer.updateAnimation();
+
+    EXPECT_TRUE(layer.stopAnimation(7));
+    EXPECT_FALSE(layer.hasAnimation());
+    EXPECT_FALSE(layer.getStatus().has_value());
+    EXPECT_EQ(layer.getAnimationFrame(), std::vector<std::uint8_t>(4, 0));
+}
+
+TEST(SegmentLayer, StopIgnoresOtherAnimations)
+{
+    SegmentLayer layer(1, false);
+    EXPECT_FALSE(layer.stopAnimation(7));
+
+    layer.setAnimation(makeStubWithId(3), true);
+    layer.updateAnimation();
+
+    EXPECT_FALSE(layer.stopAnimation(7));
+    EXPECT_TRUE(layer.hasAnimation());
+}
+
+TEST(SegmentLayer, StopIgnoresAFinishedOneShot)
+{
+    SegmentLayer layer(1, false);
+    layer.setAnimation(makeStubWithId(7), false);
+
+    for (int i = 0; i < 11; i++) {
+        layer.updateAnimation();
+    }
+
+    ASSERT_TRUE(layer.isAnimationFinished());
+    EXPECT_FALSE(layer.stopAnimation(7));
+}
+
+TEST(SegmentLayer, AcceptsANewAnimationAfterAStop)
+{
+    SegmentLayer layer(1, false);
+    layer.setAnimation(makeStubWithId(7), true);
+    layer.stopAnimation(7);
+
+    layer.setAnimation(makeStubWithId(8, {40, 0, 0, 255}), true);
+    layer.updateAnimation();
+
+    EXPECT_EQ(pixel(layer.getAnimationFrame(), 0)[0], 40);
+}
+
+TEST(SegmentQueueLayer, StoppingTheCurrentAnimationPlaysTheNextQueuedOne)
+{
+    SegmentQueueLayer layer(1, false);
+    layer.setAnimation(makeStubWithId(7, {10, 0, 0, 255}), false);
+    layer.setAnimation(makeStubWithId(8, {50, 0, 0, 255}), false);
+    layer.updateAnimation();
+
+    EXPECT_TRUE(layer.stopAnimation(7));
+    layer.updateAnimation();
+
+    EXPECT_EQ(pixel(layer.getAnimationFrame(), 0)[0], 50);
+    EXPECT_EQ(layer.getStatus()->queued, 0u);
+}
+
+TEST(SegmentQueueLayer, StopDropsQueuedCopies)
+{
+    SegmentQueueLayer layer(1, false);
+    layer.setAnimation(makeStubWithId(8), false);
+    layer.setAnimation(makeStubWithId(7), false);
+    layer.setAnimation(makeStubWithId(7), false);
+    layer.updateAnimation();
+
+    EXPECT_TRUE(layer.stopAnimation(7));
+    EXPECT_EQ(layer.getStatus()->info.id, 8u);
+    EXPECT_EQ(layer.getStatus()->queued, 0u);
+}
+
+TEST(SegmentQueueLayer, StoppingTheLastAnimationEmptiesTheLayer)
+{
+    SegmentQueueLayer layer(1, false);
+    layer.setAnimation(makeStubWithId(7), false);
+    layer.updateAnimation();
+
+    EXPECT_TRUE(layer.stopAnimation(7));
+    EXPECT_FALSE(layer.hasAnimation());
+    EXPECT_FALSE(layer.stopAnimation(7));
+
+    // The next animation plays straight away instead of queueing.
+    layer.setAnimation(makeStubWithId(8, {50, 0, 0, 255}), false);
+    layer.updateAnimation();
+    EXPECT_EQ(pixel(layer.getAnimationFrame(), 0)[0], 50);
 }

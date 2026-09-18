@@ -90,6 +90,20 @@ public:
         animation_finished_ = false;
     }
 
+    // Stops the animation with this catalog id if the layer is playing it,
+    // leaving the layer blank. Returns false when that animation isn't playing.
+    virtual bool stopAnimation(const std::size_t id)
+    {
+        if (!isPlaying(id)) {
+            return false;
+        }
+
+        animation_.reset();
+        animation_finished_ = true;
+
+        return true;
+    }
+
     bool hasAnimation() const
     {
         return static_cast<bool>(animation_);
@@ -108,6 +122,11 @@ public:
 protected:
 
     virtual bool isRepeating() const { return false; }
+
+    bool isPlaying(const std::size_t id) const
+    {
+        return animation_ && !animation_finished_ && animation_->getInfo().id == id;
+    }
 
     virtual std::size_t getQueueSize() const { return 0; }
 

@@ -61,6 +61,15 @@ bool LedSegment::setAnimation(
     return layers_.at(static_cast<AnimationPriority>(priority))->setAnimation(animation, repeating);
 }
 
+bool LedSegment::stopAnimation(const std::size_t id, const std::uint8_t priority)
+{
+    if (priority > STATE) {
+        throw std::runtime_error("Failed to stop animation: Invalid priority value");
+    }
+
+    return layers_.at(static_cast<AnimationPriority>(priority))->stopAnimation(id);
+}
+
 void LedSegment::updateAnimation()
 {
     for (auto & [priority, layer] : layers_) {

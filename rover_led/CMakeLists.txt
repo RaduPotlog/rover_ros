@@ -19,6 +19,7 @@ set(PACKAGE_DEPENDENCIES
     rclcpp_components
     rclcpp_lifecycle
     sensor_msgs
+    std_msgs
     std_srvs
     yaml-cpp
 )
@@ -60,6 +61,7 @@ add_library(rover_led_application SHARED
     src/application/render_tick_use_case.cpp
     src/application/set_animation_use_case.cpp
     src/application/set_brightness_use_case.cpp
+    src/application/stop_animation_use_case.cpp
 )
 
 target_link_libraries(rover_led_application rover_led_domain)
@@ -93,6 +95,7 @@ target_link_libraries(led_driver_node_component
     ${rclcpp_components_TARGETS}
     ${rclcpp_lifecycle_TARGETS}
     ${sensor_msgs_TARGETS}
+    ${std_msgs_TARGETS}
     ${std_srvs_TARGETS}
 )
 
@@ -174,6 +177,8 @@ if(BUILD_TESTING)
                      test/unit/application/test_render_tick_use_case.cpp rover_led_application)
   rover_led_add_test(test_encode_frame_use_case
                      test/unit/application/test_encode_frame_use_case.cpp rover_led_application)
+  rover_led_add_test(test_stop_animation_use_case
+                     test/unit/application/test_stop_animation_use_case.cpp rover_led_application)
   rover_led_add_test(test_set_brightness_use_case
                      test/unit/application/test_set_brightness_use_case.cpp rover_led_application)
   rover_led_add_test(test_get_led_state_use_case

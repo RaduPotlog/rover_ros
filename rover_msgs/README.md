@@ -25,6 +25,7 @@ Custom messages and services of the Rover A1 stack.
 | Service | Request → Response | Served by |
 |---------|--------------------|-----------|
 | `SetLedAnimation` | `LedAnimation animation`, `bool repeating` → `success`, `message` | `rover_led` (`led/set_animation`) |
+| `StopLedAnimation` | `uint16 id` → `success`, `message` | `rover_led` (`led/stop_animation`) |
 | `SetLedBrightness` | `float32 data` (0–1) → `success`, `message` | `rover_led` (`led/set_brightness`) |
 | `SetLedImageAnimation` | front/rear `LedImageAnimation`, `interrupting`, `repeating` → `success`, `message` | not implemented by any node |
 

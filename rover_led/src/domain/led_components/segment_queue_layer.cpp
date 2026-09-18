@@ -14,6 +14,7 @@
 
 #include "rover_led/domain/led_components/segment_queue_layer.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -74,6 +75,33 @@ void SegmentQueueLayer::updateAnimation()
     } catch (const std::runtime_error & e) {
         throw std::runtime_error("Failed to update animation: " + std::string(e.what()));
     }
+}
+
+bool SegmentQueueLayer::stopAnimation(const std::size_t id)
+{
+    const auto queued = animations_queue_.size();
+
+    animations_queue_.erase(
+        std::remove_if(
+            animations_queue_.begin(), animations_queue_.end(),
+            [id](const std::shared_ptr<Animation> & animation) { return animation->getInfo().id == id; }),
+        animations_queue_.end());
+
+    bool stopped = animations_queue_.size() != queued;
+
+    if (isPlaying(id)) {
+        stopped = true;
+
+        if (animations_queue_.empty()) {
+            animation_.reset();
+            animation_finished_ = true;
+        } else {
+            animation_ = animations_queue_.front();
+            animations_queue_.pop_front();
+        }
+    }
+
+    return stopped;
 }
 
 }  // namespace rover_led

@@ -117,3 +117,24 @@ TEST(LedSegment, NonRepeatingAnimationEndsBlank)
     EXPECT_TRUE(segment.isAnimationFinished(rover_led::STATE));
     EXPECT_EQ(segment.getAnimationFrame(), std::vector<std::uint8_t>(4, 0));
 }
+
+TEST(LedSegment, StopClearsOnlyTheGivenLayer)
+{
+    LedSegment segment(LedSegmentConfig{1, 0, 0});
+
+    auto state = makeStub(1, {5, 5, 5, 255});
+    state->setInfo({1, "STATE", ""});
+    auto info = makeStub(1, {9, 9, 9, 255});
+    info->setInfo({2, "INFO", ""});
+    segment.setAnimation(state, true, rover_led::STATE);
+    segment.setAnimation(info, true, rover_led::INFO);
+    segment.updateAnimation();
+
+    // Wrong layer for that id: nothing stops.
+    EXPECT_FALSE(segment.stopAnimation(2, rover_led::STATE));
+    EXPECT_THROW(segment.stopAnimation(2, 4), std::runtime_error);
+
+    EXPECT_TRUE(segment.stopAnimation(2, rover_led::INFO));
+    EXPECT_FALSE(segment.layerHasAnimation(rover_led::INFO));
+    EXPECT_EQ(pixel(segment.getAnimationFrame(), 0), (Rgba{5, 5, 5, 255}));
+}

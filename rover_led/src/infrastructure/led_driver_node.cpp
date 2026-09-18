@@ -141,6 +141,9 @@ LedDriverNode::CallbackReturn LedDriverNode::on_configure(const rclcpp_lifecycle
     set_brightness_server_ = this->create_service<SetLedBrightnessSrv>(
         "led/set_brightness", std::bind(&LedDriverNode::setBrightnessCallback, this, _1, _2));
 
+    brightness_publisher_ = this->create_publisher<Float32Msg>(
+        "led/brightness", rclcpp::QoS(1).reliable().transient_local());
+
     RCLCPP_INFO(this->get_logger(), "Configured.");
 
     return CallbackReturn::SUCCESS;
@@ -154,6 +157,8 @@ LedDriverNode::CallbackReturn LedDriverNode::on_activate(const rclcpp_lifecycle:
     if (result != CallbackReturn::SUCCESS) {
         return result;
     }
+
+    publishBrightness();
 
     // Replies to requests of an earlier activation are stale from now on.
     control_epoch_++;
@@ -247,6 +252,7 @@ void LedDriverNode::releaseResources()
     }
 
     set_brightness_server_.reset();
+    brightness_publisher_.reset();
     enable_led_control_client_.reset();
     set_brightness_use_case_.reset();
 
@@ -405,10 +411,27 @@ void LedDriverNode::setBrightnessCallback(
         return;
     }
 
+    // Kept as the parameter too, so a reconfigure doesn't fall back to the
+    // brightness from the launch configuration.
+    this->params_.global_brightness = brightness;
+    this->set_parameter(rclcpp::Parameter("global_brightness", static_cast<double>(brightness)));
+    publishBrightness();
+
     auto str_bright = std::to_string(brightness);
     str_bright = str_bright.substr(0, str_bright.find(".") + 3);
     res->success = true;
     res->message = "Changed brightness to " + str_bright;
+}
+
+void LedDriverNode::publishBrightness()
+{
+    if (!brightness_publisher_ || !brightness_publisher_->is_activated()) {
+        return;
+    }
+
+    Float32Msg msg;
+    msg.data = static_cast<float>(this->params_.global_brightness);
+    brightness_publisher_->publish(msg);
 }
 
 void LedDriverNode::throttledWarn(const std::string & message)

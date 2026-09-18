@@ -19,6 +19,7 @@ led/set_animation ──► rover_led_controller ──led/channel_<n>_frame─�
 | Direction | Name | Type |
 |-----------|------|------|
 | srv | `led/set_animation` | `rover_msgs/SetLedAnimation` |
+| srv | `led/stop_animation` | `rover_msgs/StopLedAnimation`: clears an animation (and its queued copies) from its layer on every segment; fails if it isn't playing |
 | pub | `led/channel_<n>_frame` | `sensor_msgs/Image` (`rgba8`, one row per panel) at `controller_frequency` |
 | pub | `led/animations` | `rover_msgs/LedAnimationCatalog`, latched, once after loading |
 | pub | `led/state` | `rover_msgs/LedState` (what every layer of every segment plays), latched, at `state_publish_rate` |
@@ -33,7 +34,8 @@ Parameters (`src/led_controller_parameters.yaml`): `animations_config_path` (req
 |-----------|------|------|
 | sub | `led/channel_<n>_frame` | `sensor_msgs/Image` |
 | pub | `udp_write/led_channel_<n>` | `udp_msgs/UdpPacket` (SK9822 frame) |
-| srv | `led/set_brightness` | `rover_msgs/SetLedBrightness` (0.0–1.0) |
+| srv | `led/set_brightness` | `rover_msgs/SetLedBrightness` (0.0–1.0); also updates the `global_brightness` parameter, so it survives a reconfigure |
+| pub | `led/brightness` | `std_msgs/Float32`, latched, the brightness in effect (on activation and after each change) |
 | client | `hardware/led_control_enable` | `std_srvs/SetBool`, only with `led_control_handshake` |
 | pub | `diagnostics` | hardware id `Bumper Led`: `Led driver status` |
 
@@ -127,6 +129,7 @@ also add the constant to `rover_msgs/msg/LedAnimation.msg`. Then request it:
 ```bash
 ros2 service call /rover/led/set_animation rover_msgs/srv/SetLedAnimation \
   "{animation: {id: 1, param: ''}, repeating: true}"
+ros2 service call /rover/led/stop_animation rover_msgs/srv/StopLedAnimation "{id: 1}"
 ros2 service call /rover/led/set_brightness rover_msgs/srv/SetLedBrightness "{data: 0.5}"
 ros2 topic echo /rover/led/state
 ```

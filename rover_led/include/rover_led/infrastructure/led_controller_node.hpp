@@ -31,10 +31,12 @@
 #include "rover_msgs/msg/led_animation_catalog.hpp"
 #include "rover_msgs/msg/led_state.hpp"
 #include "rover_msgs/srv/set_led_animation.hpp"
+#include "rover_msgs/srv/stop_led_animation.hpp"
 
 #include "rover_led/application/get_led_state_use_case.hpp"
 #include "rover_led/application/render_tick_use_case.hpp"
 #include "rover_led/application/set_animation_use_case.hpp"
+#include "rover_led/application/stop_animation_use_case.hpp"
 #include "rover_led/infrastructure/led_controller_diagnostics.hpp"
 #include "rover_led/infrastructure/pluginlib_animation_factory.hpp"
 #include "rover_led/led_controller_parameters.hpp"
@@ -46,9 +48,10 @@ using ImageMsg = sensor_msgs::msg::Image;
 using LedAnimationCatalogMsg = rover_msgs::msg::LedAnimationCatalog;
 using LedStateMsg = rover_msgs::msg::LedState;
 using SetLedAnimationSrv = rover_msgs::srv::SetLedAnimation;
+using StopLedAnimationSrv = rover_msgs::srv::StopLedAnimation;
 
 // ROS adapter of the animation side: loads the LED configuration, serves
-// led/set_animation and publishes one RGBA8 frame per panel on
+// led/set_animation and led/stop_animation and publishes one RGBA8 frame per panel on
 // led/channel_<n>_frame at controller_frequency. Reports the loaded
 // animations once on led/animations and what every layer plays on led/state
 // at state_publish_rate (both latched).
@@ -72,6 +75,10 @@ private:
         const SetLedAnimationSrv::Request::SharedPtr & request,
         SetLedAnimationSrv::Response::SharedPtr response);
 
+    void stopLedAnimationCallback(
+        const StopLedAnimationSrv::Request::SharedPtr & request,
+        StopLedAnimationSrv::Response::SharedPtr response);
+
     void controllerTimerCallback();
 
     void stateTimerCallback();
@@ -89,6 +96,7 @@ private:
     std::unordered_map<std::size_t, rclcpp::Publisher<ImageMsg>::SharedPtr> panel_publishers_;
 
     std::unique_ptr<SetAnimationUseCase> set_animation_use_case_;
+    std::unique_ptr<StopAnimationUseCase> stop_animation_use_case_;
 
     std::unique_ptr<RenderTickUseCase> render_tick_use_case_;
 
@@ -103,6 +111,7 @@ private:
     led_controller::Params params_;
 
     rclcpp::Service<SetLedAnimationSrv>::SharedPtr set_led_animation_server_;
+    rclcpp::Service<StopLedAnimationSrv>::SharedPtr stop_led_animation_server_;
 
     rclcpp::TimerBase::SharedPtr controller_timer_;
 

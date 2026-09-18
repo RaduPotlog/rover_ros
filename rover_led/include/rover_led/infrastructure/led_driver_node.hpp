@@ -27,6 +27,7 @@
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 
 #include "sensor_msgs/msg/image.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "udp_msgs/msg/udp_packet.hpp"
 
@@ -41,6 +42,7 @@ namespace rover_led
 {
 
 using ImageMsg = sensor_msgs::msg::Image;
+using Float32Msg = std_msgs::msg::Float32;
 using UdpPacketMsg = udp_msgs::msg::UdpPacket;
 using SetBoolSrv = std_srvs::srv::SetBool;
 using SetLedBrightnessSrv = rover_msgs::srv::SetLedBrightness;
@@ -113,6 +115,9 @@ private:
         const SetLedBrightnessSrv::Request::SharedPtr & request,
         SetLedBrightnessSrv::Response::SharedPtr response);
 
+    // Latched on led/brightness, so dashboards show the brightness in effect.
+    void publishBrightness();
+
     void throttledWarn(const std::string & message);
 
     void diagnoseLeds(diagnostic_updater::DiagnosticStatusWrapper & status);
@@ -152,6 +157,8 @@ private:
     rclcpp::Client<SetBoolSrv>::SharedPtr enable_led_control_client_;
 
     rclcpp::Service<SetLedBrightnessSrv>::SharedPtr set_brightness_server_;
+
+    rclcpp_lifecycle::LifecyclePublisher<Float32Msg>::SharedPtr brightness_publisher_;
 
     rclcpp::PreShutdownCallbackHandle pre_shutdown_callback_handle_;
 

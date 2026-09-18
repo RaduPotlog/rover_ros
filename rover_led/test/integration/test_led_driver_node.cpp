@@ -34,6 +34,7 @@
 #include "udp_msgs/msg/udp_packet.hpp"
 
 #include "rover_msgs/srv/set_led_brightness.hpp"
+#include "std_msgs/msg/float32.hpp"
 
 #include "rover_led/domain/sk9822_frame_encoder.hpp"
 #include "rover_led/infrastructure/led_driver_node.hpp"
@@ -266,6 +267,44 @@ TEST_F(LedDriverNodeTest, SetBrightnessValidatesTheRange)
     EXPECT_EQ(ok->message, "Changed brightness to 0.50");
 
     EXPECT_FALSE(call(1.5f)->success);
+}
+
+TEST_F(LedDriverNodeTest, BrightnessIsLatchedAppliedAndKeptAcrossReconfigure)
+{
+    std::vector<float> reported;
+    auto brightness_sub = helper_->create_subscription<std_msgs::msg::Float32>(
+        "led/brightness", rclcpp::QoS(1).reliable().transient_local(),
+        [&reported](const std_msgs::msg::Float32 & msg) { reported.push_back(msg.data); });
+
+    driver_->configure();
+    ASSERT_TRUE(waitForConnections());
+    driver_->activate();
+    ASSERT_TRUE(spinUntil([&reported] { return !reported.empty(); }));
+    EXPECT_FLOAT_EQ(reported.back(), 1.0f);
+
+    auto request = std::make_shared<rover_msgs::srv::SetLedBrightness::Request>();
+    request->data = 0.25f;
+    auto future = brightness_client_->async_send_request(request);
+    ASSERT_EQ(executor_.spin_until_future_complete(future, 3s), rclcpp::FutureReturnCode::SUCCESS);
+    ASSERT_TRUE(future.get()->success);
+
+    ASSERT_TRUE(spinUntil([&reported] { return reported.back() == 0.25f; }));
+    EXPECT_DOUBLE_EQ(driver_->get_parameter("global_brightness").as_double(), 0.25);
+
+    // The SK9822 global current field carries it: ceil(0.25 * 31) = 8.
+    packets_.clear();
+    frame_pub_->publish(frame(Bytes(kNumLed * 4, 255)));
+    ASSERT_TRUE(spinUntil([this] { return !packets_.empty(); }));
+    EXPECT_EQ(packets_.front().at(7), 0xE0 | 8);
+
+    // A reconfigure keeps the brightness set through the service.
+    reported.clear();
+    driver_->deactivate();
+    driver_->cleanup();
+    driver_->configure();
+    driver_->activate();
+    ASSERT_TRUE(spinUntil([&reported] { return !reported.empty(); }));
+    EXPECT_FLOAT_EQ(reported.back(), 0.25f);
 }
 
 class LedDriverNodeHandshakeTest : public LedDriverNodeTest
