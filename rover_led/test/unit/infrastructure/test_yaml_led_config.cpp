@@ -71,6 +71,7 @@ TEST(ParseLedLayout, ParsesPanelsSegmentsAndGroups)
     ASSERT_EQ(layout.panels.size(), 2u);
     EXPECT_EQ(layout.panels[1].channel, 2u);
     EXPECT_EQ(layout.panels[1].number_of_leds, 20u);
+    EXPECT_EQ(layout.panels[1].rows, 1u);
 
     ASSERT_EQ(layout.segments.size(), 2u);
     EXPECT_EQ(layout.segments[1].name, "front_2");
@@ -79,6 +80,18 @@ TEST(ParseLedLayout, ParsesPanelsSegmentsAndGroups)
     EXPECT_EQ(layout.segments[1].config.last_led, 20u);
 
     EXPECT_EQ(layout.segments_map.at("all"), (std::vector<std::string>{"front_1", "front_2"}));
+}
+
+TEST(ParseLedLayout, ParsesOptionalRows)
+{
+    auto folded = YAML::Load(kLayout);
+    folded["panels"][1]["rows"] = 2;
+    EXPECT_EQ(parseLedLayout(folded).panels[1].rows, 2u);
+
+    folded["panels"][1]["rows"] = 3;
+    EXPECT_EQ(
+        expectThrowMessage([&] { parseLedLayout(folded); }),
+        "Panel with channel nr '2' can not fold 20 LEDs into 3 rows.");
 }
 
 TEST(ParseLedLayout, RejectsDuplicatesAndBadRanges)

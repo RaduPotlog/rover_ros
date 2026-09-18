@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -47,6 +49,7 @@ TEST(RenderTickUseCase, ProducesAFramePerPanel)
     ASSERT_FALSE(result.error);
     EXPECT_TRUE(result.segment_errors.empty());
     ASSERT_EQ(result.frames.size(), 2u);
+    EXPECT_EQ(result.rows, (std::map<std::size_t, std::size_t>{{1, 1}, {2, 1}}));
     EXPECT_EQ(pixel(result.frames.at(1), 1), (Rgba{40, 0, 0, 255}));
     EXPECT_EQ(result.frames.at(2), std::vector<std::uint8_t>(12, 0));
 

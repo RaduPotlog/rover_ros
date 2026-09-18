@@ -38,8 +38,11 @@ struct RenderTickResult
     // frames are produced in that case.
     std::optional<std::string> error;
 
-    // RGBA8 frame per panel channel.
+    // RGBA8 frame per panel channel, in wire order.
     std::map<std::size_t, std::vector<std::uint8_t>> frames;
+
+    // Serpentine rows per panel channel (1 for a straight strip), see LedPanel.
+    std::map<std::size_t, std::size_t> rows;
 };
 
 // One controller cycle: advance every segment animation, then compose the

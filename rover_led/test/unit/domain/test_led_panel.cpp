@@ -45,3 +45,34 @@ TEST(LedPanel, RejectsValuesThatDoNotFit)
     EXPECT_THROW(panel.updateFrame(4, std::vector<std::uint8_t>(8, 1)), std::runtime_error);
     EXPECT_NO_THROW(panel.updateFrame(4, std::vector<std::uint8_t>(4, 1)));
 }
+
+TEST(LedPanel, FoldsLogicalOrderIntoSerpentineRows)
+{
+    // 6 LEDs in 2 rows: row 0 is physical 0-2, row 1 is 3-5 running back, so
+    // column k (from LED 0's end) holds physical k and 5-k.
+    rover_led::LedPanel panel(6, 2);
+
+    std::vector<std::uint8_t> logical;
+
+    for (std::uint8_t led = 0; led < 6; led++) {
+        logical.insert(logical.end(), {led, led, led, 255});
+    }
+
+    panel.updateFrame(0, logical);
+
+    std::vector<std::uint8_t> physical_order;
+    const auto frame = panel.getFrame();
+
+    for (std::size_t i = 0; i < frame.size(); i += 4) {
+        physical_order.push_back(frame[i]);
+    }
+
+    EXPECT_EQ(physical_order, (std::vector<std::uint8_t>{0, 2, 4, 5, 3, 1}));
+}
+
+TEST(LedPanel, RejectsRowsThatDoNotDivideTheStrip)
+{
+    EXPECT_THROW(rover_led::LedPanel(5, 2), std::runtime_error);
+    EXPECT_THROW(rover_led::LedPanel(4, 0), std::runtime_error);
+    EXPECT_NO_THROW(rover_led::LedPanel(4, 4));
+}

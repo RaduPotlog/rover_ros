@@ -17,14 +17,44 @@
 #include <algorithm>
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace rover_led
 {
 
-LedPanel::LedPanel(const std::size_t num_led) : num_led_(num_led)
+LedPanel::LedPanel(const std::size_t num_led, const std::size_t rows) : num_led_(num_led), rows_(rows)
 {
+    if (rows_ == 0 || num_led_ % rows_ != 0) {
+        throw std::runtime_error(
+            "Can not fold " + std::to_string(num_led_) + " LEDs into " + std::to_string(rows_) + " rows.");
+    }
+
     frame_ = std::vector<std::uint8_t>(num_led_ * 4, 0);
+}
+
+std::vector<std::uint8_t> LedPanel::getFrame() const
+{
+    if (rows_ == 1) {
+        return frame_;
+    }
+
+    std::vector<std::uint8_t> physical_frame(frame_.size());
+
+    for (std::size_t i = 0; i < num_led_; i++) {
+        std::copy_n(frame_.begin() + i * 4, 4, physical_frame.begin() + physicalIndex(i) * 4);
+    }
+
+    return physical_frame;
+}
+
+std::size_t LedPanel::physicalIndex(const std::size_t logical_index) const
+{
+    const std::size_t columns = num_led_ / rows_;
+    const std::size_t column = logical_index / rows_;
+    const std::size_t row = logical_index % rows_;
+
+    return row * columns + (row % 2 ? columns - 1 - column : column);
 }
 
 void LedPanel::updateFrame(

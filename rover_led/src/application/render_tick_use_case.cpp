@@ -51,6 +51,7 @@ RenderTickResult RenderTickUseCase::execute()
 
     for (const auto & [channel, panel] : panels_) {
         result.frames.emplace(channel, panel->getFrame());
+        result.rows.emplace(channel, panel->getRows());
     }
 
     return result;

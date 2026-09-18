@@ -71,12 +71,9 @@ std::string EncodeFrameUseCase::validate(const RgbaFrame & frame, const std::int
         return "Incorrect image encoding ('" + frame.encoding + "')";
     }
 
-    if (frame.height != 1) {
-        return "Incorrect image height " + std::to_string(frame.height);
-    }
-
-    if (frame.width != num_led_) {
-        return "Incorrect image width " + std::to_string(frame.width);
+    // A panel folded into serpentine rows arrives as rows x leds-per-row.
+    if (frame.height * frame.width != num_led_) {
+        return "Incorrect image size " + std::to_string(frame.height) + "x" + std::to_string(frame.width);
     }
 
     if (frame.data.size() != num_led_ * 4) {

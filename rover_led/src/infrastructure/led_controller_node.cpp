@@ -67,7 +67,7 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     PanelMap panels;
 
     for (const auto & panel : layout.panels) {
-        panels.emplace(panel.channel, std::make_shared<LedPanel>(panel.number_of_leds));
+        panels.emplace(panel.channel, std::make_shared<LedPanel>(panel.number_of_leds, panel.rows));
         panel_publishers_.emplace(
             panel.channel,
             this->create_publisher<ImageMsg>("led/channel_" + std::to_string(panel.channel) + "_frame", 10));
@@ -221,18 +221,20 @@ void LedControllerNode::stopLedAnimationCallback(
     }
 }
 
-void LedControllerNode::publishPanelFrame(const std::size_t channel, std::vector<std::uint8_t> frame)
+// One image row per serpentine row of the panel; data stays in wire order.
+void LedControllerNode::publishPanelFrame(
+    const std::size_t channel, std::vector<std::uint8_t> frame, const std::size_t rows)
 {
-    const auto number_of_leds = frame.size() / 4;
+    const auto leds_per_row = frame.size() / 4 / rows;
 
     ImageMsg::UniquePtr image(new ImageMsg);
     image->header.frame_id = rover_utils::ros::addNamespaceToFrameID(
         "led_channel_" + std::to_string(channel) + "_link", std::string(this->get_namespace()));
     image->header.stamp = this->get_clock()->now();
     image->encoding = "rgba8";
-    image->height = 1;
-    image->width = number_of_leds;
-    image->step = number_of_leds * 4;
+    image->height = rows;
+    image->width = leds_per_row;
+    image->step = leds_per_row * 4;
     image->data = std::move(frame);
 
     panel_publishers_.at(channel)->publish(std::move(image));
@@ -256,7 +258,7 @@ void LedControllerNode::controllerTimerCallback()
     render_rate_->tick();
 
     for (auto & [channel, frame] : result.frames) {
-        publishPanelFrame(channel, std::move(frame));
+        publishPanelFrame(channel, std::move(frame), result.rows.at(channel));
     }
 }
 

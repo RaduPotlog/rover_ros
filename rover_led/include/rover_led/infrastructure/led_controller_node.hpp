@@ -69,7 +69,7 @@ private:
     // Returns the number of animations using a type the factory cannot create.
     std::size_t checkAnimationTypes(const std::vector<LedAnimationDescription> & animations);
 
-    void publishPanelFrame(const std::size_t channel, std::vector<std::uint8_t> frame);
+    void publishPanelFrame(const std::size_t channel, std::vector<std::uint8_t> frame, const std::size_t rows);
 
     void setLedAnimationCallback(
         const SetLedAnimationSrv::Request::SharedPtr & request,

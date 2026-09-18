@@ -37,6 +37,8 @@ struct LedPanelConfig
 {
     std::size_t channel;
     std::size_t number_of_leds;
+    // Serpentine rows the strip is folded into (optional, default 1), see LedPanel.
+    std::size_t rows = 1;
 };
 
 struct NamedLedSegmentConfig

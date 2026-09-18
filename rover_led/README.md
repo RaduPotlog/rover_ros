@@ -20,7 +20,7 @@ led/set_animation ──► rover_led_controller ──led/channel_<n>_frame─�
 |-----------|------|------|
 | srv | `led/set_animation` | `rover_msgs/SetLedAnimation` |
 | srv | `led/stop_animation` | `rover_msgs/StopLedAnimation`: clears an animation (and its queued copies) from its layer on every segment; fails if it isn't playing |
-| pub | `led/channel_<n>_frame` | `sensor_msgs/Image` (`rgba8`, one row per panel) at `controller_frequency` |
+| pub | `led/channel_<n>_frame` | `sensor_msgs/Image` (`rgba8`) at `controller_frequency`: `height` = the panel's serpentine `rows` (1 for a straight strip), `data` in wire order (LED 0 first) |
 | pub | `led/animations` | `rover_msgs/LedAnimationCatalog`, latched, once after loading |
 | pub | `led/state` | `rover_msgs/LedState` (what every layer of every segment plays), latched, at `state_publish_rate` |
 | pub | `diagnostics` | hardware id `Bumper Led`: `Led controller status` + render rate |
@@ -68,20 +68,29 @@ These are lifecycle `rover_udp_sender_node` instances. Each one subscribes to
 
 `config/rover_a1_animations.yaml` describes the hardware and the animation catalog. It is a port
 of Husarion Panther's `panther_animations.yaml`: the front bumper is channel 1, the rear bumper is
-channel 2, and each bumper is one full-width segment (the rear one reversed). Front and rear play
-different images for the same state, and directional animations such as blinkers work.
+channel 2, and each bumper is one full-width segment. Front and rear play different images for the
+same state, and directional animations such as blinkers work.
+
+The rear panel is physically 2 rows × 20 LEDs wired in series: seen from behind, LED 0 is on the
+right, row 1 (0–19) runs right→left and row 2 (20–39) comes back left→right. The panel's `rows: 2`
+folds the logical 40-LED frame into that wiring (logical LEDs 2k and 2k+1 are the two LEDs of
+column k), so on both bumpers segment LED 0 is the robot's right and every animation, blinkers
+included, lights the same physical side front and rear.
 
 ```yaml
 panels:            # physical strips: UDP channel + LED count
   - channel: 1
     number_of_leds: 40
+  - channel: 2
+    number_of_leds: 40
+    rows: 2        # optional: strip folded into serpentine rows (default 1)
 segments:          # virtual strips on a panel; a reversed range runs backwards
   - name: front
     channel: 1
     led_range: 0-39
   - name: rear
     channel: 2
-    led_range: 39-0
+    led_range: 0-39
 segments_map:      # named groups of segments
   all: [front, rear]
   front: [front]

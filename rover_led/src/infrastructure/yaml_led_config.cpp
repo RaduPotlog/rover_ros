@@ -60,6 +60,17 @@ LedLayoutConfig parseLedLayout(const YAML::Node & led_config)
         panel_config.channel = rover_utils::getYAMLKeyValue<std::size_t>(panel, "channel");
         panel_config.number_of_leds = rover_utils::getYAMLKeyValue<std::size_t>(panel, "number_of_leds");
 
+        if (panel["rows"]) {
+            panel_config.rows = rover_utils::getYAMLKeyValue<std::size_t>(panel, "rows");
+        }
+
+        if (panel_config.rows == 0 || panel_config.number_of_leds % panel_config.rows != 0) {
+            throw std::runtime_error(
+                "Panel with channel nr '" + std::to_string(panel_config.channel) + "' can not fold " +
+                std::to_string(panel_config.number_of_leds) + " LEDs into " +
+                std::to_string(panel_config.rows) + " rows.");
+        }
+
         if (!channels.insert(panel_config.channel).second) {
             throw std::runtime_error(
                 "Multiple panels with channel nr '" + std::to_string(panel_config.channel) + "' found.");

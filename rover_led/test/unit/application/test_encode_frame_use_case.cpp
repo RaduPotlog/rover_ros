@@ -66,6 +66,17 @@ TEST_F(EncodeFrameUseCaseTest, EncodesAValidFrameForTheUdpBridge)
     EXPECT_EQ(result.payload, encoder_->encodeForUdpBridge(input.data));
 }
 
+TEST_F(EncodeFrameUseCaseTest, AcceptsAPanelFoldedIntoRows)
+{
+    auto folded = frame(kStart + 10);
+    folded.height = 2;
+    folded.width = 1;
+    const auto result = use_case_.execute(folded, kStart + 20);
+
+    EXPECT_TRUE(result.accepted);
+    EXPECT_EQ(result.payload, encoder_->encodeForUdpBridge(folded.data));
+}
+
 TEST_F(EncodeFrameUseCaseTest, UsesTheCurrentBrightness)
 {
     encoder_->setGlobalBrightness(0.5f);
@@ -114,11 +125,11 @@ TEST_F(EncodeFrameUseCaseTest, RejectsMalformedImages)
 
     auto height = frame(kStart);
     height.height = 2;
-    EXPECT_EQ(use_case_.execute(height, kStart).error, "Incorrect image height 2");
+    EXPECT_EQ(use_case_.execute(height, kStart).error, "Incorrect image size 2x2");
 
     auto width = frame(kStart);
     width.width = 3;
-    EXPECT_EQ(use_case_.execute(width, kStart).error, "Incorrect image width 3");
+    EXPECT_EQ(use_case_.execute(width, kStart).error, "Incorrect image size 1x3");
 
     auto data = frame(kStart);
     data.data.pop_back();
