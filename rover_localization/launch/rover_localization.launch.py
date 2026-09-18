@@ -80,6 +80,21 @@ def generate_launch_description():
         choices=["True", "true", "False", "false"],
     )
 
+    # Like fuse_gps, the default usually comes from a balena variable (ROVER_GPS_PUBLISH_MAP_TF),
+    # so any of true/1/yes/on (any case) counts as true; anything else, empty included, is false.
+    publish_global_tf = LaunchConfiguration("publish_global_tf")
+    declare_publish_global_tf_arg = DeclareLaunchArgument(
+        "publish_global_tf",
+        default_value=EnvironmentVariable("ROVER_GPS_PUBLISH_MAP_TF", default_value="false"),
+        description=(
+            "Let rover_ekf_global_node broadcast map -> odom (GPS fusion only). Off by default: "
+            "SLAM or AMCL owns map -> odom; odometry/global is still published."
+        ),
+    )
+    publish_global_tf_bool = PythonExpression(
+        ["'", publish_global_tf, "'.strip().lower() in ('true', '1', 'yes', 'on')"]
+    )
+
     use_sim = LaunchConfiguration("use_sim")
     declare_use_sim_arg = DeclareLaunchArgument(
         "use_sim",
@@ -156,7 +171,12 @@ def generate_launch_description():
         package="robot_localization",
         executable="ekf_node",
         name="rover_ekf_global_node",
-        parameters=[localization_config_path, {"tf_prefix": namespace}],
+        parameters=[
+            localization_config_path,
+            {"tf_prefix": namespace},
+            # Overrides the config's publish_tf: true.
+            {"publish_tf": publish_global_tf_bool},
+        ],
         namespace=namespace,
         remappings=[
             ("/diagnostics", "diagnostics"),
@@ -233,6 +253,7 @@ def generate_launch_description():
         declare_localization_config_path_arg,
         declare_log_level_arg,
         declare_namespace_arg,
+        declare_publish_global_tf_arg,
         declare_use_ekf_arg,
         declare_use_sim_arg,
         SetParameter(name="use_sim_time", value=use_sim),
