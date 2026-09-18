@@ -94,7 +94,9 @@ namespace rover_hardware_interface
 struct MotorDriverState
 {
     std::int64_t pos;
-    std::int16_t vel;
+    // Motor-shaft speed in RPM. Kept as double: truncating to an integer RPM throws away the
+    // sub-RPM resolution a closed wheel-speed loop needs at low speed.
+    double       vel;
     std::int16_t current;
     float        temp;
 };

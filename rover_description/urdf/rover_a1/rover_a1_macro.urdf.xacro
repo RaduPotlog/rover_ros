@@ -177,6 +177,12 @@
                it. -->
           <param name="motor_failsafe_timeout_ms">500</param>
 
+          <!-- On-board duty-cycle ramp of each DCC1000, in duty/s (Phidget range 0.1-100).
+               2.0 = up to 0.5 s from stop to full duty, a lag the ROS side can't see. Optional -
+               omitting it keeps the compiled-in kDefaultMotorAcceleration (2.0). Once the wheel
+               PID loop owns the speed dynamics, raise it after measuring the step response. -->
+          <param name="motor_acceleration">2.0</param>
+
           <!-- Motor parameters -->
           <param name="motor_torque_constant">0.11</param>
           <param name="max_rpm_motor_speed">2800</param>

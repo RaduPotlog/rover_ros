@@ -24,6 +24,9 @@
 namespace rover_hardware_interface
 {
 
+// Default for DrivetrainSettings::motor_acceleration - the value that used to be hard-coded.
+constexpr float kDefaultMotorAcceleration = 2.0f;
+
 struct DrivetrainSettings
 {
     float motor_torque_constant;
@@ -45,6 +48,10 @@ struct DrivetrainSettings
     // driver.hpp. Optional in the URDF; absent means kDefaultMotorFailsafeTimeoutMs, so an
     // existing URDF keeps working unchanged.
     unsigned motor_failsafe_timeout_ms;
+    // On-board duty-cycle ramp of the motor controller, in duty/s (e.g.
+    // PhidgetDCMotor_setAcceleration()). It adds lag the ROS side cannot see, so it is exposed to
+    // let a closed wheel-speed loop own the dynamics. Optional in the URDF.
+    float motor_acceleration{kDefaultMotorAcceleration};
 };
 
 constexpr unsigned kDefaultMotorFailsafeTimeoutMs = 500;

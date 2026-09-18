@@ -114,6 +114,7 @@ PhidgetMotorDriver::PhidgetMotorDriver(
 , failsafe_timeout_ms_(drivetrain_settings.motor_failsafe_timeout_ms)
 {
     encoder_resolution_ = drivetrain_settings.encoder_resolution;
+    motor_acceleration_ = drivetrain_settings.motor_acceleration;
 
     RCLCPP_INFO(logger_, "Create phidget motor driver channel = %d, encoder resolution = %f", channel_, encoder_resolution_);
 }
@@ -317,7 +318,7 @@ void PhidgetMotorDriver::initialize()
 void PhidgetMotorDriver::configureMotorChannel()
 {
     // Set acceleration
-    PhidgetReturnCode ret = PhidgetDCMotor_setAcceleration(motor_handle_, 2.0f);
+    PhidgetReturnCode ret = PhidgetDCMotor_setAcceleration(motor_handle_, motor_acceleration_);
 
     if (ret != EPHIDGET_OK) {
         throw std::runtime_error("Failed to set acceleration for motor channel " +
@@ -407,12 +408,29 @@ MotorDriverState PhidgetMotorDriver::readState()
         state_snapshot_ = state_;
     }
 
+    const auto last_encoder_event_ns = last_encoder_event_ns_.load(std::memory_order_relaxed);
+
+    if (last_encoder_event_ns == 0 ||
+        isCommTimedOut(
+            std::chrono::steady_clock::time_point(std::chrono::nanoseconds(last_encoder_event_ns)),
+            std::chrono::steady_clock::now(), kEncoderStaleTimeout))
+    {
+        state_snapshot_.vel = 0.0;
+    }
+
     return state_snapshot_;
 }
 
-double PhidgetMotorDriver::calculateRPM(int64_t delta_ticks, double dt, float ppr)
+double PhidgetMotorDriver::encoderCountsToMotorRpm(
+    const std::int64_t delta_counts, const double dt_s, const float lines)
 {
-    return ((static_cast<double>(delta_ticks) / static_cast<double>(ppr)) * (60.0f / dt));
+    if (dt_s <= 0.0 || lines <= 0.0f) {
+        return 0.0;
+    }
+
+    const double revolutions = static_cast<double>(delta_counts) / (4.0 * static_cast<double>(lines));
+
+    return revolutions * 60.0 / dt_s;
 }
 
 bool PhidgetMotorDriver::isCommunicationError()
@@ -468,12 +486,12 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
             driver->encoder_ticks_ = position;
         }
 
-        driver->position_time_change_ = timeChange / 1000.0f;
+        driver->position_time_change_ = timeChange / 1000.0;
 
-        int64_t delta_encoder_ticks = (driver->encoder_ticks_ - driver->prev_encoder_ticks_) / 4.0;
-
-        const int16_t vel = static_cast<int16_t>(driver->calculateRPM(delta_encoder_ticks, driver->position_time_change_, driver->encoder_resolution_));
-        const int64_t pos = driver->encoder_ticks_ / 4.0;
+        const double vel = encoderCountsToMotorRpm(
+            driver->encoder_ticks_ - driver->prev_encoder_ticks_,
+            driver->position_time_change_, driver->encoder_resolution_);
+        const int64_t pos = driver->encoder_ticks_ / 4;
 
         {
             std::lock_guard<std::mutex> lck(driver->state_mtx_);
@@ -482,6 +500,10 @@ void CCONV PhidgetMotorDriver::positionChangeHandler(
         }
 
         driver->prev_encoder_ticks_ = driver->encoder_ticks_;
+
+        driver->last_encoder_event_ns_.store(
+            std::chrono::steady_clock::now().time_since_epoch().count(),
+            std::memory_order_relaxed);
     }
 }
 

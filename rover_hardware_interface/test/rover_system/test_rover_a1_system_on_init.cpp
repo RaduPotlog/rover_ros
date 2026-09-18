@@ -218,4 +218,23 @@ TEST(RoverA1SystemOnInit, FailsWithUnparsableMotorFailsafeTimeoutMs)
     EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
 }
 
+// motor_acceleration is optional too (default kDefaultMotorAcceleration), but must be > 0.
+TEST(RoverA1SystemOnInit, SucceedsWithMotorAccelerationOverride)
+{
+    RoverA1System system;
+    auto info = buildValidHardwareInfo();
+    info.hardware_parameters["motor_acceleration"] = "10.0";
+
+    EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::SUCCESS);
+}
+
+TEST(RoverA1SystemOnInit, FailsWithNonPositiveMotorAcceleration)
+{
+    RoverA1System system;
+    auto info = buildValidHardwareInfo();
+    info.hardware_parameters["motor_acceleration"] = "0.0";
+
+    EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
+}
+
 }  // namespace rover_hardware_interface

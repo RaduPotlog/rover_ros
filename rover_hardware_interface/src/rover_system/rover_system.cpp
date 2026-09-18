@@ -478,6 +478,18 @@ void RoverSystem::readDrivetrainSettings()
             ? kDefaultMotorFailsafeTimeoutMs
             : static_cast<unsigned>(
                   std::stoi(info_.hardware_parameters.at("motor_failsafe_timeout_ms")));
+
+    // Optional as well; absent keeps the previously hard-coded ramp.
+    drivetrain_settings_.motor_acceleration =
+        info_.hardware_parameters.count("motor_acceleration") == 0
+            ? kDefaultMotorAcceleration
+            : std::stof(info_.hardware_parameters.at("motor_acceleration"));
+
+    if (drivetrain_settings_.motor_acceleration <= 0.0f) {
+        throw std::runtime_error(
+            "motor_acceleration must be > 0, got " +
+            std::to_string(drivetrain_settings_.motor_acceleration) + ".");
+    }
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()

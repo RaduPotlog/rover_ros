@@ -53,4 +53,35 @@ TEST(PhidgetMotorDriverFailsafeTest, TrippedChannelIsReopened)
         PhidgetMotorDriver::selectFailsafeAction(false, true), FailsafeAction::kReopenAndEnable);
 }
 
+TEST(PhidgetMotorDriverEncoderTest, CountsConvertToMotorRpm)
+{
+    // 1024 lines -> 4096 counts/rev; 4096 counts in 1 s is 1 rev/s = 60 RPM.
+    EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(4096, 1.0, 1024.0f), 60.0);
+    EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(-4096, 0.5, 1024.0f), -120.0);
+}
+
+TEST(PhidgetMotorDriverEncoderTest, CountsNotMultipleOfFourAreNotTruncated)
+{
+    // The old code divided the delta by 4 as an integer and lost the remainder every event:
+    // 7 counts read as 1 line (-43 %).
+    EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(7, 1.0, 1.0f), 7.0 / 4.0 * 60.0);
+}
+
+TEST(PhidgetMotorDriverEncoderTest, SumOfEventsMatchesOneLongInterval)
+{
+    // Many small odd deltas must integrate to the same distance as one big one (no drift).
+    double revolutions = 0.0;
+    for (int i = 0; i < 100; ++i) {
+        revolutions += PhidgetMotorDriver::encoderCountsToMotorRpm(3, 0.008, 1024.0f) / 60.0 * 0.008;
+    }
+    EXPECT_NEAR(revolutions, 300.0 / 4096.0, 1e-12);
+}
+
+TEST(PhidgetMotorDriverEncoderTest, InvalidIntervalGivesZero)
+{
+    EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(100, 0.0, 1024.0f), 0.0);
+    EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(100, -1.0, 1024.0f), 0.0);
+    EXPECT_DOUBLE_EQ(PhidgetMotorDriver::encoderCountsToMotorRpm(100, 1.0, 0.0f), 0.0);
+}
+
 }  // namespace rover_hardware_interface

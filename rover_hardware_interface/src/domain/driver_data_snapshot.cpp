@@ -118,7 +118,7 @@ float MotorStateReading::getPosition() const
 
 float MotorStateReading::getVelocity() const
 {
-    return static_cast<float>(motor_state_.vel) * raw_vel_feedback_to_radians_per_second_;
+    return static_cast<float>(motor_state_.vel * raw_vel_feedback_to_radians_per_second_);
 }
 
 float MotorStateReading::getTorque() const

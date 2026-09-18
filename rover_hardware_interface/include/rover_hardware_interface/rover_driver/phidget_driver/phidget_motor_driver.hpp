@@ -111,6 +111,17 @@ public:
     // Pure logic, factored out so it's unit-testable without any Phidget SDK handles.
     static FailsafeAction selectFailsafeAction(const bool enabled, const bool tripped);
 
+    // Motor-shaft RPM from a change of raw quadrature counts over dt_s seconds, for an encoder
+    // with `lines` lines per revolution (4 counts per line). Works on raw counts so no remainder
+    // is dropped between events. Returns 0 for a non-positive dt_s or lines.
+    static double encoderCountsToMotorRpm(
+        const std::int64_t delta_counts, const double dt_s, const float lines);
+
+    // How long without an encoder event before the reported speed is forced to 0. The encoder
+    // callback only fires when the position changes, so without this a wheel that stops keeps
+    // reporting its last non-zero speed.
+    static constexpr std::chrono::milliseconds kEncoderStaleTimeout{50};
+
 private:
 
     // Applies the motor channel's settings (acceleration, current limit, regulator gain, braking)
@@ -158,8 +169,6 @@ private:
         PhidgetHandle phid,
         void * ctx, PhidgetReturnCode res);
 
-    double calculateRPM(int64_t delta_ticks, double dt, float ppr);
-
     std::weak_ptr<PhidgetDriver> driver_;
 
     const std::uint8_t channel_;
@@ -185,6 +194,11 @@ private:
     MotorDriverState state_snapshot_{};
 
     float encoder_resolution_;
+
+    float motor_acceleration_;
+
+    // steady_clock ns of the last encoder event; written on the SDK thread, read in readState().
+    std::atomic<std::int64_t> last_encoder_event_ns_{0};
 
     bool direction_reversed_;
 
