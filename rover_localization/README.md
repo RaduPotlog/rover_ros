@@ -7,11 +7,12 @@ selects between two modes:
 | Mode | Nodes | Transforms |
 |------|-------|------------|
 | `ROVER_USE_GPS=false` (default) | `rover_ekf_node`: wheels + IMU yaw rate | `<ns>/odom → <ns>/base_link` |
-| `ROVER_USE_GPS=true` | `rover_ekf_node` (unchanged), `rover_ekf_global_node`: wheels + IMU yaw rate + GPS position, `rover_navsat_transform_node` | also `<ns>/map → <ns>/odom` |
+| `ROVER_USE_GPS=true` | `rover_ekf_node` (unchanged), `rover_ekf_global_node`: wheels + IMU yaw rate + GPS position, `rover_gps_heading_node`, `rover_navsat_transform_node` | also `<ns>/map → <ns>/odom` |
 
 With GPS, `odom` stays continuous for local control, and GPS corrections show up only in
-`map → odom`. The GPS driver, its diagnostics and the ENU heading (`gps/heading_imu`) come from
-`rover_gps`.
+`map → odom`. The GPS driver and its fix diagnostics (`gps/fix`) are the sensor payload
+(`rover_sensors/rover_gps`, container `rover-a1-sensors`). The ENU heading (`gps/heading_imu`)
+comes from `rover_gps_heading_node` (package `rover_gps_heading`), started here in GPS mode.
 
 > Do not run AMCL (`rover_orchestrator/rover_navigation/launch/localization.launch.py`) together
 > with `ROVER_USE_GPS=true`: both publish `map → odom`.
@@ -39,12 +40,24 @@ With GPS, `odom` stays continuous for local control, and GPS corrections show up
 | pub | `/tf` | `<namespace>/map → <namespace>/odom` |
 | srv | `localization/global/{set_pose,enable,toggle}` | robot_localization services |
 
+### `rover_gps_heading_node` (GPS mode)
+
+| Direction | Name | Type |
+|-----------|------|------|
+| sub | `gps/fix` | `sensor_msgs/NavSatFix` (sensor payload) |
+| sub | `odom` | `rover_ekf_node` output |
+| pub | `gps/heading_imu` | `sensor_msgs/Imu`, ENU yaw of `<namespace>/base_link`, once aligned |
+| srv | `gps/reset_heading_alignment` | `std_srvs/Trigger` |
+
+Parameters are in the `rover_gps_heading_node:` section of `config/rel_localization_with_gps.yaml`;
+see `rover_gps_heading/README.md` for the alignment.
+
 ### `rover_navsat_transform_node` (GPS mode)
 
 | Direction | Name | Type |
 |-----------|------|------|
-| sub | `gps/fix` | `sensor_msgs/NavSatFix` (`rover_gps_driver`) |
-| sub | `gps/heading_imu` | `sensor_msgs/Imu`, ENU heading from `rover_gps_node` (published once aligned) |
+| sub | `gps/fix` | `sensor_msgs/NavSatFix` (`rover_gps_driver`, sensor payload) |
+| sub | `gps/heading_imu` | `sensor_msgs/Imu`, ENU heading from `rover_gps_heading_node` (published once aligned) |
 | sub | `odometry/global` | global EKF output |
 | pub | `odometry/gps` | GPS position in the map frame |
 | pub | `gps/filtered` | `sensor_msgs/NavSatFix` of the filtered pose |
@@ -96,4 +109,4 @@ ros2 topic echo /rover/odom
 - Only the `rel` configs exist. `localization_mode:=enu` selects files that are not in the
   package, so pass `localization_config_path` with it.
 - `rover_navsat_transform_node` computes its transform once, from the first heading it
-  receives. After `gps/reset_heading_alignment` (rover_gps), restart the node.
+  receives. After `gps/reset_heading_alignment` (rover_gps_heading), restart the node.

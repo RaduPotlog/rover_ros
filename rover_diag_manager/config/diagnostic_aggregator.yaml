@@ -32,7 +32,9 @@
     gps:
       type: diagnostic_aggregator/GenericAnalyzer
       path: GPS
-      find_and_remove_prefix: [ 'rover_gps_node: ' ]
+      # rover_gps_node (sensor payload): GPS fix. rover_gps_heading_node (localization):
+      # Heading alignment. Grouped together so the Cockpit GPS page shows both.
+      find_and_remove_prefix: [ 'rover_gps_node: ', 'rover_gps_heading_node: ' ]
     lidar:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lidar

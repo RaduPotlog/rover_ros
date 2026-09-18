@@ -28,10 +28,13 @@ It prints the rover banner (`rover_utils.messages.welcome_msg`) and then:
    - `rover_led`
    - `rover_safety` (skipped with `disable_manager:=True`)
    - `rover_localization` (with `use_ekf:=True` and `fuse_gps:=<use_gps>`)
-   - `rover_gps` (RUTX11 NMEA driver, GPS diagnostics, GNSS heading alignment)
    - `rover_crsf_teleop`
    - `rover_twist_mux`
-   - `rover_rs16_lidar` (RoboSense RS16 driver, `scan` bridge, lidar diagnostics; only with `use_lidar:=true`)
+
+The GPS and lidar drivers are not started here. They are the sensor payload: the
+`rover_sensors` repo, run by the `rover-a1-sensors` container, which only publishes `gps/fix`,
+`scan`, `rslidar_points` and their diagnostics. In GPS mode `rover_localization` also starts
+`rover_gps_heading_node`, which turns `gps/fix` + `odom` into the ENU heading.
 
 Every included launch file receives `namespace`, `log_level` and, where supported,
 `common_dir_path`.
@@ -44,13 +47,11 @@ Every included launch file receives `namespace`, `log_level` and, where supporte
 | `disable_manager` | `False` | `True` skips `rover_safety`. |
 | `exit_on_wrong_hw` | `false` | Exit instead of idling when the hardware configuration is incorrect. |
 | `use_gps` | `$ROVER_USE_GPS`, else `false` | `true`: localization fuses wheels + IMU + GPS (dual EKF, `map → odom`). `false`: wheels + IMU only. |
-| `use_lidar` | `$ROVER_USE_LIDAR`, else `false` | `true`: start the RS16 lidar driver and publish `scan`. Leave `false` on rovers with no lidar fitted. |
 
 | Environment variable | Default | Effect |
 |----------------------|---------|--------|
 | `ROVER_NAMESPACE` | empty | Default for `namespace`. |
 | `ROVER_USE_GPS` | `false` | Default for `use_gps` (set as a balenaCloud variable; `start.sh` normalizes it to `true`/`false`). |
-| `ROVER_USE_LIDAR` | `false` | Default for `use_lidar` (balenaCloud variable). Any of `true`/`1`/`yes`/`on`, any case, enables it. |
 | `ROBOT_MODEL_NAME` / `ROBOT_SERIAL_NO` / `ROBOT_VERSION` | `rover_a1` / `A1-2026-01` / `1.0` | Shown in the banner. |
 | `ROBOT_HW_CONFIG_CORRECT` | `true` | Gate for starting the driver stack. |
 | `SYSTEM_BUILD_VERSION` | `v1.0.0` | OS version compared against the minimum. |
@@ -71,11 +72,3 @@ The bridges are not namespaced, so they see the whole graph (`/rover/...` topics
 ```bash
 ros2 launch rover_bringup rover_web_bridges.launch.py
 ```
-
-## Scripts (`scripts/`)
-
-Not installed by CMake; run them from a checkout.
-
-| File | Purpose |
-|------|---------|
-| `rutx11_gps_nmea_forwarding.sh` | Shows (`show`) or configures (`apply`) the RUTX11 GNSS and its NMEA forwarding over UDP to `rover_gps`. See `rover_gps/README.md`. |

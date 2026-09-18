@@ -36,8 +36,9 @@ def generate_launch_description():
         "fuse_gps",
         default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
         description=(
-            "Fuse GPS: adds rover_ekf_global_node (map -> odom) and rover_navsat_transform_node "
-            "and loads the _with_gps config. The GPS driver itself is started by rover_gps."
+            "Fuse GPS: adds rover_gps_heading_node, rover_ekf_global_node (map -> odom) and "
+            "rover_navsat_transform_node, and loads the _with_gps config. The GPS driver "
+            "(gps/fix) is part of the sensor payload (rover-a1-sensors container)."
         ),
     )
     fuse_gps_bool = PythonExpression(
@@ -175,8 +176,33 @@ def generate_launch_description():
         condition=IfCondition(gps_enabled),
     )
 
+    # TF frames carry the namespace as prefix (robot_state_publisher frame_prefix).
+    base_link_frame = PythonExpression(
+        ["'", namespace, "/base_link' if '", namespace, "' else 'base_link'"]
+    )
+
+    # Aligns the odom yaw to ENU from the GNSS course while driving straight, then republishes
+    # every odom yaw as gps/heading_imu: the absolute heading navsat_transform needs.
+    gps_heading_node = Node(
+        package="rover_gps_heading",
+        executable="rover_gps_heading_node",
+        name="rover_gps_heading_node",
+        parameters=[
+            localization_config_path,
+            {"publish_heading": True, "heading_frame_id": base_link_frame},
+        ],
+        namespace=namespace,
+        remappings=[("/diagnostics", "diagnostics")],
+        arguments=[
+            "--ros-args",
+            "--log-level",
+            log_level,
+        ],
+        condition=IfCondition(gps_enabled),
+    )
+
     # Converts gps/fix into odometry/gps in the map frame. The heading it needs comes from
-    # rover_gps_node (gps/heading_imu), published only once aligned from the GNSS course.
+    # rover_gps_heading_node (gps/heading_imu), published only once aligned.
     navsat_transform_node = Node(
         package="robot_localization",
         executable="navsat_transform_node",
@@ -212,6 +238,7 @@ def generate_launch_description():
         SetParameter(name="use_sim_time", value=use_sim),
         ekf_filter_node,
         ekf_global_filter_node,
+        gps_heading_node,
         navsat_transform_node,
     ]
 
