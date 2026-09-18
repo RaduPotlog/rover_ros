@@ -1,8 +1,4 @@
 repositories:
-  rover_modbus:
-    type: git
-    url: https://github.com/RaduPotlog/rover_modbus
-    version: master
   rover_cppuprofile:
     type: git
     url: https://github.com/RaduPotlog/rover_cppuprofile
