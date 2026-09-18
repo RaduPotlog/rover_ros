@@ -23,6 +23,7 @@ set(PACKAGE_DEPENDENCIES
     # find_package(imu_filter_madgwick) expects that imported target to already exist.
     rclcpp_components
     imu_filter_madgwick
+    rover_modbus_driver
     rover_msgs
     phidgets_api
     pluginlib
@@ -46,11 +47,6 @@ endforeach()
 # PkgConfig is a CMake-builtin module, not an ament package - kept out of PACKAGE_DEPENDENCIES so
 # it isn't exported as an ament dependency (it has no package.xml entry).
 find_package(PkgConfig REQUIRED)
-
-# Modbus_Core is a plain CMake package (not ament) from the sibling rover_modbus repo —
-# not colcon-discoverable, so it must be built and installed (cmake --install) to a prefix on
-# CMAKE_PREFIX_PATH *before* building this package. See src/rover_modbus/README.md.
-find_package(Modbus_Core REQUIRED)
 
 include_directories(include)
 
@@ -95,7 +91,6 @@ add_library(
     src/rover_system/rover_a1_system.cpp
     src/rover_system/rover_system.cpp
     src/system_ros_interface/system_ros_interface.cpp
-    src/rover_modbus/modbus.cpp
     src/rover_safety_controller/rover_safety_controller.cpp
     src/rover_safety_controller/rover_safety_controller_e_stop_io.cpp
     src/rover_safety_controller/rover_safety_controller_gpio_adapter.cpp
@@ -105,12 +100,13 @@ add_library(
 # on one target). ${PROJECT_NAME}_core and phidgets_spatial_parameters are PUBLIC: public headers
 # include their headers (e.g. rover_system.hpp -> application/, phidget_imu_sensor.hpp ->
 # phidgets_spatial_parameters.hpp), and both are in this package's own export set, so exporting
-# them is safe. Modbus_Core::Modbus_Core is PRIVATE: it is not an ament_export_dependencies()
-# entry, so leaving it in the exported target's INTERFACE_LINK_LIBRARIES would break a downstream
-# find_package(rover_hardware_interface) consumer linking the exported target. The plugin's own
-# public headers (rover_a1_system.hpp) only reach the std-only rover_modbus/modbus_types.hpp;
-# code including rover_safety_controller.hpp or rover_modbus/modbus*.hpp needs Modbus_Core's
-# headers on its include path itself (today /usr/local/include, a default search path).
+# them is safe. rover_modbus_driver is PUBLIC, and must be: it is now a proper
+# ament_export_dependencies() entry (the Modbus client moved to
+# rover_transport/rover_modbus_driver), and this package's public headers reach into it -
+# rover_a1_system.hpp includes client_settings.hpp, rover_safety_controller.hpp includes
+# discrete_io_port.hpp. Downstream consumers therefore get its headers and libraries from the
+# export set rather than having to find them on a default search path, which is exactly what
+# the old PRIVATE Modbus_Core link could not offer.
 target_link_libraries(${PROJECT_NAME} PUBLIC
     ${diagnostic_updater_TARGETS}
     ${geometry_msgs_TARGETS}
@@ -131,8 +127,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 
 target_link_libraries(
     ${PROJECT_NAME}
-    PUBLIC ${PROJECT_NAME}_core phidgets_spatial_parameters
-    PRIVATE Modbus_Core::Modbus_Core
+    PUBLIC ${PROJECT_NAME}_core phidgets_spatial_parameters rover_modbus_driver::rover_modbus_driver_ros
 )
 
 target_compile_definitions(
@@ -306,14 +301,8 @@ if(BUILD_TESTING)
     test_rover_safety_controller test/rover_safety_controller/test_rover_safety_controller.cpp)
   target_link_libraries(test_rover_safety_controller ${PROJECT_NAME})
 
-  # Integration test: drives RoverModbus - the one remaining infrastructure adapter with no
-  # coverage of its own (test_contact_coil_handler/test_rover_safety_controller above cover the
-  # rest of this stack, but only against FakeRoverModbus) - through its real constructor against
-  # the real Modbus_Core TCP client. No live Modbus server needed: only the connection-
-  # establishment/retry path is exercised, which fails fast and deterministically against a closed
-  # loopback port (see test/rover_modbus/test_rover_modbus.cpp's file comment).
-  ament_add_gtest(test_rover_modbus test/rover_modbus/test_rover_modbus.cpp)
-  target_link_libraries(test_rover_modbus ${PROJECT_NAME})
+  # The Modbus client's own tests (connection retry, wire encoding, and a real round trip
+  # against MB::TCP::Server) moved with the code to rover_transport/rover_modbus_driver.
 endif()
 
 ament_package()

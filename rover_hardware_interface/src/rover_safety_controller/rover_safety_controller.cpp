@@ -25,6 +25,8 @@
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 
+#include "rover_modbus_driver/infrastructure/modbus_tcp_client_factory.hpp"
+
 namespace rover_hardware_interface
 {
 
@@ -77,7 +79,7 @@ constexpr std::size_t kEStopUserBtnCoilIdx = 2;
 constexpr std::size_t kEStopMotorDriverFaultCoilIdx = 3;
 constexpr std::size_t kEStopLatchResetCoilIdx = 4;
 
-ContactCoilHandler::ContactCoilHandler(std::shared_ptr<RoverModbusInterface> rover_modbus)
+ContactCoilHandler::ContactCoilHandler(std::shared_ptr<DiscreteIoPort> rover_modbus)
 : rover_modbus_(rover_modbus)
 {
 
@@ -211,16 +213,13 @@ void ContactCoilHandler::contactCoilHandlerThread()
     }
 }
 
-RoverSafetyController::RoverSafetyController(
-    const std::string & modbus_host, const int modbus_port,
-    const unsigned modbus_connection_retry_count,
-    const std::chrono::milliseconds modbus_connection_retry_delay)
+RoverSafetyController::RoverSafetyController(const ModbusSettings & modbus_settings)
+: rover_modbus_(rover::transport::modbus::makeModbusTcpDiscreteIoClient(modbus_settings))
 {
-    rover_modbus_ = std::make_shared<RoverModbus>(
-        modbus_host, modbus_port, modbus_connection_retry_count, modbus_connection_retry_delay);
+
 }
 
-RoverSafetyController::RoverSafetyController(std::shared_ptr<RoverModbusInterface> rover_modbus)
+RoverSafetyController::RoverSafetyController(std::shared_ptr<DiscreteIoPort> rover_modbus)
 : rover_modbus_(std::move(rover_modbus))
 {
 

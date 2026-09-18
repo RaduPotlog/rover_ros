@@ -33,7 +33,7 @@
 # Deliberately NOT scanned: defineRoverDriver()/defineRoverController() and any *_system.cpp code
 # reachable only from them, since those run during on_configure() (not on the RT path) and are
 # expected to construct blocking backends (e.g. `RoverSafetyController(...)`, a real Modbus TCP
-# connection). Also NOT scanned: rover_modbus/ and rover_sensors/, and any adapter method not in
+# connection). Also NOT scanned: rover_sensors/, and any adapter method not in
 # RT_REACHABLE_ADAPTER_METHODS - a NEW RT-reachable adapter method, or a new driver/adapter
 # backend, must be added to that list by hand or it will not be caught here. This is a substring
 # scan of specific function bodies, NOT a real call-graph analysis: it catches a blocking call
@@ -92,7 +92,8 @@ FORBIDDEN_SYMBOLS=(
     readDiscreteCoil
     readDiscreteContact
     "RoverSafetyController("
-    "RoverModbus("
+    "ModbusDiscreteIoClient("
+    "makeModbusTcpDiscreteIoClient("
     # Synchronous Phidget SDK calls (unlike PhidgetDCMotor_setTargetVelocity_async) - confined by
     # design to RoverSystem::on_activate() and resetEStopLatch() (see MotorDriverInterface::
     # armFailsafe()/resetFailsafe() in domain/driver.hpp), neither of which this script scans

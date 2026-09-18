@@ -21,7 +21,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
+#include "rover_modbus_driver/domain/client_settings.hpp"
 #include "rover_hardware_interface/rover_system/rover_system.hpp"
 
 namespace rover_hardware_interface

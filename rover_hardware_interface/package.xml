@@ -38,11 +38,10 @@
   <!-- Phidgets API -->
   <depend>phidgets_api</depend>
 
-  <!-- Modbus_Core (from the sibling rover_modbus repo) is a plain CMake package, not an ament
-       package, so it cannot be expressed as a depend here and rosdep/colcon cannot resolve or
-       order it. It must be built and installed (via CMake's install step) to a prefix on
-       CMAKE_PREFIX_PATH before this package is built - see CMakeLists.txt and
-       src/rover_modbus/README.md. -->
+  <!-- The Modbus TCP client, extracted to rover_transport/rover_modbus_driver. It used to be
+       an in-tree subdirectory linking a plain-CMake Modbus_Core that colcon could not see,
+       which is why this was a paragraph of apology rather than a dependency. -->
+  <depend>rover_modbus_driver</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>

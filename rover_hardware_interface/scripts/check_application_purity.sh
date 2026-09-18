@@ -19,7 +19,7 @@
 # other than domain/ or application/ itself. Per .claude/rules/clean_architecture.md, the
 # application layer may depend only on the domain layer (never on rclcpp/ROS/hardware_interface,
 # and never on infrastructure - rover_system/, rover_driver/, rover_safety_controller/,
-# rover_sensors/, rover_modbus/, system_ros_interface/, which is where the infrastructure layer
+# rover_sensors/, system_ros_interface/, which is where the infrastructure layer
 # actually lives in this package - see the "Note on infrastructure" comment atop
 # check_domain_purity.sh) so it stays unit-testable with fake domain ports, the same way domain/
 # itself is (see check_domain_purity.sh, which this mirrors). Invoked from CMakeLists.txt as a
@@ -40,7 +40,7 @@ APPLICATION_DIRS=(
 # In-project (quoted) includes from application/ files may only reach other application/ headers,
 # domain/ headers (the only layer application/ is allowed to depend on), or the dependency-free
 # utils.hpp - never rover_system/, rover_driver/, rover_safety_controller/, rover_sensors/,
-# rover_modbus/, or system_ros_interface/, all of which are infrastructure.
+# or system_ros_interface/, all of which are infrastructure.
 ALLOWED_QUOTED_PATTERN='^rover_hardware_interface/(application/[^/]+\.hpp$|domain/[^/]+\.hpp$|utils\.hpp$)'
 
 # Angle-bracket includes are forbidden if they name a ROS package, hardware_interface, or a
@@ -67,6 +67,12 @@ FORBIDDEN_KEYWORDS=(
     Phidget22
     modbus
     Modbus_Core
+    # The Modbus client now lives in rover_transport/rover_modbus_driver and its headers are
+    # reached as <MB/...> and "rover_modbus_driver/...". Neither spelling contains the
+    # substring "modbus" in every case - <MB/crc.hpp> and <MB/connection.hpp> do not - so both
+    # prefixes are listed explicitly.
+    "MB/"
+    rover_modbus_driver
 )
 
 existing_dirs=()

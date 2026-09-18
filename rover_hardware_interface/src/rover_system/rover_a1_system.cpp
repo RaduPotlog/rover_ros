@@ -84,10 +84,8 @@ void RoverA1System::defineRoverController()
     // stored as a member so nothing on the RT read()/write() path can reach the concrete
     // Modbus-backed type directly (see rover_system.hpp's RoverGpioPort/EmergencyStopInterface
     // member comments).
-    auto rover_safety_controller_impl = std::make_shared<RoverSafetyController>(
-        modbus_settings_.host, modbus_settings_.port,
-        modbus_settings_.connection_retry_count,
-        std::chrono::milliseconds(modbus_settings_.connection_retry_delay_ms));
+    auto rover_safety_controller_impl =
+        std::make_shared<RoverSafetyController>(modbus_settings_);
 
     rover_controller_ = std::make_shared<RoverSafetyControllerGpioAdapter>(rover_safety_controller_impl);
 

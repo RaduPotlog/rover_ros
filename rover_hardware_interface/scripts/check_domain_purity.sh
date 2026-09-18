@@ -23,7 +23,7 @@
 # Note on "infrastructure": this package has no single include/rover_hardware_interface/infrastructure/
 # directory. Everything outside domain/ and application/ IS the infrastructure layer, split into
 # subsystem-named directories instead (rover_system/, rover_driver/, rover_safety_controller/,
-# rover_sensors/, rover_modbus/, system_ros_interface/) - one per real hardware/ROS boundary. This
+# rover_sensors/, system_ros_interface/) - one per real hardware/ROS boundary. This
 # is a deliberate, reviewed choice (each directory maps 1:1 to a concrete adapter a reader needs to
 # reason about independently), not a naming oversight, so don't go looking for an infrastructure/
 # folder that doesn't exist, and don't add one purely to match the template's default shape - the
@@ -43,7 +43,7 @@ DOMAIN_DIRS=(
 
 # In-project (quoted) includes from domain/ files may only reach other domain/ headers or the
 # dependency-free utils.hpp - never rover_system/, rover_driver/, rover_safety_controller/,
-# rover_sensors/, rover_modbus/, or system_ros_interface/, all of which are infrastructure.
+# rover_sensors/, or system_ros_interface/, all of which are infrastructure.
 ALLOWED_QUOTED_PATTERN='^rover_hardware_interface/(domain/[^/]+\.hpp$|utils\.hpp$)'
 
 # Angle-bracket includes are forbidden if they name a ROS package, hardware_interface, or a
@@ -69,6 +69,12 @@ FORBIDDEN_KEYWORDS=(
     Phidget22
     modbus
     Modbus_Core
+    # The Modbus client now lives in rover_transport/rover_modbus_driver and its headers are
+    # reached as <MB/...> and "rover_modbus_driver/...". Neither spelling contains the
+    # substring "modbus" in every case - <MB/crc.hpp> and <MB/connection.hpp> do not - so both
+    # prefixes are listed explicitly.
+    "MB/"
+    rover_modbus_driver
 )
 
 existing_dirs=()

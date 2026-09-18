@@ -19,10 +19,31 @@
 #include <string>
 
 #include "rover_hardware_interface/domain/rover_gpio_types.hpp"
-#include "rover_hardware_interface/rover_modbus/modbus_types.hpp"
+#include "rover_modbus_driver/domain/client_settings.hpp"
+#include "rover_modbus_driver/domain/contact_coil_types.hpp"
+#include "rover_modbus_driver/domain/discrete_io_port.hpp"
 
 namespace rover_hardware_interface
 {
+
+// The Modbus client moved out to rover_transport/rover_modbus_driver, where it can be reused
+// and tested on its own. These aliases keep the ~40 unqualified call sites in
+// rover_safety_controller.cpp's coil table compiling unchanged, in the same spirit as the
+// RoverControllerGpio re-include noted below. Prefer the qualified
+// rover::transport::modbus:: names in new code.
+using rover::transport::modbus::Coil;
+using rover::transport::modbus::CoilInfo;
+using rover::transport::modbus::Contact;
+using rover::transport::modbus::ContactInfo;
+
+using DiscreteIoPort = rover::transport::modbus::DiscreteIoPort;
+
+// Was RoverModbusInterface before the extraction.
+using RoverModbusInterface = rover::transport::modbus::DiscreteIoPort;
+
+// Was ModbusSettings before the extraction. Still parsed out of the URDF <ros2_control>
+// hardware parameters by RoverA1System - that stays a ros2_control plugin concern.
+using ModbusSettings = rover::transport::modbus::ClientSettings;
 
 // RoverControllerGpio itself now lives in domain/rover_gpio_types.hpp (RoverGpioPort needs it and
 // domain code may not include infrastructure headers); re-included here so existing call sites

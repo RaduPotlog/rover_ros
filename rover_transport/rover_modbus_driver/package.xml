@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rover_modbus_driver</name>
+  <version>1.0.0</version>
+  <description>
+    Synchronous Modbus TCP client for the rover: the discrete contact/coil port, the
+    retrying client that speaks it, and the POSIX TCP transport behind it.
+
+    Library only - no bridge node. Unlike the other rover_transport packages this one
+    exposes no topics, because its consumer (the ros2_control safety controller) needs
+    in-process calls rather than a topic round-trip on the e-stop path. See README.md.
+
+    Extracted from rover_hardware_interface, where it was linked PRIVATE and could not be
+    reused by any other package.
+  </description>
+
+  <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rover_modbus</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

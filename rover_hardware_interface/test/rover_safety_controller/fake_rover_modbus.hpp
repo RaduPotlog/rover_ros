@@ -18,7 +18,7 @@
 #include <mutex>
 #include <vector>
 
-#include "rover_hardware_interface/rover_modbus/rover_modbus_interface.hpp"
+#include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 
 namespace rover_hardware_interface
 {
@@ -36,11 +36,11 @@ struct CoilWrite
     }
 };
 
-// Thread-safe in-memory fake of RoverModbusInterface: records every coil write (so tests can
+// Thread-safe in-memory fake of the driver's DiscreteIoPort: records every coil write (so tests can
 // assert what ContactCoilHandler/RoverSafetyController sent) and returns a configurable canned
 // value for reads. No real Modbus/network I/O - safe to construct and drive from a unit test,
 // including from ContactCoilHandler's background poll thread.
-class FakeRoverModbus : public RoverModbusInterface
+class FakeRoverModbus : public DiscreteIoPort
 {
 
 public:
@@ -65,7 +65,7 @@ public:
         writes_.push_back({coil.coil, coil_state});
     }
 
-    // --- Test-only helpers below; not part of RoverModbusInterface. ---
+    // --- Test-only helpers below; not part of DiscreteIoPort. ---
 
     std::vector<CoilWrite> writesSnapshot() const
     {

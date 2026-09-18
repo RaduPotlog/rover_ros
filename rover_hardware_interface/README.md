@@ -55,12 +55,14 @@ domain/                    emergency stop, velocity command guard, error filter,
                            driver/GPIO ports - no ROS, hardware_interface or vendor SDK
 application/               RoverControlLoopUseCase - the read()/write() cycle decisions
 rover_driver/              Phidget motor driver adapters (Phidget22)
-rover_modbus/              Modbus TCP connection
 rover_safety_controller/   safety controller E-Stop / GPIO adapter over Modbus
 rover_sensors/             PhidgetImuSensor
 rover_system/              RoverSystem base + RoverA1System (the ros2_control plugin)
 system_ros_interface/      rover_hardware_controller node: topics, services, diagnostics
 ```
+
+The Modbus TCP client itself lives in `rover_transport/rover_modbus_driver` - it was
+extracted from this package so it could be depended on and tested on its own.
 
 ## Tests
 
@@ -68,7 +70,7 @@ system_ros_interface/      rover_hardware_controller node: topics, services, dia
 colcon test --packages-select rover_hardware_interface && colcon test-result --all --verbose
 ```
 
-- `test/` has gtests per layer: domain, application, driver, Modbus, safety controller,
+- `test/` has gtests per layer: domain, application, driver, safety controller,
   sensors, system and the ROS interface. Fakes live in `test/fakes/`.
 - Three architecture checks run as CTest tests:
   - `scripts/check_domain_purity.sh`: domain code includes no ROS, hardware_interface or
