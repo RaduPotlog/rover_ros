@@ -493,6 +493,41 @@ void RoverSystem::readDrivetrainSettings()
             "motor_acceleration must be in [0.5, 10000] duty/s, got " +
             std::to_string(drivetrain_settings_.motor_acceleration) + ".");
     }
+
+    // Optional as well; absent keeps the previously hard-coded 10 A limit on 24 V.
+    drivetrain_settings_.motor_current_limit =
+        info_.hardware_parameters.count("motor_current_limit") == 0
+            ? kDefaultMotorCurrentLimit
+            : std::stof(info_.hardware_parameters.at("motor_current_limit"));
+    drivetrain_settings_.motor_supply_voltage =
+        info_.hardware_parameters.count("motor_supply_voltage") == 0
+            ? kDefaultMotorSupplyVoltage
+            : std::stof(info_.hardware_parameters.at("motor_supply_voltage"));
+
+    // DCC1000 ranges: current limit 2-25 A, supply 8-30 V, current regulator gain 1-100.
+    if (drivetrain_settings_.motor_current_limit < 2.0f ||
+        drivetrain_settings_.motor_current_limit > 25.0f)
+    {
+        throw std::runtime_error(
+            "motor_current_limit must be in [2, 25] A, got " +
+            std::to_string(drivetrain_settings_.motor_current_limit) + ".");
+    }
+
+    if (drivetrain_settings_.motor_supply_voltage < 8.0f ||
+        drivetrain_settings_.motor_supply_voltage > 30.0f)
+    {
+        throw std::runtime_error(
+            "motor_supply_voltage must be in [8, 30] V, got " +
+            std::to_string(drivetrain_settings_.motor_supply_voltage) + ".");
+    }
+
+    const float gain = motorCurrentRegulatorGain(
+        drivetrain_settings_.motor_current_limit, drivetrain_settings_.motor_supply_voltage);
+    if (gain < 1.0f || gain > 100.0f) {
+        throw std::runtime_error(
+            "Derived motor current regulator gain must be in [1, 100], got " +
+            std::to_string(gain) + ".");
+    }
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()

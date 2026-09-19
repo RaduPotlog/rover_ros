@@ -249,4 +249,38 @@ TEST(RoverA1SystemOnInit, FailsWithMotorAccelerationOutsideDeviceRange)
     }
 }
 
+// motor_current_limit / motor_supply_voltage are optional too, but must be within the DCC1000's
+// ranges (2-25 A, 8-30 V).
+TEST(RoverA1SystemOnInit, SucceedsWithMotorCurrentOverrides)
+{
+    RoverA1System system;
+    auto info = buildValidHardwareInfo();
+    info.hardware_parameters["motor_current_limit"] = "12.0";
+    info.hardware_parameters["motor_supply_voltage"] = "24.0";
+
+    EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::SUCCESS);
+}
+
+TEST(RoverA1SystemOnInit, FailsWithMotorCurrentLimitOutsideDeviceRange)
+{
+    for (const char * value : {"1.0", "30", "not-a-number"}) {
+        RoverA1System system;
+        auto info = buildValidHardwareInfo();
+        info.hardware_parameters["motor_current_limit"] = value;
+
+        EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR) << value;
+    }
+}
+
+TEST(RoverA1SystemOnInit, FailsWithMotorSupplyVoltageOutsideDeviceRange)
+{
+    for (const char * value : {"5.0", "48", "not-a-number"}) {
+        RoverA1System system;
+        auto info = buildValidHardwareInfo();
+        info.hardware_parameters["motor_supply_voltage"] = value;
+
+        EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR) << value;
+    }
+}
+
 }  // namespace rover_hardware_interface

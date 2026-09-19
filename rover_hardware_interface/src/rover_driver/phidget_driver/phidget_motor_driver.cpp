@@ -115,8 +115,15 @@ PhidgetMotorDriver::PhidgetMotorDriver(
 {
     encoder_resolution_ = drivetrain_settings.encoder_resolution;
     motor_acceleration_ = drivetrain_settings.motor_acceleration;
+    motor_current_limit_ = drivetrain_settings.motor_current_limit;
+    motor_current_regulator_gain_ = motorCurrentRegulatorGain(
+        drivetrain_settings.motor_current_limit, drivetrain_settings.motor_supply_voltage);
 
-    RCLCPP_INFO(logger_, "Create phidget motor driver channel = %d, encoder resolution = %f", channel_, encoder_resolution_);
+    RCLCPP_INFO(
+        logger_,
+        "Create phidget motor driver channel = %d, encoder resolution = %f, current limit = %f A, "
+        "current regulator gain = %f",
+        channel_, encoder_resolution_, motor_current_limit_, motor_current_regulator_gain_);
 }
 
 PhidgetMotorDriver::~PhidgetMotorDriver()
@@ -340,20 +347,20 @@ void PhidgetMotorDriver::configureMotorChannel()
     }
 
     // Set current limit
-    ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, 10.0);
+    ret = PhidgetDCMotor_setCurrentLimit(motor_handle_, motor_current_limit_);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current limit for motor channel " +
+        throw std::runtime_error("Failed to set current limit " +
+            std::to_string(motor_current_limit_) + " A for motor channel " +
             std::to_string(channel_));
     }
 
-    /*
-     *  CurrentRegulatorGain = CurrentLimit * (Voltage / 12)
-     */
-    ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, 20.0);
+    // Derived from the current limit and supply voltage - see motorCurrentRegulatorGain().
+    ret = PhidgetDCMotor_setCurrentRegulatorGain(motor_handle_, motor_current_regulator_gain_);
 
     if (ret != EPHIDGET_OK) {
-        throw std::runtime_error("Failed to set current regulator gain for motor channel " +
+        throw std::runtime_error("Failed to set current regulator gain " +
+            std::to_string(motor_current_regulator_gain_) + " for motor channel " +
             std::to_string(channel_));
     }
 

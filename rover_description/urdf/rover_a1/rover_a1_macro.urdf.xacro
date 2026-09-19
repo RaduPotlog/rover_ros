@@ -181,7 +181,21 @@
                2.0 = up to 0.5 s from stop to full duty, a lag the ROS side can't see. Optional -
                omitting it keeps the compiled-in kDefaultMotorAcceleration (2.0). Once the wheel
                PID loop owns the speed dynamics, raise it after measuring the step response. -->
-          <param name="motor_acceleration">1.0</param>
+          <param name="motor_acceleration">80.0</param>
+
+          <!-- DCC1000 motor current limit in A (device range 2-25). The motor stalls at 16 A on
+               24 V, and a direction reversal can briefly reach ~2x stall as back-EMF adds to the
+               supply, so the limit is what protects motor, DCC1000 and gearbox. 10 A gives ~60 %
+               of stall torque with thermal headroom. Optional - omitting it keeps the compiled-in
+               kDefaultMotorCurrentLimit (10.0). -->
+          <param name="motor_current_limit">10.0</param>
+
+          <!-- Motor supply voltage in V (DCC1000 range 8-30). Only used to derive the current
+               regulator gain = motor_current_limit * (motor_supply_voltage / 12) (Phidget rule of
+               thumb) = 20 here. Too low a gain causes current spikes / jerky torque, too high a
+               rough-sounding motor on reversals. Optional - omitting it keeps the compiled-in
+               kDefaultMotorSupplyVoltage (24.0). -->
+          <param name="motor_supply_voltage">24.0</param>
 
           <!-- Motor parameters -->
           <param name="motor_torque_constant">0.11</param>
@@ -204,7 +218,7 @@
                above the floating-point residue a controller's kinematics leave behind. Raise it
                only if a controller is known to idle with a larger steady-state output. 
                Set to 0.8 - workaround until the solution to reset the PID will be find -->
-          <param name="velocity_command_zero_tolerance">0.8</param>
+          <param name="velocity_command_zero_tolerance">1.2</param>
 
         </xacro:unless>
       </hardware>

@@ -93,4 +93,12 @@ TEST(PhidgetMotorDriverEncoderTest, StaleTimeoutSpansSeveralEncoderIntervals)
     EXPECT_GT(PhidgetMotorDriver::encoderStaleTimeout(50), milliseconds(2 * 50));
 }
 
+TEST(PhidgetMotorDriverCurrentTest, RegulatorGainFollowsPhidgetRuleOfThumb)
+{
+    // gain = current_limit * (voltage / 12)
+    EXPECT_FLOAT_EQ(motorCurrentRegulatorGain(10.0f, 24.0f), 20.0f);
+    EXPECT_FLOAT_EQ(motorCurrentRegulatorGain(12.0f, 24.0f), 24.0f);
+    EXPECT_FLOAT_EQ(motorCurrentRegulatorGain(10.0f, 12.0f), 10.0f);
+}
+
 }  // namespace rover_hardware_interface
