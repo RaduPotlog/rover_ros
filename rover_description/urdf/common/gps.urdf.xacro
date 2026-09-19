@@ -23,10 +23,12 @@
           <visualize>false</visualize>
           <navsat>
             <position_sensing>
+              <!-- gz-sensors adds horizontal noise to latitude/longitude in DEGREES:
+                   4.5e-7 deg ~ 5 cm north-south (~3 cm east-west at 50 deg N). -->
               <horizontal>
                 <noise type="gaussian">
                   <mean>0.0</mean>
-                  <stddev>0.05</stddev>
+                  <stddev>4.5e-7</stddev>
                 </noise>
               </horizontal>
               <vertical>
