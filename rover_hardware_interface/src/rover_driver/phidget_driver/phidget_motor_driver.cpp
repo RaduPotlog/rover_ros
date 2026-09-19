@@ -370,6 +370,14 @@ void PhidgetMotorDriver::configureMotorChannel()
         throw std::runtime_error("Failed to set braking strength for motor channel " +
             std::to_string(channel_));
     }
+
+    // Run the driver's cooling fan continuously instead of the board's thermostatic default.
+    ret = PhidgetDCMotor_setFanMode(motor_handle_, FAN_MODE_ON);
+
+    if (ret != EPHIDGET_OK) {
+        throw std::runtime_error("Failed to set fan mode for motor channel " +
+            std::to_string(channel_));
+    }
 }
 
 void PhidgetMotorDriver::reopenMotorChannel()
