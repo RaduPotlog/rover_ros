@@ -62,7 +62,8 @@
       lidar_xyz="${lidar_xyz}"
       lidar_rpy="${lidar_rpy}"
       gps_xyz="${gps_xyz}"
-      gps_rpy="${gps_rpy}" />
+      gps_rpy="${gps_rpy}"
+      use_sim="${use_sim}" />
 
     <!-- Rover wheel -->
     <xacro:wheel.wheel

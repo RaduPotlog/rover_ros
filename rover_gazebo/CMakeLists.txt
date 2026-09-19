@@ -9,7 +9,7 @@ install(DIRECTORY config launch
         DESTINATION share/${PROJECT_NAME}
 )
 
-install(PROGRAMS scripts/sim_gpio_state.py
+install(PROGRAMS scripts/sim_gpio_state.py scripts/rover_sim.sh
         DESTINATION lib/${PROJECT_NAME}
 )
 

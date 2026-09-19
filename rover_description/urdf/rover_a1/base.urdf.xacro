@@ -10,7 +10,8 @@
             lidar_xyz
             lidar_rpy
             gps_xyz
-            gps_rpy">
+            gps_rpy
+            use_sim:=false">
 
     <!-- REP-105 root: ground projection of base_link. The odometry filters publish
          odom -> base_footprint, so in 2D mode odom stays on the ground plane. -->
@@ -37,6 +38,18 @@
           <mesh filename="package://rover_description/meshes/rover_a1/base.stl" />
         </geometry>
       </visual>
+
+      <!-- Simulation only: a box over the base.stl bounds (x +/-0.351, y +/-0.313,
+           z -0.015..0.241) so the body hits obstacles in Gazebo. Gazebo does not
+           self-collide a model's links, so it cannot fight the wheels. -->
+      <xacro:if value="${use_sim}">
+        <collision>
+          <origin xyz="0.0 0.0 0.113" rpy="0.0 0.0 0.0" />
+          <geometry>
+            <box size="0.702 0.626 0.256" />
+          </geometry>
+        </collision>
+      </xacro:if>
 
       <inertial>
         <origin xyz="-0.0352516654672473 0.000230769565957786 0.0766816513547671" rpy="0 0 0" />
