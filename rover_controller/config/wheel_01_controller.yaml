@@ -130,7 +130,7 @@
       wheel_separation: 0.62602
       wheel_radius: 0.1651
 
-      wheel_separation_multiplier: 1.5
+      wheel_separation_multiplier: 1.63
 
       left_wheel_radius_multiplier: 1.0
       right_wheel_radius_multiplier: 1.0
