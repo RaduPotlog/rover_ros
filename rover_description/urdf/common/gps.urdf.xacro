@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro
+    name="gps"
+    params="use_sim:=false
+            reference_frame:=''
+            namespace:=''">
+
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+
+    <!-- Gazebo GNSS: stands in for the RUTX11 NMEA stream (rover_gps in rover_sensors).
+         Needs the NavSat system and <spherical_coordinates> in the world. The bridge maps
+         <ns>gps/fix to sensor_msgs/NavSatFix, the topic the real driver publishes. On
+         hardware gps_link is only a frame: the driver runs in the sensors container. -->
+    <xacro:if value="${use_sim}">
+      <gazebo reference="${reference_frame}">
+        <sensor name="${ns}gps" type="navsat">
+          <topic>${ns}gps/fix</topic>
+          <update_rate>5</update_rate>
+          <gz_frame_id>${ns}${reference_frame}</gz_frame_id>
+          <always_on>1</always_on>
+          <visualize>false</visualize>
+          <navsat>
+            <position_sensing>
+              <horizontal>
+                <noise type="gaussian">
+                  <mean>0.0</mean>
+                  <stddev>0.05</stddev>
+                </noise>
+              </horizontal>
+              <vertical>
+                <noise type="gaussian">
+                  <mean>0.0</mean>
+                  <stddev>0.1</stddev>
+                </noise>
+              </vertical>
+            </position_sensing>
+            <velocity_sensing>
+              <horizontal>
+                <noise type="gaussian">
+                  <mean>0.0</mean>
+                  <stddev>0.02</stddev>
+                </noise>
+              </horizontal>
+              <vertical>
+                <noise type="gaussian">
+                  <mean>0.0</mean>
+                  <stddev>0.02</stddev>
+                </noise>
+              </vertical>
+            </velocity_sensing>
+          </navsat>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+
+</robot>

@@ -18,7 +18,8 @@
   <!-- Rover dependency -->
   <depend>rover_msgs</depend>
 
-  <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">twist_mux</exec_depend>
+  <!-- Hardware and simulation both run the mux (rover_twist_mux.launch.py). -->
+  <exec_depend>twist_mux</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
 

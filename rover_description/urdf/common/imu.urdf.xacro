@@ -58,7 +58,7 @@
           <topic>${ns}imu/data_raw</topic>
           <visualize>false</visualize>
           <enable_metrics>false</enable_metrics>
-          <gz_frame_id>imu_link</gz_frame_id>
+          <gz_frame_id>${ns}${reference_frame}</gz_frame_id>
           <imu>
             <orientation_reference_frame>
             <localization>ENU</localization>
@@ -92,9 +92,10 @@
       </gazebo>
     </xacro:if>
 
-    <!-- ROS2 controller -->
+    <!-- ROS2 controller. Hardware only: in simulation the IMU interfaces live in the
+         GazeboSimSystem block, and an empty <ros2_control> would have no <hardware>. -->
+    <xacro:unless value="${use_sim}">
     <ros2_control name="${ns}rover_imu" type="sensor">
-      <xacro:unless value="${use_sim}">
         <hardware>
           <!-- Hardware IMU sensor interface  -->
           <plugin>rover_hardware_interface/PhidgetImuSensor</plugin>
@@ -121,9 +122,9 @@
       
         <!-- IMU interfaces -->
         <xacro:imu_interface use_sim="${use_sim}" namespace="${namespace}" />
-      
-      </xacro:unless>
-    </ros2_control> 
+
+    </ros2_control>
+    </xacro:unless>
   </xacro:macro>
 
 </robot>

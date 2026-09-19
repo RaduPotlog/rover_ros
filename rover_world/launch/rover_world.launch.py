@@ -34,7 +34,7 @@ def launch_setup(context):
 
     gz_args = f"-r -v {gz_log_level} {gz_world}"
     
-    if eval(gz_headless_mode):
+    if gz_headless_mode.strip().lower() == "true":
         gz_args = "--headless-rendering -s " + gz_args
     if gz_gui:
         gz_args = f"--gui-config {gz_gui} " + gz_args
@@ -63,7 +63,7 @@ def generate_launch_description():
         "gz_headless_mode",
         default_value="False",
         description="Run the simulation in headless mode.",
-        choices=["True", "False"],
+        choices=["True", "true", "False", "false"],
     )
 
     declare_gz_log_level = DeclareLaunchArgument(

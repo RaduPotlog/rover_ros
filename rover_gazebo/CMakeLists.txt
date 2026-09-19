@@ -1,31 +1,16 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 project(rover_gazebo)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wold-style-cast)
-endif()
+# Launch, config and a sim helper script only: nothing is compiled here. The Gazebo
+# ros2_control plugin comes from gz_ros2_control (see package.xml).
+find_package(ament_cmake REQUIRED)
 
-set(PACKAGE_DEPENDENCIES
-    ament_cmake
-    hardware_interface
-    gz_ros2_control
-    pluginlib
-    rclcpp
-    realtime_tools
-    std_msgs
-    std_srvs
-)
-
-foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
-  find_package(${PACKAGE} REQUIRED)
-endforeach()
-
-install(DIRECTORY config launch 
+install(DIRECTORY config launch
         DESTINATION share/${PROJECT_NAME}
 )
 
-ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/setup_envs.sh.in")
-
-ament_export_dependencies(${PACKAGE_DEPENDENCIES})
+install(PROGRAMS scripts/sim_gpio_state.py
+        DESTINATION lib/${PROJECT_NAME}
+)
 
 ament_package()

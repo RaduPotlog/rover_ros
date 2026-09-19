@@ -1,19 +1,32 @@
-
 # For detailed information on configuring the parameter_bridge, please refer to:
 # https://github.com/gazebosim/ros_gz/tree/ros2/ros_gz_bridge#example-5-configuring-the-bridge-via-yaml
+#
+# <namespace> is replaced by simulate_robot.launch.py. The ROS side mirrors what the real
+# rover publishes, so the orchestrator runs unchanged against the simulation.
 
 - topic_name: /clock
   ros_type_name: rosgraph_msgs/msg/Clock
   gz_type_name: gz.msgs.Clock
   direction: GZ_TO_ROS
 
-- topic_name: /<namespace>/cmd_vel
+# Gazebo GUI Teleop -> twist_mux teleop input (same priority as the Foxglove joystick).
+- ros_topic_name: /<namespace>/teleop_foxglove_cmd_vel_stamped
+  gz_topic_name: /<namespace>/teleop_gz_cmd_vel
   ros_type_name: geometry_msgs/msg/TwistStamped
   gz_type_name: gz.msgs.Twist
   direction: GZ_TO_ROS
 
-- ros_topic_name: "/<namespace>/scan"
-  gz_topic_name: "/lidar"
-  ros_type_name: "sensor_msgs/msg/LaserScan"
-  gz_type_name: "gz.msgs.LaserScan"
+# Lidar (RS16 stand-in): the point cloud the rover_rs16_lidar driver publishes.
+# <namespace>/scan is sliced out of it by pointcloud_to_laserscan.
+- ros_topic_name: /<namespace>/rslidar_points
+  gz_topic_name: /<namespace>/lidar/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
+
+# GNSS (RUTX11 stand-in): the fix the rover_gps driver publishes.
+- ros_topic_name: /<namespace>/gps/fix
+  gz_topic_name: /<namespace>/gps/fix
+  ros_type_name: sensor_msgs/msg/NavSatFix
+  gz_type_name: gz.msgs.NavSat
   direction: GZ_TO_ROS

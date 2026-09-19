@@ -1,7 +1,24 @@
 # rover_gazebo
 
 Runs Rover A1 in Gazebo Sim (`gz sim`): the world, the spawned robot with `gz_ros2_control`, the
-same controllers and EKF as the real rover, a ROS–Gazebo bridge and RViz.
+same controllers, EKFs and twist_mux as the real rover, simulated stand-ins for the sensor
+payload (RS16 lidar, RUTX11 GNSS), a ROS–Gazebo bridge and RViz.
+
+The ROS side mirrors what the platform and the sensor containers publish on the rover, so the
+orchestrator (`rover_navigation`, `rover_mission_manager`) runs against the simulation unchanged
+apart from `use_sim_time`.
+
+## Building
+
+```bash
+export ROVER_ROS_BUILD_TYPE=simulation
+sudo apt install ros-$ROS_DISTRO-gz-ros2-control ros-$ROS_DISTRO-ros-gz-bridge   # or rosdep
+colcon build --symlink-install --packages-up-to rover_metapackage rover_autonomy \
+  --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+```
+
+Run the simulation on a local middleware: an inherited `ZENOH_CONFIG_OVERRIDE` pointing at the
+rover's router would join the simulated nodes to the real rover.
 
 ## Launch Files
 
@@ -13,21 +30,48 @@ same controllers and EKF as the real rover, a ROS–Gazebo bridge and RViz.
   Everything runs with `use_sim_time`.
 - `include/simulate_robot.launch.py` - per-robot part:
   - `include/spawn_robot.launch.py` spawns the URDF at `x`/`y`/`z`/`roll`/`pitch`/`yaw`
-    (default `0, -2.0, 0.2`).
+    (default `0, -2.0, 0.2`). The model is named after the namespace, else `rover_a1`.
   - `rover_controller` with `use_sim:=True`, so `gz_ros2_control` owns the controller manager.
-  - `rover_localization` with `use_sim:=True use_ekf:=True`.
+  - `rover_localization` with `use_sim:=True use_ekf:=True`; `fuse_gps` follows `use_gps`, which
+    adds `rover_gps_heading_node`, `rover_navsat_transform_node` and `rover_ekf_global_node`.
+  - `rover_twist_mux` (mux + `rover_motion_lock_node`), as on the rover:
+    `nav_cmd_vel_stamped` / teleop → `cmd_vel`, gated by `motion_lock`.
+  - `sim_gpio_state_publisher` (`scripts/sim_gpio_state.py`): an all-clear
+    `hardware_interface/gpio_state`, which `rover_motion_lock_node` needs to open the lock.
+    `ros2 param set <ns>/sim_gpio_state_publisher e_stop true` simulates a software E-Stop.
   - `gz_bridge` (`ros_gz_bridge/parameter_bridge`) configured by `config/gz_bridge.yaml`.
-  - `static_tf_publisher`: a static `world → <namespace>/odom` transform at the spawn pose.
+  - `rover_rs16_lidar_scan` (`pointcloud_to_laserscan`): `scan` sliced from `rslidar_points`
+    with the real driver's settings (±0.25 m, 360° at 0.5°, 0.2–20 m).
+  - `static_tf_publisher`: an optional `world → <namespace>/odom` transform at the spawn pose
+    (`add_world_transform:=True`).
 
-| Argument (`simulation.launch.py`) | Default | Description |
-|-----------------------------------|---------|-------------|
+| Argument | Default | Description |
+|----------|---------|-------------|
 | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace of the robot's nodes and topics. |
-| `use_rviz` | `True` | Start RViz. |
+| `use_gps` | `$ROVER_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF + navsat_transform). |
+| `publish_global_tf` | `$ROVER_GPS_PUBLISH_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
+| `use_rviz` | `True` | Start RViz (`simulation.launch.py`). |
 | `gz_gui` | `config/teleop.config` | Gazebo GUI layout; `{namespace}` in the file is replaced with `namespace`. |
+| `gz_headless_mode` | `False` | Run Gazebo server-only with headless rendering (`rover_world`). |
 | `log_level` | `INFO` | Logging level. |
 
-`rover_safety`, `rover_led`, `rover_twist_mux`, `rover_battery`, `rover_crsf_teleop` and
-`rover_diag_manager` are not started in simulation. Velocity commands go straight to `cmd_vel`.
+`rover_safety`, `rover_led`, `rover_battery`, `rover_crsf_teleop` and `rover_diag_manager` are
+not started in simulation.
+
+## Simulated sensors
+
+Defined in `rover_description` (`urdf/common/lidar.urdf.xacro`, `gps.urdf.xacro`), sim only.
+Frames carry the namespace prefix, like `robot_state_publisher`'s TF.
+
+| Sensor | Stand-in for | ROS topic | Frame |
+|--------|--------------|-----------|-------|
+| `gpu_lidar`, 16 rings ±15°, 360° at 0.5°, 0.2–20 m, 10 Hz | `rover_rs16_lidar` | `<ns>/rslidar_points` (`PointCloud2`), `<ns>/scan` (`LaserScan`) | `<ns>/lidar_link` |
+| `navsat`, 5 Hz, σ 5 cm | `rover_gps` (RUTX11) | `<ns>/gps/fix` (`NavSatFix`) | `<ns>/gps_link` |
+| `imu`, 50 Hz | Phidget IMU | `<ns>/imu/data` (via `rover_imu_broadcaster`) | `<ns>/imu_link` |
+
+The lidar uses the `ROVER_LIDAR_*` mount pose; with none set it sits 0.30 m above `body_link`,
+clear of the body mesh. The GNSS uses `ROVER_GPS_*`. The world's `<spherical_coordinates>` sets
+the datum (50.088384 N, 19.939128 E).
 
 ## Config Files
 
@@ -36,16 +80,22 @@ same controllers and EKF as the real rover, a ROS–Gazebo bridge and RViz.
   | ROS topic | Gazebo topic | Direction |
   |-----------|--------------|-----------|
   | `/clock` | `/clock` | Gazebo → ROS |
-  | `/<namespace>/cmd_vel` (`TwistStamped`) | same (`gz.msgs.Twist`) | Gazebo → ROS (the GUI teleop plugin drives the controller) |
-  | `/<namespace>/scan` (`LaserScan`) | `/lidar` | Gazebo → ROS |
+  | `/<namespace>/teleop_foxglove_cmd_vel_stamped` (`TwistStamped`) | `/<namespace>/teleop_gz_cmd_vel` (`gz.msgs.Twist`) | Gazebo → ROS (GUI teleop into twist_mux) |
+  | `/<namespace>/rslidar_points` (`PointCloud2`) | `/<namespace>/lidar/points` | Gazebo → ROS |
+  | `/<namespace>/gps/fix` (`NavSatFix`) | `/<namespace>/gps/fix` (`gz.msgs.NavSat`) | Gazebo → ROS |
 
-- `teleop.config` - Gazebo GUI layout with a teleop panel that publishes to `{namespace}/cmd_vel`.
+- `teleop.config` - Gazebo GUI layout with a teleop panel that publishes to
+  `{namespace}/teleop_gz_cmd_vel`.
 
 ## Running
 
 ```bash
 ros2 launch rover_gazebo simulation.launch.py
-ROVER_NAMESPACE=rover ros2 launch rover_gazebo simulation.launch.py use_rviz:=False
+ROVER_NAMESPACE=rover ROVER_USE_GPS=true ros2 launch rover_gazebo simulation.launch.py use_rviz:=False
+
+# then the orchestrator, e.g.
+ros2 launch rover_navigation bringup.launch.py use_sim_time:=True localization_source:=slam
 ```
 
-The package hook adds its `lib/` to `GZ_GUI_PLUGIN_PATH` and `GZ_GAZEBO_SYSTEM_PLUGIN_PATH`.
+With `ROVER_USE_GPS=true`, `gps/heading_imu` (and so `odometry/gps` / `odometry/global`) only
+appears after the rover has driven straight for a few metres, exactly as on the rover.

@@ -15,15 +15,13 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import (
     EnvironmentVariable,
     LaunchConfiguration,
-    PathJoinSubstitution,
+    PythonExpression,
 )
 from launch_ros.actions import Node, SetUseSimTime
-from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
 
@@ -80,26 +78,15 @@ def generate_launch_description():
         "yaw", default_value="0.0", description="Initial robot 'yaw' orientation."
     )
 
-    load_urdf = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("rover_description"), "launch", "rover_load_urdf.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "namespace": namespace,
-            "robot_model": robot_model,
-            "log_level": log_level,
-            "use_sim": "True",
-        }.items(),
-    )
+    # An empty namespace would give the Gazebo model an empty name.
+    model_name = PythonExpression(["'", namespace, "' if '", namespace, "' else 'rover_a1'"])
 
     spawn_robot = Node(
         package="ros_gz_sim",
         executable="create",
         arguments=[
             "-name",
-            namespace,
+            model_name,
             "-topic",
             "robot_description",
             "-x",
@@ -130,7 +117,6 @@ def generate_launch_description():
         declare_pitch_arg,
         declare_yaw_arg,
         SetUseSimTime(True),
-        # load_urdf,
         spawn_robot,
     ]
 
