@@ -52,8 +52,8 @@ struct DrivetrainSettings
     // motor_torque_constant/gear_ratio/gearbox_efficiency to get torque (see
     // MotorStateReading::getTorque() in domain/driver_data_snapshot.cpp). This is a property of
     // the driver backend's raw feedback units, not of the drivetrain itself - e.g. Phidget
-    // motor controllers report current in deci-amps, so PhidgetRoverDriver's caller supplies
-    // 0.1f here. A different driver backend reporting raw current in a different unit supplies
+    // driver reports current in milliamps (PhidgetMotorDriver::currentChangeHandler), so the URDF supplies
+    // 0.001 here. A different driver backend reporting raw current in a different unit supplies
     // its own value instead of silently inheriting Phidget's convention.
     float raw_current_to_amps_scale;
     // Timeout (ms) for the motor driver's own hardware watchdog (e.g. Phidget's

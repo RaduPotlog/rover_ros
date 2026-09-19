@@ -235,7 +235,7 @@ void RoverA1System::diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper &
         std::make_pair(std::string("Rear Right"), rear_right_driver_state)};
 
     for (const auto & [driver_name, driver_state] : driver_states_with_names) {
-        status.add(driver_name + " driver current (A)", driver_state.getDriverCurrent());
+        status.addf(driver_name + " driver current (A)", "%.2f", driver_state.getDriverCurrent());
         status.add(driver_name + " driver temperature (\u00B0C)", driver_state.getTemperature());
     }
 

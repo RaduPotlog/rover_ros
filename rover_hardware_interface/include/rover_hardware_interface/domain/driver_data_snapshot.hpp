@@ -125,7 +125,10 @@ class DriverStateReading
 
 public:
 
-    DriverStateReading() = default;
+    explicit DriverStateReading(const DrivetrainSettings & drivetrain_settings)
+    : raw_current_to_amps_(drivetrain_settings.raw_current_to_amps_scale)
+    {
+    }
 
     void setTemperature(const std::int16_t temp)
     {
@@ -134,7 +137,7 @@ public:
 
     void setDriverCurrent(const std::int16_t driver_current)
     {
-        driver_current_ = driver_current;
+        driver_current_raw_ = driver_current;
     }
 
     std::int16_t getTemperature() const
@@ -142,15 +145,18 @@ public:
         return temp_;
     }
 
+    // Driver current in amps (the raw value is in the backend's units, scaled by
+    // DrivetrainSettings::raw_current_to_amps_scale).
     float getDriverCurrent() const
     {
-        return driver_current_;
+        return static_cast<float>(driver_current_raw_) * raw_current_to_amps_;
     }
 
 private:
 
+    float raw_current_to_amps_;
     std::int16_t temp_ = 0;
-    float driver_current_ = 0.0;
+    std::int16_t driver_current_raw_ = 0;
 };
 
 class MotorStateReading
