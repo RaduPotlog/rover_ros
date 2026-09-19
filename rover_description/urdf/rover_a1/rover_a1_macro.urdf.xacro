@@ -181,7 +181,7 @@
                2.0 = up to 0.5 s from stop to full duty, a lag the ROS side can't see. Optional -
                omitting it keeps the compiled-in kDefaultMotorAcceleration (2.0). Once the wheel
                PID loop owns the speed dynamics, raise it after measuring the step response. -->
-          <param name="motor_acceleration">2.0</param>
+          <param name="motor_acceleration">1.0</param>
 
           <!-- Motor parameters -->
           <param name="motor_torque_constant">0.11</param>
@@ -202,8 +202,9 @@
                compiled-in kDefaultVelocityCommandZeroTolerance. 0.01 rad/s is ~1.65 mm/s at the
                A1's 0.1651 m wheel radius - well below anything that moves the rover, and well
                above the floating-point residue a controller's kinematics leave behind. Raise it
-               only if a controller is known to idle with a larger steady-state output. -->
-          <param name="velocity_command_zero_tolerance">0.01</param>
+               only if a controller is known to idle with a larger steady-state output. 
+               Set to 0.8 - workaround until the solution to reset the PID will be find -->
+          <param name="velocity_command_zero_tolerance">0.8</param>
 
         </xacro:unless>
       </hardware>

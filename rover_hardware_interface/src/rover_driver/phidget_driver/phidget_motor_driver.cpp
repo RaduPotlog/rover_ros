@@ -224,7 +224,7 @@ void PhidgetMotorDriver::initialize()
             std::to_string(channel_));
     }
 
-    // Read back what the device actually runs at (DCC1000: 50 ms minimum) - the stale-velocity
+    // Read back what the device actually runs at (DCC1000: 100 ms minimum) - the stale-velocity
     // timeout is derived from it.
     uint32_t dataInterval = minDataInterval;
 

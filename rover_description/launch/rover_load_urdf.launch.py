@@ -122,7 +122,7 @@ def generate_launch_description():
     imu_pos_x = _env_float("ROVER_IMU_LOCALIZATION_X", "-0.09")
     imu_pos_y = _env_float("ROVER_IMU_LOCALIZATION_Y", "0.0")
     imu_pos_z = _env_float("ROVER_IMU_LOCALIZATION_Z", "0.2")
-    imu_rot_r = _env_float("ROVER_IMU_ORIENTATION_R", "0.0")
+    imu_rot_r = _env_float("ROVER_IMU_ORIENTATION_R", "3.14159")
     imu_rot_p = _env_float("ROVER_IMU_ORIENTATION_P", "0.0")
     imu_rot_y = _env_float("ROVER_IMU_ORIENTATION_Y", "0.0")
 

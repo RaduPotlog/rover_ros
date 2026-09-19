@@ -63,7 +63,7 @@
         - velocity
         
       gains:
-        rl_wheel_base_to_rl_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
+        rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
 
   pid_controller_rr_wheel_base_to_rr_wheel_joint:
     ros__parameters:
@@ -77,7 +77,7 @@
         - velocity
         
       gains:
-        rr_wheel_base_to_rr_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
+        rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
 
   pid_controller_fl_wheel_base_to_fl_wheel_joint:
     ros__parameters:
@@ -91,7 +91,7 @@
         - velocity
         
       gains:
-        fl_wheel_base_to_fl_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
+        fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
 
   pid_controller_fr_wheel_base_to_fr_wheel_joint:
     ros__parameters:
@@ -105,8 +105,8 @@
         - velocity
         
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
-
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
+        
   rover_imu_broadcaster:
     ros__parameters:
       sensor_name: "<namespace>/imu"
@@ -157,8 +157,8 @@
       # ~10% under the 2 m/s wheel maximum (hardware clamps at 2800 rpm / 23.3 = 12.58 rad/s).
       linear:
         x:
-          max_velocity: 1.0 # m/s
-          min_velocity: -1.0 # m/s
+          max_velocity: 1.5 # m/s
+          min_velocity: -1.5 # m/s
           max_acceleration: 1.7 # m/s^2
           max_deceleration: -1.7 # m/s^2
           max_acceleration_reverse: -1.7 # m/s^2
