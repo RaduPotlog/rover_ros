@@ -161,17 +161,17 @@
         x:
           max_velocity: 1.5 # m/s
           min_velocity: -1.5 # m/s
-          max_acceleration: 1.7 # m/s^2
-          max_deceleration: -1.7 # m/s^2
-          max_acceleration_reverse: -1.7 # m/s^2
-          max_deceleration_reverse: 1.7 # m/s^2
+          max_acceleration: 2.7 # m/s^2
+          max_deceleration: -2.7 # m/s^2
+          max_acceleration_reverse: -2.7 # m/s^2
+          max_deceleration_reverse: 2.7 # m/s^2
           max_jerk: .NAN # m/s^3
           min_jerk: .NAN # m/s^3
 
       angular:
         z:
-          max_velocity: 1.7 # rad/s
-          min_velocity: -1.7 # rad/s
+          max_velocity: 2.1 # rad/s
+          min_velocity: -2.1 # rad/s
           max_acceleration: 3.74 # rad/s^2
           max_deceleration: -3.74 # rad/s^2
           max_acceleration_reverse: -3.74 # rad/s^2
