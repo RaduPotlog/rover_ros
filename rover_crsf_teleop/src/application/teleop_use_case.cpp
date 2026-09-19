@@ -57,7 +57,7 @@ TickStatus TeleopUseCase::tick(const SteadyTime now)
     VelocityCommand command;
     command.linear_x = mapChannel(config_.linear_x_channel, config_.linear_x_mapping);
     command.angular_z = mapChannel(config_.angular_z_channel, config_.angular_z_mapping);
-    publish(command);
+    publish(limitRimSpeed(command, config_.max_wheel_rim_speed, config_.half_track_width));
 
     evaluateSwitches();
 

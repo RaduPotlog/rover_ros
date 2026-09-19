@@ -97,6 +97,11 @@ void RoverCrsfTeleopNode::declareParameters()
     // defined about the midpoint now, so the inversion is explicit.
     declare_parameter<bool>("angular_z_invert", true);
 
+    // Outer-wheel rim speed budget (m/s) and wheel_separation * wheel_separation_multiplier (m).
+    // 0.0 disables the limit; see domain/rim_speed_limit.hpp.
+    declare_parameter<double>("max_wheel_rim_speed", 0.0);
+    declare_parameter<double>("effective_track_width", 0.0);
+
     declare_parameter<int>("e_stop_channel", 5);
     declare_parameter<int>("e_stop_latch_reset_channel", 4);
     declare_parameter<int>("channel_switch_threshold", 500);
@@ -158,6 +163,9 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
     config.angular_z_mapping.out_min = get_parameter("angular_z_out_min").as_double();
     config.angular_z_mapping.out_max = get_parameter("angular_z_out_max").as_double();
     config.angular_z_mapping.invert = get_parameter("angular_z_invert").as_bool();
+
+    config.max_wheel_rim_speed = get_parameter("max_wheel_rim_speed").as_double();
+    config.half_track_width = get_parameter("effective_track_width").as_double() / 2.0;
 
     config.linear_x_channel = static_cast<int>(get_parameter("linear_x_channel").as_int());
     config.angular_z_channel = static_cast<int>(get_parameter("angular_z_channel").as_int());

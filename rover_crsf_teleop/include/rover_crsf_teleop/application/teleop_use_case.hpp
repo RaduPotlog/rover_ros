@@ -22,6 +22,7 @@
 #include "rover_crsf_teleop/domain/link_monitor.hpp"
 #include "rover_crsf_teleop/domain/ports.hpp"
 #include "rover_crsf_teleop/domain/rc_frame.hpp"
+#include "rover_crsf_teleop/domain/rim_speed_limit.hpp"
 #include "rover_crsf_teleop/domain/stick_mapping.hpp"
 #include "rover_crsf_teleop/domain/switch_debouncer.hpp"
 #include "rover_crsf_teleop/domain/teleop_health.hpp"
@@ -37,6 +38,11 @@ struct TeleopConfig
     // RC channel numbers, 1-16.
     int linear_x_channel{3};
     int angular_z_channel{1};
+
+    // Outer-wheel rim speed budget, m/s, and half the effective track width, m (see
+    // domain/rim_speed_limit.hpp). Either <= 0 disables the limit.
+    double max_wheel_rim_speed{0.0};
+    double half_track_width{0.0};
     int e_stop_channel{5};
     int e_stop_latch_reset_channel{4};
 

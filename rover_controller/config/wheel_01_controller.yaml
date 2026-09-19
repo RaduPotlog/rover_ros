@@ -153,14 +153,17 @@
       cmd_vel_timeout: 0.5
       publish_limited_velocity: true
 
-      # linear.x and angular.z are limited independently, so the outer wheel rim speed is
-      #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.4695
-      # Keep that <= 1.8 m/s (10.9 rad/s): under the URDF joint limit (10.958 rad/s) and
-      # ~10% under the 2 m/s wheel maximum (hardware clamps at 2800 rpm / 23.3 = 12.58 rad/s).
+      # linear.x and angular.z are limited independently, so the outer wheel rim speed can reach
+      #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.5102
+      # Keep that <= 1.7 m/s (10.3 rad/s at r = 0.1651), under the URDF joint limit (10.958 rad/s).
+      # The margin is for the wheel PIDs: their output is feedforward * reference + P + I, and
+      # u_clamp only bounds the P + I part, so up to ~0.6 rad/s of trim rides on top of the
+      # reference. Enforced by test/test_wheel_geometry.py. rover_crsf_teleop scales stick
+      # commands against the same budget (max_wheel_rim_speed / effective_track_width).
       linear:
         x:
-          max_velocity: 1.5 # m/s
-          min_velocity: -1.5 # m/s
+          max_velocity: 1.2 # m/s
+          min_velocity: -1.2 # m/s
           max_acceleration: 2.7 # m/s^2
           max_deceleration: -2.7 # m/s^2
           max_acceleration_reverse: -2.7 # m/s^2
@@ -170,8 +173,8 @@
 
       angular:
         z:
-          max_velocity: 2.1 # rad/s
-          min_velocity: -2.1 # rad/s
+          max_velocity: 1.0 # rad/s
+          min_velocity: -1.0 # rad/s
           max_acceleration: 3.74 # rad/s^2
           max_deceleration: -3.74 # rad/s^2
           max_acceleration_reverse: -3.74 # rad/s^2

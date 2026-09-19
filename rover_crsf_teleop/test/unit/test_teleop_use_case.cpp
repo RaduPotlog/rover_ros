@@ -130,6 +130,23 @@ TEST_F(TeleopUseCaseTest, DeflectedStickPublishesEveryTick)
     EXPECT_DOUBLE_EQ(velocity_->published[1].linear_x, 2.0);
 }
 
+TEST_F(TeleopUseCaseTest, FullForwardAndTurnIsScaledToTheRimSpeedBudget)
+{
+    config_.max_wheel_rim_speed = 1.7;
+    config_.half_track_width = 0.5;
+    use_case_ = std::make_unique<TeleopUseCase>(config_, velocity_, safety_);
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    setChannel(kAngularChannel, kDefaultCrsfChannelMax);
+
+    feedAndTick();
+
+    // Unlimited this is 2.0 m/s + 5.0 rad/s: an outer rim speed of 4.5 m/s.
+    ASSERT_EQ(velocity_->published.size(), 1u);
+    const auto & command = velocity_->published[0];
+    EXPECT_NEAR(command.linear_x + command.angular_z * 0.5, 1.7, 1e-12);
+    EXPECT_NEAR(command.angular_z / command.linear_x, 5.0 / 2.0, 1e-12);
+}
+
 TEST_F(TeleopUseCaseTest, CentredStickPublishesZeroOnlyOnce)
 {
     feedAndTick();

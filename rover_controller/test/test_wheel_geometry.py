@@ -20,6 +20,7 @@ values as plain parameters, so this test fails the build if they drift.
 """
 
 from pathlib import Path
+import re
 
 from ament_index_python.packages import get_package_share_directory
 import pytest
@@ -74,3 +75,34 @@ def test_calibration_multipliers_are_plausible(wheel_type):
     assert 1.0 <= drive['wheel_separation_multiplier'] <= 2.5
     for side in ('left', 'right'):
         assert 0.9 <= drive[f'{side}_wheel_radius_multiplier'] <= 1.1
+
+
+def _urdf_wheel_velocity_limit():
+    xacro = (Path(get_package_share_directory('rover_description'))
+             / 'urdf' / 'common' / 'wheel.urdf.xacro').read_text(encoding='utf-8')
+    match = re.search(r'<limit\b[^>]*\bvelocity="([0-9.]+)"', xacro)
+    assert match, 'wheel joint <limit velocity="..."> not found in wheel.urdf.xacro'
+    return float(match.group(1))
+
+
+@pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
+def test_drive_limits_respect_joint_velocity_limit(wheel_type):
+    """Full linear + full angular must keep the outer wheel under the URDF limit.
+
+    diff_drive limits linear.x and angular.z independently, and each wheel PID adds up to
+    i_clamp_max (plus a small P term) on top of its feed-forward reference, outside u_clamp.
+    """
+    config = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')['/**']
+    drive = config['rover_drive_controller']['ros__parameters']
+    half_track = drive['wheel_separation'] * drive['wheel_separation_multiplier'] / 2.0
+    max_v = max(drive['linear']['x']['max_velocity'], -drive['linear']['x']['min_velocity'])
+    max_w = max(drive['angular']['z']['max_velocity'], -drive['angular']['z']['min_velocity'])
+    wheel_reference = (max_v + max_w * half_track) / drive['wheel_radius']
+
+    limit = _urdf_wheel_velocity_limit()
+    for wheel in drive['left_wheel_names'] + drive['right_wheel_names']:
+        pid_name, joint = wheel.split('/', 1)
+        i_clamp = config[pid_name]['ros__parameters']['gains'][joint]['i_clamp_max']
+        assert wheel_reference + i_clamp <= limit, (
+            f'{joint}: outer wheel reference {wheel_reference:.2f} rad/s + I {i_clamp} '
+            f'exceeds the URDF limit {limit} rad/s')

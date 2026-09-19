@@ -31,6 +31,7 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/crsf/crc8.cpp
             src/domain/crsf/crsf_parser.cpp
             src/domain/stick_mapping.cpp
+            src/domain/rim_speed_limit.cpp
             src/domain/switch_debouncer.cpp
             src/domain/link_monitor.cpp
             src/domain/teleop_health.cpp
@@ -85,6 +86,7 @@ if(BUILD_TESTING)
           test_crc8
           test_crsf_parser
           test_stick_mapping
+          test_rim_speed_limit
           test_switch_debouncer
           test_link_monitor
           test_teleop_health
