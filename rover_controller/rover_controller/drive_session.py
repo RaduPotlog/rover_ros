@@ -86,7 +86,7 @@ class DriveSession(Node):
                     f'{segment.start:6.1f}-{segment.end:6.1f} s  {segment.label}: '
                     f'v={segment.linear:+.2f} m/s  w={segment.angular:+.2f} rad/s')
         if not self.get_parameter('enable_motion').value:
-            self.get_logger().warn(
+            self.get_logger().warning(
                 'Dry run: the rover would drive the schedule above. Clear the area (or lift the '
                 'wheels for a first run) and re-run with -p enable_motion:=true.')
             return False

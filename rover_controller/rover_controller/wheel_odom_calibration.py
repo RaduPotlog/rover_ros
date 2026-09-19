@@ -116,7 +116,7 @@ class WheelOdomCalibration(DriveSession):
             wheels = [w for w in self.wheels if window[0] <= w[0] < window[1]]
             gyro = [g for g in self.gyro if window[0] <= g[0] < window[1]]
             if not wheels or not gyro:
-                self.get_logger().warn(f'{seg.label}: no joint_states or imu/data samples')
+                self.get_logger().warning(f'{seg.label}: no joint_states or imu/data samples')
                 continue
             segments.append(SpinSegment(
                 commanded_yaw_rate=seg.angular,
