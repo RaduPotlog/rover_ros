@@ -119,7 +119,8 @@ SerialBridgeNode::CallbackReturn SerialBridgeNode::on_configure(
         return CallbackReturn::FAILURE;
     }
 
-    byte_publisher_ = std::make_unique<Ros2BytePublisher>(publisher_);
+    byte_publisher_ = std::make_unique<Ros2BytePublisher>(
+        publisher_, get_node_base_interface()->get_context());
     inbound_ = std::make_unique<InboundByteBridge>(*port_, *byte_publisher_);
     outbound_ = std::make_unique<OutboundByteBridge>(*port_);
     inbound_->start();
@@ -174,16 +175,17 @@ SerialBridgeNode::CallbackReturn SerialBridgeNode::on_shutdown(
 
 void SerialBridgeNode::releaseResources()
 {
-    // Order matters: the bridges hold references to the port and the publisher adapter,
-    // so they go first.
+    // Order matters: close the port first so the ASIO thread stops feeding the inbound
+    // bridge, then drop the bridges (they hold references to the port and the publisher
+    // adapter), then the port itself.
+    if (port_) {
+        port_->close();
+    }
+
     inbound_.reset();
     outbound_.reset();
     byte_publisher_.reset();
-
-    if (port_) {
-        port_->close();
-        port_.reset();
-    }
+    port_.reset();
 
     subscriber_.reset();
     publisher_.reset();

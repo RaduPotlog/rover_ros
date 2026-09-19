@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from rover_utils.logging import limit_log_level_to_info
+from rover_utils.shutdown import shutdown_unless_shutting_down
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, IncludeLaunchDescription, LogError,
@@ -215,7 +216,7 @@ def generate_launch_description():
         ],
         condition=UnlessCondition(use_sim),
         emulate_tty=True,
-        on_exit=Shutdown(),
+        on_exit=shutdown_unless_shutting_down("ros2_control_node"),
     )
 
     def configure_spawners(context):

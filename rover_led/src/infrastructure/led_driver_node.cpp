@@ -33,6 +33,7 @@
 
 #include "rover_msgs/srv/set_led_brightness.hpp"
 
+#include "rover_led/infrastructure/shutdown_safe_publish.hpp"
 #include "rover_led/led_driver_parameters.hpp"
 
 namespace rover_led
@@ -274,7 +275,8 @@ void LedDriverNode::publishPayload(Channel & channel, std::vector<std::uint8_t> 
     udp_msg.header.frame_id = "";
     udp_msg.data = std::move(payload);
 
-    channel.publisher->publish(udp_msg);
+    publishUnlessShutdown(
+        this->get_node_base_interface()->get_context(), this->get_logger(), channel.publisher, udp_msg);
 }
 
 void LedDriverNode::frameCallback(const ImageMsg::UniquePtr & msg, Channel & channel)
@@ -431,7 +433,8 @@ void LedDriverNode::publishBrightness()
 
     Float32Msg msg;
     msg.data = static_cast<float>(this->params_.global_brightness);
-    brightness_publisher_->publish(msg);
+    publishUnlessShutdown(
+        this->get_node_base_interface()->get_context(), this->get_logger(), brightness_publisher_, msg);
 }
 
 void LedDriverNode::throttledWarn(const std::string & message)

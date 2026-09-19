@@ -145,6 +145,11 @@ void AsioUdpSocket::asyncReceiveHandler(
     const asio::error_code & error,
     std::size_t bytes_transferred)
 {
+    if (error == asio::error::operation_aborted) {
+        // close() cancelled the pending read - a normal part of shutdown/cleanup.
+        return;
+    }
+
     if (error) {
         RCLCPP_ERROR_STREAM(
             rclcpp::get_logger("AsioUdpSocket::asyncReceiveHandler"), error.message());

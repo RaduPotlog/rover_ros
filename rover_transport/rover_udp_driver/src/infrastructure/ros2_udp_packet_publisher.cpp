@@ -18,6 +18,10 @@
 #include <utility>
 #include <vector>
 
+#include <rclcpp/exceptions.hpp>
+#include <rclcpp/logging.hpp>
+#include <rclcpp/utilities.hpp>
+
 #include "rover_udp_driver/infrastructure/udp_packet_conversions.hpp"
 
 namespace rover::transport::udp
@@ -26,16 +30,19 @@ namespace rover::transport::udp
 Ros2UdpPacketPublisher::Ros2UdpPacketPublisher(
     PublisherPtr publisher,
     UdpEndpoint endpoint,
-    rclcpp::Clock::SharedPtr clock)
+    rclcpp::Clock::SharedPtr clock,
+    rclcpp::Context::SharedPtr context)
 : publisher_(std::move(publisher)),
   endpoint_(std::move(endpoint)),
-  clock_(std::move(clock))
+  clock_(std::move(clock)),
+  context_(std::move(context))
 {
 }
 
 void Ros2UdpPacketPublisher::publish(const std::vector<uint8_t> & buffer, std::size_t length)
 {
-    if (!publisher_) {
+    // Runs on the ASIO thread, which keeps receiving after Ctrl-C has shut the context down.
+    if (!publisher_ || !rclcpp::ok(context_)) {
         return;
     }
 
@@ -47,7 +54,16 @@ void Ros2UdpPacketPublisher::publish(const std::vector<uint8_t> & buffer, std::s
     out.address = endpoint_.ip();
     out.src_port = endpoint_.port();
 
-    publisher_->publish(out);
+    try {
+        publisher_->publish(out);
+    } catch (const rclcpp::exceptions::RCLError & e) {
+        // Never let this escape the ASIO thread: rmw_zenoh also refuses publishes during
+        // shutdown while the context is still valid. Drop the datagram.
+        if (rclcpp::ok(context_)) {
+            RCLCPP_WARN(
+                rclcpp::get_logger("Ros2UdpPacketPublisher"), "Dropped datagram, publish failed: %s", e.what());
+        }
+    }
 }
 
 }  // namespace rover::transport::udp

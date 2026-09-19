@@ -1,7 +1,8 @@
 
 from rover_utils.logging import limit_log_level_to_info
+from rover_utils.shutdown import shutdown_unless_shutting_down
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, Shutdown
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import UnlessCondition
 from launch.substitutions import (
     EnvironmentVariable,
@@ -119,7 +120,7 @@ def generate_launch_description():
             limit_log_level_to_info("pluginlib.ClassLoader", log_level),
         ],
         emulate_tty=True,
-        on_exit=Shutdown(),
+        on_exit=shutdown_unless_shutting_down("rover_led_container"),
     )
 
     driver_udp_channel_1_config = PythonExpression(["'", robot_model, "_udp_led_channel_1.yaml'"])

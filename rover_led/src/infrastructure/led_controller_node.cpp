@@ -39,6 +39,7 @@
 #include "rover_led/application/led_types.hpp"
 #include "rover_led/domain/led_components/led_panel.hpp"
 #include "rover_led/domain/led_components/led_segment.hpp"
+#include "rover_led/infrastructure/shutdown_safe_publish.hpp"
 #include "rover_led/infrastructure/yaml_led_config.hpp"
 #include "rover_led/led_controller_parameters.hpp"
 #include "rover_utils/ros_utils.hpp"
@@ -237,7 +238,9 @@ void LedControllerNode::publishPanelFrame(
     image->step = leds_per_row * 4;
     image->data = std::move(frame);
 
-    panel_publishers_.at(channel)->publish(std::move(image));
+    publishUnlessShutdown(
+        this->get_node_base_interface()->get_context(), this->get_logger(),
+        panel_publishers_.at(channel), std::move(image));
 }
 
 void LedControllerNode::controllerTimerCallback()
@@ -313,7 +316,8 @@ void LedControllerNode::stateTimerCallback()
         msg.segments.push_back(std::move(segment_msg));
     }
 
-    state_publisher_->publish(msg);
+    publishUnlessShutdown(
+        this->get_node_base_interface()->get_context(), this->get_logger(), state_publisher_, msg);
 }
 
 void LedControllerNode::diagnoseController(diagnostic_updater::DiagnosticStatusWrapper & status)

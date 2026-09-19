@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 
+#include <rclcpp/context.hpp>
 #include <rclcpp_lifecycle/lifecycle_publisher.hpp>
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 
@@ -38,13 +39,14 @@ public:
     using PublisherPtr =
         rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::UInt8MultiArray>::SharedPtr;
 
-    explicit Ros2BytePublisher(PublisherPtr publisher);
+    Ros2BytePublisher(PublisherPtr publisher, rclcpp::Context::SharedPtr context);
 
     void publish(const std::vector<uint8_t> & buffer, std::size_t length) override;
 
 private:
 
     PublisherPtr publisher_;
+    rclcpp::Context::SharedPtr context_;
 };
 
 }  // namespace rover::transport::serial
