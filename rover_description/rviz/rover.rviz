@@ -153,6 +153,32 @@ Visualization Manager:
           Frame Timeout: 15
           Frames:
             All Enabled: true
+            base_footprint:
+              Value: true
+            base_link:
+              Value: true
+            body_link:
+              Value: true
+            fl_wheel_base_link:
+              Value: true
+            fl_wheel_link:
+              Value: true
+            fr_wheel_base_link:
+              Value: true
+            fr_wheel_link:
+              Value: true
+            gps_link:
+              Value: true
+            imu_link:
+              Value: true
+            lidar_link:
+              Value: true
+            odom:
+              Value: true
+            rl_wheel_base_link:
+              Value: true
+            rl_wheel_link:
+              Value: true
             rover/base_footprint:
               Value: true
             rover/base_link:
@@ -173,6 +199,8 @@ Visualization Manager:
               Value: true
             rover/lidar_link:
               Value: true
+            rover/map:
+              Value: true
             rover/odom:
               Value: true
             rover/rl_wheel_base_link:
@@ -183,12 +211,18 @@ Visualization Manager:
               Value: true
             rover/rr_wheel_link:
               Value: true
+            rr_wheel_base_link:
+              Value: true
+            rr_wheel_link:
+              Value: true
           Marker Scale: 1
           Name: TF
           Show Arrows: true
           Show Axes: true
           Show Names: false
           Tree:
+            rover/map:
+              {}
             rover/odom:
               rover/base_link:
                 rover/body_link:
@@ -349,7 +383,7 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 72
+      Max Intensity: 68
       Min Color: 0; 0; 0
       Min Intensity: 1
       Name: PointCloud2
@@ -448,25 +482,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 10.009252548217773
+      Distance: 11.74656867980957
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 1.3271424770355225
-        Y: -0.3364899456501007
-        Z: -0.328449010848999
+        X: 0.45908212661743164
+        Y: -1.1966910362243652
+        Z: -0.3728659451007843
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.48479628562927246
+      Pitch: 0.5197961330413818
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.3231801986694336
+      Yaw: 2.0581793785095215
     Saved: ~
 Window Geometry:
   Displays:
