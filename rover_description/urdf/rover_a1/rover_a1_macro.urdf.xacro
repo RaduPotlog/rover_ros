@@ -188,7 +188,7 @@
                supply, so the limit is what protects motor, DCC1000 and gearbox. 10 A gives ~60 %
                of stall torque with thermal headroom. Optional - omitting it keeps the compiled-in
                kDefaultMotorCurrentLimit (10.0). -->
-          <param name="motor_current_limit">10.0</param>
+          <param name="motor_current_limit">15.0</param>
 
           <!-- Motor supply voltage in V (DCC1000 range 8-30). Only used to derive the current
                regulator gain = motor_current_limit * (motor_supply_voltage / 12) (Phidget rule of
