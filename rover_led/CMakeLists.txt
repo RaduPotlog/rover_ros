@@ -103,6 +103,7 @@ target_link_libraries(led_driver_node_component
                       rover_led_application
                       led_driver_parameters
 )
+target_include_directories(led_driver_node_component PUBLIC ${rover_utils_INCLUDE_DIRS})
 
 generate_parameter_library(led_controller_parameters
                            src/led_controller_parameters.yaml)

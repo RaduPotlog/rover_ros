@@ -34,4 +34,12 @@ install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
 ament_export_include_directories(include/${PROJECT_NAME})
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_shutdown_gate test/test_shutdown_gate.cpp)
+  target_include_directories(test_shutdown_gate PRIVATE include)
+  target_link_libraries(test_shutdown_gate rclcpp::rclcpp)
+endif()
+
 ament_package()

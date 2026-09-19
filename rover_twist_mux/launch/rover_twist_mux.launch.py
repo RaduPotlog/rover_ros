@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from rover_utils.logging import quiet_rmw_zenoh
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import (
@@ -88,6 +89,7 @@ def generate_launch_description():
         output='screen',
         parameters=[twist_mux_config_path],
         remappings=[('cmd_vel_out', 'cmd_vel'), ('/diagnostics', 'diagnostics')],
+        arguments=["--ros-args", "--log-level", quiet_rmw_zenoh(log_level)],
     )
 
     actions = [

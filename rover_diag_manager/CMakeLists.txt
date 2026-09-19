@@ -15,6 +15,7 @@ set(PACKAGE_DEPENDENCIES
     generate_parameter_library
     rclcpp
     rover_msgs
+    rover_utils
 )
 
 find_package(ament_cmake REQUIRED)
@@ -53,6 +54,7 @@ target_link_libraries(${PROJECT_NAME}_ros
                       system_diag_params
                       PkgConfig::CPPUPROFILE
 )
+target_include_directories(${PROJECT_NAME}_ros PUBLIC ${rover_utils_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_ros
     ${diagnostic_msgs_TARGETS}
     ${diagnostic_updater_TARGETS}

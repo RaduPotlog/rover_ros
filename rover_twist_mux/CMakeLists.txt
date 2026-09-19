@@ -15,6 +15,7 @@ set(PACKAGE_DEPENDENCIES
     generate_parameter_library
     rclcpp
     rover_msgs
+    rover_utils
     std_msgs
 )
 
@@ -44,6 +45,7 @@ target_link_libraries(${PROJECT_NAME}_ros
                       ${PROJECT_NAME}_core
                       motion_lock_params
 )
+target_include_directories(${PROJECT_NAME}_ros PUBLIC ${rover_utils_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_ros
     ${diagnostic_msgs_TARGETS}
     ${diagnostic_updater_TARGETS}

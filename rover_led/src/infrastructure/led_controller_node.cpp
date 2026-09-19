@@ -51,6 +51,7 @@ namespace rover_led
 LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
 : Node("rover_led_controller", options)
 , animation_factory_(std::make_shared<PluginlibAnimationFactory>())
+, shutdown_gate_(this->get_node_base_interface()->get_context(), [this]() { stopTimers(); })
 {
     RCLCPP_INFO(this->get_logger(), "Initializing.");
 
@@ -238,9 +239,7 @@ void LedControllerNode::publishPanelFrame(
     image->step = leds_per_row * 4;
     image->data = std::move(frame);
 
-    publishUnlessShutdown(
-        this->get_node_base_interface()->get_context(), this->get_logger(),
-        panel_publishers_.at(channel), std::move(image));
+    publishUnlessShutdown(shutdown_gate_, this->get_logger(), panel_publishers_.at(channel), std::move(image));
 }
 
 void LedControllerNode::controllerTimerCallback()
@@ -316,8 +315,19 @@ void LedControllerNode::stateTimerCallback()
         msg.segments.push_back(std::move(segment_msg));
     }
 
-    publishUnlessShutdown(
-        this->get_node_base_interface()->get_context(), this->get_logger(), state_publisher_, msg);
+    publishUnlessShutdown(shutdown_gate_, this->get_logger(), state_publisher_, msg);
+}
+
+void LedControllerNode::stopTimers()
+{
+    // Stop rendering at the source; the driver then has no frames to forward.
+    if (controller_timer_) {
+        controller_timer_->cancel();
+    }
+
+    if (state_timer_) {
+        state_timer_->cancel();
+    }
 }
 
 void LedControllerNode::diagnoseController(diagnostic_updater::DiagnosticStatusWrapper & status)

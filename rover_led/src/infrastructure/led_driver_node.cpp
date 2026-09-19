@@ -14,11 +14,12 @@
 
 #include "rover_led/infrastructure/led_driver_node.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <mutex>
+#include <future>
 #include <string>
 #include <utility>
 #include <vector>
@@ -44,24 +45,13 @@ using std::placeholders::_2;
 
 LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
 : LifecycleNode("rover_led_driver", options)
+, shutdown_gate_(this->get_node_base_interface()->get_context(), [this]() { finalizeOnExecutor(); })
 , diagnostic_updater_(this)
 {
     RCLCPP_INFO(this->get_logger(), "Constructing node.");
 
     this->param_listener_ =
         std::make_shared<led_driver::ParamListener>(this->get_node_parameters_interface());
-
-    // Clear the LEDs while publishing still works (on_shutdown callbacks run
-    // after the context is shut down). Runs on the thread calling
-    // rclcpp::shutdown(), hence the lock against on_configure/on_cleanup.
-    pre_shutdown_callback_handle_ =
-        this->get_node_base_interface()->get_context()->add_pre_shutdown_callback([this]() {
-            const std::lock_guard<std::mutex> lock(channels_mutex_);
-
-            if (isActive()) {
-                clearLeds();
-            }
-        });
 
     diagnostic_updater_.setHardwareID("Bumper Led");
     diagnostic_updater_.add("Led driver status", this, &LedDriverNode::diagnoseLeds);
@@ -82,11 +72,7 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
     RCLCPP_INFO(this->get_logger(), "Node constructed successfully.");
 }
 
-LedDriverNode::~LedDriverNode()
-{
-    this->get_node_base_interface()->get_context()->remove_pre_shutdown_callback(
-        pre_shutdown_callback_handle_);
-}
+LedDriverNode::~LedDriverNode() = default;
 
 LedDriverNode::CallbackReturn LedDriverNode::on_configure(const rclcpp_lifecycle::State & /*previous_state*/)
 {
@@ -101,8 +87,6 @@ LedDriverNode::CallbackReturn LedDriverNode::on_configure(const rclcpp_lifecycle
         {"channel_1", static_cast<std::size_t>(this->params_.channel_1_num_led)},
         {"channel_2", static_cast<std::size_t>(this->params_.channel_2_num_led)},
     };
-
-    const std::lock_guard<std::mutex> lock(channels_mutex_);
 
     channels_.clear();
     channels_.reserve(channel_layout.size());
@@ -234,6 +218,36 @@ LedDriverNode::CallbackReturn LedDriverNode::on_shutdown(const rclcpp_lifecycle:
     return CallbackReturn::SUCCESS;
 }
 
+void LedDriverNode::finalizeOnExecutor()
+{
+    // Runs on the thread calling rclcpp::shutdown(), while publishing still works. The
+    // transition is handed to the executor so it is serialized with the frame, timer and
+    // service callbacks; on_shutdown() then clears the LEDs and hands back LED control, and
+    // the node is Finalized before it is destroyed.
+    auto finalized = std::make_shared<std::promise<void>>();
+    auto finalized_future = finalized->get_future();
+    auto fired = std::make_shared<std::atomic<bool>>(false);
+
+    const auto timer = this->create_wall_timer(std::chrono::milliseconds(0), [this, finalized, fired]() {
+        if (fired->exchange(true)) {
+            return;
+        }
+
+        if (this->get_current_state().id() != lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED) {
+            this->shutdown();
+        }
+
+        finalized->set_value();
+    });
+
+    // Bounded: the executor may not be spinning (or this may be called from one of its callbacks).
+    if (finalized_future.wait_for(kFinalizeTimeout) != std::future_status::ready) {
+        RCLCPP_WARN(this->get_logger(), "Executor did not finalize the node on shutdown; LEDs may stay lit.");
+    }
+
+    timer->cancel();
+}
+
 bool LedDriverNode::isActive() const
 {
     return this->get_current_state().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
@@ -256,8 +270,6 @@ void LedDriverNode::releaseResources()
     brightness_publisher_.reset();
     enable_led_control_client_.reset();
     set_brightness_use_case_.reset();
-
-    const std::lock_guard<std::mutex> lock(channels_mutex_);
     channels_.clear();
 }
 
@@ -275,8 +287,7 @@ void LedDriverNode::publishPayload(Channel & channel, std::vector<std::uint8_t> 
     udp_msg.header.frame_id = "";
     udp_msg.data = std::move(payload);
 
-    publishUnlessShutdown(
-        this->get_node_base_interface()->get_context(), this->get_logger(), channel.publisher, udp_msg);
+    publishUnlessShutdown(shutdown_gate_, this->get_logger(), channel.publisher, udp_msg);
 }
 
 void LedDriverNode::frameCallback(const ImageMsg::UniquePtr & msg, Channel & channel)
@@ -433,8 +444,7 @@ void LedDriverNode::publishBrightness()
 
     Float32Msg msg;
     msg.data = static_cast<float>(this->params_.global_brightness);
-    publishUnlessShutdown(
-        this->get_node_base_interface()->get_context(), this->get_logger(), brightness_publisher_, msg);
+    publishUnlessShutdown(shutdown_gate_, this->get_logger(), brightness_publisher_, msg);
 }
 
 void LedDriverNode::throttledWarn(const std::string & message)

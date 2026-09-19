@@ -24,3 +24,21 @@ def limit_log_level_to_info(unit: SomeSubstitutionsType, log_level: SomeSubstitu
         return PythonExpression(["'", unit, "' + ':=' + 'INFO'"])
     else:
         return PythonExpression(["'", unit, "' + ':=' + ", log_level])
+
+def quiet_rmw_zenoh(log_level: SomeSubstitutionsType):
+    """
+    Return a `--log-level` value capping rmw_zenoh_cpp at ERROR.
+
+    For nodes we don't own: on Ctrl-C rmw_zenoh closes its session ~2 s before the context is
+    invalidated, and their timers log "unable to publish message since the zenoh session is
+    closed" on every publish in between. DEBUG (and ERROR/FATAL) runs keep the chosen level.
+    """
+    return PythonExpression(
+        [
+            "'rmw_zenoh_cpp:=' + ('",
+            log_level,
+            "' if '",
+            log_level,
+            "'.upper() in ('DEBUG', 'ERROR', 'FATAL') else 'ERROR')",
+        ]
+    )

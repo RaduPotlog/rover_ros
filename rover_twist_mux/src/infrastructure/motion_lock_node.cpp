@@ -73,6 +73,11 @@ MotionLockNode::MotionLockNode(
     const std::string & node_name, const rclcpp::NodeOptions & options)
 : rclcpp::Node(node_name, options)
 , last_gpio_stamp_(0, 0, this->get_clock()->get_clock_type())
+, shutdown_gate_(this->get_node_base_interface()->get_context(), [this]() {
+    if (timer_) {
+        timer_->cancel();
+    }
+})
 , diagnostic_updater_(this)
 {
     param_listener_ = std::make_shared<motion_lock::ParamListener>(

@@ -17,34 +17,36 @@
 
 #include <utility>
 
-#include "rclcpp/context.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/logging.hpp"
-#include "rclcpp/utilities.hpp"
+
+#include "rover_utils/shutdown_gate.hpp"
 
 namespace rover_led
 {
 
-// Publishes unless the context has been shut down, and never lets a failed publish escape.
+// Publishes unless shutdown has started, and never lets a failed publish escape.
 //
-// On Ctrl-C rmw_zenoh starts refusing publishes (generic error, so rclcpp throws RCLError)
-// while timer callbacks are still running - and even from pre-shutdown callbacks, where the
-// context is still valid. An uncaught RCLError aborts the whole component container, so the
-// message is dropped instead: a lost LED frame is never worth a crash.
+// rmw_zenoh closes its session as soon as rcl_shutdown() starts, but the context stays valid
+// until the session is fully closed (~2 s), so rclcpp::ok() alone lets timers keep publishing
+// into a closed session. The gate closes in a pre-shutdown callback, before that window.
+// A publish can still fail (generic error, so rclcpp throws RCLError), and an uncaught RCLError
+// aborts the whole component container, so the message is dropped instead: a lost LED frame is
+// never worth a crash.
 template<typename PublisherPtrT, typename MessageT>
 void publishUnlessShutdown(
-    const rclcpp::Context::SharedPtr & context, const rclcpp::Logger & logger,
+    const rover_utils::ros::ShutdownGate & gate, const rclcpp::Logger & logger,
     const PublisherPtrT & publisher, MessageT && msg)
 {
-    if (!rclcpp::ok(context)) {
+    if (!gate.isOpen()) {
         return;
     }
 
     try {
         publisher->publish(std::forward<MessageT>(msg));
     } catch (const rclcpp::exceptions::RCLError & e) {
-        if (rclcpp::ok(context)) {
+        if (gate.isOpen()) {
             RCLCPP_WARN(logger, "Dropped message, publish failed: %s", e.what());
         }
     }

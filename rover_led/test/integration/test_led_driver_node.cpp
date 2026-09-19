@@ -23,6 +23,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -374,4 +375,40 @@ TEST_F(LedDriverNodeHandshakeTest, GrantArrivingAfterDeactivationIsHandedBack)
     ASSERT_TRUE(spinUntil([this] { return hardware_requests_.size() == 3; }));
     EXPECT_TRUE(hardware_requests_.back());
     EXPECT_FALSE(spinUntil([this] { return !packets_.empty(); }, 500ms));
+}
+
+// Ctrl-C path: shutting the context down finalizes the node on the executor, before the
+// middleware goes away (otherwise it is destroyed while still Active).
+TEST(LedDriverNodeShutdownTest, ContextShutdownFinalizesTheNode)
+{
+    auto context = std::make_shared<rclcpp::Context>();
+    context->init(0, nullptr);
+
+    rclcpp::NodeOptions options;
+    options.context(context);
+    options.arguments({"--ros-args", "-r", "__ns:=/led_driver_shutdown_test_" + std::to_string(getpid())});
+    options.parameter_overrides({{"autostart", true}, {"led_control_handshake", false}});
+
+    auto driver = std::make_shared<rover_led::LedDriverNode>(options);
+
+    rclcpp::ExecutorOptions executor_options;
+    executor_options.context = context;
+    rclcpp::executors::SingleThreadedExecutor executor(executor_options);
+    executor.add_node(driver->get_node_base_interface());
+
+    const auto deadline = std::chrono::steady_clock::now() + 3s;
+    while (driver->get_current_state().id() != lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE &&
+           std::chrono::steady_clock::now() < deadline) {
+        executor.spin_some(10ms);
+    }
+    ASSERT_EQ(driver->get_current_state().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    std::thread spinner([&executor]() { executor.spin(); });
+
+    context->shutdown("test");
+    spinner.join();
+
+    EXPECT_EQ(driver->get_current_state().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED);
+
+    executor.remove_node(driver->get_node_base_interface());
 }

@@ -28,6 +28,7 @@
 #include "rover_twist_mux/domain/motion_lock_health.hpp"
 #include "rover_twist_mux/domain/safety_io_flags.hpp"
 #include "rover_twist_mux/motion_lock_params.hpp"
+#include "rover_utils/shutdown_gate.hpp"
 
 namespace rover_twist_mux
 {
@@ -86,6 +87,9 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr motion_lock_pub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
+
+    // Cancels timer_ once shutdown starts, before rmw_zenoh closes its session.
+    rover_utils::ros::ShutdownGate shutdown_gate_;
 
     // Last member: its timer must not fire into a partially destroyed node.
     diagnostic_updater::Updater diagnostic_updater_;

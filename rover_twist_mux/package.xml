@@ -17,6 +17,7 @@
 
   <!-- Rover dependency -->
   <depend>rover_msgs</depend>
+  <depend>rover_utils</depend>
 
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">twist_mux</exec_depend>
 
