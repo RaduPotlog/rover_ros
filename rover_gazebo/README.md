@@ -72,8 +72,9 @@ Frames carry the namespace prefix, like `robot_state_publisher`'s TF.
 In simulation only, `body_link` gets a box collision over the `base.stl` bounds, so the body
 collides with obstacles. The hardware URDF keeps visual-only geometry.
 
-The lidar uses the `ROVER_LIDAR_*` mount pose; with none set it sits 0.30 m above `body_link`,
-clear of the body mesh. The GNSS uses `ROVER_GPS_*`. The world's `<spherical_coordinates>` sets
+The lidar uses the `ROVER_LIDAR_*` mount pose; with none set it sits 0.45 m above `body_link`,
+high enough that its lowest ring (-15°) clears the body. A custom mount lower than about
+0.37 m makes the rover see itself. The GNSS uses `ROVER_GPS_*`. The world's `<spherical_coordinates>` sets
 the datum (50.088384 N, 19.939128 E).
 
 ## Config Files

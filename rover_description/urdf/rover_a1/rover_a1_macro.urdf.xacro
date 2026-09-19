@@ -19,9 +19,12 @@
       <xacro:property name="imu_xyz" value="-0.09 0.0 0.2" />
       <xacro:property name="imu_rpy" value="0.0 0.0 0.0" />
       <!-- Keep the ROVER_LIDAR_* mount when one is set; with the all-zero default the
-           gpu_lidar would sit inside the body mesh (top at z = 0.241), so lift it above. -->
+           gpu_lidar would sit inside the body mesh (top at z = 0.241), so lift it above.
+           Its lowest ring (-15 deg) must clear the body's far corner (0.47 m out), which
+           needs >= 0.126 m above the top; 0.45 gives 0.21 m. Lower, the rover sees itself
+           and the costmaps mark obstacles inside the footprint. -->
       <xacro:if value="${[float(v) for v in str(lidar_xyz).split()] == [0.0, 0.0, 0.0]}">
-        <xacro:property name="lidar_xyz" value="0.0 0.0 0.30" />
+        <xacro:property name="lidar_xyz" value="0.0 0.0 0.45" />
       </xacro:if>
     </xacro:if>
 
