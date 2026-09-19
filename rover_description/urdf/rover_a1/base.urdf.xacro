@@ -12,6 +12,17 @@
             gps_xyz
             gps_rpy">
 
+    <!-- REP-105 root: ground projection of base_link. The odometry filters publish
+         odom -> base_footprint, so in 2D mode odom stays on the ground plane. -->
+    <link name="base_footprint" />
+
+    <!-- base_link sits above the ground by the wheel radius minus the axis offset. -->
+    <joint name="footprint_to_base_joint" type="fixed">
+      <origin xyz="0.0 0.0 ${wheel_radius - wheel_mount_point_z}" rpy="0.0 0.0 0.0" />
+      <parent link="base_footprint" />
+      <child link="base_link" />
+    </joint>
+
     <link name="base_link" />
 
     <joint name="base_to_body_joint" type="fixed">
@@ -59,15 +70,6 @@
     </joint>
 
     <link name="gps_link" />
-
-    <!-- Ground projection of body_link: the wheel axis height minus the wheel radius. -->
-    <joint name="body_to_footprint_joint" type="fixed">
-      <origin xyz="0.0 0.0 ${wheel_mount_point_z - wheel_radius}" rpy="0.0 0.0 0.0" />
-      <parent link="body_link" />
-      <child link="base_footprint" />
-    </joint>
-    
-    <link name="base_footprint" />
 
   </xacro:macro>
 </robot>

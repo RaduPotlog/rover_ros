@@ -154,8 +154,10 @@ def generate_launch_description():
             LaunchConfiguration("x"),
             "--y",
             LaunchConfiguration("y"),
+            # odom lies on the ground plane (base_footprint is the root); the spawn z is only
+            # the drop height, so it must not lift odom above the world.
             "--z",
-            LaunchConfiguration("z"),
+            "0.0",
             "--roll",
             LaunchConfiguration("roll"),
             "--pitch",

@@ -71,7 +71,7 @@ def test_urdf_wheel_placement_matches_convention(wheel_type):
         # All four wheels mount at the same height.
         assert z == pytest.approx(origins['body_to_fl_wheel_base_joint'][2])
 
-    # base_footprint is the ground projection: wheel axis height - wheel radius.
+    # base_footprint is the root on the ground: base_link sits wheel radius - axis height above it.
     axis_z = origins['body_to_fl_wheel_base_joint'][2]
-    footprint_z = origins['body_to_footprint_joint'][2]
-    assert footprint_z == pytest.approx(axis_z - wheel['wheel_radius'])
+    base_z = origins['footprint_to_base_joint'][2]
+    assert base_z == pytest.approx(wheel['wheel_radius'] - axis_z)

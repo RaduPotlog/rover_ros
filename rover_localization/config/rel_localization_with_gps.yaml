@@ -1,5 +1,5 @@
 # Localization with GPS (ROVER_USE_GPS=true), dual EKF:
-#   rover_ekf_node              odom -> base_link   wheels + IMU yaw rate      (same as rel_localization.yaml)
+#   rover_ekf_node              odom -> base_footprint  wheels + IMU yaw rate      (same as rel_localization.yaml)
 #   rover_ekf_global_node       map  -> odom        wheels + IMU yaw rate + GPS position
 #   rover_navsat_transform_node gps/fix + gps/heading_imu + odometry/global -> odometry/gps
 #   rover_gps_heading_node      gps/fix + odom -> gps/heading_imu (ENU heading from GNSS course)
@@ -20,7 +20,7 @@
       map_frame: map
       world_frame: odom
       odom_frame: odom
-      base_link_frame: base_link
+      base_link_frame: base_footprint
       publish_tf: true
       publish_acceleration: false
 
@@ -124,7 +124,7 @@
       # Global filter: continuous odometry + absolute GPS position, publishes map -> odom.
       world_frame: map
       odom_frame: odom
-      base_link_frame: base_link
+      base_link_frame: base_footprint
       publish_tf: true
       publish_acceleration: false
 
