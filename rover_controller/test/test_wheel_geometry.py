@@ -62,6 +62,8 @@ def test_drive_controller_chains_through_declared_wheel_pids(wheel_type):
         assert pid['reference_and_state_interfaces'] == ['velocity']
         # Feed-forward carries the open-loop command; PI only trims it.
         assert pid['gains'][joint]['feedforward_gain'] == pytest.approx(1.0)
+        # Integral is cleared on (re)activation - no stale I-term after an e-stop.
+        assert pid['gains'][joint]['save_i_term'] is False
 
 
 @pytest.mark.parametrize('wheel_type', WHEEL_TYPES)

@@ -28,6 +28,9 @@ ros2 param set <ns>/pid_controller_fl_wheel_base_to_fl_wheel_joint \
 ```
 
 Each PID publishes `<pid>/controller_state` (reference, feedback, error, output).
+`save_i_term: false` clears each PID's integral whenever it is (re)activated; pid_controller
+has no reset service, so to reset on demand deactivate and reactivate
+`rover_drive_controller` together with its PIDs.
 Listing plain joint names as wheel names instead drives the wheels open loop; the
 launch file then spawns no PIDs (see below).
 

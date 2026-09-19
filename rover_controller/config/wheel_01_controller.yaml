@@ -51,6 +51,8 @@
   # is exactly the old open-loop behaviour - use it for A/B runs:
   #   ros2 param set <ns>/pid_controller_<wheel> gains.<joint>.p 0.0   (and .i)
   # u_clamp is the hardware full-duty speed (2800 rpm / 23.3 = 12.58 rad/s).
+  # save_i_term false: the integral is cleared each time the PIDs are (re)activated
+  # (e-stop, controller switch), so a stale I-term never carries into the next drive.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
@@ -63,7 +65,7 @@
         - velocity
         
       gains:
-        rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
+        rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_rr_wheel_base_to_rr_wheel_joint:
     ros__parameters:
@@ -77,7 +79,7 @@
         - velocity
         
       gains:
-        rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
+        rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_fl_wheel_base_to_fl_wheel_joint:
     ros__parameters:
@@ -91,7 +93,7 @@
         - velocity
         
       gains:
-        fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
+        fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_fr_wheel_base_to_fr_wheel_joint:
     ros__parameters:
@@ -105,7 +107,7 @@
         - velocity
         
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation"}
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -0.4, "i_clamp_max": 0.4, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
         
   rover_imu_broadcaster:
     ros__parameters:
