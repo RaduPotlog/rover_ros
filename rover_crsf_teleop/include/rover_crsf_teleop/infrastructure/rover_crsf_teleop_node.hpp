@@ -30,6 +30,7 @@
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
+#include <rover_msgs/msg/gpio_state.hpp>
 #include <rover_msgs/msg/rc_calibration_state.hpp>
 #include <rover_msgs/srv/set_rc_calibration.hpp>
 #include <rover_msgs/srv/start_rc_calibration.hpp>
@@ -142,6 +143,15 @@ private:
 
     void publishCalibrationState();
 
+    // What the node can currently say about the rover's E-Stop. kUnknown when nothing has
+    // arrived on gpio_state or the last sample is older than e_stop_state_timeout_ - GpioState
+    // carries no header, so freshness is measured from when it arrived here.
+    EStopState eStopState(SteadyTime now) const;
+
+    // Feeds the current E-Stop state to the calibration session, which cancels it if the E-Stop
+    // has been released for longer than its grace window.
+    void updateCalibrationEStop();
+
     // Fails fast with an explanation when a pre-array configuration is loaded.
     void rejectScalarChannelParameters();
 
@@ -205,6 +215,23 @@ private:
     // Runs only while a session is in progress: at idle the transient-local publisher has
     // already latched the last state for whoever joins next.
     rclcpp::TimerBase::SharedPtr calibration_state_timer_;
+
+    // The rover's safety IO, which is what actually gates a calibration. Subscribed in
+    // on_configure with the publisher's exact QoS (reliable + transient local, depth 1): miss any
+    // of the three and nothing is delivered at all.
+    rclcpp::Subscription<rover_msgs::msg::GpioState>::SharedPtr gpio_state_subscriber_;
+    std::optional<SafetyIoFlags> last_safety_io_;
+    std::optional<SteadyTime> last_safety_io_at_;
+    std::chrono::milliseconds e_stop_state_timeout_{1000};
+
+    // Last E-Stop state put on the wire, so the state topic is republished when it changes
+    // rather than on every 20 Hz gpio_state message.
+    EStopState reported_e_stop_{EStopState::kUnknown};
+
+    // Always on, unlike the session heartbeat: a publisher that dies while nothing is
+    // calibrating still has to age into "unverified" on the page, and no callback will fire to
+    // notice that.
+    rclcpp::TimerBase::SharedPtr e_stop_watchdog_timer_;
 
     std::optional<TickStatus> last_tick_status_;
 

@@ -43,6 +43,7 @@ constexpr char kRcChannelsTopic[] = "rc/channels";
 constexpr char kRcLinkTopic[] = "rc/link";
 constexpr auto kControlPeriod = 20ms;
 
+constexpr char kGpioStateTopic[] = "hardware_interface/gpio_state";
 constexpr char kCalibrationStateTopic[] = "rc/calibration/state";
 constexpr char kCalibrationStartService[] = "rc/calibration/start";
 constexpr char kCalibrationSweepService[] = "rc/calibration/sweep";
@@ -118,6 +119,13 @@ void RoverCrsfTeleopNode::declareParameters()
     // to do so forever.
     declare_parameter<int>("calibration_timeout_s", 300);
     declare_parameter<double>("calibration_state_rate_hz", 5.0);
+    // How long a gpio_state sample stays trustworthy. It is published at 20 Hz, so a second is
+    // 20 missed messages; matches rover_twist_mux's gpio_timeout.
+    declare_parameter<double>("e_stop_state_timeout_s", 1.0);
+    // How long the E-Stop must stay un-engaged before a running calibration is cancelled. The
+    // driver reports a Modbus read error as "clear" and the underlying IO only refreshes at
+    // 2 Hz, so a single not-engaged sample must not throw away a measurement.
+    declare_parameter<double>("e_stop_grace_s", 1.0);
 
     declare_parameter<int>("linear_x_channel", 3);
     declare_parameter<double>("linear_x_out_min", -2.0);
@@ -454,12 +462,33 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
 
     // Created here rather than in on_activate on purpose: a calibration runs while the node is
     // INACTIVE - that is the interlock - so its services and state topic have to work there.
+    // The publisher's QoS exactly (system_ros_interface.cpp): reliable, transient local, depth 1.
+    // Transient local means the latched sample arrives on subscribe, so a freshly configured node
+    // knows the E-Stop state without waiting for the next 20 Hz cycle.
+    gpio_state_subscriber_ = create_subscription<rover_msgs::msg::GpioState>(
+        kGpioStateTopic, rclcpp::QoS(1).reliable().transient_local(),
+        [this](const rover_msgs::msg::GpioState & msg) {
+            last_safety_io_ = toSafetyIoFlags(msg);
+            last_safety_io_at_ = std::chrono::steady_clock::now();
+            updateCalibrationEStop();
+        });
+
+    e_stop_state_timeout_ = std::chrono::milliseconds(
+        static_cast<int>(get_parameter("e_stop_state_timeout_s").as_double() * 1000.0));
+
+    // Ages the last sample even when nothing is arriving and nothing is calibrating, so the page
+    // shows "unverified" rather than a stale "engaged" after the hardware interface goes away.
+    e_stop_watchdog_timer_ = create_wall_timer(
+        e_stop_state_timeout_ / 2, [this]() { updateCalibrationEStop(); });
+
     calibration_ = std::make_unique<CalibrationUseCase>(
         config->calibration, axisChannels(*config), calibration_store_,
         // Explicit: TeleopControlPort is a private base, so the conversion has to happen here,
         // inside the class, rather than inside make_unique's forwarding.
         static_cast<TeleopControlPort &>(*this),
-        std::chrono::seconds(get_parameter("calibration_timeout_s").as_int()));
+        std::chrono::seconds(get_parameter("calibration_timeout_s").as_int()),
+        std::chrono::milliseconds(
+            static_cast<int>(get_parameter("e_stop_grace_s").as_double() * 1000.0)));
     createCalibrationInterfaces();
     publishCalibrationState();
 
@@ -529,8 +558,9 @@ void RoverCrsfTeleopNode::createCalibrationInterfaces()
         [this](
             const std::shared_ptr<StartCalibration::Request> request,
             std::shared_ptr<StartCalibration::Response> response) {
+            const SteadyTime now = std::chrono::steady_clock::now();
             const CalibrationOutcome outcome =
-                calibration_->start(request->e_stop_confirmed, std::chrono::steady_clock::now());
+                calibration_->start(request->e_stop_confirmed, eStopState(now), now);
             response->success = outcome.ok;
             response->message = outcome.message;
 
@@ -604,9 +634,15 @@ void RoverCrsfTeleopNode::startCalibrationHeartbeat()
     const double rate_hz = get_parameter("calibration_state_rate_hz").as_double();
     const auto period = std::chrono::duration<double>(1.0 / std::max(0.1, rate_hz));
 
+    // Also re-evaluates the E-Stop: the subscription callback covers a released button, but a
+    // publisher that stops entirely produces no callback at all, and that has to time out into
+    // kUnknown and cancel the session too.
     calibration_state_timer_ = create_wall_timer(
         std::chrono::duration_cast<std::chrono::nanoseconds>(period),
-        [this]() { publishCalibrationState(); });
+        [this]() {
+            updateCalibrationEStop();
+            publishCalibrationState();
+        });
 }
 
 void RoverCrsfTeleopNode::stopCalibrationHeartbeat()
@@ -616,6 +652,52 @@ void RoverCrsfTeleopNode::stopCalibrationHeartbeat()
     if (calibration_state_timer_) {
         calibration_state_timer_->cancel();
         calibration_state_timer_.reset();
+    }
+}
+
+EStopState RoverCrsfTeleopNode::eStopState(const SteadyTime now) const
+{
+    // GpioState carries no header, so this is arrival time here, not the time the pin was read.
+    // Anything older than the timeout is "cannot verify" rather than "still whatever it was":
+    // a transient-local sample from a publisher that has since died looks perfectly fresh until
+    // it is aged.
+    if (!last_safety_io_.has_value() || !last_safety_io_at_.has_value() ||
+        (now - *last_safety_io_at_) > e_stop_state_timeout_)
+    {
+        return EStopState::kUnknown;
+    }
+
+    return motionIsInhibited(*last_safety_io_) ? EStopState::kEngaged : EStopState::kReleased;
+}
+
+void RoverCrsfTeleopNode::updateCalibrationEStop()
+{
+    if (!calibration_) {
+        return;
+    }
+
+    const SteadyTime now = std::chrono::steady_clock::now();
+    const bool was_running = calibration_->sessionInProgress();
+    const EStopState e_stop = eStopState(now);
+
+    calibration_->onEStop(e_stop, now);
+
+    if (was_running && !calibration_->sessionInProgress()) {
+        RCLCPP_WARN(
+            get_logger(),
+            "RC calibration cancelled: the E-Stop is no longer engaged. Teleop is no longer held "
+            "off.");
+        stopCalibrationHeartbeat();
+        publishCalibrationState();
+        reported_e_stop_ = e_stop;
+        return;
+    }
+
+    // On change only. gpio_state arrives at 20 Hz and this message is not small; the page needs
+    // to know when the button moves, not that it is still where it was.
+    if (e_stop != reported_e_stop_) {
+        reported_e_stop_ = e_stop;
+        publishCalibrationState();
     }
 }
 
@@ -788,6 +870,10 @@ void RoverCrsfTeleopNode::releaseResources()
     stopCalibrationHeartbeat();
     calibration_.reset();
     calibration_store_.reset();
+    e_stop_watchdog_timer_.reset();
+    gpio_state_subscriber_.reset();
+    last_safety_io_.reset();
+    last_safety_io_at_.reset();
     calibration_state_publisher_.reset();
     calibration_start_service_.reset();
     calibration_sweep_service_.reset();
@@ -886,6 +972,28 @@ void RoverCrsfTeleopNode::diagnoseCalibration(diagnostic_updater::DiagnosticStat
     const CalibrationSnapshot snapshot = calibration_->snapshot(std::chrono::steady_clock::now());
 
     status.add("Calibration in effect", calibration_source_);
+
+    // The gate, and how old the evidence behind it is. A calibration that will not start is
+    // almost always one of these two lines.
+    const SteadyTime e_stop_now = std::chrono::steady_clock::now();
+    switch (eStopState(e_stop_now)) {
+        case EStopState::kEngaged:
+            status.add("E-Stop", "engaged (calibration allowed)");
+            break;
+        case EStopState::kReleased:
+            status.add("E-Stop", "released (calibration refused)");
+            break;
+        case EStopState::kUnknown:
+            status.add("E-Stop", "unverified (calibration refused)");
+            break;
+    }
+
+    status.add(
+        "Safety IO age (ms)",
+        last_safety_io_at_.has_value()
+            ? std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 e_stop_now - *last_safety_io_at_).count())
+            : std::string("never received"));
     status.add("Persisted to", calibration_store_ ? calibration_store_->location() : "(disabled)");
     status.add(
         "linear_x endpoints",

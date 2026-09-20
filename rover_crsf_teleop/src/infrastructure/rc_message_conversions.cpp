@@ -70,6 +70,20 @@ std::array<std::uint16_t, RcFrame::kChannelCount> toUnsigned(
     return out;
 }
 
+std::uint8_t toEStopField(const EStopState e_stop)
+{
+    switch (e_stop) {
+        case EStopState::kEngaged:
+            return rover_msgs::msg::RcCalibrationState::ESTOP_ENGAGED;
+        case EStopState::kReleased:
+            return rover_msgs::msg::RcCalibrationState::ESTOP_RELEASED;
+        case EStopState::kUnknown:
+            break;
+    }
+
+    return rover_msgs::msg::RcCalibrationState::ESTOP_UNKNOWN;
+}
+
 std::uint8_t toPhaseField(const CalibrationPhase phase)
 {
     switch (phase) {
@@ -108,6 +122,7 @@ rover_msgs::msg::RcCalibrationState toRcCalibrationStateMsg(
     message.samples = snapshot.samples;
     message.progress = static_cast<float>(snapshot.progress);
     message.teleop_inhibited = snapshot.teleop_inhibited;
+    message.e_stop = toEStopField(snapshot.e_stop);
     message.active = toRcCalibrationMsg(snapshot.active);
     message.measured = toRcCalibrationMsg(snapshot.measured);
     message.channel_moved = snapshot.channel_moved;
@@ -134,6 +149,16 @@ ChannelCalibration fromRcCalibrationMsg(const rover_msgs::msg::RcCalibration & m
 std::vector<int64_t> toParameterArray(const std::array<int, RcFrame::kChannelCount> & values)
 {
     return std::vector<int64_t>(values.cbegin(), values.cend());
+}
+
+SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::GpioState & message)
+{
+    SafetyIoFlags flags;
+    flags.hw_e_stop_user_button = message.gpio_pin_hw_e_stop_user_button;
+    flags.sw_e_stop_user_button = message.gpio_pin_sw_e_stop_user_button;
+    flags.sw_e_stop_motor_driver_fault = message.gpio_pin_sw_e_stop_motor_driver_fault;
+    flags.sw_e_stop_latch_status = message.gpio_pin_sw_e_stop_latch_status;
+    return flags;
 }
 
 }  // namespace rover_crsf_teleop

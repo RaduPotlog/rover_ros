@@ -32,6 +32,7 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/crsf/crc8.cpp
             src/domain/crsf/crsf_parser.cpp
             src/domain/rc_calibration.cpp
+            src/domain/safety_io_flags.cpp
             src/domain/stick_mapping.cpp
             src/domain/rim_speed_limit.cpp
             src/domain/switch_debouncer.cpp
@@ -104,6 +105,7 @@ if(BUILD_TESTING)
           test_rim_speed_limit
           test_switch_debouncer
           test_rc_calibration
+          test_safety_io_flags
           test_calibration_use_case
           test_link_monitor
           test_teleop_health

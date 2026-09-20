@@ -40,6 +40,7 @@
 
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 
+#include <rover_msgs/msg/gpio_state.hpp>
 #include <rover_msgs/msg/rc_calibration_state.hpp>
 #include <rover_msgs/srv/set_rc_calibration.hpp>
 #include <rover_msgs/srv/start_rc_calibration.hpp>
@@ -58,6 +59,7 @@ namespace
 using namespace std::chrono_literals;
 using Twist = geometry_msgs::msg::TwistStamped;
 using Trigger = std_srvs::srv::Trigger;
+using GpioState = rover_msgs::msg::GpioState;
 using RcCalibrationState = rover_msgs::msg::RcCalibrationState;
 using SetRcCalibration = rover_msgs::srv::SetRcCalibration;
 using StartRcCalibration = rover_msgs::srv::StartRcCalibration;
@@ -134,6 +136,21 @@ public:
         channels_.channels[3] = kSwitchHigh;   // channel 4: E-Stop latch reset
         channels_.channels[4] = kSwitchHigh;   // channel 5: E-Stop
 
+        // The hardware interface's safety IO, with its exact QoS - reliable, transient local,
+        // depth 1. Miss any of the three and the node's subscription gets nothing at all.
+        gpio_state_pub_ = node_->create_publisher<GpioState>(
+            "hardware_interface/gpio_state", rclcpp::QoS(1).reliable().transient_local());
+
+        // The hardware interface republishes the safety IO every cycle at 20 Hz rather than on
+        // change, and the node ages a silent publisher into "unverified" after a second. A
+        // harness that published once would therefore time out mid-test and prove the wrong
+        // thing.
+        gpio_timer_ = node_->create_wall_timer(50ms, [this]() {
+            if (gpio_state_.has_value()) {
+                gpio_state_pub_->publish(*gpio_state_);
+            }
+        });
+
         // The receiver's 50 Hz frame stream, while `feeding` is set.
         feed_timer_ = node_->create_wall_timer(20ms, [this]() {
             if (!feeding) {
@@ -147,6 +164,16 @@ public:
 
     // Channel N is channels()[N - 1].
     RcFrame & channels() { return channels_; }
+
+    // Publishes the safety IO with the E-Stop engaged or released. Active-high: `true` is
+    // engaged, which is what permits a calibration.
+    void publishEStop(const bool engaged)
+    {
+        GpioState message;
+        message.gpio_pin_hw_e_stop_user_button = engaged;
+        gpio_state_ = message;
+        gpio_state_pub_->publish(message);
+    }
 
     // Publishes an arbitrary byte chunk, so a test can split a frame across messages.
     void publishBytes(const Bytes & bytes)
@@ -223,6 +250,9 @@ private:
 
     rclcpp::Node::SharedPtr node_;
     rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr serial_pub_;
+    rclcpp::Publisher<GpioState>::SharedPtr gpio_state_pub_;
+    rclcpp::TimerBase::SharedPtr gpio_timer_;
+    std::optional<GpioState> gpio_state_;
     rclcpp::Subscription<Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Service<Trigger>::SharedPtr e_stop_set_srv_;
     rclcpp::Service<Trigger>::SharedPtr e_stop_reset_srv_;
@@ -491,6 +521,23 @@ protected:
         harness_->connectCalibration();
         ASSERT_TRUE(spinUntil([this]() { return harness_->calibrationServicesReady(); }))
             << "The calibration services never came up.";
+
+        // What an operator does before calibrating. Without it every start is refused, which is
+        // the point of the gate.
+        engageEStop(true);
+    }
+
+    // Publishes the E-Stop state and spins until the node has taken it in, so a following
+    // service call sees it rather than racing it.
+    void engageEStop(const bool engaged)
+    {
+        harness_->publishEStop(engaged);
+        ASSERT_TRUE(spinUntil([this, engaged]() {
+            return harness_->calibration_state.has_value() &&
+                   harness_->calibration_state->e_stop ==
+                       (engaged ? RcCalibrationState::ESTOP_ENGAGED
+                                : RcCalibrationState::ESTOP_RELEASED);
+        })) << "the node never reported the E-Stop state the harness published";
     }
 
     // Calls a service and spins until the response arrives.
@@ -708,6 +755,80 @@ TEST_F(TeleopCalibrationTest, NothingIsCommandedWhileACalibrationRuns)
     feedFrames(kCenterSampleTarget);
 
     EXPECT_TRUE(harness_->received.empty());
+}
+
+TEST_F(TeleopCalibrationTest, StartIsRefusedWhileTheEStopIsReleased)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    engageEStop(false);
+
+    // The operator's confirmation does not override the rover's own answer.
+    const auto response = startCalibration(true);
+
+    EXPECT_FALSE(response->success);
+    EXPECT_NE(response->message.find("Engage the E-Stop"), std::string::npos);
+}
+
+TEST_F(TeleopCalibrationTest, ReleasingTheEStopCancelsARunningCalibration)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_TRUE(startCalibration(true)->success);
+
+    harness_->publishEStop(false);
+
+    // The node's grace window is 1 s by default, and its watchdog re-evaluates twice a second,
+    // so this resolves without anything here sleeping.
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->phase == RcCalibrationState::PHASE_IDLE;
+    }, 5s)) << "the session was never cancelled";
+
+    EXPECT_FALSE(harness_->calibration_state->teleop_inhibited);
+    EXPECT_EQ(harness_->calibration_state->e_stop, RcCalibrationState::ESTOP_RELEASED);
+    EXPECT_NE(harness_->calibration_state->message.find("E-Stop"), std::string::npos);
+}
+
+TEST_F(TeleopCalibrationTest, TheStateTopicReportsTheVerifiedEStop)
+{
+    // The page draws its indicator from this, and enables Start from it.
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->e_stop == RcCalibrationState::ESTOP_ENGAGED;
+    }));
+
+    engageEStop(false);
+    EXPECT_EQ(harness_->calibration_state->e_stop, RcCalibrationState::ESTOP_RELEASED);
+}
+
+// Without the harness publishing gpio_state at all, which is how a bench or a sim looks.
+class TeleopCalibrationNoSafetyIoTest : public TeleopNodeTest
+{
+
+protected:
+
+    void SetUp() override
+    {
+        TeleopNodeTest::SetUp();
+        harness_->connectCalibration();
+        ASSERT_TRUE(spinUntil([this]() { return harness_->calibrationServicesReady(); }));
+    }
+};
+
+TEST_F(TeleopCalibrationNoSafetyIoTest, StartIsRefusedWhenTheEStopWasNeverPublished)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    auto request = std::make_shared<StartRcCalibration::Request>();
+    request->e_stop_confirmed = true;
+    auto future = harness_->start()->async_send_request(request);
+    ASSERT_TRUE(spinUntil([&future]() {
+        return future.wait_for(0s) == std::future_status::ready;
+    }));
+    const auto response = future.get();
+
+    // Refused rather than assumed safe: nobody can vouch for this rover.
+    EXPECT_FALSE(response->success);
+    EXPECT_NE(response->message.find("Cannot verify"), std::string::npos);
 }
 
 }  // namespace rover_crsf_teleop

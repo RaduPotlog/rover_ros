@@ -29,6 +29,7 @@ constexpr int kLinearChannel = 3;
 constexpr int kAngularChannel = 1;
 constexpr int kRest = 1004;
 constexpr auto kTimeout = std::chrono::seconds(300);
+constexpr auto kGrace = std::chrono::milliseconds(1000);
 
 class FakeTeleop : public TeleopControlPort
 {
@@ -118,7 +119,14 @@ struct Fixture
 
     CalibrationUseCase make()
     {
-        return CalibrationUseCase(defaultCalibration(), axisMask(), store, teleop, kTimeout);
+        return CalibrationUseCase(
+            defaultCalibration(), axisMask(), store, teleop, kTimeout, kGrace);
+    }
+
+    // The ordinary case: E-Stop verified engaged and the operator confirming it.
+    CalibrationOutcome start(CalibrationUseCase & use_case)
+    {
+        return use_case.start(true, EStopState::kEngaged, now);
     }
 
     void feedRest(CalibrationUseCase & use_case, const unsigned int count)
@@ -139,7 +147,7 @@ struct Fixture
     // Carries a session all the way to kReview.
     void measure(CalibrationUseCase & use_case)
     {
-        ASSERT_TRUE(use_case.start(true, now).ok);
+        ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, now).ok);
         feedRest(use_case, kCenterSampleTarget);
         ASSERT_TRUE(use_case.beginSweep().ok);
         sweep(use_case);
@@ -252,7 +260,7 @@ TEST(CalibrationUseCaseTest, StartIsRefusedWithoutTheEStopConfirmation)
     Fixture fixture;
     auto use_case = fixture.make();
 
-    const CalibrationOutcome outcome = use_case.start(false, fixture.now);
+    const CalibrationOutcome outcome = use_case.start(false, EStopState::kEngaged, fixture.now);
 
     EXPECT_FALSE(outcome.ok);
     EXPECT_FALSE(outcome.message.empty());
@@ -268,7 +276,7 @@ TEST(CalibrationUseCaseTest, StartIsRefusedWhileTeleopCouldStillCommand)
 
     // The sweep goes to full throw; on an active node that is a full-speed command. The gate is
     // here rather than in the UI so no client can skip it.
-    EXPECT_FALSE(use_case.start(true, fixture.now).ok);
+    EXPECT_FALSE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
     EXPECT_FALSE(fixture.teleop.inhibited());
 }
 
@@ -277,18 +285,18 @@ TEST(CalibrationUseCaseTest, AStartedSessionInhibitsTeleop)
     Fixture fixture;
     auto use_case = fixture.make();
 
-    ASSERT_TRUE(use_case.start(true, fixture.now).ok);
+    ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
 
     EXPECT_TRUE(use_case.sessionInProgress());
     EXPECT_TRUE(fixture.teleop.inhibited());
-    EXPECT_FALSE(use_case.start(true, fixture.now).ok) << "a second start must be refused";
+    EXPECT_FALSE(use_case.start(true, EStopState::kEngaged, fixture.now).ok) << "a second start must be refused";
 }
 
 TEST(CalibrationUseCaseTest, CancelReleasesTheInhibit)
 {
     Fixture fixture;
     auto use_case = fixture.make();
-    ASSERT_TRUE(use_case.start(true, fixture.now).ok);
+    ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
 
     EXPECT_TRUE(use_case.cancel().ok);
     EXPECT_FALSE(use_case.sessionInProgress());
@@ -300,7 +308,7 @@ TEST(CalibrationUseCaseTest, AnAbandonedSessionTimesOutAndReleasesTheInhibit)
 {
     Fixture fixture;
     auto use_case = fixture.make();
-    ASSERT_TRUE(use_case.start(true, fixture.now).ok);
+    ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
 
     // A browser tab closed mid-sweep must not be able to hold teleop off forever.
     use_case.onFrame(frameAt(kRest), fixture.now + kTimeout + std::chrono::seconds(1));
@@ -396,7 +404,7 @@ TEST(CalibrationUseCaseTest, TheSweepMustFollowTheCentre)
     auto use_case = fixture.make();
 
     EXPECT_FALSE(use_case.beginSweep().ok) << "no session yet";
-    ASSERT_TRUE(use_case.start(true, fixture.now).ok);
+    ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
     EXPECT_FALSE(use_case.beginSweep().ok) << "not enough frames at rest";
 
     fixture.feedRest(use_case, kCenterSampleTarget);
@@ -409,7 +417,7 @@ TEST(CalibrationUseCaseTest, TheSnapshotReportsProblemsOnlyOnceTheMeasurementIsC
     Fixture fixture;
     auto use_case = fixture.make();
 
-    ASSERT_TRUE(use_case.start(true, fixture.now).ok);
+    ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
     fixture.feedRest(use_case, kCenterSampleTarget);
     ASSERT_TRUE(use_case.beginSweep().ok);
 
@@ -428,7 +436,7 @@ TEST(CalibrationUseCaseTest, AnAxisThatWasNeverSweptIsReported)
 {
     Fixture fixture;
     auto use_case = fixture.make();
-    ASSERT_TRUE(use_case.start(true, fixture.now).ok);
+    ASSERT_TRUE(use_case.start(true, EStopState::kEngaged, fixture.now).ok);
     fixture.feedRest(use_case, kCenterSampleTarget);
     ASSERT_TRUE(use_case.beginSweep().ok);
 
@@ -458,6 +466,151 @@ TEST(CalibrationUseCaseTest, TheLatestFrameIsReportedEvenWhenNoSessionIsRunning)
     EXPECT_EQ(snapshot.latest[0], 1234);
     EXPECT_EQ(snapshot.phase, CalibrationPhase::kIdle);
     EXPECT_FALSE(snapshot.teleop_inhibited);
+}
+
+// --- the E-Stop gate ---------------------------------------------------------------------------
+
+TEST(CalibrationUseCaseTest, StartIsRefusedWhileTheEStopIsReleased)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+
+    const CalibrationOutcome outcome =
+        use_case.start(true, EStopState::kReleased, fixture.now);
+
+    EXPECT_FALSE(outcome.ok);
+    EXPECT_NE(outcome.message.find("Engage the E-Stop"), std::string::npos);
+    EXPECT_FALSE(fixture.teleop.inhibited());
+}
+
+TEST(CalibrationUseCaseTest, StartIsRefusedWhenTheEStopCannotBeVerified)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+
+    // Nothing on gpio_state is not "probably fine". The operator ticking the box does not make
+    // the rover safe, which is the whole reason the topic is consulted at all.
+    const CalibrationOutcome outcome = use_case.start(true, EStopState::kUnknown, fixture.now);
+
+    EXPECT_FALSE(outcome.ok);
+    EXPECT_NE(outcome.message.find("Cannot verify"), std::string::npos);
+    EXPECT_FALSE(use_case.sessionInProgress());
+}
+
+TEST(CalibrationUseCaseTest, EachRefusalNamesItsOwnCause)
+{
+    // Whichever gate stops them, the operator has to be told which one - "refused" on its own
+    // sends people to the wrong thing.
+    Fixture fixture;
+    fixture.teleop.could_command = true;
+    auto active = fixture.make();
+    const std::string active_message =
+        active.start(true, EStopState::kEngaged, fixture.now).message;
+
+    Fixture released_fixture;
+    auto released = released_fixture.make();
+    const std::string released_message =
+        released.start(true, EStopState::kReleased, released_fixture.now).message;
+
+    Fixture unconfirmed_fixture;
+    auto unconfirmed = unconfirmed_fixture.make();
+    const std::string unconfirmed_message =
+        unconfirmed.start(false, EStopState::kEngaged, unconfirmed_fixture.now).message;
+
+    EXPECT_NE(active_message, released_message);
+    EXPECT_NE(released_message, unconfirmed_message);
+    EXPECT_NE(active_message, unconfirmed_message);
+}
+
+TEST(CalibrationUseCaseTest, TheSnapshotReportsTheVerifiedEStopNotTheConfirmation)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+
+    EXPECT_EQ(use_case.snapshot(fixture.now).e_stop, EStopState::kUnknown);
+
+    use_case.onEStop(EStopState::kEngaged, fixture.now);
+    EXPECT_EQ(use_case.snapshot(fixture.now).e_stop, EStopState::kEngaged);
+
+    use_case.onEStop(EStopState::kReleased, fixture.now);
+    EXPECT_EQ(use_case.snapshot(fixture.now).e_stop, EStopState::kReleased);
+}
+
+TEST(CalibrationUseCaseTest, ReleasingTheEStopCancelsARunningSession)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+    ASSERT_TRUE(fixture.start(use_case).ok);
+
+    use_case.onEStop(EStopState::kReleased, fixture.now);
+    ASSERT_TRUE(use_case.sessionInProgress()) << "not before the grace window has passed";
+
+    use_case.onEStop(EStopState::kReleased, fixture.now + kGrace + std::chrono::milliseconds(1));
+
+    EXPECT_FALSE(use_case.sessionInProgress());
+    EXPECT_FALSE(fixture.teleop.inhibited());
+    EXPECT_NE(use_case.snapshot(fixture.now).message.find("E-Stop"), std::string::npos);
+}
+
+TEST(CalibrationUseCaseTest, ABriefEStopDropoutDoesNotThrowAwayTheMeasurement)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+    ASSERT_TRUE(fixture.start(use_case).ok);
+
+    // The driver reports a Modbus read error as "clear", and the underlying IO only refreshes at
+    // 2 Hz, so a single not-engaged sample is a hiccup - not consent being withdrawn.
+    use_case.onEStop(EStopState::kReleased, fixture.now);
+    use_case.onEStop(EStopState::kEngaged, fixture.now + std::chrono::milliseconds(200));
+    use_case.onEStop(EStopState::kEngaged, fixture.now + kGrace + std::chrono::seconds(5));
+
+    EXPECT_TRUE(use_case.sessionInProgress());
+    EXPECT_TRUE(fixture.teleop.inhibited());
+}
+
+TEST(CalibrationUseCaseTest, AnUnverifiableEStopAlsoCancelsARunningSession)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+    ASSERT_TRUE(fixture.start(use_case).ok);
+
+    // The publisher dying mid-sweep is exactly as disqualifying as the button being released:
+    // either way nothing can vouch for the rover any more.
+    use_case.onEStop(EStopState::kUnknown, fixture.now);
+    use_case.onEStop(EStopState::kUnknown, fixture.now + kGrace + std::chrono::milliseconds(1));
+
+    EXPECT_FALSE(use_case.sessionInProgress());
+}
+
+TEST(CalibrationUseCaseTest, ApplyIsRefusedOnceTheEStopIsNoLongerEngaged)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+    fixture.measure(use_case);
+
+    // Inside the grace window, so the session is still open - but applying is a state change and
+    // must not happen unsupervised.
+    use_case.onEStop(EStopState::kReleased, fixture.now);
+    ASSERT_TRUE(use_case.sessionInProgress());
+
+    const CalibrationOutcome outcome = use_case.apply(nullptr, false);
+
+    EXPECT_FALSE(outcome.ok);
+    EXPECT_EQ(fixture.teleop.rebuilds, 0);
+}
+
+TEST(CalibrationUseCaseTest, TheEStopIsTrackedWhileIdleWithoutStartingAnything)
+{
+    Fixture fixture;
+    auto use_case = fixture.make();
+
+    // The page shows the live state before anyone presses Start, so this has to work at idle -
+    // and must not be mistaken for a session.
+    use_case.onEStop(EStopState::kReleased, fixture.now);
+    use_case.onEStop(EStopState::kReleased, fixture.now + kGrace + std::chrono::seconds(60));
+
+    EXPECT_FALSE(use_case.sessionInProgress());
+    EXPECT_FALSE(fixture.teleop.inhibited());
 }
 
 }  // namespace

@@ -78,6 +78,26 @@
     # every phase change and every service call publishes immediately regardless.
     calibration_state_rate_hz: 5.0
 
+    # A calibration is gated on the rover's REAL E-Stop, read off
+    # hardware_interface/gpio_state, not on the operator's word for it. "Engaged" means any of
+    # the motion-inhibiting stops is active - hardware button, software button, motor-driver
+    # fault or the safety latch - which is the same set rover_twist_mux locks motion on, so
+    # "safe to calibrate" means exactly "twist_mux would refuse to move".
+    #
+    # These are active-high: `true` is engaged. The one inverted field in that message is
+    # gpio_pin_motor_contactor_engaged, which is not an E-Stop bit and is not used here.
+    #
+    # How long a gpio_state sample stays trustworthy. It is published at 20 Hz, so a second is 20
+    # missed messages. Past it the state is "cannot verify" and a calibration is REFUSED rather
+    # than assumed safe - which also means no calibration without rover_hardware_interface
+    # running, so not on a bench and not in simulation.
+    e_stop_state_timeout_s: 1.0
+    # How long the E-Stop must stay un-engaged before a running calibration is cancelled. Not
+    # zero: the driver reports a Modbus read error as "clear", and the IO behind it only
+    # refreshes at 2 Hz, so a single not-engaged sample is a hiccup rather than consent being
+    # withdrawn - and cancelling on it would throw away a measurement that took minutes.
+    e_stop_grace_s: 1.0
+
     # Stick axes. Out limits match rover_drive_controller's linear.x / angular.z caps in
     # rover_controller/config/wheel_01_controller.yaml: anything above them is clipped per axis
     # by diff_drive, which bends the commanded arc.

@@ -84,9 +84,18 @@ deactivate ──▶ start(e_stop_confirmed) ──▶ sweep ──▶ finish �
                       kCenter              kSweep    kReview     kIdle
 ```
 
-1. **Deactivate the node.** `start` refuses while it is ACTIVE, and `on_activate` refuses while a
-   session is running — two independent interlocks, because the sweep drives the sticks to full
-   throw and that is a full-speed command.
+1. **Engage the E-Stop and deactivate the node.** Three independent interlocks, because the sweep
+   drives the sticks to full throw and RC teleop is not the only thing that can command this
+   rover:
+   - the node reads `hardware_interface/gpio_state` itself and refuses unless a stop is actually
+     active. Not the operator's word for it, and **"cannot verify" refuses too** — no
+     `rover_hardware_interface`, no calibration, on a bench or anywhere else;
+   - the operator still confirms it, which the node also requires. Evidence and intent are
+     separate conditions: the topic can be right while nobody is standing at the rover;
+   - `start` refuses while the node is ACTIVE, and `on_activate` refuses while a session runs.
+
+   Releasing the E-Stop mid-session cancels it, after a one-second grace window — a Modbus read
+   error surfaces as "clear", so a single sample is not enough to throw away the measurement.
 2. **`start`**, with `e_stop_confirmed: true`. The node also inhibits teleop itself for the whole
    session (`TickStatus::kInhibited`): one zero command, then silence, and the switches are not
    evaluated at all.

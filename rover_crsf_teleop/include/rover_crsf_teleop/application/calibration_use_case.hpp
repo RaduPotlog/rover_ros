@@ -18,6 +18,7 @@
 #include <array>
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,7 @@
 #include "rover_crsf_teleop/domain/ports.hpp"
 #include "rover_crsf_teleop/domain/rc_calibration.hpp"
 #include "rover_crsf_teleop/domain/rc_frame.hpp"
+#include "rover_crsf_teleop/domain/safety_io_flags.hpp"
 
 namespace rover_crsf_teleop
 {
@@ -87,6 +89,9 @@ struct CalibrationSnapshot
     bool teleop_inhibited{false};
     double remaining_s{0.0};
 
+    // What the node last verified from the rover's safety IO, not what the operator claimed.
+    EStopState e_stop{EStopState::kUnknown};
+
     ChannelCalibration active;
     ChannelCalibration measured;
     std::array<bool, RcFrame::kChannelCount> channel_moved{};
@@ -142,11 +147,18 @@ public:
         std::array<bool, RcFrame::kChannelCount> axis_channels,
         std::shared_ptr<CalibrationStorePort> store,
         TeleopControlPort & teleop,
-        std::chrono::seconds timeout);
+        std::chrono::seconds timeout,
+        std::chrono::milliseconds e_stop_grace);
 
-    // Refused unless the operator confirms the E-Stop is engaged AND teleop cannot command. Both
-    // are checked here rather than in the UI, so no client can skip either one.
-    CalibrationOutcome start(bool e_stop_confirmed, SteadyTime now);
+    // Refused unless all three hold: teleop cannot command, the E-Stop is VERIFIED engaged, and
+    // the operator confirms it. All three are checked here rather than in the UI, so no client
+    // can skip any of them.
+    //
+    // `e_stop` is evidence - what the node read off hardware_interface/gpio_state -
+    // while `e_stop_confirmed` is the operator's assertion. They are kept separate on purpose:
+    // the first can be wrong because the rover is not publishing, the second because someone
+    // ticked a box without looking, and neither failure mode covers the other.
+    CalibrationOutcome start(bool e_stop_confirmed, EStopState e_stop, SteadyTime now);
 
     CalibrationOutcome beginSweep();
 
@@ -160,6 +172,12 @@ public:
     CalibrationOutcome apply(const ChannelCalibration * calibration, bool persist);
 
     void onFrame(const RcFrame & frame, SteadyTime now);
+
+    // The latest verified E-Stop state. A session whose E-Stop stops being engaged is cancelled,
+    // but only once it has stayed that way for `e_stop_grace`: a Modbus read error is reported as
+    // "clear" by the driver, and the underlying IO only refreshes at 2 Hz, so a single
+    // not-engaged sample is not enough to throw away a measurement that took minutes.
+    void onEStop(EStopState e_stop, SteadyTime now);
 
     bool sessionInProgress() const { return calibrator_.phase() != CalibrationPhase::kIdle; }
 
@@ -177,6 +195,12 @@ private:
     std::shared_ptr<CalibrationStorePort> store_;
     TeleopControlPort & teleop_;
     std::chrono::seconds timeout_;
+    std::chrono::milliseconds e_stop_grace_;
+
+    EStopState e_stop_{EStopState::kUnknown};
+    // When the E-Stop stopped being engaged during the current session; unset while it is
+    // engaged. The session is cancelled once this is older than e_stop_grace_.
+    std::optional<SteadyTime> e_stop_lost_at_;
 
     std::array<int, RcFrame::kChannelCount> latest_{};
     bool frame_seen_{false};

@@ -23,6 +23,19 @@ float32 progress
 # True while teleop is held off because a calibration is running. Always true when phase != IDLE.
 bool teleop_inhibited
 
+# The E-Stop state the node verified for itself from hardware_interface/gpio_state, which is what
+# actually gates a calibration - the operator's confirmation is a second, independent condition.
+# ENGAGED means any of the motion-inhibiting stops is active (hardware button, software button,
+# motor-driver fault, or the safety latch), the same set rover_twist_mux locks motion on.
+#
+# UNKNOWN is not "probably fine": nothing has been received, or the last sample is too old to
+# trust. A calibration is refused in that state, because the absence of evidence that the rover
+# is safe to sweep is not evidence that it is.
+uint8 ESTOP_UNKNOWN=0
+uint8 ESTOP_ENGAGED=1
+uint8 ESTOP_RELEASED=2
+uint8 e_stop
+
 # What the node is mapping sticks with right now.
 rover_msgs/RcCalibration active
 # The in-progress (or just-finished) measurement. Meaningless while phase is IDLE.

@@ -66,38 +66,99 @@ CalibrationUseCase::CalibrationUseCase(
     std::array<bool, RcFrame::kChannelCount> axis_channels,
     std::shared_ptr<CalibrationStorePort> store,
     TeleopControlPort & teleop,
-    const std::chrono::seconds timeout)
+    const std::chrono::seconds timeout,
+    const std::chrono::milliseconds e_stop_grace)
 : active_(std::move(active)),
   axis_channels_(axis_channels),
   store_(std::move(store)),
   teleop_(teleop),
-  timeout_(timeout)
+  timeout_(timeout),
+  e_stop_grace_(e_stop_grace)
 {
 }
 
-CalibrationOutcome CalibrationUseCase::start(const bool e_stop_confirmed, const SteadyTime now)
+namespace
+{
+
+// One sentence saying why an unverified or released E-Stop blocks a calibration, phrased for
+// whoever is standing at the rover rather than for a log grep.
+std::string eStopRefusal(const EStopState e_stop)
+{
+    if (e_stop == EStopState::kReleased) {
+        return "Engage the E-Stop before calibrating: the sweep drives the sticks to full throw, "
+               "and RC teleop is not the only thing that can command this rover.";
+    }
+
+    return "Cannot verify the E-Stop: nothing recent on hardware_interface/gpio_state. Is "
+           "rover_hardware_interface running? Calibration is refused rather than assumed safe.";
+}
+
+}  // namespace
+
+CalibrationOutcome CalibrationUseCase::start(
+    const bool e_stop_confirmed, const EStopState e_stop, const SteadyTime now)
 {
     if (sessionInProgress()) {
         return {false, "A calibration is already in progress. Cancel it first."};
     }
 
-    // Both gates are checked here, not in the caller: the sweep drives the sticks to full throw,
-    // which on an active node is a full-speed command.
-    if (!e_stop_confirmed) {
-        return {false, "Engage the E-Stop and confirm it before starting a calibration."};
-    }
-
+    // All three gates are checked here, not in the caller: the sweep drives the sticks to full
+    // throw, which on an active node is a full-speed command. Ordered so the operator is told
+    // about the condition they are most likely to be able to fix first.
     if (teleop_.teleopCouldCommand()) {
         return {false, "Deactivate rover_crsf_teleop_node before starting a calibration: while "
                        "it is active the sweep would command full speed."};
     }
 
+    if (e_stop != EStopState::kEngaged) {
+        return {false, eStopRefusal(e_stop)};
+    }
+
+    // Evidence and assertion are independent: the rover saying the E-Stop is engaged does not
+    // mean anyone is standing next to it, which is what the confirmation is for.
+    if (!e_stop_confirmed) {
+        return {false, "Confirm the E-Stop is engaged before starting a calibration."};
+    }
+
     calibrator_.start(active_);
     teleop_.setTeleopInhibited(true);
     deadline_ = now + timeout_;
+    e_stop_ = e_stop;
+    e_stop_lost_at_.reset();
     message_ = "Release every stick and leave the transmitter untouched.";
 
     return {true, message_};
+}
+
+void CalibrationUseCase::onEStop(const EStopState e_stop, const SteadyTime now)
+{
+    e_stop_ = e_stop;
+
+    if (!sessionInProgress()) {
+        e_stop_lost_at_.reset();
+        return;
+    }
+
+    if (e_stop == EStopState::kEngaged) {
+        e_stop_lost_at_.reset();
+        return;
+    }
+
+    if (!e_stop_lost_at_.has_value()) {
+        e_stop_lost_at_ = now;
+        return;
+    }
+
+    // Only after the grace window. The driver reports a Modbus read error as "clear" and the
+    // underlying IO refreshes at 2 Hz, so one not-engaged sample is a hiccup, not consent being
+    // withdrawn - and cancelling on it would throw away a measurement that took minutes.
+    if ((now - *e_stop_lost_at_) < e_stop_grace_) {
+        return;
+    }
+
+    endSession(
+        "Calibration cancelled: the E-Stop is no longer engaged. The previous values are still "
+        "in effect.");
 }
 
 CalibrationOutcome CalibrationUseCase::beginSweep()
@@ -167,6 +228,12 @@ CalibrationOutcome CalibrationUseCase::apply(
         return {false, "Refusing to apply: " + problems.front()};
     }
 
+    // Belt and braces: a released E-Stop should already have cancelled the session, so reaching
+    // here means either the grace window has not expired yet or something bypassed onEStop.
+    if (e_stop_ != EStopState::kEngaged) {
+        return {false, eStopRefusal(e_stop_)};
+    }
+
     std::string reason;
     if (!teleop_.rebuildTeleop(requested, reason)) {
         return {false, "Could not apply the calibration: " + reason};
@@ -226,6 +293,7 @@ void CalibrationUseCase::endSession(const std::string & message)
 {
     calibrator_.cancel();
     teleop_.setTeleopInhibited(false);
+    e_stop_lost_at_.reset();
     message_ = message;
 }
 
@@ -236,6 +304,7 @@ CalibrationSnapshot CalibrationUseCase::snapshot(const SteadyTime now) const
     snapshot.samples = calibrator_.samples();
     snapshot.progress = calibrator_.progress();
     snapshot.teleop_inhibited = sessionInProgress();
+    snapshot.e_stop = e_stop_;
     snapshot.active = active_;
     snapshot.measured = calibrator_.measured();
     snapshot.channel_moved = calibrator_.channelsMoved();
