@@ -45,19 +45,6 @@ rosdep install --from-paths src -y -i
 
 #### Only for real rover
 
-`rover_modbus` used to need a manual `sudo make install` here as well. It is now an ament
-package that colcon builds in dependency order, so only `rover_cppuprofile` remains.
-
-If this machine ever ran that old step, remove the stale copy first - its headers installed
-flat into `/usr/local/include`, which is on a default search path and will shadow the new
-`<MB/...>` ones:
-
-```bash
-sudo rm -f /usr/local/lib/libModbus_Core.so
-sudo rm -f /usr/local/include/{connection,crc,modbusCell,modbusException,modbusRequest,modbusResponse,modbusUtils,server}.hpp
-sudo rm -rf /usr/local/lib/cmake/Modbus_Core
-```
-
 ```bash
 cd src/rover_cppuprofile
 cmake -Bbuild . -DPROFILE_ENABLED=ON
