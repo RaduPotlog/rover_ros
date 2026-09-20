@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "rover_crsf_teleop/application/teleop_use_case.hpp"
 #include "rover_crsf_teleop/domain/link_monitor.hpp"
 #include "rover_crsf_teleop/domain/ports.hpp"
 #include "rover_crsf_teleop/domain/rc_calibration.hpp"
@@ -28,6 +29,46 @@
 
 namespace rover_crsf_teleop
 {
+
+// Which calibration a freshly configured node ended up driving on, and why. The node turns this
+// into a log line; nothing here is a ROS type and nothing here logs.
+enum class StartupCalibrationOutcome
+{
+    kNoStore,         // persistence is off - no file was configured
+    kNothingStored,   // a store is configured but has nothing in it yet
+    kStoredApplied,   // a stored calibration passed its checks and is in force
+    kStoredRefused,   // a stored calibration failed its checks and was rejected whole
+};
+
+struct StartupCalibration
+{
+    // The base config, with the winning calibration applied. On kStoredRefused this is the base
+    // unchanged - a calibration that is wrong on one channel is refused whole rather than applied
+    // in part, because half a calibration is a rover that drives differently on one axis than the
+    // operator measured.
+    TeleopConfig config;
+
+    // What is in force, phrased for the "Calibration in effect" diagnostic.
+    std::string source;
+
+    StartupCalibrationOutcome outcome{StartupCalibrationOutcome::kNoStore};
+
+    // kStoredRefused: the first problem found, ready to drop into a warning. Empty otherwise.
+    std::string detail;
+};
+
+// Decides which calibration a starting node drives on: a stored one if there is one and it is
+// usable, the configured parameters otherwise.
+//
+// `store` may be null, meaning persistence is off. `axis_channels` flags the channels used as
+// proportional axes - only those are checked, because a switch channel legitimately rests at one
+// end of its travel (see calibrationProblems).
+//
+// Does no I/O beyond the port and never logs: the caller owns the wording and the log level.
+StartupCalibration resolveStartupCalibration(
+    const TeleopConfig & base,
+    CalibrationStorePort * store,
+    const std::array<bool, RcFrame::kChannelCount> & axis_channels);
 
 // Outcome of one operator request. `message` is what the service response carries back, so it is
 // written for a person reading it in a browser, not for a log grep.
@@ -55,8 +96,13 @@ struct CalibrationSnapshot
     std::string message;
 };
 
-// What the use case needs the node to do for it. Implemented by the node; not a domain port,
-// because TeleopConfig is an application type and the collaborator is the same process.
+// What the use case needs the node to do for it. Implemented by the node.
+//
+// Application rather than domain, and it has to stay there: teleopCouldCommand() asks whether the
+// node is lifecycle-ACTIVE, and the lifecycle is a ROS concept the domain is not allowed to know
+// about. Moving this next to the ports in domain/ports.hpp for symmetry would drag that concept
+// across the boundary - the other three ports describe things the rover does, this one describes
+// a state the ROS node is in.
 class TeleopControlPort
 {
 
@@ -72,7 +118,8 @@ public:
     // cannot - the node refuses while it is ACTIVE, because rebuilding resets the link monitor.
     virtual bool rebuildTeleop(const ChannelCalibration & calibration, std::string & reason) = 0;
 
-    // True while the node could still command if a frame arrived (lifecycle ACTIVE).
+    // True while teleop could still command if a frame arrived - the calibration gate. The node
+    // answers it from its lifecycle state; that mapping belongs on the implementation, not here.
     virtual bool teleopCouldCommand() const = 0;
 };
 

@@ -49,6 +49,15 @@ ChannelCalibration defaultCalibration();
 // array: the node validates channel numbers in readConfig() and fails configure on a bad one.
 AxisMapping axisMapping(const ChannelCalibration & calibration, int channel_number);
 
+// `mapping` with its endpoints taken from `calibration`, keeping the output limits and inversion
+// - those come from the parameters and are not something a calibration measures.
+//
+// This is the whole of "applying a calibration" to one axis, and it lives next to axisMapping()
+// because it is written in terms of it. Everything the calibration owns (in_min/in_mid/in_max and
+// the deadband) is replaced; everything the operator configured (out_min/out_max, invert) is not.
+AxisMapping mergedMapping(
+    const AxisMapping & mapping, const ChannelCalibration & calibration, int channel_number);
+
 // Everything wrong with `calibration` on the channels flagged in `axis_channels`, one
 // human-readable sentence each. Empty means usable.
 //

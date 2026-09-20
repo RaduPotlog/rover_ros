@@ -44,9 +44,7 @@ AxisMapping axisMapping(const ChannelCalibration & calibration, const int channe
 {
     AxisMapping mapping;
 
-    if (channel_number < 1 ||
-        static_cast<std::size_t>(channel_number) > RcFrame::kChannelCount)
-    {
+    if (!RcFrame::isValidChannel(channel_number)) {
         return mapping;
     }
 
@@ -56,6 +54,19 @@ AxisMapping axisMapping(const ChannelCalibration & calibration, const int channe
     mapping.in_max = calibration.in_max[index];
     mapping.deadband_counts = calibration.deadband[index];
     return mapping;
+}
+
+AxisMapping mergedMapping(
+    const AxisMapping & mapping, const ChannelCalibration & calibration, const int channel_number)
+{
+    const AxisMapping endpoints = axisMapping(calibration, channel_number);
+
+    AxisMapping merged = mapping;
+    merged.in_min = endpoints.in_min;
+    merged.in_mid = endpoints.in_mid;
+    merged.in_max = endpoints.in_max;
+    merged.deadband_counts = endpoints.deadband_counts;
+    return merged;
 }
 
 std::vector<std::string> calibrationProblems(

@@ -19,6 +19,23 @@
 namespace rover_crsf_teleop
 {
 
+TeleopConfig applyCalibration(const TeleopConfig & config, const ChannelCalibration & calibration)
+{
+    TeleopConfig calibrated = config;
+    calibrated.calibration = calibration;
+
+    // Each axis takes the endpoints of the channel it actually reads, keeping the output limits
+    // and inversion that came from the parameters. This is what per-channel calibration buys: the
+    // linear stick's 1004 resting count and the angular one's 987 no longer have to share one
+    // midpoint and one deadband wide enough for the worse of the two.
+    calibrated.linear_x_mapping =
+        mergedMapping(config.linear_x_mapping, calibration, config.linear_x_channel);
+    calibrated.angular_z_mapping =
+        mergedMapping(config.angular_z_mapping, calibration, config.angular_z_channel);
+
+    return calibrated;
+}
+
 TeleopUseCase::TeleopUseCase(
     const TeleopConfig & config,
     std::shared_ptr<VelocityCommandPort> velocity_port,

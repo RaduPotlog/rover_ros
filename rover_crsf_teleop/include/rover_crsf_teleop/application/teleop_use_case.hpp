@@ -59,6 +59,18 @@ struct TeleopConfig
     LinkMonitorConfig link;
 };
 
+// `config` with both stick axes re-anchored on `calibration`, and `calibration` recorded on it.
+//
+// This is the single definition of what "applying a calibration" means, and every path that has
+// one goes through it: the parameters read at configure, a calibration loaded from the store, and
+// one handed over at run time by the apply service. Written once because the alternative - the
+// same three lines at each site - is how one path quietly keeps driving on stale endpoints when a
+// third axis is added.
+//
+// `config` is the base to apply onto, not somewhere to accumulate: a run-time apply passes the
+// pre-calibration config, so applying twice is the same as applying once.
+TeleopConfig applyCalibration(const TeleopConfig & config, const ChannelCalibration & calibration);
+
 enum class TickStatus
 {
     kWaitingForFirstFrame,

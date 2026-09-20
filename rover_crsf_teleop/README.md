@@ -160,6 +160,14 @@ include/rover_crsf_teleop/
 The CRSF decoder sits in `domain/` because it is pure byte math: no clock, no syscalls, no ROS
 types. Freshness is `LinkMonitor`'s job, not the parser's.
 
+The `(no ROS)` above is checked, not just intended. `rover_crsf_teleop_core` is built from
+`domain/` and `application/` alone and links no ROS target, and `test/layer_purity.cmake` (run as
+the `test_layer_purity` test) fails the build if either layer ever includes `rclcpp`, a message
+package, yaml-cpp or the filesystem - a header-only include would otherwise compile quietly and
+take the boundary with it. Infrastructure is split in two: `rover_crsf_teleop_adapters` holds the
+port adapters and the conversions, `rover_crsf_teleop_ros` holds the node, so an adapter's unit
+test does not link the node.
+
 ## Launch
 
 ```bash

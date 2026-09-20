@@ -19,6 +19,48 @@
 namespace rover_crsf_teleop
 {
 
+StartupCalibration resolveStartupCalibration(
+    const TeleopConfig & base,
+    CalibrationStorePort * const store,
+    const std::array<bool, RcFrame::kChannelCount> & axis_channels)
+{
+    StartupCalibration result;
+    result.config = base;
+    result.source = "the configured parameters";
+
+    if (store == nullptr) {
+        result.outcome = StartupCalibrationOutcome::kNoStore;
+        return result;
+    }
+
+    const std::optional<StoredCalibration> stored = store->load();
+
+    if (!stored.has_value()) {
+        result.outcome = StartupCalibrationOutcome::kNothingStored;
+        return result;
+    }
+
+    const std::vector<std::string> problems =
+        calibrationProblems(stored->calibration, axis_channels);
+
+    if (!problems.empty()) {
+        // Refused whole, not in part: the rover keeps driving on the shipped values and the
+        // operator is told to re-measure. `config` is deliberately left as `base`.
+        result.outcome = StartupCalibrationOutcome::kStoredRefused;
+        result.detail = problems.front();
+        return result;
+    }
+
+    // A calibration measured on this rover describes the transmitter that is actually plugged in,
+    // so it wins over the shipped defaults.
+    result.config = applyCalibration(base, stored->calibration);
+    result.outcome = StartupCalibrationOutcome::kStoredApplied;
+    result.detail = stored->created;
+    result.source =
+        "'" + store->location() + "'" + (stored->created.empty() ? "" : " of " + stored->created);
+    return result;
+}
+
 CalibrationUseCase::CalibrationUseCase(
     ChannelCalibration active,
     std::array<bool, RcFrame::kChannelCount> axis_channels,

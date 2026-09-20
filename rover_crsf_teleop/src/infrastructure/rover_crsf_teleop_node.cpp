@@ -65,26 +65,6 @@ std::vector<int64_t> channelDefaults(const int value)
 // byte stream means the bridge or the USB link, not the RC link.
 constexpr auto kSerialSilenceTimeout = 1000ms;
 
-bool isValidChannel(const int channel_number)
-{
-    return channel_number >= 1 && static_cast<std::size_t>(channel_number) <= RcFrame::kChannelCount;
-}
-
-// `mapping` with its endpoints taken from `calibration`, keeping the output limits and inversion
-// - those come from the parameters and are not something a calibration measures.
-AxisMapping mergedMapping(
-    const AxisMapping & mapping, const ChannelCalibration & calibration, const int channel_number)
-{
-    const AxisMapping endpoints = axisMapping(calibration, channel_number);
-
-    AxisMapping merged = mapping;
-    merged.in_min = endpoints.in_min;
-    merged.in_mid = endpoints.in_mid;
-    merged.in_max = endpoints.in_max;
-    merged.deadband_counts = endpoints.deadband_counts;
-    return merged;
-}
-
 }  // namespace
 
 RoverCrsfTeleopNode::RoverCrsfTeleopNode(
@@ -258,7 +238,7 @@ std::array<bool, RcFrame::kChannelCount> RoverCrsfTeleopNode::axisChannels(
     std::array<bool, RcFrame::kChannelCount> axes{};
 
     for (const int channel : {config.linear_x_channel, config.angular_z_channel}) {
-        if (isValidChannel(channel)) {
+        if (RcFrame::isValidChannel(channel)) {
             axes[static_cast<std::size_t>(channel - 1)] = true;
         }
     }
@@ -314,7 +294,7 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
         {"e_stop_channel", config.e_stop_channel},
         {"e_stop_latch_reset_channel", config.e_stop_latch_reset_channel}}};
     for (const auto & [name, channel] : channel_roles) {
-        if (!isValidChannel(channel)) {
+        if (!RcFrame::isValidChannel(channel)) {
             RCLCPP_ERROR(
                 get_logger(), "Parameter %s = %d is outside 1-%zu.", name, channel,
                 RcFrame::kChannelCount);
@@ -334,14 +314,9 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
         }
     }
 
-    // Each axis takes the endpoints of the channel it actually reads, keeping the output limits
-    // and inversion already read above. This is what per-channel calibration buys: the linear
-    // stick's 1004 resting count and the angular stick's 987 no longer have to share one
-    // midpoint and one deadband wide enough for the worse of the two.
-    config.linear_x_mapping =
-        mergedMapping(config.linear_x_mapping, calibration, config.linear_x_channel);
-    config.angular_z_mapping =
-        mergedMapping(config.angular_z_mapping, calibration, config.angular_z_channel);
+    // The endpoints measured on this transmitter, over the output limits and inversion read
+    // above. See applyCalibration() for what a calibration does and does not own.
+    config = applyCalibration(config, calibration);
 
     const std::vector<std::string> problems = calibrationProblems(calibration, axisChannels(config));
     if (!problems.empty()) {
@@ -414,8 +389,6 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
         static_cast<long>(channel_timeout_ms),
         config.link.require_link_stats ? " or on stale / low-quality link stats" : "");
 
-    config.calibration = calibration;
-
     return config;
 }
 
@@ -429,52 +402,48 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
 
     base_config_ = *config;
 
-    // A calibration measured on this rover describes the transmitter that is actually plugged in,
-    // so it wins over the shipped defaults. Which one is in force is logged, never guessed at.
+    // Which calibration is in force is decided in the application layer and only reported here -
+    // see resolveStartupCalibration(). An empty calibration_file means persistence is off.
     const std::string calibration_file = get_parameter("calibration_file").as_string();
     calibration_store_.reset();
-    calibration_source_ = "the configured parameters";
 
     if (!calibration_file.empty()) {
-        auto store = std::make_shared<YamlCalibrationStore>(calibration_file, get_logger());
+        calibration_store_ = std::make_shared<YamlCalibrationStore>(calibration_file, get_logger());
+    }
 
-        if (const auto stored = store->load()) {
-            const std::vector<std::string> problems =
-                calibrationProblems(stored->calibration, axisChannels(*config));
+    const StartupCalibration startup =
+        resolveStartupCalibration(*config, calibration_store_.get(), axisChannels(*config));
 
-            if (problems.empty()) {
-                config->calibration = stored->calibration;
-                config->linear_x_mapping = mergedMapping(
-                    config->linear_x_mapping, stored->calibration, config->linear_x_channel);
-                config->angular_z_mapping = mergedMapping(
-                    config->angular_z_mapping, stored->calibration, config->angular_z_channel);
-                calibration_source_ = "'" + calibration_file + "'" +
-                                      (stored->created.empty() ? "" : " of " + stored->created);
-                RCLCPP_INFO(
-                    get_logger(), "Using the RC calibration saved in %s.",
-                    calibration_source_.c_str());
-            } else {
-                // Refusing a saved calibration outright beats applying half of it: the rover
-                // still drives on the shipped values, and the operator is told to re-measure.
-                RCLCPP_WARN(
-                    get_logger(),
-                    "Ignoring the RC calibration in '%s': %s Using the configured values instead.",
-                    calibration_file.c_str(), problems.front().c_str());
-            }
-        } else {
+    *config = startup.config;
+    calibration_source_ = startup.source;
+
+    switch (startup.outcome) {
+        case StartupCalibrationOutcome::kStoredApplied:
+            RCLCPP_INFO(
+                get_logger(), "Using the RC calibration saved in %s.", calibration_source_.c_str());
+            break;
+
+        case StartupCalibrationOutcome::kStoredRefused:
+            RCLCPP_WARN(
+                get_logger(),
+                "Ignoring the RC calibration in '%s': %s Using the configured values instead.",
+                calibration_file.c_str(), startup.detail.c_str());
+            break;
+
+        case StartupCalibrationOutcome::kNothingStored:
             RCLCPP_INFO(
                 get_logger(),
                 "No RC calibration saved at '%s' yet; using the configured values. Measure one "
                 "with the rc/calibration services.",
                 calibration_file.c_str());
-        }
+            break;
 
-        calibration_store_ = std::move(store);
-    } else {
-        RCLCPP_INFO(
-            get_logger(),
-            "RC calibration persistence is off (calibration_file is empty): a calibration can "
-            "still be measured and applied, but it will not survive a restart.");
+        case StartupCalibrationOutcome::kNoStore:
+            RCLCPP_INFO(
+                get_logger(),
+                "RC calibration persistence is off (calibration_file is empty): a calibration can "
+                "still be measured and applied, but it will not survive a restart.");
+            break;
     }
 
     velocity_publisher_ =
@@ -692,12 +661,9 @@ bool RoverCrsfTeleopNode::rebuildTeleop(const ChannelCalibration & calibration, 
         return false;
     }
 
-    TeleopConfig config = base_config_;
-    config.calibration = calibration;
-    config.linear_x_mapping =
-        mergedMapping(base_config_.linear_x_mapping, calibration, config.linear_x_channel);
-    config.angular_z_mapping =
-        mergedMapping(base_config_.angular_z_mapping, calibration, config.angular_z_channel);
+    // Applied to base_config_, never to the config currently in force: the endpoints a
+    // calibration carries replace the previous ones, they do not compound on them.
+    const TeleopConfig config = applyCalibration(base_config_, calibration);
 
     // Rebuilt rather than mutated: TeleopConfig is fanned out at construction into the link
     // monitor and both switch debouncers, so assigning the config alone would leave those on the

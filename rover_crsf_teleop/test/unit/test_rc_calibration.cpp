@@ -114,6 +114,73 @@ TEST(RcCalibrationTest, AxisMappingPicksOutOneChannel)
     EXPECT_EQ(fallback.in_mid, kDefaultCrsfChannelMid);
 }
 
+TEST(RcCalibrationTest, MergedMappingTakesTheEndpointsAndKeepsTheConfiguredLimits)
+{
+    ChannelCalibration calibration = defaultCalibration();
+    calibration.in_min[kLinearChannel - 1] = 200;
+    calibration.in_mid[kLinearChannel - 1] = kLinearRest;
+    calibration.in_max[kLinearChannel - 1] = 1800;
+    calibration.deadband[kLinearChannel - 1] = 17;
+
+    // What the operator configured: output limits and inversion, which no calibration measures.
+    AxisMapping configured;
+    configured.out_min = -1.2;
+    configured.out_max = 1.2;
+    configured.invert = true;
+
+    const AxisMapping merged = mergedMapping(configured, calibration, kLinearChannel);
+
+    // Taken from the calibration.
+    EXPECT_EQ(merged.in_min, 200);
+    EXPECT_EQ(merged.in_mid, kLinearRest);
+    EXPECT_EQ(merged.in_max, 1800);
+    EXPECT_EQ(merged.deadband_counts, 17);
+
+    // Survives untouched - this is the half of the merge that is easy to break silently.
+    EXPECT_DOUBLE_EQ(merged.out_min, -1.2);
+    EXPECT_DOUBLE_EQ(merged.out_max, 1.2);
+    EXPECT_TRUE(merged.invert);
+}
+
+TEST(RcCalibrationTest, MergedMappingIsIdempotent)
+{
+    ChannelCalibration calibration = defaultCalibration();
+    calibration.in_mid[kAngularChannel - 1] = kAngularRest;
+    calibration.deadband[kAngularChannel - 1] = 9;
+
+    AxisMapping configured;
+    configured.out_max = 1.0;
+    configured.invert = true;
+
+    const AxisMapping once = mergedMapping(configured, calibration, kAngularChannel);
+    const AxisMapping twice = mergedMapping(once, calibration, kAngularChannel);
+
+    // Applying a calibration replaces the endpoints, it does not compound on them - which is what
+    // lets on_configure apply a stored calibration over the parameter one, and lets the apply
+    // service re-apply onto a config that already carries one.
+    EXPECT_EQ(twice.in_min, once.in_min);
+    EXPECT_EQ(twice.in_mid, once.in_mid);
+    EXPECT_EQ(twice.in_max, once.in_max);
+    EXPECT_EQ(twice.deadband_counts, once.deadband_counts);
+    EXPECT_DOUBLE_EQ(twice.out_max, once.out_max);
+    EXPECT_EQ(twice.invert, once.invert);
+}
+
+TEST(RcCalibrationTest, MergedMappingLeavesAnOutOfRangeChannelOnTheNominalEndpoints)
+{
+    ChannelCalibration calibration = defaultCalibration();
+    calibration.in_mid[0] = kAngularRest;
+
+    AxisMapping configured;
+    configured.out_max = 2.5;
+
+    // Same fallback axisMapping() documents: nominal endpoints rather than reading past the
+    // array. The node rejects such a channel number at configure time.
+    const AxisMapping merged = mergedMapping(configured, calibration, 0);
+    EXPECT_EQ(merged.in_mid, kDefaultCrsfChannelMid);
+    EXPECT_DOUBLE_EQ(merged.out_max, 2.5);
+}
+
 TEST(RcCalibrationTest, CentreIsTheMeanOfTheRestSamplesAndTheDeadbandCoversTheirSpread)
 {
     RcCalibrator calibrator;

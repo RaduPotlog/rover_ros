@@ -15,6 +15,8 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "rover_crsf_teleop/application/calibration_use_case.hpp"
 
@@ -144,6 +146,106 @@ struct Fixture
         ASSERT_TRUE(use_case.finish().ok);
     }
 };
+
+// A store that can actually hand something back, for the startup-resolution tests below. The
+// FakeStore above deliberately always loads empty, which the session tests depend on.
+class LoadableStore : public CalibrationStorePort
+{
+
+public:
+
+    std::optional<StoredCalibration> load() override { return stored; }
+
+    bool save(const ChannelCalibration &, std::string &) override { return true; }
+
+    std::string location() const override { return "/config/rc_calibration.yaml"; }
+
+    std::optional<StoredCalibration> stored;
+};
+
+TeleopConfig baseConfig()
+{
+    TeleopConfig config;
+    config.linear_x_channel = kLinearChannel;
+    config.angular_z_channel = kAngularChannel;
+    config.linear_x_mapping.out_max = 1.2;
+    config.angular_z_mapping.out_max = 1.0;
+    return config;
+}
+
+StoredCalibration storedAt(const int linear_mid, const int linear_deadband)
+{
+    StoredCalibration stored;
+    stored.created = "2026-09-20T18:00:00Z";
+    stored.calibration = defaultCalibration();
+    stored.calibration.in_mid[kLinearChannel - 1] = linear_mid;
+    stored.calibration.deadband[kLinearChannel - 1] = linear_deadband;
+    return stored;
+}
+
+TEST(ResolveStartupCalibrationTest, NoStoreLeavesTheConfiguredParametersInForce)
+{
+    const TeleopConfig base = baseConfig();
+
+    const StartupCalibration result = resolveStartupCalibration(base, nullptr, axisMask());
+
+    EXPECT_EQ(result.outcome, StartupCalibrationOutcome::kNoStore);
+    EXPECT_EQ(result.source, "the configured parameters");
+    EXPECT_EQ(result.config.linear_x_mapping.in_mid, base.linear_x_mapping.in_mid);
+    EXPECT_TRUE(result.detail.empty());
+}
+
+TEST(ResolveStartupCalibrationTest, AnEmptyStoreLeavesTheConfiguredParametersInForce)
+{
+    LoadableStore store;
+
+    const StartupCalibration result = resolveStartupCalibration(baseConfig(), &store, axisMask());
+
+    EXPECT_EQ(result.outcome, StartupCalibrationOutcome::kNothingStored);
+    EXPECT_EQ(result.source, "the configured parameters");
+}
+
+TEST(ResolveStartupCalibrationTest, AUsableStoredCalibrationWins)
+{
+    LoadableStore store;
+    store.stored = storedAt(kRest, 14);
+
+    const StartupCalibration result = resolveStartupCalibration(baseConfig(), &store, axisMask());
+
+    EXPECT_EQ(result.outcome, StartupCalibrationOutcome::kStoredApplied);
+    EXPECT_EQ(result.config.linear_x_mapping.in_mid, kRest);
+    EXPECT_EQ(result.config.linear_x_mapping.deadband_counts, 14);
+
+    // The output limits still come from the parameters.
+    EXPECT_DOUBLE_EQ(result.config.linear_x_mapping.out_max, 1.2);
+
+    // Names the file and when it was measured, for the "Calibration in effect" diagnostic.
+    EXPECT_NE(result.source.find("/config/rc_calibration.yaml"), std::string::npos);
+    EXPECT_NE(result.source.find("2026-09-20T18:00:00Z"), std::string::npos);
+}
+
+TEST(ResolveStartupCalibrationTest, AnUnusableStoredCalibrationIsRefusedWhole)
+{
+    LoadableStore store;
+
+    // A deadband wider than the throw: mapAxis() would return 0.0 for every input, so this axis
+    // would be silently dead. Half-applying it is worse than not applying it at all.
+    store.stored = storedAt(kRest, 2000);
+
+    const TeleopConfig base = baseConfig();
+    const StartupCalibration result = resolveStartupCalibration(base, &store, axisMask());
+
+    EXPECT_EQ(result.outcome, StartupCalibrationOutcome::kStoredRefused);
+    EXPECT_FALSE(result.detail.empty()) << "the operator has to be told what was wrong with it";
+    EXPECT_EQ(result.source, "the configured parameters");
+
+    // Nothing from the refused calibration reached the config - not even the good channels.
+    EXPECT_EQ(result.config.linear_x_mapping.in_mid, base.linear_x_mapping.in_mid);
+    EXPECT_EQ(
+        result.config.linear_x_mapping.deadband_counts, base.linear_x_mapping.deadband_counts);
+    EXPECT_EQ(result.config.calibration.in_mid[kLinearChannel - 1],
+              base.calibration.in_mid[kLinearChannel - 1]);
+}
 
 TEST(CalibrationUseCaseTest, StartIsRefusedWithoutTheEStopConfirmation)
 {

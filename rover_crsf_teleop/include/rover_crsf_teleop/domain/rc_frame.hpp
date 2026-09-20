@@ -33,12 +33,20 @@ struct RcFrame
     // Indexed 0-based: channel N lives at index N-1.
     std::array<int, kChannelCount> channels{};
 
+    // Whether `channel_number` names a channel at all, in the 1-16 numbering the transmitter and
+    // the ROS parameters use. The one place this bound is written down: parameter validation, the
+    // calibration lookups and channel() all ask here rather than re-deriving it.
+    static constexpr bool isValidChannel(const int channel_number)
+    {
+        return channel_number >= 1 && static_cast<std::size_t>(channel_number) <= kChannelCount;
+    }
+
     // Returns channel `channel_number` (1-16, the numbering the transmitter and the ROS
     // parameters use), or nullopt for a number outside that range - a misconfiguration the caller
     // is expected to report rather than silently read as some default value.
     std::optional<int> channel(const int channel_number) const
     {
-        if (channel_number < 1 || static_cast<std::size_t>(channel_number) > kChannelCount) {
+        if (!isValidChannel(channel_number)) {
             return std::nullopt;
         }
 
