@@ -50,9 +50,14 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
    first, then on the ground. Tune the PID gains until overshoot stays under 10 %
    and steady-state error under 3 %. The DCC1000 encoders report at most every
    50 ms (20 Hz), while the controllers run at 100 Hz, so each PID gets a new
-   measurement only every ~5 cycles. Keep the PI gains modest, and read measured
+   measurement only every ~5 cycles. Keep the PID gains modest, and read measured
    dead times as accurate to about 50 ms. The driver logs each channel's actual
    encoder interval at startup.
+
+   `docs/wheel_pid_tuning_notes.md` records the measurements behind the current
+   gains, what each knob actually does on this plant (`i_clamp` is what bounds
+   overshoot, not `i`; `p` above ~0.1 rings the loop; `d` above 0.04 amplifies
+   encoder noise) and the remaining on-ground work. Read it before changing a gain.
 
    ```bash
    ros2 run rover_controller wheel_step_response --ros-args -r __ns:=/<ns> -p enable_motion:=true
