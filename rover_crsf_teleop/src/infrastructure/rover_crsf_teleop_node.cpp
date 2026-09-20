@@ -294,6 +294,17 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
     config.channel_switch_threshold =
         static_cast<int>(get_parameter("channel_switch_threshold").as_int());
 
+    // Same 0-2047 wire domain the endpoint arrays are held to above. The calibrated-range check
+    // further down is a WARN and is gated on having a calibration at all, so without this a
+    // negative or out-of-wire-range threshold configured silently and pinned both switches to one
+    // position for the life of the node.
+    if (config.channel_switch_threshold < 0 || config.channel_switch_threshold > 2047) {
+        RCLCPP_ERROR(
+            get_logger(), "Parameter channel_switch_threshold = %d is outside 0-2047.",
+            config.channel_switch_threshold);
+        return std::nullopt;
+    }
+
     // Fail configure on a bad channel number instead of the previous behaviour of reading it as
     // 0 - which the stick mapping clamps to full negative deflection.
     const std::array<std::pair<const char *, int>, 4> channel_roles{{
@@ -995,12 +1006,17 @@ void RoverCrsfTeleopNode::diagnoseCalibration(diagnostic_updater::DiagnosticStat
                                  e_stop_now - *last_safety_io_at_).count())
             : std::string("never received"));
     status.add("Persisted to", calibration_store_ ? calibration_store_->location() : "(disabled)");
+    // All three endpoints come from the calibration in force, never from base_config_.
+    // base_config_ deliberately keeps the *uncalibrated* endpoints - applyCalibration() is always
+    // written against it - so pairing its in_min/in_max with the active in_mid reported a triple
+    // that no calibration ever held. The channel number still comes from base_config_: that is a
+    // parameter, not something a calibration measures.
+    const auto linear_x_index = static_cast<std::size_t>(base_config_.linear_x_channel - 1);
     status.add(
         "linear_x endpoints",
-        std::to_string(base_config_.linear_x_mapping.in_min) + " / " +
-            std::to_string(snapshot.active.in_mid[
-                static_cast<std::size_t>(base_config_.linear_x_channel - 1)]) +
-            " / " + std::to_string(base_config_.linear_x_mapping.in_max));
+        std::to_string(snapshot.active.in_min[linear_x_index]) + " / " +
+            std::to_string(snapshot.active.in_mid[linear_x_index]) + " / " +
+            std::to_string(snapshot.active.in_max[linear_x_index]));
 
     if (!snapshot.teleop_inhibited) {
         status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Idle.");

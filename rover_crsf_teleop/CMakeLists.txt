@@ -85,8 +85,10 @@ target_link_libraries(${PROJECT_NAME}_ros PUBLIC ${PROJECT_NAME}_adapters)
 add_executable(${PROJECT_NAME}_node src/rover_crsf_teleop_node_main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
 
-install(DIRECTORY include/ DESTINATION include)
-
+# No install(DIRECTORY include/ ...) on purpose: _core / _adapters / _ros are STATIC and are
+# neither installed nor exported, so shipping the headers would advertise an interface that
+# compiles downstream and then fails to link. Nothing outside this package includes them. If a
+# consumer ever appears, install and export the libraries first, then put the headers back.
 install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})

@@ -505,6 +505,22 @@ TEST_F(TeleopNodeTest, ConfigureRejectsNegativeDeadband)
     EXPECT_EQ(node->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
 }
 
+// The calibrated-range check on this parameter is only a WARN, and it is skipped when there is no
+// calibration - so without the hard bound a threshold off the wire domain configured silently and
+// pinned both switch channels to one position for the life of the node.
+TEST_F(TeleopNodeTest, ConfigureRejectsASwitchThresholdOffTheWire)
+{
+    for (const int threshold : {-1, 2048}) {
+        rclcpp::NodeOptions options;
+        options.parameter_overrides({rclcpp::Parameter("channel_switch_threshold", threshold)});
+        auto node = std::make_shared<RoverCrsfTeleopNode>(
+            "rover_crsf_teleop_bad_threshold", options);
+
+        EXPECT_EQ(node->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED)
+            << "channel_switch_threshold " << threshold << " should have failed configure";
+    }
+}
+
 // --- RC calibration --------------------------------------------------------------------------
 
 // Everything the calibration flow needs: the services connected, and teleop deactivated (which is
@@ -572,8 +588,12 @@ protected:
         }
     }
 
-    // The whole operator sequence: centre, sweep both sticks, finish.
-    void measure(const int linear_rest, const int angular_rest)
+    // The whole operator sequence: centre, sweep both sticks, finish. The sweep endpoints default
+    // to the nominal CRSF ends; pass narrower ones to measure a transmitter that does not reach
+    // them, which is what tells a calibrated endpoint apart from the shipped parameter.
+    void measure(
+        const int linear_rest, const int angular_rest,
+        const int sweep_min = kDefaultCrsfChannelMin, const int sweep_max = kDefaultCrsfChannelMax)
     {
         ASSERT_TRUE(teleop_->deactivate().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
         ASSERT_TRUE(startCalibration(true)->success);
@@ -583,7 +603,7 @@ protected:
         feedFrames(kCenterSampleTarget);
         ASSERT_TRUE(trigger(harness_->sweep())->success);
 
-        for (const int value : {kDefaultCrsfChannelMin, kDefaultCrsfChannelMax}) {
+        for (const int value : {sweep_min, sweep_max}) {
             harness_->channels().channels[2] = value;
             harness_->channels().channels[0] = value;
             feedFrames(3);
@@ -728,6 +748,45 @@ TEST_F(TeleopCalibrationTest, AnAppliedCalibrationChangesTheMappingWithoutAResta
     const auto mid = teleop_->get_parameter("channel_in_mid").as_integer_array();
     ASSERT_EQ(mid.size(), RcFrame::kChannelCount);
     EXPECT_EQ(mid[2], kLinearRest);
+}
+
+// The three numbers on one diagnostic line have to come from one calibration. They used to be
+// spliced: min and max from base_config_ (which deliberately keeps the *uncalibrated* endpoints,
+// because applyCalibration() is always written against it) and mid from the calibration actually
+// in force - so the operator read a triple that no calibration ever held.
+TEST_F(TeleopCalibrationTest, TheCalibrationDiagnosticReportsOneCalibration)
+{
+    constexpr int kLinearRest = 1004;
+    constexpr int kSweepMin = 300;    // inside the nominal 172..1811, so it differs from the
+    constexpr int kSweepMax = 1700;   // shipped parameters and the splice would be visible
+
+    measure(kLinearRest, 987, kSweepMin, kSweepMax);
+
+    auto request = std::make_shared<SetRcCalibration::Request>();
+    request->persist = false;
+    ASSERT_TRUE(call(harness_->applyCalibration(), request)->success);
+
+    std::string endpoints;
+    auto diagnostics_sub = helper_node_->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+        "/diagnostics", 10, [&endpoints](const diagnostic_msgs::msg::DiagnosticArray & msg) {
+            for (const auto & status : msg.status) {
+                if (status.name != "rover_crsf_teleop_node: RC calibration") {
+                    continue;
+                }
+                for (const auto & value : status.values) {
+                    if (value.key == "linear_x endpoints") {
+                        endpoints = value.value;
+                    }
+                }
+            }
+        });
+
+    ASSERT_TRUE(spinUntil([&endpoints]() { return !endpoints.empty(); }))
+        << "the RC calibration diagnostic never carried linear_x endpoints";
+
+    // All three from the calibration that was just applied - not the shipped 172 / 1811.
+    EXPECT_EQ(endpoints, std::to_string(kSweepMin) + " / " + std::to_string(kLinearRest) + " / " +
+                             std::to_string(kSweepMax));
 }
 
 TEST_F(TeleopCalibrationTest, AMeasurementWaitingInReviewStillBlocksActivation)
