@@ -15,11 +15,19 @@
 #ifndef ROVER_CRSF_TELEOP_INFRASTRUCTURE_RC_MESSAGE_CONVERSIONS_HPP_
 #define ROVER_CRSF_TELEOP_INFRASTRUCTURE_RC_MESSAGE_CONVERSIONS_HPP_
 
+#include <array>
+#include <cstdint>
+#include <vector>
+
 #include <rclcpp/time.hpp>
 
+#include "rover_msgs/msg/rc_calibration.hpp"
+#include "rover_msgs/msg/rc_calibration_state.hpp"
 #include "rover_msgs/msg/rc_channels.hpp"
 #include "rover_msgs/msg/rc_link_status.hpp"
 
+#include "rover_crsf_teleop/application/calibration_use_case.hpp"
+#include "rover_crsf_teleop/domain/rc_calibration.hpp"
 #include "rover_crsf_teleop/domain/rc_frame.hpp"
 
 namespace rover_crsf_teleop
@@ -32,6 +40,19 @@ namespace rover_crsf_teleop
 rover_msgs::msg::RcChannels toRcChannelsMsg(const RcFrame & frame, const rclcpp::Time & stamp);
 
 rover_msgs::msg::RcLinkStatus toRcLinkStatusMsg(const RcLinkStats & stats, const rclcpp::Time & stamp);
+
+rover_msgs::msg::RcCalibration toRcCalibrationMsg(const ChannelCalibration & calibration);
+
+rover_msgs::msg::RcCalibrationState toRcCalibrationStateMsg(
+    const CalibrationSnapshot & snapshot, const rclcpp::Time & stamp);
+
+// ROS -> domain, for the apply service. Out-of-range values are clamped rather than rejected
+// here; whether the result is usable is the domain's judgement (calibrationProblems), not the
+// message layer's.
+ChannelCalibration fromRcCalibrationMsg(const rover_msgs::msg::RcCalibration & message);
+
+// The per-channel array as a ROS integer-array parameter value.
+std::vector<int64_t> toParameterArray(const std::array<int, RcFrame::kChannelCount> & values);
 
 }  // namespace rover_crsf_teleop
 

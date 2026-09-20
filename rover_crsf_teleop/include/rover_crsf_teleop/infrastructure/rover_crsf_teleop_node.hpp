@@ -15,10 +15,12 @@
 #ifndef ROVER_CRSF_TELEOP_INFRASTRUCTURE_ROVER_CRSF_TELEOP_NODE_HPP_
 #define ROVER_CRSF_TELEOP_INFRASTRUCTURE_ROVER_CRSF_TELEOP_NODE_HPP_
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <diagnostic_updater/update_functions.hpp>
@@ -26,7 +28,13 @@
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 
 #include <std_msgs/msg/u_int8_multi_array.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
+#include <rover_msgs/msg/rc_calibration_state.hpp>
+#include <rover_msgs/srv/set_rc_calibration.hpp>
+#include <rover_msgs/srv/start_rc_calibration.hpp>
+
+#include "rover_crsf_teleop/application/calibration_use_case.hpp"
 #include "rover_crsf_teleop/application/teleop_use_case.hpp"
 #include "rover_crsf_teleop/domain/crsf/crsf_parser.hpp"
 #include "rover_crsf_teleop/infrastructure/rc_message_conversions.hpp"
@@ -62,9 +70,18 @@ namespace rover_crsf_teleop
 //                         (WARN when it is silent - which is how a dead bridge becomes visible);
 //   - "E-Stop requests":  reachability and last outcome of the hardware interface E-Stop services;
 //   - "RC channels rate": decoded CRSF frame rate against rc_channels_expected_hz (WARN at
-//                         worst, also when no frames arrive).
+//                         worst, also when no frames arrive);
+//   - "RC calibration":   whether a calibration session is holding teleop off, and where the
+//                         calibration in effect came from.
 // None of them reports ERROR: RC teleop is optional.
-class RoverCrsfTeleopNode : public rclcpp_lifecycle::LifecycleNode, private crsf::CrsfSink
+//
+// RC calibration (rc/calibration/*) measures this transmitter's per-channel endpoints and centre.
+// It runs while the node is INACTIVE - the subscription lives in on_configure, so frames are
+// still decoded - and the services are created in on_configure for the same reason. Applying a
+// measurement rebuilds TeleopUseCase in place, so nothing restarts.
+class RoverCrsfTeleopNode : public rclcpp_lifecycle::LifecycleNode,
+                            private crsf::CrsfSink,
+                            private TeleopControlPort
 {
 
 public:
@@ -92,12 +109,41 @@ private:
 
     void onLinkStatistics(const RcLinkStats & stats) override;
 
+    // TeleopControlPort - how CalibrationUseCase reaches the teleop rules.
+    void setTeleopInhibited(bool inhibited) override;
+
+    bool rebuildTeleop(const ChannelCalibration & calibration, std::string & reason) override;
+
+    bool teleopCouldCommand() const override;
+
     // Declared once, in the constructor, so a cleanup -> configure cycle doesn't re-declare them.
     void declareParameters();
 
     // Reads the parameters into a TeleopConfig, or returns nullopt (after logging why) when they
     // are inconsistent.
     std::optional<TeleopConfig> readConfig();
+
+    // Reads one channel_in_* / channel_deadband parameter. A single-element list is expanded to
+    // all 16, which is both how a pre-array config migrates and the sane way to say "my
+    // transmitter is uniform". Any other length is a configure error.
+    std::optional<std::array<int, RcFrame::kChannelCount>> readChannelArray(
+        const char * name, int lower, int upper);
+
+    // Which channels the mapping drives as proportional axes. Switch channels are deliberately
+    // not included: a switch rests at one end of its travel, so it fails every check meant for a
+    // stick.
+    std::array<bool, RcFrame::kChannelCount> axisChannels(const TeleopConfig & config) const;
+
+    void createCalibrationInterfaces();
+
+    void startCalibrationHeartbeat();
+
+    void stopCalibrationHeartbeat();
+
+    void publishCalibrationState();
+
+    // Fails fast with an explanation when a pre-array configuration is loaded.
+    void rejectScalarChannelParameters();
 
     void controlTimerCallback();
 
@@ -110,6 +156,8 @@ private:
     void diagnoseChannelsRate(diagnostic_updater::DiagnosticStatusWrapper & status);
 
     void diagnoseSerialLink(diagnostic_updater::DiagnosticStatusWrapper & status);
+
+    void diagnoseCalibration(diagnostic_updater::DiagnosticStatusWrapper & status);
 
     std::unique_ptr<TeleopUseCase> use_case_;
     std::shared_ptr<Ros2VelocityCommandPublisher> velocity_publisher_;
@@ -137,6 +185,26 @@ private:
     std::uint64_t decoded_link_stats_{0};
 
     rclcpp::TimerBase::SharedPtr control_timer_;
+
+    // Calibration. The use case owns the session; the node owns the transport and the clock.
+    std::unique_ptr<CalibrationUseCase> calibration_;
+    std::shared_ptr<CalibrationStorePort> calibration_store_;
+
+    // The parameter-derived config, kept so a calibration can be applied on top of it without
+    // re-reading parameters that a previous apply has already overwritten.
+    TeleopConfig base_config_;
+    std::string calibration_source_;
+
+    rclcpp::Publisher<rover_msgs::msg::RcCalibrationState>::SharedPtr calibration_state_publisher_;
+    rclcpp::Service<rover_msgs::srv::StartRcCalibration>::SharedPtr calibration_start_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibration_sweep_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibration_finish_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibration_cancel_service_;
+    rclcpp::Service<rover_msgs::srv::SetRcCalibration>::SharedPtr calibration_apply_service_;
+
+    // Runs only while a session is in progress: at idle the transient-local publisher has
+    // already latched the last state for whoever joins next.
+    rclcpp::TimerBase::SharedPtr calibration_state_timer_;
 
     std::optional<TickStatus> last_tick_status_;
 

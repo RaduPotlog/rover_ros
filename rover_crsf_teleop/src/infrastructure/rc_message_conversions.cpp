@@ -55,4 +55,85 @@ rover_msgs::msg::RcLinkStatus toRcLinkStatusMsg(const RcLinkStats & stats, const
     return message;
 }
 
+namespace
+{
+
+std::array<std::uint16_t, RcFrame::kChannelCount> toUnsigned(
+    const std::array<int, RcFrame::kChannelCount> & values)
+{
+    std::array<std::uint16_t, RcFrame::kChannelCount> out{};
+
+    for (std::size_t i = 0; i < RcFrame::kChannelCount; ++i) {
+        out[i] = static_cast<std::uint16_t>(std::clamp(values[i], 0, 2047));
+    }
+
+    return out;
+}
+
+std::uint8_t toPhaseField(const CalibrationPhase phase)
+{
+    switch (phase) {
+        case CalibrationPhase::kCenter:
+            return rover_msgs::msg::RcCalibrationState::PHASE_CENTER;
+        case CalibrationPhase::kSweep:
+            return rover_msgs::msg::RcCalibrationState::PHASE_SWEEP;
+        case CalibrationPhase::kReview:
+            return rover_msgs::msg::RcCalibrationState::PHASE_REVIEW;
+        case CalibrationPhase::kIdle:
+            break;
+    }
+
+    return rover_msgs::msg::RcCalibrationState::PHASE_IDLE;
+}
+
+}  // namespace
+
+rover_msgs::msg::RcCalibration toRcCalibrationMsg(const ChannelCalibration & calibration)
+{
+    rover_msgs::msg::RcCalibration message;
+    message.channel_min = toUnsigned(calibration.in_min);
+    message.channel_mid = toUnsigned(calibration.in_mid);
+    message.channel_max = toUnsigned(calibration.in_max);
+    message.channel_deadband = toUnsigned(calibration.deadband);
+    return message;
+}
+
+rover_msgs::msg::RcCalibrationState toRcCalibrationStateMsg(
+    const CalibrationSnapshot & snapshot, const rclcpp::Time & stamp)
+{
+    rover_msgs::msg::RcCalibrationState message;
+    message.header.stamp = stamp;
+
+    message.phase = toPhaseField(snapshot.phase);
+    message.samples = snapshot.samples;
+    message.progress = static_cast<float>(snapshot.progress);
+    message.teleop_inhibited = snapshot.teleop_inhibited;
+    message.active = toRcCalibrationMsg(snapshot.active);
+    message.measured = toRcCalibrationMsg(snapshot.measured);
+    message.channel_moved = snapshot.channel_moved;
+    message.problems = snapshot.problems;
+    message.message = snapshot.message;
+
+    return message;
+}
+
+ChannelCalibration fromRcCalibrationMsg(const rover_msgs::msg::RcCalibration & message)
+{
+    ChannelCalibration calibration;
+
+    for (std::size_t i = 0; i < RcFrame::kChannelCount; ++i) {
+        calibration.in_min[i] = static_cast<int>(message.channel_min[i]);
+        calibration.in_mid[i] = static_cast<int>(message.channel_mid[i]);
+        calibration.in_max[i] = static_cast<int>(message.channel_max[i]);
+        calibration.deadband[i] = static_cast<int>(message.channel_deadband[i]);
+    }
+
+    return calibration;
+}
+
+std::vector<int64_t> toParameterArray(const std::array<int, RcFrame::kChannelCount> & values)
+{
+    return std::vector<int64_t>(values.cbegin(), values.cend());
+}
+
 }  // namespace rover_crsf_teleop

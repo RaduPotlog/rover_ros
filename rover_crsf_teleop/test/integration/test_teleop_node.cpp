@@ -40,6 +40,10 @@
 
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 
+#include <rover_msgs/msg/rc_calibration_state.hpp>
+#include <rover_msgs/srv/set_rc_calibration.hpp>
+#include <rover_msgs/srv/start_rc_calibration.hpp>
+
 #include "rover_crsf_teleop/domain/crsf/crc8.hpp"
 #include "rover_crsf_teleop/domain/crsf/crsf_protocol.hpp"
 #include "rover_crsf_teleop/domain/rc_frame.hpp"
@@ -54,6 +58,9 @@ namespace
 using namespace std::chrono_literals;
 using Twist = geometry_msgs::msg::TwistStamped;
 using Trigger = std_srvs::srv::Trigger;
+using RcCalibrationState = rover_msgs::msg::RcCalibrationState;
+using SetRcCalibration = rover_msgs::srv::SetRcCalibration;
+using StartRcCalibration = rover_msgs::srv::StartRcCalibration;
 
 constexpr int kSwitchLow = kDefaultCrsfChannelMin;
 constexpr int kSwitchHigh = kDefaultCrsfChannelMax;
@@ -164,11 +171,43 @@ public:
         return zeros;
     }
 
+    // The calibration surface, as a UI sees it: five services and one latched state topic.
+    void connectCalibration()
+    {
+        start_client_ = node_->create_client<StartRcCalibration>("rc/calibration/start");
+        sweep_client_ = node_->create_client<Trigger>("rc/calibration/sweep");
+        finish_client_ = node_->create_client<Trigger>("rc/calibration/finish");
+        cancel_client_ = node_->create_client<Trigger>("rc/calibration/cancel");
+        apply_client_ = node_->create_client<SetRcCalibration>("rc/calibration/apply");
+
+        calibration_state_sub_ = node_->create_subscription<RcCalibrationState>(
+            "rc/calibration/state", rclcpp::QoS(1).reliable().transient_local(),
+            [this](const RcCalibrationState & msg) { calibration_state = msg; });
+    }
+
+    bool calibrationServicesReady() const
+    {
+        return start_client_ && start_client_->service_is_ready() &&
+               sweep_client_->service_is_ready() && finish_client_->service_is_ready() &&
+               cancel_client_->service_is_ready() && apply_client_->service_is_ready();
+    }
+
+    rclcpp::Client<StartRcCalibration>::SharedPtr start() { return start_client_; }
+
+    rclcpp::Client<Trigger>::SharedPtr sweep() { return sweep_client_; }
+
+    rclcpp::Client<Trigger>::SharedPtr finishCalibration() { return finish_client_; }
+
+    rclcpp::Client<Trigger>::SharedPtr cancelCalibration() { return cancel_client_; }
+
+    rclcpp::Client<SetRcCalibration>::SharedPtr applyCalibration() { return apply_client_; }
+
     bool feeding{false};
     std::vector<Twist> received;
     int e_stop_set_calls{0};
     int e_stop_reset_calls{0};
     int latch_reset_calls{0};
+    std::optional<RcCalibrationState> calibration_state;
 
 private:
 
@@ -188,6 +227,12 @@ private:
     rclcpp::Service<Trigger>::SharedPtr e_stop_set_srv_;
     rclcpp::Service<Trigger>::SharedPtr e_stop_reset_srv_;
     rclcpp::Service<Trigger>::SharedPtr latch_reset_srv_;
+    rclcpp::Client<StartRcCalibration>::SharedPtr start_client_;
+    rclcpp::Client<Trigger>::SharedPtr sweep_client_;
+    rclcpp::Client<Trigger>::SharedPtr finish_client_;
+    rclcpp::Client<Trigger>::SharedPtr cancel_client_;
+    rclcpp::Client<SetRcCalibration>::SharedPtr apply_client_;
+    rclcpp::Subscription<RcCalibrationState>::SharedPtr calibration_state_sub_;
     rclcpp::TimerBase::SharedPtr feed_timer_;
     RcFrame channels_;
 };
@@ -423,10 +468,246 @@ TEST_F(TeleopNodeTest, ConfigureRejectsDuplicateChannels)
 TEST_F(TeleopNodeTest, ConfigureRejectsNegativeDeadband)
 {
     rclcpp::NodeOptions options;
-    options.parameter_overrides({rclcpp::Parameter("channel_deadband", -1)});
+    options.parameter_overrides(
+        {rclcpp::Parameter("channel_deadband", std::vector<int64_t>{-1})});
     auto node = std::make_shared<RoverCrsfTeleopNode>("rover_crsf_teleop_bad_deadband", options);
 
     EXPECT_EQ(node->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
+}
+
+// --- RC calibration --------------------------------------------------------------------------
+
+// Everything the calibration flow needs: the services connected, and teleop deactivated (which is
+// the operator interlock the node enforces).
+class TeleopCalibrationTest : public TeleopNodeTest
+{
+
+protected:
+
+    void SetUp() override
+    {
+        TeleopNodeTest::SetUp();
+
+        harness_->connectCalibration();
+        ASSERT_TRUE(spinUntil([this]() { return harness_->calibrationServicesReady(); }))
+            << "The calibration services never came up.";
+    }
+
+    // Calls a service and spins until the response arrives.
+    template <typename ClientT, typename RequestT>
+    auto call(const ClientT & client, const RequestT & request)
+    {
+        auto future = client->async_send_request(request);
+        EXPECT_TRUE(spinUntil([&future]() {
+            return future.wait_for(0s) == std::future_status::ready;
+        })) << "the service never answered";
+        return future.get();
+    }
+
+    auto startCalibration(const bool e_stop_confirmed)
+    {
+        auto request = std::make_shared<StartRcCalibration::Request>();
+        request->e_stop_confirmed = e_stop_confirmed;
+        return call(harness_->start(), request);
+    }
+
+    auto trigger(const rclcpp::Client<Trigger>::SharedPtr & client)
+    {
+        return call(client, std::make_shared<Trigger::Request>());
+    }
+
+    // Feeds `count` frames of the current channel values.
+    void feedFrames(const std::size_t count)
+    {
+        for (std::size_t i = 0; i < count; ++i) {
+            harness_->publishBytes(encodeRcChannelsFrame(harness_->channels()));
+            executor_.spin_some(2ms);
+        }
+    }
+
+    // The whole operator sequence: centre, sweep both sticks, finish.
+    void measure(const int linear_rest, const int angular_rest)
+    {
+        ASSERT_TRUE(teleop_->deactivate().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+        ASSERT_TRUE(startCalibration(true)->success);
+
+        harness_->channels().channels[2] = linear_rest;
+        harness_->channels().channels[0] = angular_rest;
+        feedFrames(kCenterSampleTarget);
+        ASSERT_TRUE(trigger(harness_->sweep())->success);
+
+        for (const int value : {kDefaultCrsfChannelMin, kDefaultCrsfChannelMax}) {
+            harness_->channels().channels[2] = value;
+            harness_->channels().channels[0] = value;
+            feedFrames(3);
+        }
+
+        harness_->channels().channels[2] = linear_rest;
+        harness_->channels().channels[0] = angular_rest;
+        feedFrames(3);
+
+        ASSERT_TRUE(trigger(harness_->finishCalibration())->success);
+    }
+};
+
+TEST_F(TeleopCalibrationTest, StartIsRefusedWhileTheNodeIsActive)
+{
+    // The node is active from SetUp. A sweep at full throw would be a full-speed command.
+    const auto response = startCalibration(true);
+
+    EXPECT_FALSE(response->success);
+    EXPECT_FALSE(response->message.empty());
+}
+
+TEST_F(TeleopCalibrationTest, StartIsRefusedWithoutTheEStopConfirmation)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    EXPECT_FALSE(startCalibration(false)->success);
+}
+
+TEST_F(TeleopCalibrationTest, TheStateTopicIsLatchedForWhoeverConnectsNext)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_TRUE(startCalibration(true)->success);
+
+    // A second page opening mid-session must learn at once that teleop is held off, without
+    // waiting for the next heartbeat.
+    auto late = helper_node_->create_subscription<RcCalibrationState>(
+        "rc/calibration/state", rclcpp::QoS(1).reliable().transient_local(),
+        [](const RcCalibrationState &) {});
+
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->phase == RcCalibrationState::PHASE_CENTER;
+    }));
+    EXPECT_TRUE(harness_->calibration_state->teleop_inhibited);
+}
+
+TEST_F(TeleopCalibrationTest, ASweepMeasuresTheRestingPositionAndBothEndpoints)
+{
+    constexpr int kLinearRest = 1004;
+    constexpr int kAngularRest = 987;
+
+    measure(kLinearRest, kAngularRest);
+
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->phase == RcCalibrationState::PHASE_REVIEW;
+    }));
+
+    const auto & measured = harness_->calibration_state->measured;
+    EXPECT_EQ(measured.channel_mid[2], kLinearRest);
+    EXPECT_EQ(measured.channel_mid[0], kAngularRest);
+    EXPECT_EQ(measured.channel_min[2], kDefaultCrsfChannelMin);
+    EXPECT_EQ(measured.channel_max[2], kDefaultCrsfChannelMax);
+    EXPECT_TRUE(harness_->calibration_state->channel_moved[2]);
+    EXPECT_TRUE(harness_->calibration_state->problems.empty());
+}
+
+TEST_F(TeleopCalibrationTest, SweepingTheEStopSwitchCallsNoSafetyServices)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_TRUE(startCalibration(true)->success);
+    feedFrames(kCenterSampleTarget);
+    ASSERT_TRUE(trigger(harness_->sweep())->success);
+
+    // Exactly what an operator does during the sweep: walk every switch end to end.
+    for (const int value : {kSwitchLow, kSwitchHigh, kSwitchLow, kSwitchHigh}) {
+        harness_->channels().channels[3] = value;
+        harness_->channels().channels[4] = value;
+        feedFrames(3);
+    }
+
+    ASSERT_TRUE(trigger(harness_->cancelCalibration())->success);
+
+    EXPECT_EQ(harness_->e_stop_set_calls, 0);
+    EXPECT_EQ(harness_->e_stop_reset_calls, 0);
+    EXPECT_EQ(harness_->latch_reset_calls, 0);
+}
+
+TEST_F(TeleopCalibrationTest, ActivateIsRefusedWhileACalibrationIsRunning)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_TRUE(startCalibration(true)->success);
+
+    // Independent of the inhibit: the node refuses to become able to command at all.
+    teleop_->activate();
+    EXPECT_EQ(
+        teleop_->get_current_state().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    ASSERT_TRUE(trigger(harness_->cancelCalibration())->success);
+    EXPECT_EQ(teleop_->activate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+}
+
+TEST_F(TeleopCalibrationTest, CancellingLetsTeleopCommandAgain)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_TRUE(startCalibration(true)->success);
+    ASSERT_TRUE(trigger(harness_->cancelCalibration())->success);
+    ASSERT_EQ(teleop_->activate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    harness_->received.clear();
+    harness_->channels().channels[2] = kDefaultCrsfChannelMax;
+    harness_->feeding = true;
+
+    EXPECT_TRUE(waitForDeflectedCommand());
+}
+
+TEST_F(TeleopCalibrationTest, AnAppliedCalibrationChangesTheMappingWithoutARestart)
+{
+    constexpr int kLinearRest = 1004;
+
+    measure(kLinearRest, 987);
+
+    auto request = std::make_shared<SetRcCalibration::Request>();
+    request->persist = false;   // an all-zero calibration means "apply what you measured"
+    const auto response = call(harness_->applyCalibration(), request);
+    ASSERT_TRUE(response->success) << response->message;
+
+    ASSERT_EQ(teleop_->activate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    // The node is using the measured centre now: the resting count maps to exactly zero, where
+    // before it was 12 counts off the nominal midpoint.
+    harness_->received.clear();
+    harness_->channels().channels[2] = kLinearRest;
+    harness_->channels().channels[0] = 987;
+    harness_->feeding = true;
+
+    ASSERT_TRUE(spinUntil([this]() { return !harness_->received.empty(); }));
+    EXPECT_DOUBLE_EQ(harness_->received.back().twist.linear.x, 0.0);
+
+    // And the parameters agree with what the rover is actually using.
+    const auto mid = teleop_->get_parameter("channel_in_mid").as_integer_array();
+    ASSERT_EQ(mid.size(), RcFrame::kChannelCount);
+    EXPECT_EQ(mid[2], kLinearRest);
+}
+
+TEST_F(TeleopCalibrationTest, AMeasurementWaitingInReviewStillBlocksActivation)
+{
+    measure(1004, 987);
+
+    // The session is not over until the measurement is applied or discarded, and activating in
+    // between would have to rebuild teleop while it could command - which resets the link monitor
+    // and publishes a spurious zero. So the operator has to decide first.
+    teleop_->activate();
+    EXPECT_EQ(
+        teleop_->get_current_state().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    ASSERT_TRUE(trigger(harness_->cancelCalibration())->success);
+    EXPECT_EQ(teleop_->activate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+}
+
+TEST_F(TeleopCalibrationTest, NothingIsCommandedWhileACalibrationRuns)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_TRUE(startCalibration(true)->success);
+
+    harness_->received.clear();
+    harness_->channels().channels[2] = kDefaultCrsfChannelMax;
+    feedFrames(kCenterSampleTarget);
+
+    EXPECT_TRUE(harness_->received.empty());
 }
 
 }  // namespace rover_crsf_teleop

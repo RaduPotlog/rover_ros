@@ -16,6 +16,7 @@ set(PACKAGE_DEPENDENCIES
     std_msgs
     geometry_msgs
     rover_msgs
+    yaml-cpp
 )
 
 find_package(ament_cmake REQUIRED)
@@ -30,11 +31,13 @@ endforeach()
 add_library(${PROJECT_NAME}_core STATIC
             src/domain/crsf/crc8.cpp
             src/domain/crsf/crsf_parser.cpp
+            src/domain/rc_calibration.cpp
             src/domain/stick_mapping.cpp
             src/domain/rim_speed_limit.cpp
             src/domain/switch_debouncer.cpp
             src/domain/link_monitor.cpp
             src/domain/teleop_health.cpp
+            src/application/calibration_use_case.cpp
             src/application/teleop_use_case.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
@@ -52,6 +55,7 @@ add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/ros2_trigger_safety_switch.cpp
             src/infrastructure/rover_crsf_teleop_node.cpp
             src/infrastructure/teleop_diagnostics_conversions.cpp
+            src/infrastructure/yaml_calibration_store.cpp
 )
 target_link_libraries(${PROJECT_NAME}_ros PUBLIC ${PROJECT_NAME}_core)
 target_link_libraries(${PROJECT_NAME}_ros PUBLIC
@@ -64,6 +68,7 @@ target_link_libraries(${PROJECT_NAME}_ros PUBLIC
     ${std_msgs_TARGETS}
     ${geometry_msgs_TARGETS}
     ${rover_msgs_TARGETS}
+    yaml-cpp
 )
 
 add_executable(${PROJECT_NAME}_node src/rover_crsf_teleop_node_main.cpp)
@@ -88,6 +93,8 @@ if(BUILD_TESTING)
           test_stick_mapping
           test_rim_speed_limit
           test_switch_debouncer
+          test_rc_calibration
+          test_calibration_use_case
           test_link_monitor
           test_teleop_health
           test_teleop_use_case)
@@ -98,7 +105,8 @@ if(BUILD_TESTING)
   # Infrastructure: diagnostics formatting and message conversion, without a running node.
   foreach(TEST_NAME IN ITEMS
           test_teleop_diagnostics_conversions
-          test_rc_message_conversions)
+          test_rc_message_conversions
+          test_yaml_calibration_store)
     ament_add_gtest(${TEST_NAME} test/unit/${TEST_NAME}.cpp)
     target_link_libraries(${TEST_NAME} ${PROJECT_NAME}_ros)
   endforeach()

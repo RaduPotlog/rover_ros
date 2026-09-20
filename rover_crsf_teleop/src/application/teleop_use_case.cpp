@@ -45,6 +45,14 @@ void TeleopUseCase::onLinkStats(const std::uint8_t link_quality, const SteadyTim
 
 TickStatus TeleopUseCase::tick(const SteadyTime now)
 {
+    // First, and before the first-frame check, so no branch below can be reached while inhibited.
+    // publish() swallows a repeated zero, so this is one zero and then silence - the same shape
+    // as the link-lost path, and twist_mux falls through to its next source.
+    if (inhibited_) {
+        publish(VelocityCommand{});
+        return TickStatus::kInhibited;
+    }
+
     if (!last_frame_.has_value()) {
         return TickStatus::kWaitingForFirstFrame;
     }
@@ -69,6 +77,17 @@ void TeleopUseCase::stop()
     publish(VelocityCommand{});
 }
 
+void TeleopUseCase::setCommandInhibited(const bool inhibited)
+{
+    inhibited_ = inhibited;
+}
+
+void TeleopUseCase::rearmSwitches()
+{
+    e_stop_switch_.rearm();
+    latch_reset_switch_.rearm();
+}
+
 void TeleopUseCase::publish(const VelocityCommand & command)
 {
     // A centred stick maps to exactly 0.0 (see domain/stick_mapping.hpp), so "zero" here really
@@ -86,6 +105,7 @@ TeleopDiagnostics TeleopUseCase::diagnostics(const SteadyTime now) const
 {
     TeleopDiagnostics diagnostics;
     diagnostics.first_frame_received = last_frame_.has_value();
+    diagnostics.inhibited = inhibited_;
     diagnostics.link = link_monitor_.snapshot(now);
     diagnostics.health = evaluateTeleopHealth(diagnostics.first_frame_received, diagnostics.link);
     diagnostics.last_command = last_command_;

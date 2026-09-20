@@ -1,0 +1,7 @@
+# Begin an RC calibration. Refused unless the caller confirms the E-Stop is engaged AND the
+# teleop node is not in the ACTIVE state: the sweep drives the sticks to full throw, which would
+# otherwise be a full-speed command.
+bool e_stop_confirmed
+---
+bool success
+string message

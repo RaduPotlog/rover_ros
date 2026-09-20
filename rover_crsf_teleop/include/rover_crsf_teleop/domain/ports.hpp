@@ -15,6 +15,11 @@
 #ifndef ROVER_CRSF_TELEOP_DOMAIN_PORTS_HPP_
 #define ROVER_CRSF_TELEOP_DOMAIN_PORTS_HPP_
 
+#include <optional>
+#include <string>
+
+#include "rover_crsf_teleop/domain/rc_calibration.hpp"
+
 namespace rover_crsf_teleop
 {
 
@@ -54,6 +59,36 @@ public:
     virtual void requestUserEStopReset() = 0;
 
     virtual void requestLatchReset() = 0;
+};
+
+// A measured calibration plus where it came from. The timestamp is a preformatted ISO-8601 string
+// so the domain still needs no clock; the infrastructure adapter formats it.
+struct StoredCalibration
+{
+    int schema_version{1};
+    std::string created;
+    ChannelCalibration calibration;
+};
+
+// Where a measured calibration is kept between runs. Implemented in infrastructure by a yaml-cpp
+// file store on a persistent volume; a null store means persistence is turned off.
+//
+// Never throws: an unreadable or malformed store reports nullopt / false after the adapter has
+// logged why. A calibration that cannot be saved is still worth applying live, so the caller
+// treats a failed save as a warning, not as a failed apply.
+class CalibrationStorePort
+{
+
+public:
+
+    virtual ~CalibrationStorePort() = default;
+
+    virtual std::optional<StoredCalibration> load() = 0;
+
+    virtual bool save(const ChannelCalibration & calibration, std::string & error) = 0;
+
+    // Where this store reads and writes, for log lines and service responses.
+    virtual std::string location() const = 0;
 };
 
 }  // namespace rover_crsf_teleop

@@ -14,15 +14,20 @@
 
 #include "rover_crsf_teleop/infrastructure/rover_crsf_teleop_node.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <lifecycle_msgs/msg/state.hpp>
 
 #include "rover_crsf_teleop/infrastructure/teleop_diagnostics_conversions.hpp"
+#include "rover_crsf_teleop/infrastructure/yaml_calibration_store.hpp"
 
 namespace rover_crsf_teleop
 {
@@ -38,6 +43,23 @@ constexpr char kRcChannelsTopic[] = "rc/channels";
 constexpr char kRcLinkTopic[] = "rc/link";
 constexpr auto kControlPeriod = 20ms;
 
+constexpr char kCalibrationStateTopic[] = "rc/calibration/state";
+constexpr char kCalibrationStartService[] = "rc/calibration/start";
+constexpr char kCalibrationSweepService[] = "rc/calibration/sweep";
+constexpr char kCalibrationFinishService[] = "rc/calibration/finish";
+constexpr char kCalibrationCancelService[] = "rc/calibration/cancel";
+constexpr char kCalibrationApplyService[] = "rc/calibration/apply";
+
+// The four per-channel calibration parameters. They were scalars shared by both stick axes until
+// per-channel calibration; see rejectScalarChannelParameters().
+constexpr std::array<const char *, 4> kChannelArrayParameters{
+    "channel_in_min", "channel_in_mid", "channel_in_max", "channel_deadband"};
+
+std::vector<int64_t> channelDefaults(const int value)
+{
+    return std::vector<int64_t>(RcFrame::kChannelCount, static_cast<int64_t>(value));
+}
+
 // Beyond this with no bytes at all, the serial bridge is presumed dead rather than merely quiet.
 // A receiver that is powered but out of range still sends LINK_STATISTICS, so silence on the
 // byte stream means the bridge or the USB link, not the RC link.
@@ -46,6 +68,21 @@ constexpr auto kSerialSilenceTimeout = 1000ms;
 bool isValidChannel(const int channel_number)
 {
     return channel_number >= 1 && static_cast<std::size_t>(channel_number) <= RcFrame::kChannelCount;
+}
+
+// `mapping` with its endpoints taken from `calibration`, keeping the output limits and inversion
+// - those come from the parameters and are not something a calibration measures.
+AxisMapping mergedMapping(
+    const AxisMapping & mapping, const ChannelCalibration & calibration, const int channel_number)
+{
+    const AxisMapping endpoints = axisMapping(calibration, channel_number);
+
+    AxisMapping merged = mapping;
+    merged.in_min = endpoints.in_min;
+    merged.in_mid = endpoints.in_mid;
+    merged.in_max = endpoints.in_max;
+    merged.deadband_counts = endpoints.deadband_counts;
+    return merged;
 }
 
 }  // namespace
@@ -73,6 +110,7 @@ RoverCrsfTeleopNode::RoverCrsfTeleopNode(
     diagnostic_updater_->add("E-Stop requests", this, &RoverCrsfTeleopNode::diagnoseSafetyRequests);
     diagnostic_updater_->add("RC channels rate", this, &RoverCrsfTeleopNode::diagnoseChannelsRate);
     diagnostic_updater_->add("RC serial link", this, &RoverCrsfTeleopNode::diagnoseSerialLink);
+    diagnostic_updater_->add("RC calibration", this, &RoverCrsfTeleopNode::diagnoseCalibration);
 }
 
 void RoverCrsfTeleopNode::declareParameters()
@@ -80,10 +118,26 @@ void RoverCrsfTeleopNode::declareParameters()
     // Every parameter is declared, per .claude/rules/ros2_general.md - a silent get_parameter()
     // on an undeclared name is a bug. Channel defaults are the raw CRSF endpoints from
     // domain/crsf/crsf_protocol.hpp, which is what the decoder actually produces.
-    declare_parameter<int>("channel_in_min", kDefaultCrsfChannelMin);
-    declare_parameter<int>("channel_in_mid", kDefaultCrsfChannelMid);
-    declare_parameter<int>("channel_in_max", kDefaultCrsfChannelMax);
-    declare_parameter<int>("channel_deadband", kDefaultChannelDeadband);
+    rejectScalarChannelParameters();
+
+    // One entry per channel, index N-1 = channel N. Declared with all 16 filled in rather than a
+    // single element, so `ros2 param get` and the calibration page always see the whole picture.
+    declare_parameter<std::vector<int64_t>>(
+        "channel_in_min", channelDefaults(kDefaultCrsfChannelMin));
+    declare_parameter<std::vector<int64_t>>(
+        "channel_in_mid", channelDefaults(kDefaultCrsfChannelMid));
+    declare_parameter<std::vector<int64_t>>(
+        "channel_in_max", channelDefaults(kDefaultCrsfChannelMax));
+    declare_parameter<std::vector<int64_t>>(
+        "channel_deadband", channelDefaults(kDefaultChannelDeadband));
+
+    // Where a measured calibration is kept between runs. Empty turns persistence off: the
+    // calibration flow still works, the result is just lost on restart.
+    declare_parameter<std::string>("calibration_file", "");
+    // A session holds teleop off, so an abandoned one - a closed browser tab - must not be able
+    // to do so forever.
+    declare_parameter<int>("calibration_timeout_s", 300);
+    declare_parameter<double>("calibration_state_rate_hz", 5.0);
 
     declare_parameter<int>("linear_x_channel", 3);
     declare_parameter<double>("linear_x_out_min", -2.0);
@@ -135,26 +189,103 @@ void RoverCrsfTeleopNode::declareParameters()
     declare_parameter<double>("rc_channels_rate_tolerance", 0.2);
 }
 
+void RoverCrsfTeleopNode::rejectScalarChannelParameters()
+{
+    // channel_in_* used to be plain integers. Declaring them as arrays turns an old override into
+    // an InvalidParameterTypeException thrown out of declare_parameter() with an rcl-flavoured
+    // message, which is a poor thing to debug on a rover in a field. Catch it first and say what
+    // to do instead.
+    for (const auto & override : get_node_options().parameter_overrides()) {
+        const bool is_channel_parameter =
+            std::find_if(
+                kChannelArrayParameters.cbegin(), kChannelArrayParameters.cend(),
+                [&override](const char * name) { return override.get_name() == name; }) !=
+            kChannelArrayParameters.cend();
+
+        if (is_channel_parameter && override.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER)
+        {
+            RCLCPP_FATAL(
+                get_logger(),
+                "Parameter '%s' is now an array of %zu values, one per channel (channel N at "
+                "index N-1), but this configuration still sets a single number. Write "
+                "'%s: [%ld]' - a one-element list is expanded to every channel, which is exactly "
+                "the old behaviour.",
+                override.get_name().c_str(), RcFrame::kChannelCount, override.get_name().c_str(),
+                static_cast<long>(override.as_int()));
+            throw std::runtime_error(
+                "rover_crsf_teleop: '" + override.get_name() +
+                "' must be a list of per-channel values, not a single number");
+        }
+    }
+}
+
+std::optional<std::array<int, RcFrame::kChannelCount>> RoverCrsfTeleopNode::readChannelArray(
+    const char * name, const int lower, const int upper)
+{
+    const std::vector<int64_t> values = get_parameter(name).as_integer_array();
+
+    if (values.size() != 1 && values.size() != RcFrame::kChannelCount) {
+        RCLCPP_ERROR(
+            get_logger(),
+            "Parameter %s must have 1 or %zu entries (got %zu). One entry is expanded to every "
+            "channel.",
+            name, RcFrame::kChannelCount, values.size());
+        return std::nullopt;
+    }
+
+    std::array<int, RcFrame::kChannelCount> out{};
+
+    for (std::size_t i = 0; i < RcFrame::kChannelCount; ++i) {
+        const int64_t value = (values.size() == 1) ? values[0] : values[i];
+
+        // A typo'd endpoint used to sail straight through and silently kill the stick throw.
+        if (value < lower || value > upper) {
+            RCLCPP_ERROR(
+                get_logger(), "Parameter %s[%zu] = %ld is outside %d-%d.", name, i,
+                static_cast<long>(value), lower, upper);
+            return std::nullopt;
+        }
+
+        out[i] = static_cast<int>(value);
+    }
+
+    return out;
+}
+
+std::array<bool, RcFrame::kChannelCount> RoverCrsfTeleopNode::axisChannels(
+    const TeleopConfig & config) const
+{
+    std::array<bool, RcFrame::kChannelCount> axes{};
+
+    for (const int channel : {config.linear_x_channel, config.angular_z_channel}) {
+        if (isValidChannel(channel)) {
+            axes[static_cast<std::size_t>(channel - 1)] = true;
+        }
+    }
+
+    return axes;
+}
+
 std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
 {
     TeleopConfig config;
 
-    const int channel_in_min = get_parameter("channel_in_min").as_int();
-    const int channel_in_mid = get_parameter("channel_in_mid").as_int();
-    const int channel_in_max = get_parameter("channel_in_max").as_int();
-    const int channel_deadband = get_parameter("channel_deadband").as_int();
+    // 0-2047 is the whole 11-bit wire domain (crsf_protocol.hpp); the deadband is a half-width,
+    // so anything approaching the full span is nonsense.
+    const auto in_min = readChannelArray("channel_in_min", 0, 2047);
+    const auto in_mid = readChannelArray("channel_in_mid", 0, 2047);
+    const auto in_max = readChannelArray("channel_in_max", 0, 2047);
+    const auto deadband = readChannelArray("channel_deadband", 0, 1023);
 
-    if (channel_deadband < 0) {
-        RCLCPP_ERROR(get_logger(), "channel_deadband must be >= 0 (got %d).", channel_deadband);
+    if (!in_min || !in_mid || !in_max || !deadband) {
         return std::nullopt;
     }
 
-    for (AxisMapping * mapping : {&config.linear_x_mapping, &config.angular_z_mapping}) {
-        mapping->in_min = channel_in_min;
-        mapping->in_mid = channel_in_mid;
-        mapping->in_max = channel_in_max;
-        mapping->deadband_counts = channel_deadband;
-    }
+    ChannelCalibration calibration;
+    calibration.in_min = *in_min;
+    calibration.in_mid = *in_mid;
+    calibration.in_max = *in_max;
+    calibration.deadband = *deadband;
 
     config.linear_x_mapping.out_min = get_parameter("linear_x_out_min").as_double();
     config.linear_x_mapping.out_max = get_parameter("linear_x_out_max").as_double();
@@ -203,6 +334,46 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
         }
     }
 
+    // Each axis takes the endpoints of the channel it actually reads, keeping the output limits
+    // and inversion already read above. This is what per-channel calibration buys: the linear
+    // stick's 1004 resting count and the angular stick's 987 no longer have to share one
+    // midpoint and one deadband wide enough for the worse of the two.
+    config.linear_x_mapping =
+        mergedMapping(config.linear_x_mapping, calibration, config.linear_x_channel);
+    config.angular_z_mapping =
+        mergedMapping(config.angular_z_mapping, calibration, config.angular_z_channel);
+
+    const std::vector<std::string> problems = calibrationProblems(calibration, axisChannels(config));
+    if (!problems.empty()) {
+        RCLCPP_ERROR(get_logger(), "Unusable stick calibration: %s", problems.front().c_str());
+        return std::nullopt;
+    }
+
+    // channel_switch_threshold stays an absolute raw value: a switch sits at the ends of its
+    // travel, so comparing raw counts is right, and re-deriving a safety-critical threshold from
+    // a measurement an operator just took is a worse failure mode than leaving it explicit. What
+    // the calibration does buy is being able to notice when the threshold has fallen outside a
+    // switch's actual range - which would leave that switch stuck reading one position forever.
+    for (const auto & [name, channel] :
+         {std::make_pair("e_stop_channel", config.e_stop_channel),
+          std::make_pair("e_stop_latch_reset_channel", config.e_stop_latch_reset_channel)})
+    {
+        const std::size_t index = static_cast<std::size_t>(channel - 1);
+        const int low = calibration.in_min[index];
+        const int high = calibration.in_max[index];
+
+        if (high > low && (config.channel_switch_threshold <= low ||
+                           config.channel_switch_threshold >= high))
+        {
+            RCLCPP_WARN(
+                get_logger(),
+                "channel_switch_threshold %d is outside channel %d's calibrated range %d-%d (%s), "
+                "so that switch will always read the same position. Re-measure the channel or "
+                "move the threshold.",
+                config.channel_switch_threshold, channel, low, high, name);
+        }
+    }
+
     const int64_t settle_frames = get_parameter("switch_settle_frames").as_int();
     const int64_t channel_timeout_ms = get_parameter("channel_timeout_ms").as_int();
     const int64_t link_stats_timeout_ms = get_parameter("link_stats_timeout_ms").as_int();
@@ -234,21 +405,76 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
 
     RCLCPP_INFO(
         get_logger(),
-        "RC channel range [%d, %d] with midpoint %d and deadband %d counts. Link lost after "
-        "%ld ms without channels%s.",
-        channel_in_min, channel_in_max, channel_in_mid, channel_deadband,
+        "Stick calibration: linear_x on channel %d [%d, %d] mid %d deadband %d; angular_z on "
+        "channel %d [%d, %d] mid %d deadband %d. Link lost after %ld ms without channels%s.",
+        config.linear_x_channel, config.linear_x_mapping.in_min, config.linear_x_mapping.in_max,
+        config.linear_x_mapping.in_mid, config.linear_x_mapping.deadband_counts,
+        config.angular_z_channel, config.angular_z_mapping.in_min, config.angular_z_mapping.in_max,
+        config.angular_z_mapping.in_mid, config.angular_z_mapping.deadband_counts,
         static_cast<long>(channel_timeout_ms),
         config.link.require_link_stats ? " or on stale / low-quality link stats" : "");
+
+    config.calibration = calibration;
 
     return config;
 }
 
 RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclcpp_lifecycle::State &)
 {
-    const auto config = readConfig();
+    auto config = readConfig();
 
     if (!config.has_value()) {
         return CallbackReturn::FAILURE;
+    }
+
+    base_config_ = *config;
+
+    // A calibration measured on this rover describes the transmitter that is actually plugged in,
+    // so it wins over the shipped defaults. Which one is in force is logged, never guessed at.
+    const std::string calibration_file = get_parameter("calibration_file").as_string();
+    calibration_store_.reset();
+    calibration_source_ = "the configured parameters";
+
+    if (!calibration_file.empty()) {
+        auto store = std::make_shared<YamlCalibrationStore>(calibration_file, get_logger());
+
+        if (const auto stored = store->load()) {
+            const std::vector<std::string> problems =
+                calibrationProblems(stored->calibration, axisChannels(*config));
+
+            if (problems.empty()) {
+                config->calibration = stored->calibration;
+                config->linear_x_mapping = mergedMapping(
+                    config->linear_x_mapping, stored->calibration, config->linear_x_channel);
+                config->angular_z_mapping = mergedMapping(
+                    config->angular_z_mapping, stored->calibration, config->angular_z_channel);
+                calibration_source_ = "'" + calibration_file + "'" +
+                                      (stored->created.empty() ? "" : " of " + stored->created);
+                RCLCPP_INFO(
+                    get_logger(), "Using the RC calibration saved in %s.",
+                    calibration_source_.c_str());
+            } else {
+                // Refusing a saved calibration outright beats applying half of it: the rover
+                // still drives on the shipped values, and the operator is told to re-measure.
+                RCLCPP_WARN(
+                    get_logger(),
+                    "Ignoring the RC calibration in '%s': %s Using the configured values instead.",
+                    calibration_file.c_str(), problems.front().c_str());
+            }
+        } else {
+            RCLCPP_INFO(
+                get_logger(),
+                "No RC calibration saved at '%s' yet; using the configured values. Measure one "
+                "with the rc/calibration services.",
+                calibration_file.c_str());
+        }
+
+        calibration_store_ = std::move(store);
+    } else {
+        RCLCPP_INFO(
+            get_logger(),
+            "RC calibration persistence is off (calibration_file is empty): a calibration can "
+            "still be measured and applied, but it will not survive a restart.");
     }
 
     velocity_publisher_ =
@@ -256,6 +482,17 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
     safety_switch_ = std::make_shared<Ros2TriggerSafetySwitch>(*this);
     use_case_ = std::make_unique<TeleopUseCase>(*config, velocity_publisher_, safety_switch_);
     channels_rate_->clear();
+
+    // Created here rather than in on_activate on purpose: a calibration runs while the node is
+    // INACTIVE - that is the interlock - so its services and state topic have to work there.
+    calibration_ = std::make_unique<CalibrationUseCase>(
+        config->calibration, axisChannels(*config), calibration_store_,
+        // Explicit: TeleopControlPort is a private base, so the conversion has to happen here,
+        // inside the class, rather than inside make_unique's forwarding.
+        static_cast<TeleopControlPort &>(*this),
+        std::chrono::seconds(get_parameter("calibration_timeout_s").as_int()));
+    createCalibrationInterfaces();
+    publishCalibrationState();
 
     publish_rc_topics_ = get_parameter("publish_rc_topics").as_bool();
 
@@ -302,9 +539,202 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
     return CallbackReturn::SUCCESS;
 }
 
+void RoverCrsfTeleopNode::createCalibrationInterfaces()
+{
+    using Trigger = std_srvs::srv::Trigger;
+    using SetCalibration = rover_msgs::srv::SetRcCalibration;
+    using StartCalibration = rover_msgs::srv::StartRcCalibration;
+
+    // Reliable + transient-local, the opposite of the rc/* echoes: a page opening mid-session
+    // must immediately learn that a calibration is running and that teleop is held off, and a
+    // dropped phase change would leave its wizard out of step with the node.
+    const auto state_qos = rclcpp::QoS(1).reliable().transient_local();
+    calibration_state_publisher_ =
+        create_publisher<rover_msgs::msg::RcCalibrationState>(kCalibrationStateTopic, state_qos);
+
+    // Every handler returns immediately. Frames are decoded in the rc/raw subscription callback
+    // on this same single-threaded executor, so a handler that waited for samples would stop the
+    // frames it was waiting for and deadlock the node.
+    calibration_start_service_ = create_service<StartCalibration>(
+        kCalibrationStartService,
+        [this](
+            const std::shared_ptr<StartCalibration::Request> request,
+            std::shared_ptr<StartCalibration::Response> response) {
+            const CalibrationOutcome outcome =
+                calibration_->start(request->e_stop_confirmed, std::chrono::steady_clock::now());
+            response->success = outcome.ok;
+            response->message = outcome.message;
+
+            if (outcome.ok) {
+                RCLCPP_WARN(
+                    get_logger(),
+                    "RC calibration started: teleop is held off until it finishes or times out.");
+                startCalibrationHeartbeat();
+            }
+
+            publishCalibrationState();
+        });
+
+    calibration_sweep_service_ = create_service<Trigger>(
+        kCalibrationSweepService,
+        [this](
+            const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {
+            const CalibrationOutcome outcome = calibration_->beginSweep();
+            response->success = outcome.ok;
+            response->message = outcome.message;
+            publishCalibrationState();
+        });
+
+    calibration_finish_service_ = create_service<Trigger>(
+        kCalibrationFinishService,
+        [this](
+            const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {
+            const CalibrationOutcome outcome = calibration_->finish();
+            response->success = outcome.ok;
+            response->message = outcome.message;
+            publishCalibrationState();
+        });
+
+    calibration_cancel_service_ = create_service<Trigger>(
+        kCalibrationCancelService,
+        [this](
+            const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {
+            const CalibrationOutcome outcome = calibration_->cancel();
+            response->success = outcome.ok;
+            response->message = outcome.message;
+            stopCalibrationHeartbeat();
+            publishCalibrationState();
+        });
+
+    calibration_apply_service_ = create_service<SetCalibration>(
+        kCalibrationApplyService,
+        [this](
+            const std::shared_ptr<SetCalibration::Request> request,
+            std::shared_ptr<SetCalibration::Response> response) {
+            // An all-zero calibration means "apply what you measured"; anything else is the
+            // operator having adjusted a value before applying it.
+            const ChannelCalibration requested = fromRcCalibrationMsg(request->calibration);
+            const bool supplied = requested.in_max != std::array<int, RcFrame::kChannelCount>{};
+
+            const CalibrationOutcome outcome =
+                calibration_->apply(supplied ? &requested : nullptr, request->persist);
+            response->success = outcome.ok;
+            response->message = outcome.message;
+
+            if (outcome.ok) {
+                RCLCPP_INFO(get_logger(), "%s", outcome.message.c_str());
+                stopCalibrationHeartbeat();
+            }
+
+            publishCalibrationState();
+        });
+}
+
+void RoverCrsfTeleopNode::startCalibrationHeartbeat()
+{
+    const double rate_hz = get_parameter("calibration_state_rate_hz").as_double();
+    const auto period = std::chrono::duration<double>(1.0 / std::max(0.1, rate_hz));
+
+    calibration_state_timer_ = create_wall_timer(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(period),
+        [this]() { publishCalibrationState(); });
+}
+
+void RoverCrsfTeleopNode::stopCalibrationHeartbeat()
+{
+    // Nothing to stream at idle: the transient-local publisher has already latched the final
+    // state for whoever connects next.
+    if (calibration_state_timer_) {
+        calibration_state_timer_->cancel();
+        calibration_state_timer_.reset();
+    }
+}
+
+void RoverCrsfTeleopNode::publishCalibrationState()
+{
+    if (!calibration_ || !calibration_state_publisher_) {
+        return;
+    }
+
+    calibration_state_publisher_->publish(toRcCalibrationStateMsg(
+        calibration_->snapshot(std::chrono::steady_clock::now()), this->now()));
+}
+
+void RoverCrsfTeleopNode::setTeleopInhibited(const bool inhibited)
+{
+    if (!use_case_) {
+        return;
+    }
+
+    use_case_->setCommandInhibited(inhibited);
+
+    if (!inhibited) {
+        // No frames reached the switch debouncers while the inhibit was set, and a calibration
+        // sweep walks the E-Stop switch through both ends. Without this, the first frame
+        // afterwards looks like a real edge and fires an E-Stop service call.
+        use_case_->rearmSwitches();
+    }
+}
+
+bool RoverCrsfTeleopNode::rebuildTeleop(const ChannelCalibration & calibration, std::string & reason)
+{
+    if (teleopCouldCommand()) {
+        // Defence in depth - on_activate already refuses while a session is in progress, so this
+        // is not reachable through the services. Kept because rebuilding resets the link monitor:
+        // while active it would publish a spurious zero and log a link loss until the next
+        // LINK_STATISTICS frame, which is a bad thing to discover through a future refactor.
+        reason = "the node is active; deactivate it first";
+        return false;
+    }
+
+    if (!velocity_publisher_ || !safety_switch_) {
+        reason = "the node is not configured";
+        return false;
+    }
+
+    TeleopConfig config = base_config_;
+    config.calibration = calibration;
+    config.linear_x_mapping =
+        mergedMapping(base_config_.linear_x_mapping, calibration, config.linear_x_channel);
+    config.angular_z_mapping =
+        mergedMapping(base_config_.angular_z_mapping, calibration, config.angular_z_channel);
+
+    // Rebuilt rather than mutated: TeleopConfig is fanned out at construction into the link
+    // monitor and both switch debouncers, so assigning the config alone would leave those on the
+    // old values. The ports are reused, so the cmd_vel publisher keeps its activation state.
+    use_case_ = std::make_unique<TeleopUseCase>(config, velocity_publisher_, safety_switch_);
+
+    // Mirror it into the parameters, so `ros2 param get` agrees with what the rover is using.
+    set_parameters(
+        {rclcpp::Parameter("channel_in_min", toParameterArray(calibration.in_min)),
+         rclcpp::Parameter("channel_in_mid", toParameterArray(calibration.in_mid)),
+         rclcpp::Parameter("channel_in_max", toParameterArray(calibration.in_max)),
+         rclcpp::Parameter("channel_deadband", toParameterArray(calibration.deadband))});
+
+    calibration_source_ = "a calibration applied at run time";
+    return true;
+}
+
+bool RoverCrsfTeleopNode::teleopCouldCommand() const
+{
+    return get_current_state().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
+}
+
 void RoverCrsfTeleopNode::onRcChannels(const RcFrame & frame)
 {
     const SteadyTime now = std::chrono::steady_clock::now();
+
+    // Before the teleop rules, and unconditionally: the calibration page's channel bars come
+    // from this even when no session is running, and the peak hold during a sweep is the reason
+    // the measurement happens here instead of in a browser.
+    const bool was_running = calibration_->sessionInProgress();
+    calibration_->onFrame(frame, now);
+
+    if (was_running && !calibration_->sessionInProgress()) {
+        RCLCPP_WARN(get_logger(), "RC calibration timed out; teleop is no longer held off.");
+        stopCalibrationHeartbeat();
+        publishCalibrationState();
+    }
 
     use_case_->onChannels(frame, now);
 
@@ -330,6 +760,16 @@ void RoverCrsfTeleopNode::onLinkStatistics(const RcLinkStats & stats)
 
 RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_activate(const rclcpp_lifecycle::State &)
 {
+    // Second, independent interlock: the node refuses to become able to command at all, rather
+    // than becoming active and relying on the inhibit to hold. The sweep is at full throw.
+    if (calibration_ && calibration_->sessionInProgress()) {
+        RCLCPP_ERROR(
+            get_logger(),
+            "Refusing to activate: an RC calibration is in progress. Finish or cancel it first "
+            "(%s).", kCalibrationCancelService);
+        return CallbackReturn::FAILURE;
+    }
+
     velocity_publisher_->on_activate();
     last_tick_status_.reset();
 
@@ -371,6 +811,24 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_shutdown(const rclcp
 
 void RoverCrsfTeleopNode::releaseResources()
 {
+    // A session in progress holds the inhibit, and the use case it would release it on is about
+    // to be destroyed. Ending it here keeps the next configure from starting out inhibited.
+    if (calibration_ && calibration_->sessionInProgress()) {
+        RCLCPP_WARN(get_logger(), "Cancelling the RC calibration in progress: the node is being "
+                                  "cleaned up.");
+        calibration_->cancel();
+    }
+
+    stopCalibrationHeartbeat();
+    calibration_.reset();
+    calibration_store_.reset();
+    calibration_state_publisher_.reset();
+    calibration_start_service_.reset();
+    calibration_sweep_service_.reset();
+    calibration_finish_service_.reset();
+    calibration_cancel_service_.reset();
+    calibration_apply_service_.reset();
+
     control_timer_.reset();
     serial_subscriber_.reset();
     rc_channels_publisher_.reset();
@@ -396,6 +854,10 @@ void RoverCrsfTeleopNode::controlTimerCallback()
             break;
         case TickStatus::kLinkLost:
             RCLCPP_WARN(get_logger(), "RC link lost: sent a zero command, teleop is silent.");
+            break;
+        case TickStatus::kInhibited:
+            RCLCPP_WARN(
+                get_logger(), "RC calibration in progress: sent a zero command, teleop is silent.");
             break;
         case TickStatus::kActive:
             RCLCPP_INFO(get_logger(), "RC link healthy: teleop commanding.");
@@ -443,6 +905,41 @@ void RoverCrsfTeleopNode::diagnoseChannelsRate(diagnostic_updater::DiagnosticSta
     if (status.level > diagnostic_msgs::msg::DiagnosticStatus::WARN) {
         status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, status.message);
     }
+}
+
+void RoverCrsfTeleopNode::diagnoseCalibration(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    // An abandoned calibration holds teleop off, and from the outside that looks exactly like a
+    // rover that has stopped responding to the transmitter. It has to be visible here.
+    if (!calibration_) {
+        status.summary(
+            diagnostic_msgs::msg::DiagnosticStatus::OK, "Not configured; nothing calibrating.");
+        return;
+    }
+
+    const CalibrationSnapshot snapshot = calibration_->snapshot(std::chrono::steady_clock::now());
+
+    status.add("Calibration in effect", calibration_source_);
+    status.add("Persisted to", calibration_store_ ? calibration_store_->location() : "(disabled)");
+    status.add(
+        "linear_x endpoints",
+        std::to_string(base_config_.linear_x_mapping.in_min) + " / " +
+            std::to_string(snapshot.active.in_mid[
+                static_cast<std::size_t>(base_config_.linear_x_channel - 1)]) +
+            " / " + std::to_string(base_config_.linear_x_mapping.in_max));
+
+    if (!snapshot.teleop_inhibited) {
+        status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Idle.");
+        return;
+    }
+
+    status.add("Samples", static_cast<int>(snapshot.samples));
+    status.add("Seconds before it times out", static_cast<int>(snapshot.remaining_s));
+
+    // WARN, never ERROR - like every other task here, because RC teleop is optional.
+    status.summary(
+        diagnostic_msgs::msg::DiagnosticStatus::WARN,
+        "Calibration in progress: teleop is held off. " + snapshot.message);
 }
 
 void RoverCrsfTeleopNode::diagnoseSerialLink(diagnostic_updater::DiagnosticStatusWrapper & status)

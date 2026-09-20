@@ -28,6 +28,8 @@ rosidl_generate_interfaces(
     "msg/LedLayerState.msg"
     "msg/LedSegmentState.msg"
     "msg/LedState.msg"
+    "msg/RcCalibration.msg"
+    "msg/RcCalibrationState.msg"
     "msg/RcChannels.msg"
     "msg/RcLinkStatus.msg"
 
@@ -35,6 +37,8 @@ rosidl_generate_interfaces(
     "srv/SetLedAnimation.srv"
     "srv/SetLedImageAnimation.srv"
     "srv/StopLedAnimation.srv"
+    "srv/SetRcCalibration.srv"
+    "srv/StartRcCalibration.srv"
 
     DEPENDENCIES
         std_msgs

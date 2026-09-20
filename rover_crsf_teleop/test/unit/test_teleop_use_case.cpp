@@ -325,4 +325,83 @@ TEST_F(TeleopUseCaseTest, DiagnosticsAgreeWithTickOnLinkLoss)
     EXPECT_TRUE(diagnostics.last_command.isZero());
 }
 
+TEST_F(TeleopUseCaseTest, AnInhibitedTeleopPublishesOneZeroAndThenNothing)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+    ASSERT_EQ(velocity_->published.size(), 1u);
+
+    use_case_->setCommandInhibited(true);
+
+    EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+    EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+
+    ASSERT_EQ(velocity_->published.size(), 2u);
+    EXPECT_TRUE(velocity_->published.back().isZero());
+}
+
+TEST_F(TeleopUseCaseTest, AnInhibitedTeleopIgnoresTheSticksEvenBeforeTheFirstFrame)
+{
+    // The inhibit has to dominate every branch of tick(), including the ones that come before the
+    // stick mapping - there must be no route that commands while a calibration is running.
+    use_case_->setCommandInhibited(true);
+    EXPECT_EQ(use_case_->tick(now_), TickStatus::kInhibited);
+
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+
+    for (const auto & command : velocity_->published) {
+        EXPECT_TRUE(command.isZero());
+    }
+}
+
+TEST_F(TeleopUseCaseTest, SweepingTheEStopSwitchWhileInhibitedCallsNoSafetyServices)
+{
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+
+    use_case_->setCommandInhibited(true);
+
+    // Exactly what an RC calibration sweep does to the switch channels.
+    for (const int value : {kSwitchLow, kSwitchHigh, kSwitchLow, kSwitchHigh}) {
+        setChannel(kEStopChannel, value);
+        setChannel(kLatchResetChannel, value);
+        EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+    }
+
+    EXPECT_EQ(safety_->e_stop_set_calls, 0);
+    EXPECT_EQ(safety_->e_stop_reset_calls, 0);
+    EXPECT_EQ(safety_->latch_reset_calls, 0);
+}
+
+TEST_F(TeleopUseCaseTest, ReleasingTheInhibitAfterRearmingDoesNotFireAStaleEdge)
+{
+    // The switch rests high; the sweep leaves it low. Re-arming makes the debouncer treat that
+    // as the new resting position instead of as an edge.
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+
+    use_case_->setCommandInhibited(true);
+    setChannel(kEStopChannel, kSwitchLow);
+    ASSERT_EQ(feedAndTick(), TickStatus::kInhibited);
+
+    use_case_->rearmSwitches();
+    use_case_->setCommandInhibited(false);
+
+    EXPECT_EQ(feedAndTick(), TickStatus::kActive);
+    EXPECT_EQ(safety_->e_stop_set_calls, 0);
+
+    // A genuine flip after the re-arm still gets through.
+    setChannel(kEStopChannel, kSwitchHigh);
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+    EXPECT_EQ(safety_->e_stop_reset_calls, 1);
+}
+
+TEST_F(TeleopUseCaseTest, DiagnosticsReportTheInhibit)
+{
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+    EXPECT_FALSE(use_case_->diagnostics(now_).inhibited);
+
+    use_case_->setCommandInhibited(true);
+    EXPECT_TRUE(use_case_->diagnostics(now_).inhibited);
+}
+
 }  // namespace rover_crsf_teleop
