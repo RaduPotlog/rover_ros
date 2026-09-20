@@ -14,6 +14,15 @@ git clone -b master https://github.com/RaduPotlog/rover_ros.git src/rover_ros
 
 ### Setup environment variables
 
+```bash
+# Every $ROS_DISTRO below is expanded before ROS is sourced, so set it explicitly.
+export ROS_DISTRO=lyrical
+
+# Default namespace of every rover_ros launch file. The rover runs under `rover`, so the
+# orchestrator computer must export the same value or the topics never meet.
+export ROVER_NAMESPACE=rover
+```
+
 #### Real rover:
 
 ```bash
@@ -76,3 +85,25 @@ ros2 launch rover_bringup rover_bringup.launch.py
 ```bash
 ros2 launch rover_gazebo simulation.launch.py
 ```
+
+### Testing
+
+```bash
+# The build above passes -DBUILD_TESTING=OFF, so rebuild the package under test with it on.
+colcon build --symlink-install --packages-select <pkg>
+colcon test --packages-select <pkg> --parallel-workers 1
+colcon test-result --all
+```
+
+Run node tests one at a time: parallel workers make them flaky under the zenoh middleware.
+
+## Related repositories
+
+A complete rover is three repositories, one per container:
+
+- [`rover_ros`](https://github.com/RaduPotlog/rover_ros) - this one, the platform
+  (`rover-a1-platform`).
+- [`rover_sensors`](https://github.com/RaduPotlog/rover_sensors) - the sensor payload,
+  GNSS and lidar drivers (`rover-a1-sensors`).
+- [`rover_orchestrator`](https://github.com/RaduPotlog/rover_orchestrator) - the autonomy
+  stack, Nav 2 and mission supervision (`rover-a1-orchestrator`).
