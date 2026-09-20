@@ -18,14 +18,17 @@ cmd_vel -> rover_drive_controller (diff_drive) -> pid_controller_<wheel> x4 -> h
 `rover_drive_controller`'s wheel names are `<pid controller>/<joint>`, so it writes
 each PID's reference interface and reads back the PID's exported state (the measured
 wheel velocity) for odometry. Each PID uses `feedforward_gain: 1.0` - the hardware
-velocity command is an open-loop, rad/s-scaled duty cycle - and PI trims the error
-that load, battery voltage and slip leave. With `p = i = 0` it is exactly the old
+velocity command is an open-loop, rad/s-scaled duty cycle - and PID trims the error
+that load, battery voltage and slip leave. With `p = i = d = 0` it is exactly the old
 open-loop drive, which is the quickest A/B comparison (gains are live parameters):
 
 ```bash
 ros2 param set <ns>/pid_controller_fl_wheel_base_to_fl_wheel_joint \
-  gains.fl_wheel_base_to_fl_wheel_joint.p 0.0     # likewise .i, and for each wheel
+  gains.fl_wheel_base_to_fl_wheel_joint.p 0.0     # likewise .i and .d, and for each wheel
 ```
+
+`i_clamp_max/min` is per wheel (fl/fr 0.25, rl/rr 0.33) and is the gain that actually
+bounds overshoot - see the comment above the gains in `config/wheel_01_controller.yaml`.
 
 Each PID publishes `<pid>/controller_state` (reference, feedback, error, output).
 `save_i_term: false` clears each PID's integral whenever it is (re)activated; pid_controller
