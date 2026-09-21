@@ -18,8 +18,14 @@ namespace rover_crsf_teleop
 {
 
 SwitchDebouncer::SwitchDebouncer(const int threshold, const unsigned int settle_frames)
-: threshold_(threshold), settle_frames_remaining_(settle_frames)
+: threshold_(threshold), settle_frames_(settle_frames), settle_frames_remaining_(settle_frames)
 {
+}
+
+void SwitchDebouncer::rearm()
+{
+    settle_frames_remaining_ = settle_frames_;
+    position_.reset();
 }
 
 SwitchPosition SwitchDebouncer::classify(const int raw_value) const

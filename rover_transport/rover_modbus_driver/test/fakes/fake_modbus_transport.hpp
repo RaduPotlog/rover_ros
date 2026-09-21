@@ -48,6 +48,14 @@ struct Journal
     bool reply_empty{false};
 
     bool closed{false};
+
+    // How many transports the factory has handed out. The client re-dials by calling its factory
+    // again, so this counts reconnections (the first one is the constructor's).
+    int transports_created{0};
+
+    // When set, the factory throws instead of producing a transport - a host that is refusing
+    // connections.
+    bool factory_fails{false};
 };
 
 class FakeModbusTransport : public ModbusTransportPort

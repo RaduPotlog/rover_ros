@@ -55,6 +55,16 @@ bool EmergencyStop::readEStopLatchState()
     return latch_triggered_;
 }
 
+bool EmergencyStop::readContactorEngagedState()
+{
+    if (e_stop_manipulation_mtx_.try_lock()) {
+        std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_, std::adopt_lock);
+        contactor_engaged_ = io_->isContactorEngaged();
+    }
+
+    return contactor_engaged_;
+}
+
 void EmergencyStop::setEStop()
 {
     std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_);

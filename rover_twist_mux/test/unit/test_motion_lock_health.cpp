@@ -39,9 +39,45 @@ SafetyIoFlags allClear()
     return flags;
 }
 
+
+// The link going down is invisible to a staleness check: the hardware interface keeps publishing
+// at 20 Hz, it just has nothing fresh to put in the messages. Without this the lock would happily
+// unlock on last-known-good values from a PLC that stopped answering.
+TEST(MotionLockHealth, UnhealthySafetyLinkIsErrorAndLockedEvenWhenAllClear)
+{
+    SafetyIoFlags flags;
+    flags.hw_e_stop_user_button = false;
+    flags.sw_e_stop_user_button = false;
+    flags.sw_e_stop_motor_driver_fault = false;
+    flags.sw_e_stop_latch_status = false;
+    flags.motor_contactor_engaged = true;
+
+    const auto health = evaluateMotionLockHealth(flags, 0.0, 1.0, MotionLockPolicy{}, false);
+
+    EXPECT_TRUE(health.locked);
+    EXPECT_EQ(health.level, HealthLevel::Error);
+    ASSERT_FALSE(health.reasons.empty());
+    EXPECT_EQ(health.reasons.back(), MotionInhibitReason::SafetyLinkUnhealthy);
+}
+
+TEST(MotionLockHealth, HealthySafetyLinkWithNoStopsPermitsMotion)
+{
+    SafetyIoFlags flags;
+    flags.hw_e_stop_user_button = false;
+    flags.sw_e_stop_user_button = false;
+    flags.sw_e_stop_motor_driver_fault = false;
+    flags.sw_e_stop_latch_status = false;
+    flags.motor_contactor_engaged = true;
+
+    const auto health = evaluateMotionLockHealth(flags, 0.0, 1.0, MotionLockPolicy{}, true);
+
+    EXPECT_FALSE(health.locked);
+    EXPECT_EQ(health.level, HealthLevel::Ok);
+}
+
 }  // namespace
 
-TEST(MotionLockHealth, NoGpioStateIsErrorAndLocked)
+TEST(MotionLockHealth, NoSafetyStateIsErrorAndLocked)
 {
     const auto health = evaluateMotionLockHealth(std::nullopt, 0.0, kTimeout, MotionLockPolicy{});
 
@@ -50,7 +86,7 @@ TEST(MotionLockHealth, NoGpioStateIsErrorAndLocked)
     EXPECT_TRUE(health.reasons.empty());
 }
 
-TEST(MotionLockHealth, StaleGpioStateIsErrorAndLockedEvenWhenAllClear)
+TEST(MotionLockHealth, StaleSafetyStateIsErrorAndLockedEvenWhenAllClear)
 {
     const auto health = evaluateMotionLockHealth(allClear(), 1.5, kTimeout, MotionLockPolicy{});
 

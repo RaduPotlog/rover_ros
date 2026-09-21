@@ -45,6 +45,47 @@ using RoverModbusInterface = rover::transport::modbus::DiscreteIoPort;
 // hardware parameters by RoverA1System - that stays a ros2_control plugin concern.
 using ModbusSettings = rover::transport::modbus::ClientSettings;
 
+// Period of the CPU watchdog heartbeat toggle written to GPIO_CPU_WDG_HEARTBEAT.
+//
+// This is the one timing value in the system that is dimensioned against a *hardware* deadline:
+// the safety relay latches the E-Stop if the heartbeat level stops changing for longer than its
+// watchdog window (~1 s on the A1). It used to be a bare `sleep_for(500ms)` literal sharing a
+// loop with the IO poll, which meant the real interval was "500 ms + every Modbus round-trip the
+// poll made" - one response timeout was enough to overshoot the window and latch a nuisance stop
+// that then needed a manual reset to clear.
+//
+// 200 ms gives ~5x margin on a 1 s window, so the heartbeat can miss several consecutive ticks
+// to IO contention and still keep the relay fed.
+constexpr unsigned kDefaultWdgKickPeriodMs = 200;
+
+// Period of the discrete-IO poll that refreshes the cache read() serves from. Telemetry only:
+// it feeds GpioState and the E-Stop mirror, and it must never be allowed to delay the heartbeat
+// above. 100 ms (10 Hz) keeps the link duty cycle low while staying well inside the 1.0 s
+// staleness timeout rover_twist_mux applies to gpio_state.
+constexpr unsigned kDefaultIoPollPeriodMs = 100;
+
+// How long the latch-reset coil is held true before being driven back to false.
+//
+// The reset is a pulse, not a level. It used to be written true then false back-to-back with no
+// dwell at all, which made the pulse exactly as wide as one Modbus round-trip - a few
+// milliseconds, and not a width anyone had checked against the relay's input filter. A pulse the
+// relay cannot see fails in the most confusing way available: the service returns success and
+// the latch stays held.
+//
+// 100 ms is comfortably wider than any ordinary discrete-input filter. It costs nothing: the
+// reset runs on a non-RT service-callback thread, and an operator clearing a latched E-Stop is
+// not counting milliseconds. Narrow it only against a measurement.
+constexpr unsigned kDefaultLatchResetPulseMs = 100;
+
+// Timing for the safety controller's two background threads. Parsed out of the URDF
+// <ros2_control> hardware parameters by RoverA1System, like ModbusSettings.
+struct SafetyControllerSettings
+{
+    unsigned wdg_kick_period_ms = kDefaultWdgKickPeriodMs;
+    unsigned io_poll_period_ms = kDefaultIoPollPeriodMs;
+    unsigned latch_reset_pulse_ms = kDefaultLatchResetPulseMs;
+};
+
 // RoverControllerGpio itself now lives in domain/rover_gpio_types.hpp (RoverGpioPort needs it and
 // domain code may not include infrastructure headers); re-included here so existing call sites
 // that reach it via this header keep compiling unchanged.

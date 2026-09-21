@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 #include "rover_hardware_interface/domain/rover_gpio_types.hpp"
+#include "rover_hardware_interface/domain/safety_link_health.hpp"
 
 namespace rover_hardware_interface
 {
@@ -46,6 +47,9 @@ public:
     // Non-blocking; returns a reference to a cache owned by the implementation. Safe to call
     // from the RT thread (see RoverSafetyController::queryControlInterfaceIOStates()).
     virtual const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() = 0;
+
+    // Health of the link and of the threads servicing it, for the diagnostics task. Non-blocking.
+    virtual SafetyLinkHealth linkHealth() const = 0;
 };
 
 }  // namespace rover_hardware_interface

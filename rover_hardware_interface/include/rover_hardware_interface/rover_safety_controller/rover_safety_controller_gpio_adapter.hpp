@@ -42,6 +42,8 @@ public:
 
     const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() override;
 
+    SafetyLinkHealth linkHealth() const override;
+
 private:
 
     std::shared_ptr<RoverSafetyController> rover_controller_;

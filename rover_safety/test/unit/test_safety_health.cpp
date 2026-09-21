@@ -29,7 +29,7 @@ TEST(SafetyHealth, AllFreshIsOk)
 {
     const auto health = evaluateSafetyInputs({
         {"battery", 0.5, 5.0},
-        {"gpio_state", 100.0, std::nullopt},
+        {"safety_status", 100.0, std::nullopt},
     });
 
     EXPECT_EQ(health.level, HealthLevel::Ok);
@@ -41,7 +41,7 @@ TEST(SafetyHealth, MissingInputIsWarn)
 {
     const auto health = evaluateSafetyInputs({
         {"battery", std::nullopt, 5.0},
-        {"gpio_state", 1.0, std::nullopt},
+        {"safety_status", 1.0, std::nullopt},
     });
 
     EXPECT_EQ(health.level, HealthLevel::Warn);
@@ -62,7 +62,7 @@ TEST(SafetyHealth, StaleInputIsErrorAndOutranksMissing)
 
 TEST(SafetyHealth, OnChangeInputNeverGoesStale)
 {
-    const auto health = evaluateSafetyInputs({{"gpio_state", 1e6, std::nullopt}});
+    const auto health = evaluateSafetyInputs({{"safety_status", 1e6, std::nullopt}});
 
     EXPECT_EQ(health.level, HealthLevel::Ok);
 }

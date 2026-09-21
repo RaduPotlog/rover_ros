@@ -95,6 +95,11 @@ protected:
     // (not by RoverSystem) because it is specific to this variant's Modbus-backed safety
     // controller - see defineRoverController()/readRoverControllerSettings().
     ModbusSettings modbus_settings_;
+
+    // Background-thread timing for the safety controller, read from URDF alongside the Modbus
+    // endpoint. wdg_kick_period_ms in particular is dimensioned against the safety relay's
+    // watchdog window - see SafetyControllerSettings.
+    SafetyControllerSettings safety_controller_settings_;
 };
 
 }  // namespace rover_hardware_interface

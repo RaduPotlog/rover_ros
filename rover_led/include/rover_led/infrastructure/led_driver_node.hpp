@@ -17,7 +17,7 @@
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -37,6 +37,7 @@
 #include "rover_led/application/set_brightness_use_case.hpp"
 #include "rover_led/domain/sk9822_frame_encoder.hpp"
 #include "rover_led/led_driver_parameters.hpp"
+#include "rover_utils/shutdown_gate.hpp"
 
 namespace rover_led
 {
@@ -92,6 +93,9 @@ private:
         rclcpp_lifecycle::LifecyclePublisher<UdpPacketMsg>::SharedPtr publisher;
     };
 
+    // Pre-shutdown: runs the lifecycle shutdown on the executor and waits for it.
+    void finalizeOnExecutor();
+
     bool isActive() const;
 
     void releaseResources();
@@ -124,15 +128,13 @@ private:
 
     static constexpr unsigned kMaxControlRequestAttempts = 3;
     static constexpr double kServiceResponseTimeout = 3.0;
+    static constexpr std::chrono::seconds kFinalizeTimeout{1};
 
     std::shared_ptr<led_driver::ParamListener> param_listener_;
 
     led_driver::Params params_;
 
     std::vector<Channel> channels_;
-
-    // Guards channels_ against the pre-shutdown callback's thread.
-    std::mutex channels_mutex_;
 
     std::unique_ptr<SetBrightnessUseCase> set_brightness_use_case_;
 
@@ -160,7 +162,8 @@ private:
 
     rclcpp_lifecycle::LifecyclePublisher<Float32Msg>::SharedPtr brightness_publisher_;
 
-    rclcpp::PreShutdownCallbackHandle pre_shutdown_callback_handle_;
+    // After everything on_shutdown() touches, so it is unregistered first.
+    rover_utils::ros::ShutdownGate shutdown_gate_;
 
     diagnostic_updater::Updater diagnostic_updater_;
 };

@@ -109,7 +109,7 @@ UdpReceiverNode::CallbackReturn UdpReceiverNode::on_configure(
     }
 
     packet_publisher_ = std::make_unique<Ros2UdpPacketPublisher>(
-        publisher_, *endpoint, get_clock());
+        publisher_, *endpoint, get_clock(), get_node_base_interface()->get_context());
     inbound_ = std::make_unique<InboundByteBridge>(*socket_, *packet_publisher_);
     inbound_->start();
 
@@ -156,13 +156,14 @@ UdpReceiverNode::CallbackReturn UdpReceiverNode::on_shutdown(
 
 void UdpReceiverNode::releaseResources()
 {
-    inbound_.reset();
-    packet_publisher_.reset();
-
+    // Close first so the ASIO thread stops feeding the bridge before it is destroyed.
     if (socket_) {
         socket_->close();
-        socket_.reset();
     }
+
+    inbound_.reset();
+    packet_publisher_.reset();
+    socket_.reset();
 
     publisher_.reset();
 }

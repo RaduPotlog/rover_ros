@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from rover_utils.logging import quiet_rmw_zenoh
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
@@ -159,6 +160,8 @@ def generate_launch_description():
             # Harmless noise; the filter's own messages use the node logger.
             "--log-level",
             "rclcpp:=ERROR",
+            "--log-level",
+            quiet_rmw_zenoh(log_level),
         ],
         condition=IfCondition(use_ekf),
     )
@@ -192,6 +195,8 @@ def generate_launch_description():
             # Same unset-sensor parameter noise as rover_ekf_node.
             "--log-level",
             "rclcpp:=ERROR",
+            "--log-level",
+            quiet_rmw_zenoh(log_level),
         ],
         condition=IfCondition(gps_enabled),
     )

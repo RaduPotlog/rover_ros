@@ -24,10 +24,12 @@ namespace rover_hardware_interface
 RoverControlLoopUseCase::RoverControlLoopUseCase(
     std::shared_ptr<RoverDriverInterface> rover_driver,
     std::shared_ptr<EmergencyStopInterface> e_stop,
-    RoverErrorFilter & error_filter)
+    RoverErrorFilter & error_filter,
+    const std::chrono::milliseconds contactor_drop_out_tolerance)
 : rover_driver_(std::move(rover_driver))
 , e_stop_(std::move(e_stop))
 , error_filter_(error_filter)
+, contactor_monitor_(contactor_drop_out_tolerance)
 {
 
 }
@@ -67,6 +69,40 @@ bool RoverControlLoopUseCase::isMotorFailsafeLatched() const
     return error_filter_.isError(ErrorsFilterIds::MOTOR_FAILSAFE_TRIPPED);
 }
 
+ContactorFault RoverControlLoopUseCase::updateContactorPlausibility(
+    const std::chrono::steady_clock::time_point now)
+{
+    if (!e_stop_) {
+        // No E-Stop port configured: there is nothing to cross-check against, and inventing a
+        // verdict here would be worse than declining to give one. The fail-safe behaviour for
+        // that case already lives in updateEStopActiveState(), which returns "stopped".
+        return ContactorFault::kNone;
+    }
+
+    return contactor_monitor_.update(
+        e_stop_->readEStopLatchState(), e_stop_->readContactorEngagedState(), now);
+}
+
+bool RoverControlLoopUseCase::isContactorFaultLatched() const
+{
+    return contactor_monitor_.isWeldedFaultLatched();
+}
+
+bool RoverControlLoopUseCase::isHardwareFaultLatched() const
+{
+    return isMotorFailsafeLatched() || isContactorFaultLatched();
+}
+
+void RoverControlLoopUseCase::resetContactorFault()
+{
+    contactor_monitor_.reset();
+}
+
+const ContactorMonitor & RoverControlLoopUseCase::contactorMonitor() const
+{
+    return contactor_monitor_;
+}
+
 bool RoverControlLoopUseCase::updateEStopActiveState()
 {
     if (!e_stop_) {
@@ -86,9 +122,9 @@ bool RoverControlLoopUseCase::shouldCommandMotion(const bool lifecycle_active, c
 
 WriteCommandMode RoverControlLoopUseCase::decideWriteCommand(
     const bool lifecycle_active, const bool lifecycle_inactive, const bool e_stop_active,
-    const bool motor_failsafe_latched)
+    const bool hardware_fault_latched)
 {
-    if (shouldCommandMotion(lifecycle_active, e_stop_active) && !motor_failsafe_latched) {
+    if (shouldCommandMotion(lifecycle_active, e_stop_active) && !hardware_fault_latched) {
         return WriteCommandMode::kCommandMotion;
     }
 

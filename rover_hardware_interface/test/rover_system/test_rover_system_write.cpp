@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -61,6 +62,11 @@ public:
         return io_states_;
     }
 
+    SafetyLinkHealth linkHealth() const override { return health; }
+
+    // Public so a test can present an unhealthy link without another accessor.
+    SafetyLinkHealth health;
+
 private:
 
     std::unordered_map<RoverControllerGpio, bool> io_states_;
@@ -93,8 +99,19 @@ public:
         std::fill(hw_commands_velocities_.begin(), hw_commands_velocities_.end(), velocity);
     }
 
-    // The flag the E-Stop reset service reads (see areVelocityCommandsNearZero()).
+    // What the encoders would report back as the measured wheel velocity.
+    void setMeasuredVelocity(const double velocity)
+    {
+        std::fill(hw_states_velocities_.begin(), hw_states_velocities_.end(), velocity);
+    }
+
+    // The two flags the E-Stop reset service reads (see areVelocityCommandsNearZero()).
     bool commandsAreZeroFlag() const { return commands_are_zero_.load(); }
+    bool statesAreZeroFlag() const { return states_are_zero_.load(); }
+
+    bool eStopResetWouldBeAllowed() { return areVelocityCommandsNearZero(); }
+
+    void refreshZeroFlags() { refreshVelocityCommandsZeroFlag(); }
 
     void latchMotorFailsafe()
     {
@@ -295,6 +312,57 @@ TEST_F(RoverSystemWriteTest, UnconfiguredSendsNothingButStillDropsPendingCommand
 
     ASSERT_EQ(driver_->sent_speed_cmds.size(), 1u);
     EXPECT_EQ(driver_->sent_speed_cmds.back(), kZeros);
+}
+
+
+// --- E-Stop reset invariant: measured velocity ----------------------------------------------
+//
+// The command-side check alone is a weak guarantee: the wheel PIDs park their command at a frozen
+// I-term (up to i_clamp_max, 0.33 rad/s) whenever motion is inhibited, which is why the URDF
+// tolerance had drifted up to 1.2 rad/s (~0.2 m/s) - fast enough to walk beside. The measured
+// velocity has no such artifact, so it is what actually prevents clearing the E-Stop mid-roll.
+
+TEST_F(RoverSystemWriteTest, RefusesEStopResetWhileTheWheelsAreStillTurning)
+{
+    // Commands have settled to a plausible frozen I-term, well inside the command tolerance, but
+    // the rover is still rolling.
+    system_.setControllerCommand(0.005);
+    system_.setMeasuredVelocity(3.0);
+    system_.refreshZeroFlags();
+
+    EXPECT_TRUE(system_.commandsAreZeroFlag());
+    EXPECT_FALSE(system_.statesAreZeroFlag());
+    EXPECT_FALSE(system_.eStopResetWouldBeAllowed());
+}
+
+TEST_F(RoverSystemWriteTest, RefusesEStopResetWhileCommandsAreNonZeroEvenIfStopped)
+{
+    system_.setControllerCommand(5.0);
+    system_.setMeasuredVelocity(0.0);
+    system_.refreshZeroFlags();
+
+    EXPECT_FALSE(system_.commandsAreZeroFlag());
+    EXPECT_TRUE(system_.statesAreZeroFlag());
+    EXPECT_FALSE(system_.eStopResetWouldBeAllowed());
+}
+
+TEST_F(RoverSystemWriteTest, AllowsEStopResetOnlyWhenBothCommandsAndWheelsAreAtRest)
+{
+    system_.setControllerCommand(0.0);
+    system_.setMeasuredVelocity(0.0);
+    system_.refreshZeroFlags();
+
+    EXPECT_TRUE(system_.eStopResetWouldBeAllowed());
+}
+
+TEST_F(RoverSystemWriteTest, NonFiniteMeasuredVelocityFailsSafe)
+{
+    system_.setControllerCommand(0.0);
+    system_.setMeasuredVelocity(std::numeric_limits<double>::quiet_NaN());
+    system_.refreshZeroFlags();
+
+    EXPECT_FALSE(system_.statesAreZeroFlag());
+    EXPECT_FALSE(system_.eStopResetWouldBeAllowed());
 }
 
 }  // namespace rover_hardware_interface

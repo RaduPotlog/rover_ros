@@ -14,6 +14,9 @@
 
 #include "rover_twist_mux/infrastructure/motion_lock_node.hpp"
 
+#include <algorithm>
+#include <optional>
+
 #include <chrono>
 #include <memory>
 #include <string>
@@ -28,16 +31,25 @@ namespace rover_twist_mux
 namespace
 {
 
-/** @brief Maps the published GpioState onto the domain's flags, preserving pin polarity. */
-domain::SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::GpioState & msg)
+/**
+ * @brief Maps the two safety messages onto the domain's flags, preserving pin polarity.
+ * @details Which field comes from which topic is the point of the split: the plant readings come
+ *          from SafetyStatus, the two `sw_*` stop requests are read-backs of coils this system
+ *          drives and come from SafetyCommandEcho. Reading a request as a reason to inhibit is
+ *          sound and is what this package does; reading one as evidence of plant state is not.
+ */
+domain::SafetyIoFlags toSafetyIoFlags(
+    const rover_msgs::msg::SafetyStatus & status,
+    const rover_msgs::msg::SafetyCommandEcho & echo)
 {
     domain::SafetyIoFlags flags;
 
-    flags.hw_e_stop_user_button = msg.gpio_pin_hw_e_stop_user_button;
-    flags.sw_e_stop_user_button = msg.gpio_pin_sw_e_stop_user_button;
-    flags.sw_e_stop_motor_driver_fault = msg.gpio_pin_sw_e_stop_motor_driver_fault;
-    flags.sw_e_stop_latch_status = msg.gpio_pin_sw_e_stop_latch_status;
-    flags.motor_contactor_engaged = msg.gpio_pin_motor_contactor_engaged;
+    flags.hw_e_stop_user_button = status.hw_e_stop_user_button;
+    flags.sw_e_stop_latch_status = status.latch_active;
+    flags.motor_contactor_engaged = status.motor_contactor_engaged;
+
+    flags.sw_e_stop_user_button = echo.sw_e_stop_user_button;
+    flags.sw_e_stop_motor_driver_fault = echo.sw_e_stop_motor_driver_fault;
 
     return flags;
 }
@@ -72,7 +84,13 @@ unsigned char toDiagnosticLevel(domain::HealthLevel level)
 MotionLockNode::MotionLockNode(
     const std::string & node_name, const rclcpp::NodeOptions & options)
 : rclcpp::Node(node_name, options)
-, last_gpio_stamp_(0, 0, this->get_clock()->get_clock_type())
+, last_status_stamp_(0, 0, this->get_clock()->get_clock_type())
+, last_echo_stamp_(0, 0, this->get_clock()->get_clock_type())
+, shutdown_gate_(this->get_node_base_interface()->get_context(), [this]() {
+    if (timer_) {
+        timer_->cancel();
+    }
+})
 , diagnostic_updater_(this)
 {
     param_listener_ = std::make_shared<motion_lock::ParamListener>(
@@ -81,12 +99,19 @@ MotionLockNode::MotionLockNode(
     const auto params = param_listener_->get_params();
 
     // Matches the publisher in rover_hardware_interface SystemROSInterface: KeepLast(1),
-    // transient_local, reliable. Transient-local matters here - the hardware interface publishes
-    // gpio_state on change, so a late-joining subscriber would otherwise wait for the next edge.
-    gpio_state_sub_ = this->create_subscription<rover_msgs::msg::GpioState>(
-        "hardware_interface/gpio_state",
-        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
-        std::bind(&MotionLockNode::gpioStateCallback, this, std::placeholders::_1));
+    // reliable, volatile. Volatile, not transient_local: these are periodic 20 Hz status streams,
+    // and a latched last sample told late joiners what was true when the publisher last ran
+    // rather than that it is still running - which is what led two other consumers to skip their
+    // staleness checks entirely. This node times both topics out instead.
+    const auto safety_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile();
+
+    safety_status_sub_ = this->create_subscription<rover_msgs::msg::SafetyStatus>(
+        "hardware_interface/safety_status", safety_qos,
+        std::bind(&MotionLockNode::safetyStatusCallback, this, std::placeholders::_1));
+
+    safety_command_echo_sub_ = this->create_subscription<rover_msgs::msg::SafetyCommandEcho>(
+        "hardware_interface/safety_command_echo", safety_qos,
+        std::bind(&MotionLockNode::safetyCommandEchoCallback, this, std::placeholders::_1));
 
     // twist_mux subscribes its lock topics with SystemDefaultsQoS (reliable, volatile), which a
     // reliable volatile publisher satisfies.
@@ -103,23 +128,47 @@ MotionLockNode::MotionLockNode(
 
     RCLCPP_INFO(
         this->get_logger(),
-        "Motion lock publishing on '%s' at %.1f Hz; locked until gpio_state arrives.",
+        "Motion lock publishing on '%s' at %.1f Hz; locked until safety state arrives.",
         motion_lock_pub_->get_topic_name(), params.publish_frequency);
 }
 
-void MotionLockNode::gpioStateCallback(const rover_msgs::msg::GpioState::SharedPtr msg)
+void MotionLockNode::safetyStatusCallback(const rover_msgs::msg::SafetyStatus::SharedPtr msg)
 {
-    flags_ = toSafetyIoFlags(*msg);
-    last_gpio_stamp_ = this->now();
+    last_status_ = *msg;
+    last_status_stamp_ = this->now();
+}
+
+void MotionLockNode::safetyCommandEchoCallback(
+    const rover_msgs::msg::SafetyCommandEcho::SharedPtr msg)
+{
+    last_echo_ = *msg;
+    last_echo_stamp_ = this->now();
 }
 
 domain::MotionLockHealth MotionLockNode::evaluateLock()
 {
     const auto params = param_listener_->get_params();
 
-    const double age_s = flags_.has_value() ? (this->now() - last_gpio_stamp_).seconds() : 0.0;
+    // Both halves are required: acting on one alone would silently read the missing half's stop
+    // conditions as "not active", which is the fail-open this node exists to prevent.
+    std::optional<domain::SafetyIoFlags> flags;
 
-    return domain::evaluateMotionLockHealth(flags_, age_s, params.gpio_timeout, toPolicy(params));
+    if (last_status_.has_value() && last_echo_.has_value()) {
+        flags = toSafetyIoFlags(*last_status_, *last_echo_);
+    }
+
+    // The older of the two ages, so neither topic going quiet on its own can hide behind the
+    // other still arriving.
+    const double age_s = flags.has_value()
+        ? std::max(
+              (this->now() - last_status_stamp_).seconds(),
+              (this->now() - last_echo_stamp_).seconds())
+        : 0.0;
+
+    const bool link_healthy = last_status_.has_value() && last_status_->link_healthy;
+
+    return domain::evaluateMotionLockHealth(
+        flags, age_s, params.gpio_timeout, toPolicy(params), link_healthy);
 }
 
 void MotionLockNode::timerCallback()
@@ -155,16 +204,21 @@ void MotionLockNode::diagnoseMotionLock(diagnostic_updater::DiagnosticStatusWrap
 
     status.add("Locked", last_health_->locked);
 
-    if (flags_.has_value()) {
-        status.add("gpio_state age (s)", (this->now() - last_gpio_stamp_).seconds());
-        status.add("HW E-Stop user button", flags_->hw_e_stop_user_button);
-        status.add("SW E-Stop user button", flags_->sw_e_stop_user_button);
-        status.add("SW E-Stop motor driver fault", flags_->sw_e_stop_motor_driver_fault);
-        status.add("SW E-Stop latch status", flags_->sw_e_stop_latch_status);
-        status.add("Motor contactor engaged", flags_->motor_contactor_engaged);
+    if (last_status_.has_value()) {
+        status.add("safety_status age (s)", (this->now() - last_status_stamp_).seconds());
+        status.add("Safety PLC link healthy", last_status_->link_healthy);
+        status.add("HW E-Stop user button", last_status_->hw_e_stop_user_button);
+        status.add("SW E-Stop latch status", last_status_->latch_active);
+        status.add("Motor contactor engaged", last_status_->motor_contactor_engaged);
     }
 
-    status.add("gpio_state timeout (s)", params.gpio_timeout);
+    if (last_echo_.has_value()) {
+        status.add("safety_command_echo age (s)", (this->now() - last_echo_stamp_).seconds());
+        status.add("SW E-Stop user button", last_echo_->sw_e_stop_user_button);
+        status.add("SW E-Stop motor driver fault", last_echo_->sw_e_stop_motor_driver_fault);
+    }
+
+    status.add("Safety state timeout (s)", params.gpio_timeout);
     status.add("Policy: use_hw_e_stop_user_button", params.use_hw_e_stop_user_button);
     status.add("Policy: use_sw_e_stop_user_button", params.use_sw_e_stop_user_button);
     status.add("Policy: use_sw_e_stop_motor_driver_fault", params.use_sw_e_stop_motor_driver_fault);

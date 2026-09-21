@@ -1,0 +1,7 @@
+# Apply a calibration to the running node, rebuilding the stick mappings in place. With persist,
+# it is also written to the node's calibration_file so it survives a restart.
+rover_msgs/RcCalibration calibration
+bool persist
+---
+bool success
+string message

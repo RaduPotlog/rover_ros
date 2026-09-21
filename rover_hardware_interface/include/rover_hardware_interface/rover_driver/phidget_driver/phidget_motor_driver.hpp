@@ -198,6 +198,8 @@ private:
     float encoder_resolution_;
 
     float motor_acceleration_;
+    float motor_current_limit_;
+    float motor_current_regulator_gain_;
 
     // steady_clock ns of the last encoder event; written on the SDK thread, read in readState().
     std::atomic<std::int64_t> last_encoder_event_ns_{0};

@@ -18,25 +18,40 @@
 #include <utility>
 #include <vector>
 
+#include <rclcpp/exceptions.hpp>
+#include <rclcpp/logging.hpp>
+#include <rclcpp/utilities.hpp>
+
 #include "rover_serial_driver/infrastructure/serial_msg_conversions.hpp"
 
 namespace rover::transport::serial
 {
 
-Ros2BytePublisher::Ros2BytePublisher(PublisherPtr publisher)
-: publisher_(std::move(publisher))
+Ros2BytePublisher::Ros2BytePublisher(PublisherPtr publisher, rclcpp::Context::SharedPtr context)
+: publisher_(std::move(publisher)),
+  context_(std::move(context))
 {
 }
 
 void Ros2BytePublisher::publish(const std::vector<uint8_t> & buffer, std::size_t length)
 {
-    if (!publisher_) {
+    // Runs on the ASIO thread, which keeps receiving after Ctrl-C has shut the context down.
+    if (!publisher_ || !rclcpp::ok(context_)) {
         return;
     }
 
     std_msgs::msg::UInt8MultiArray out;
     toMsg(buffer, out, length);
-    publisher_->publish(out);
+    try {
+        publisher_->publish(out);
+    } catch (const rclcpp::exceptions::RCLError & e) {
+        // Never let this escape the ASIO thread: rmw_zenoh also refuses publishes during
+        // shutdown while the context is still valid. Drop the bytes.
+        if (rclcpp::ok(context_)) {
+            RCLCPP_WARN(
+                rclcpp::get_logger("Ros2BytePublisher"), "Dropped bytes, publish failed: %s", e.what());
+        }
+    }
 }
 
 }  // namespace rover::transport::serial

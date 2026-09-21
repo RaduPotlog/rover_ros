@@ -22,7 +22,9 @@ transition: the nav input goes stale and the mux falls through, instead of relyi
 
 ## Motion lock
 
-`rover_motion_lock_node` subscribes `hardware_interface/gpio_state` (`rover_msgs/GpioState`) and
+`rover_motion_lock_node` subscribes `hardware_interface/safety_status`
+(`rover_msgs/SafetyStatus`) and `hardware_interface/safety_command_echo`
+(`rover_msgs/SafetyCommandEcho`) and
 publishes `motion_lock` (`std_msgs/Bool`), which `twist_mux` consumes as a lock. It exists
 because `twist_mux` locks are typed `std_msgs/Bool` and nothing in the stack published one, so
 the safety IO could not gate the mux at all.
@@ -30,22 +32,34 @@ the safety IO could not gate the mux at all.
 **It is fail-safe closed.** The lock is asserted — motion inhibited — when:
 
 - any enabled E-Stop condition is active (see `config/rover_motion_lock.yaml`),
-- no `gpio_state` has been received yet (startup), or
-- `gpio_state` has gone stale beyond `gpio_timeout` (the hardware interface died).
+- either safety topic has not been received yet (startup),
+- either has gone stale beyond `gpio_timeout` (the hardware interface died), or
+- `SafetyStatus.link_healthy` is false — the hardware interface is alive but its link to the
+  safety PLC is not, so the values it is publishing are last-known-good rather than current.
+  Staleness alone cannot catch this, because the messages keep arriving.
 
-Two `gpio_state` fields are deliberately *not* lock conditions:
+Both halves are required before any decision is made: acting on one alone would read the missing
+half's stop conditions as "not active".
 
-- `gpio_pin_sw_e_stop_latch_reset` — a command pulse that clears the latch, not a state.
-- `gpio_pin_cpu_wdg_heartbeat` — an output the safety controller toggles roughly once a second to
-  feed the relay's CPU watchdog. It is a liveness square wave, not a fault flag; gating on it made
-  `motion_lock` oscillate at the heartbeat rate. A stalled heartbeat is caught by the safety relay,
-  which latches the E-Stop, and that *is* a lock condition (`use_sw_e_stop_latch_status`).
+Two former `gpio_state` fields are deliberately *not* lock conditions, and the message split now
+makes both exclusions structural rather than a matter of remembering a comment — neither appears
+in `SafetyStatus` at all:
+
+- `sw_e_stop_latch_reset` — a command pulse that clears the latch, not a state.
+- `cpu_wdg_heartbeat` — an output the safety controller toggles to feed the relay's CPU watchdog.
+  It is a liveness square wave, not a fault flag; gating on it made `motion_lock` oscillate at the
+  heartbeat rate. A stalled heartbeat is caught by the safety relay, which latches the E-Stop, and
+  that *is* a lock condition (`use_sw_e_stop_latch_status`).
+
+The two `sw_*` stop requests this node *does* gate on come from `SafetyCommandEcho`. That is the
+safe direction for an echo: "we asked for a stop" is a sound reason to inhibit, and it is visible
+a poll or two before the latch it causes. Nothing here reads an echo as evidence of plant state.
 
 `twist_mux` itself treats a *stale lock topic* as locked, so if `rover_motion_lock_node` dies the mux
 closes rather than opens. The node therefore republishes at `publish_frequency` (10 Hz) to stay
 well inside the lock's 0.5 s timeout, and is launched alongside the mux.
 
-A consequence worth knowing: with no hardware interface running there is no `gpio_state`, so the
+A consequence worth knowing: with no hardware interface running there is no safety state, so the
 rover will not accept velocity commands at all. That is intended — no safety IO means no driving.
 Simulation is unaffected, as it does not launch this package.
 

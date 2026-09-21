@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from rover_utils.logging import quiet_rmw_zenoh
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import (
@@ -65,6 +66,8 @@ def generate_launch_description():
             "--ros-args",
             "--log-level",
             log_level,
+            "--log-level",
+            quiet_rmw_zenoh(log_level),
         ],
         emulate_tty=True,
     )
@@ -99,6 +102,8 @@ def generate_launch_description():
             "--ros-args",
             "--log-level",
             log_level,
+            "--log-level",
+            quiet_rmw_zenoh(log_level),
         ],
         emulate_tty=True,
     )

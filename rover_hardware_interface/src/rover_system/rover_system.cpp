@@ -145,9 +145,13 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
         system_ros_interface_->addDiagnosticTask(
         std::string("system status"), this, &RoverSystem::diagnoseStatus);
 
+        system_ros_interface_->addDiagnosticTask(
+        std::string("safety plc link"), this, &RoverSystem::diagnoseSafetyLink);
+
         const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
         system_ros_interface_->updateMsgGpioStates(gpio_state);
-        system_ros_interface_->publishGpioStateMsg();
+        system_ros_interface_->updateSafetyLinkState(rover_controller_->linkHealth());
+        system_ros_interface_->publishSafetyMsgs();
     } catch (const std::exception & e) {
         // SystemROSInterface's constructor and addService()/create_publisher() calls can throw
         // (e.g. rclcpp::exceptions::* on an invalid name, bad_alloc) - must not escape
@@ -313,12 +317,14 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
 
         const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
         system_ros_interface_->updateMsgGpioStates(gpio_state);
-        system_ros_interface_->publishGpioStateMsg();
+        system_ros_interface_->updateSafetyLinkState(rover_controller_->linkHealth());
+        system_ros_interface_->publishSafetyMsgs();
 
         next_driver_state_update_time_ = time + driver_states_update_period_;
     }
 
     updateEStopState();
+    updateContactorPlausibility();
 
     return return_type::OK;
 }
@@ -341,7 +347,7 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
         lifecycle_active,
         lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE,
         e_stop_active_,
-        control_loop_use_case_->isMotorFailsafeLatched());
+        control_loop_use_case_->isHardwareFaultLatched());
 
     if (mode == WriteCommandMode::kCommandMotion) {
         handleRoverDriverWriteOperation([this] {
@@ -493,6 +499,41 @@ void RoverSystem::readDrivetrainSettings()
             "motor_acceleration must be in [0.5, 10000] duty/s, got " +
             std::to_string(drivetrain_settings_.motor_acceleration) + ".");
     }
+
+    // Optional as well; absent keeps the previously hard-coded 10 A limit on 24 V.
+    drivetrain_settings_.motor_current_limit =
+        info_.hardware_parameters.count("motor_current_limit") == 0
+            ? kDefaultMotorCurrentLimit
+            : std::stof(info_.hardware_parameters.at("motor_current_limit"));
+    drivetrain_settings_.motor_supply_voltage =
+        info_.hardware_parameters.count("motor_supply_voltage") == 0
+            ? kDefaultMotorSupplyVoltage
+            : std::stof(info_.hardware_parameters.at("motor_supply_voltage"));
+
+    // DCC1000 ranges: current limit 2-25 A, supply 8-30 V, current regulator gain 1-100.
+    if (drivetrain_settings_.motor_current_limit < 2.0f ||
+        drivetrain_settings_.motor_current_limit > 25.0f)
+    {
+        throw std::runtime_error(
+            "motor_current_limit must be in [2, 25] A, got " +
+            std::to_string(drivetrain_settings_.motor_current_limit) + ".");
+    }
+
+    if (drivetrain_settings_.motor_supply_voltage < 8.0f ||
+        drivetrain_settings_.motor_supply_voltage > 30.0f)
+    {
+        throw std::runtime_error(
+            "motor_supply_voltage must be in [8, 30] V, got " +
+            std::to_string(drivetrain_settings_.motor_supply_voltage) + ".");
+    }
+
+    const float gain = motorCurrentRegulatorGain(
+        drivetrain_settings_.motor_current_limit, drivetrain_settings_.motor_supply_voltage);
+    if (gain < 1.0f || gain > 100.0f) {
+        throw std::runtime_error(
+            "Derived motor current regulator gain must be in [1, 100], got " +
+            std::to_string(gain) + ".");
+    }
 }
 
 void RoverSystem::readDriverStatesUpdateFrequency()
@@ -543,21 +584,30 @@ void RoverSystem::readErrorFilterMaxErrorsCounts()
 
 void RoverSystem::readEStopSettings()
 {
-    // Optional, unlike every parameter above: an existing URDF that predates this parameter keeps
-    // the compiled-in default rather than failing on_init().
-    if (info_.hardware_parameters.count("velocity_command_zero_tolerance") == 0) {
-        return;
+    // Both optional, unlike every parameter above: an existing URDF that predates them keeps the
+    // compiled-in defaults rather than failing on_init().
+    velocity_command_zero_tolerance_ = readPositiveToleranceParam(
+        "velocity_command_zero_tolerance", kDefaultVelocityCommandZeroTolerance);
+
+    velocity_state_zero_tolerance_ = readPositiveToleranceParam(
+        "velocity_state_zero_tolerance", kDefaultVelocityStateZeroTolerance);
+}
+
+double RoverSystem::readPositiveToleranceParam(
+    const std::string & key, const double default_value) const
+{
+    if (info_.hardware_parameters.count(key) == 0) {
+        return default_value;
     }
 
-    const double tolerance =
-        std::stod(info_.hardware_parameters.at("velocity_command_zero_tolerance"));
+    const double tolerance = std::stod(info_.hardware_parameters.at(key));
 
     if (!(tolerance > 0.0)) {
         throw std::runtime_error(
-            "velocity_command_zero_tolerance must be > 0, got " + std::to_string(tolerance) + ".");
+            key + " must be > 0, got " + std::to_string(tolerance) + ".");
     }
 
-    velocity_command_zero_tolerance_ = tolerance;
+    return tolerance;
 }
 
 void RoverSystem::configureRoverController()
@@ -617,6 +667,11 @@ void RoverSystem::resetEStopLatch()
     // fault has been addressed - clear all accumulated per-category error-filter state too, not
     // just the fault-flag category.
     rover_error_filter_->setClearErrorsFlag();
+
+    // Same signal, same scope: the latched welded-contactor fault lives outside the error filter
+    // (see ContactorMonitor), so it has to be cleared explicitly. If the contacts are still stuck,
+    // the very next read() cycle re-latches it, so this cannot hand back a false all-clear.
+    control_loop_use_case_->resetContactorFault();
 
     // This service callback runs on a non-RT, MutuallyExclusive callback-group thread (never the
     // RT read()/write() path - see check_rt_path_purity.sh), so the blocking Phidget SDK calls
@@ -689,9 +744,95 @@ void RoverSystem::updateCommunicationStatus()
     }
 }
 
+// The safety link had no diagnostic of its own: read()/write() always return OK, so a dead PLC
+// link reached nothing but a stale gpio_state topic. This reports the link and the two threads
+// that service it, plus the contactor cross-check, so "why did the rover stop?" is answerable
+// from /diagnostics alone.
+void RoverSystem::diagnoseSafetyLink(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    unsigned char level{diagnostic_updater::DiagnosticStatusWrapper::OK};
+    std::string message{"Safety PLC link healthy."};
+
+    const auto health = rover_controller_->linkHealth();
+
+    status.add("Watchdog thread running", health.watchdog_running);
+    status.add("IO poll thread running", health.poll_running);
+    status.add("Watchdog late kicks", static_cast<int>(health.watchdog_miss_count));
+    status.add("Watchdog errors", static_cast<int>(health.watchdog_error_count));
+    status.add("IO poll errors", static_cast<int>(health.poll_error_count));
+
+    if (health.last_kick_age_ms == SafetyLinkHealth::kUnknownAgeMs) {
+        status.add("Last heartbeat kick age (ms)", "never");
+    } else {
+        status.add("Last heartbeat kick age (ms)", static_cast<int>(health.last_kick_age_ms));
+    }
+
+    if (health.last_poll_age_ms == SafetyLinkHealth::kUnknownAgeMs) {
+        status.add("Last IO poll age (ms)", "never");
+    } else {
+        status.add("Last IO poll age (ms)", static_cast<int>(health.last_poll_age_ms));
+    }
+
+    const bool contactor_fault = control_loop_use_case_->isContactorFaultLatched();
+    const bool contactor_failed_open = control_loop_use_case_->contactorMonitor().isFailedOpen();
+
+    status.add("Contactor fault latched", contactor_fault);
+    status.add("Contactor failed open", contactor_failed_open);
+
+    // Ordered least to most severe so the most serious condition owns the summary.
+    if (contactor_failed_open) {
+        level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
+        message = "Motor contactor reports open while the E-Stop latch is clear - rover will not "
+                  "drive.";
+    }
+
+    if (health.watchdog_miss_count > 0) {
+        level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
+        message = "Safety PLC heartbeat is landing late - the link is too slow for the configured "
+                  "margin.";
+    }
+
+    if (!health.watchdog_running || !health.poll_running) {
+        level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+        message = "A safety controller background thread is not running.";
+    }
+
+    if (contactor_fault) {
+        // The hazardous one: the stop was commanded and the contacts did not open.
+        level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+        message = "E-Stop latch asserted but the motor contactor still reports engaged - suspect "
+                  "welded contacts. Motion inhibited until sw_e_stop_latch_reset and a hardware "
+                  "check.";
+    }
+
+    status.summary(level, message);
+}
+
 void RoverSystem::updateEStopState()
 {
     e_stop_active_ = control_loop_use_case_->updateEStopActiveState();
+}
+
+// Cross-checks the E-Stop latch against the contactor's aux-contact feedback. steady_clock rather
+// than read()'s `time`: this is a hardware drop-out deadline, so it must not be affected by
+// use_sim_time or by a ROS time jump.
+void RoverSystem::updateContactorPlausibility()
+{
+    const auto fault = control_loop_use_case_->updateContactorPlausibility(
+        std::chrono::steady_clock::now());
+
+    if (fault == ContactorFault::kWeldedSuspected) {
+        RCLCPP_ERROR_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "E-Stop latch is asserted but the motor contactor still reports engaged. The motors "
+            "may still be powered - suspect welded contacts. Motion is inhibited until "
+            "hardware_interface/sw_e_stop_latch_reset is called and the contactor is checked.");
+    } else if (fault == ContactorFault::kFailedOpen) {
+        RCLCPP_WARN_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "Motor contactor reports open while the E-Stop latch is clear - the rover will not "
+            "drive. Check the contactor and its supply.");
+    }
 }
 
 void RoverSystem::handleRoverDriverWriteOperation(std::function<void()> write_operation)
@@ -729,6 +870,19 @@ bool RoverSystem::areVelocityCommandsNearZero()
     // Runs on the service-callback thread (see the declaration): read the flag the RT thread
     // published instead of racing it on hw_commands_velocities_.
     const bool commands_are_zero = commands_are_zero_.load(std::memory_order_relaxed);
+    const bool states_are_zero = states_are_zero_.load(std::memory_order_relaxed);
+
+    if (!states_are_zero) {
+        // Reported separately from the command case because it means something quite different:
+        // the rover is physically still moving, so clearing the E-Stop now would re-energise the
+        // motors mid-roll. No controller tuning makes this one benign.
+        RCLCPP_WARN_STREAM_THROTTLE(
+            logger_, steady_clock_, 5000,
+            "E-Stop reset refused: the wheels are still turning - largest |wheel velocity| is "
+                << max_abs_velocity_state_.load(std::memory_order_relaxed)
+                << " rad/s, tolerance is " << velocity_state_zero_tolerance_
+                << " rad/s. Wait for the rover to come to a stop.");
+    }
 
     if (!commands_are_zero) {
         // Without this, "velocity commands are not zero" gives the operator nothing to act on -
@@ -745,7 +899,7 @@ bool RoverSystem::areVelocityCommandsNearZero()
                    "offset).");
     }
 
-    return commands_are_zero;
+    return commands_are_zero && states_are_zero;
 }
 
 void RoverSystem::refreshVelocityCommandsZeroFlag()
@@ -767,6 +921,23 @@ void RoverSystem::refreshVelocityCommandsZeroFlag()
 
     commands_are_zero_.store(
         areVelocitiesWithinTolerance(hw_commands_velocities_, velocity_command_zero_tolerance_),
+        std::memory_order_relaxed);
+
+    double max_abs_state = 0.0;
+
+    for (const auto & state : hw_states_velocities_) {
+        if (!std::isfinite(state)) {
+            max_abs_state = state;
+            break;
+        }
+
+        max_abs_state = std::max(max_abs_state, std::abs(state));
+    }
+
+    max_abs_velocity_state_.store(max_abs_state, std::memory_order_relaxed);
+
+    states_are_zero_.store(
+        areVelocitiesWithinTolerance(hw_states_velocities_, velocity_state_zero_tolerance_),
         std::memory_order_relaxed);
 }
 

@@ -112,6 +112,81 @@ protected:
     SteadyTime now_{};
 };
 
+TEST(ApplyCalibrationTest, BothAxesTakeTheEndpointsOfTheChannelTheyRead)
+{
+    TeleopConfig config;
+    config.linear_x_channel = kLinearChannel;
+    config.angular_z_channel = kAngularChannel;
+    config.linear_x_mapping.out_max = 1.2;
+    config.linear_x_mapping.out_min = -1.2;
+    config.angular_z_mapping.out_max = 1.0;
+    config.angular_z_mapping.invert = true;
+
+    // The two sticks rest in different places - the whole point of per-channel calibration.
+    ChannelCalibration calibration = defaultCalibration();
+    calibration.in_mid[kLinearChannel - 1] = 1004;
+    calibration.deadband[kLinearChannel - 1] = 14;
+    calibration.in_mid[kAngularChannel - 1] = 987;
+    calibration.deadband[kAngularChannel - 1] = 7;
+
+    const TeleopConfig calibrated = applyCalibration(config, calibration);
+
+    EXPECT_EQ(calibrated.linear_x_mapping.in_mid, 1004);
+    EXPECT_EQ(calibrated.linear_x_mapping.deadband_counts, 14);
+    EXPECT_EQ(calibrated.angular_z_mapping.in_mid, 987);
+    EXPECT_EQ(calibrated.angular_z_mapping.deadband_counts, 7);
+
+    // The parameters' business, not the calibration's.
+    EXPECT_DOUBLE_EQ(calibrated.linear_x_mapping.out_max, 1.2);
+    EXPECT_DOUBLE_EQ(calibrated.angular_z_mapping.out_max, 1.0);
+    EXPECT_TRUE(calibrated.angular_z_mapping.invert);
+
+    // Carried whole, so it can be persisted and displayed for every channel, not just the two
+    // that drive something.
+    EXPECT_EQ(calibrated.calibration.in_mid[kEStopChannel - 1], calibration.in_mid[kEStopChannel - 1]);
+}
+
+TEST(ApplyCalibrationTest, ApplyingTwiceIsTheSameAsApplyingOnce)
+{
+    TeleopConfig config;
+    config.linear_x_channel = kLinearChannel;
+    config.angular_z_channel = kAngularChannel;
+
+    ChannelCalibration first = defaultCalibration();
+    first.in_mid[kLinearChannel - 1] = 1004;
+
+    ChannelCalibration second = defaultCalibration();
+    second.in_mid[kLinearChannel - 1] = 970;
+    second.deadband[kLinearChannel - 1] = 20;
+
+    // on_configure applies the stored calibration onto a config that already carries the
+    // parameter one; the endpoints must be replaced, never accumulated.
+    const TeleopConfig once = applyCalibration(config, second);
+    const TeleopConfig stacked = applyCalibration(applyCalibration(config, first), second);
+
+    EXPECT_EQ(stacked.linear_x_mapping.in_mid, once.linear_x_mapping.in_mid);
+    EXPECT_EQ(stacked.linear_x_mapping.deadband_counts, once.linear_x_mapping.deadband_counts);
+    EXPECT_EQ(stacked.calibration.in_mid[kLinearChannel - 1], 970);
+}
+
+TEST(ApplyCalibrationTest, LeavesTheInputUntouched)
+{
+    TeleopConfig base;
+    base.linear_x_channel = kLinearChannel;
+    base.angular_z_channel = kAngularChannel;
+    const int before = base.linear_x_mapping.in_mid;
+
+    ChannelCalibration calibration = defaultCalibration();
+    calibration.in_mid[kLinearChannel - 1] = 1004;
+
+    const TeleopConfig calibrated = applyCalibration(base, calibration);
+
+    // rebuildTeleop() relies on this: it applies onto base_config_ every time, so base_config_
+    // must still be the pre-calibration base afterwards.
+    EXPECT_EQ(base.linear_x_mapping.in_mid, before);
+    EXPECT_EQ(calibrated.linear_x_mapping.in_mid, 1004);
+}
+
 TEST_F(TeleopUseCaseTest, NothingPublishedBeforeTheFirstFrame)
 {
     EXPECT_EQ(use_case_->tick(now_), TickStatus::kWaitingForFirstFrame);
@@ -128,6 +203,23 @@ TEST_F(TeleopUseCaseTest, DeflectedStickPublishesEveryTick)
     ASSERT_EQ(velocity_->published.size(), 2u);
     EXPECT_DOUBLE_EQ(velocity_->published[0].linear_x, 2.0);
     EXPECT_DOUBLE_EQ(velocity_->published[1].linear_x, 2.0);
+}
+
+TEST_F(TeleopUseCaseTest, FullForwardAndTurnIsScaledToTheRimSpeedBudget)
+{
+    config_.max_wheel_rim_speed = 1.7;
+    config_.half_track_width = 0.5;
+    use_case_ = std::make_unique<TeleopUseCase>(config_, velocity_, safety_);
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    setChannel(kAngularChannel, kDefaultCrsfChannelMax);
+
+    feedAndTick();
+
+    // Unlimited this is 2.0 m/s + 5.0 rad/s: an outer rim speed of 4.5 m/s.
+    ASSERT_EQ(velocity_->published.size(), 1u);
+    const auto & command = velocity_->published[0];
+    EXPECT_NEAR(command.linear_x + command.angular_z * 0.5, 1.7, 1e-12);
+    EXPECT_NEAR(command.angular_z / command.linear_x, 5.0 / 2.0, 1e-12);
 }
 
 TEST_F(TeleopUseCaseTest, CentredStickPublishesZeroOnlyOnce)
@@ -306,6 +398,85 @@ TEST_F(TeleopUseCaseTest, DiagnosticsAgreeWithTickOnLinkLoss)
     EXPECT_EQ(diagnostics.health.level, HealthLevel::kWarn);
     EXPECT_EQ(diagnostics.link.loss_reason, LinkLossReason::kChannelsStale);
     EXPECT_TRUE(diagnostics.last_command.isZero());
+}
+
+TEST_F(TeleopUseCaseTest, AnInhibitedTeleopPublishesOneZeroAndThenNothing)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+    ASSERT_EQ(velocity_->published.size(), 1u);
+
+    use_case_->setCommandInhibited(true);
+
+    EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+    EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+
+    ASSERT_EQ(velocity_->published.size(), 2u);
+    EXPECT_TRUE(velocity_->published.back().isZero());
+}
+
+TEST_F(TeleopUseCaseTest, AnInhibitedTeleopIgnoresTheSticksEvenBeforeTheFirstFrame)
+{
+    // The inhibit has to dominate every branch of tick(), including the ones that come before the
+    // stick mapping - there must be no route that commands while a calibration is running.
+    use_case_->setCommandInhibited(true);
+    EXPECT_EQ(use_case_->tick(now_), TickStatus::kInhibited);
+
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+
+    for (const auto & command : velocity_->published) {
+        EXPECT_TRUE(command.isZero());
+    }
+}
+
+TEST_F(TeleopUseCaseTest, SweepingTheEStopSwitchWhileInhibitedCallsNoSafetyServices)
+{
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+
+    use_case_->setCommandInhibited(true);
+
+    // Exactly what an RC calibration sweep does to the switch channels.
+    for (const int value : {kSwitchLow, kSwitchHigh, kSwitchLow, kSwitchHigh}) {
+        setChannel(kEStopChannel, value);
+        setChannel(kLatchResetChannel, value);
+        EXPECT_EQ(feedAndTick(), TickStatus::kInhibited);
+    }
+
+    EXPECT_EQ(safety_->e_stop_set_calls, 0);
+    EXPECT_EQ(safety_->e_stop_reset_calls, 0);
+    EXPECT_EQ(safety_->latch_reset_calls, 0);
+}
+
+TEST_F(TeleopUseCaseTest, ReleasingTheInhibitAfterRearmingDoesNotFireAStaleEdge)
+{
+    // The switch rests high; the sweep leaves it low. Re-arming makes the debouncer treat that
+    // as the new resting position instead of as an edge.
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+
+    use_case_->setCommandInhibited(true);
+    setChannel(kEStopChannel, kSwitchLow);
+    ASSERT_EQ(feedAndTick(), TickStatus::kInhibited);
+
+    use_case_->rearmSwitches();
+    use_case_->setCommandInhibited(false);
+
+    EXPECT_EQ(feedAndTick(), TickStatus::kActive);
+    EXPECT_EQ(safety_->e_stop_set_calls, 0);
+
+    // A genuine flip after the re-arm still gets through.
+    setChannel(kEStopChannel, kSwitchHigh);
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+    EXPECT_EQ(safety_->e_stop_reset_calls, 1);
+}
+
+TEST_F(TeleopUseCaseTest, DiagnosticsReportTheInhibit)
+{
+    ASSERT_EQ(feedAndTick(), TickStatus::kActive);
+    EXPECT_FALSE(use_case_->diagnostics(now_).inhibited);
+
+    use_case_->setCommandInhibited(true);
+    EXPECT_TRUE(use_case_->diagnostics(now_).inhibited);
 }
 
 }  // namespace rover_crsf_teleop

@@ -21,7 +21,9 @@
 
 #include "rover_crsf_teleop/domain/link_monitor.hpp"
 #include "rover_crsf_teleop/domain/ports.hpp"
+#include "rover_crsf_teleop/domain/rc_calibration.hpp"
 #include "rover_crsf_teleop/domain/rc_frame.hpp"
+#include "rover_crsf_teleop/domain/rim_speed_limit.hpp"
 #include "rover_crsf_teleop/domain/stick_mapping.hpp"
 #include "rover_crsf_teleop/domain/switch_debouncer.hpp"
 #include "rover_crsf_teleop/domain/teleop_health.hpp"
@@ -34,9 +36,19 @@ struct TeleopConfig
     AxisMapping linear_x_mapping;
     AxisMapping angular_z_mapping;
 
+    // Every channel's measured endpoints. Only the two entries the mappings above are built from
+    // are read per tick; the rest are carried so a calibration can be applied, persisted and
+    // displayed whole rather than only for the channels that happen to drive something.
+    ChannelCalibration calibration{defaultCalibration()};
+
     // RC channel numbers, 1-16.
     int linear_x_channel{3};
     int angular_z_channel{1};
+
+    // Outer-wheel rim speed budget, m/s, and half the effective track width, m (see
+    // domain/rim_speed_limit.hpp). Either <= 0 disables the limit.
+    double max_wheel_rim_speed{0.0};
+    double half_track_width{0.0};
     int e_stop_channel{5};
     int e_stop_latch_reset_channel{4};
 
@@ -47,10 +59,23 @@ struct TeleopConfig
     LinkMonitorConfig link;
 };
 
+// `config` with both stick axes re-anchored on `calibration`, and `calibration` recorded on it.
+//
+// This is the single definition of what "applying a calibration" means, and every path that has
+// one goes through it: the parameters read at configure, a calibration loaded from the store, and
+// one handed over at run time by the apply service. Written once because the alternative - the
+// same three lines at each site - is how one path quietly keeps driving on stale endpoints when a
+// third axis is added.
+//
+// `config` is the base to apply onto, not somewhere to accumulate: a run-time apply passes the
+// pre-calibration config, so applying twice is the same as applying once.
+TeleopConfig applyCalibration(const TeleopConfig & config, const ChannelCalibration & calibration);
+
 enum class TickStatus
 {
     kWaitingForFirstFrame,
     kLinkLost,
+    kInhibited,
     kActive,
 };
 
@@ -68,11 +93,16 @@ enum class TickStatus
 //   4. Switch position changes are turned into E-Stop requests. A switch flipped while the link
 //      was lost fires on recovery, which is what the operator asked for.
 //
+// An RC calibration session inhibits all of this (see setCommandInhibited): one zero is published
+// and then nothing, and the switches are not evaluated - the sweep walks the E-Stop switch
+// through both ends on purpose, and that must not reach the hardware interface.
+//
 // Not thread-safe: the node calls it from a single-threaded executor.
 // Read-only snapshot for diagnostics; building it has no side effects on teleop.
 struct TeleopDiagnostics
 {
     bool first_frame_received{false};
+    bool inhibited{false};
     LinkHealthSnapshot link;
     HealthReport health;
     VelocityCommand last_command;
@@ -99,6 +129,16 @@ public:
     // Stops commanding: publishes one zero unless the last command already was zero. Called when
     // teleop is being deactivated.
     void stop();
+
+    // Holds teleop off while something else owns the sticks - today, an RC calibration session.
+    // Checked before every other branch of tick(), so there is no path that can command while it
+    // is set. Independent of the lifecycle state: deactivating is the operator's interlock, this
+    // is the node's.
+    void setCommandInhibited(bool inhibited);
+
+    // Restarts both switch debouncers' settle periods. Call when releasing an inhibit: no frames
+    // reached the debouncers while it was set, so their recorded positions are from before it.
+    void rearmSwitches();
 
     TeleopDiagnostics diagnostics(SteadyTime now) const;
 
@@ -127,6 +167,8 @@ private:
     bool zero_sent_{false};
 
     VelocityCommand last_command_;
+
+    bool inhibited_{false};
 };
 
 }  // namespace rover_crsf_teleop

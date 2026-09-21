@@ -26,6 +26,19 @@ namespace rover_hardware_interface
 
 // Default for DrivetrainSettings::motor_acceleration - the value that used to be hard-coded.
 constexpr float kDefaultMotorAcceleration = 2.0f;
+// Defaults for DrivetrainSettings::motor_current_limit / motor_supply_voltage - the previously
+// hard-coded 10 A limit on the 24 V supply (gain 20).
+constexpr float kDefaultMotorCurrentLimit = 10.0f;
+constexpr float kDefaultMotorSupplyVoltage = 24.0f;
+
+// Current regulator gain of the motor controller's current loop (e.g.
+// PhidgetDCMotor_setCurrentRegulatorGain()), derived from the current limit and supply voltage
+// with Phidget's rule of thumb gain = current_limit * (voltage / 12). Derived rather than
+// configured so it can't drift out of step with the limit.
+inline float motorCurrentRegulatorGain(const float current_limit_a, const float supply_voltage_v)
+{
+    return current_limit_a * (supply_voltage_v / 12.0f);
+}
 
 struct DrivetrainSettings
 {
@@ -39,8 +52,8 @@ struct DrivetrainSettings
     // motor_torque_constant/gear_ratio/gearbox_efficiency to get torque (see
     // MotorStateReading::getTorque() in domain/driver_data_snapshot.cpp). This is a property of
     // the driver backend's raw feedback units, not of the drivetrain itself - e.g. Phidget
-    // motor controllers report current in deci-amps, so PhidgetRoverDriver's caller supplies
-    // 0.1f here. A different driver backend reporting raw current in a different unit supplies
+    // driver reports current in milliamps (PhidgetMotorDriver::currentChangeHandler), so the URDF supplies
+    // 0.001 here. A different driver backend reporting raw current in a different unit supplies
     // its own value instead of silently inheriting Phidget's convention.
     float raw_current_to_amps_scale;
     // Timeout (ms) for the motor driver's own hardware watchdog (e.g. Phidget's
@@ -52,6 +65,12 @@ struct DrivetrainSettings
     // PhidgetDCMotor_setAcceleration()). It adds lag the ROS side cannot see, so it is exposed to
     // let a closed wheel-speed loop own the dynamics. Optional in the URDF.
     float motor_acceleration{kDefaultMotorAcceleration};
+    // Motor controller current limit in A (e.g. PhidgetDCMotor_setCurrentLimit()). Optional in
+    // the URDF.
+    float motor_current_limit{kDefaultMotorCurrentLimit};
+    // Motor supply voltage in V; only used to derive the current regulator gain (see
+    // motorCurrentRegulatorGain()). Optional in the URDF.
+    float motor_supply_voltage{kDefaultMotorSupplyVoltage};
 };
 
 constexpr unsigned kDefaultMotorFailsafeTimeoutMs = 500;

@@ -15,12 +15,14 @@
 #ifndef ROVER_HARDWARE_INTERFACE_APPLICATION_ROVER_CONTROL_LOOP_USE_CASE_HPP_
 #define ROVER_HARDWARE_INTERFACE_APPLICATION_ROVER_CONTROL_LOOP_USE_CASE_HPP_
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 
+#include "rover_hardware_interface/domain/contactor_monitor.hpp"
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_driver.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
@@ -79,7 +81,9 @@ public:
     RoverControlLoopUseCase(
         std::shared_ptr<RoverDriverInterface> rover_driver,
         std::shared_ptr<EmergencyStopInterface> e_stop,
-        RoverErrorFilter & error_filter);
+        RoverErrorFilter & error_filter,
+        const std::chrono::milliseconds contactor_drop_out_tolerance =
+            std::chrono::milliseconds(kDefaultContactorDropOutToleranceMs));
 
     // Reports RoverDriverInterface::isMotorStatesDataTimedOut() to the READ_MOTOR_STATES
     // error-filter category. Call after the driver-specific hw-states conversion step has run
@@ -110,6 +114,26 @@ public:
     // from EmergencyStopInterface and resetEStop()'s zero-velocity invariant is keyed off it.
     bool isMotorFailsafeLatched() const;
 
+    // Cross-checks the E-Stop latch against the contactor's aux-contact feedback and returns
+    // this cycle's verdict. Call every read() cycle, after updateEStopActiveState(). `now` is
+    // injected so this layer stays free of rclcpp::Time, matching the rest of the class.
+    ContactorFault updateContactorPlausibility(const std::chrono::steady_clock::time_point now);
+
+    // Whether a welded/stuck contactor has been latched. Same shape and rationale as
+    // isMotorFailsafeLatched(): a hardware fault that inhibits motion without being part of the
+    // E-Stop flag itself.
+    bool isContactorFaultLatched() const;
+
+    // Every latched hardware fault that must inhibit motion, OR-ed. This is what write() passes
+    // to decideWriteCommand().
+    bool isHardwareFaultLatched() const;
+
+    // Clears the latched contactor fault. Wired to the latch-reset service, so a welded-contactor
+    // report needs the same deliberate operator action as any other latched stop.
+    void resetContactorFault();
+
+    const ContactorMonitor & contactorMonitor() const;
+
     // Recomputes and returns whether the E-Stop (user-triggered or latched) is currently active.
     // Fail-safe: returns true when no EmergencyStopInterface was configured.
     bool updateEStopActiveState();
@@ -121,9 +145,9 @@ public:
     // What write() should send to the drivers this cycle. Pure decision, no I/O. Takes the
     // lifecycle state as bools so this layer stays free of lifecycle_msgs.
     //
-    // - kCommandMotion: shouldCommandMotion() holds AND no motor failsafe trip is latched.
+    // - kCommandMotion: shouldCommandMotion() holds AND no hardware fault is latched.
     // - kCommandZero: motion is inhibited (not active, E-Stop user-triggered or latched, or a
-    //   latched MOTOR_FAILSAFE_TRIPPED - see isMotorFailsafeLatched()) but the drivers are
+    //   latched hardware fault - see isHardwareFaultLatched()) but the drivers are
     //   configured (ACTIVE/INACTIVE). Zeros are still actively sent rather than going silent: the
     //   motors' hardware watchdog (motor_failsafe_timeout_ms) is only fed by commands actually
     //   reaching the drivers, so skipping the send tripped it on every wheel whenever an E-Stop
@@ -134,9 +158,13 @@ public:
     //
     // In both non-motion modes the caller must also drop the controller's pending command (see
     // RoverSystem::write()).
+    //
+    // `hardware_fault_latched` was originally just the motor-failsafe trip; it now carries every
+    // latched hardware fault that must inhibit motion (see isHardwareFaultLatched()), which is
+    // why it is no longer named after that one source.
     static WriteCommandMode decideWriteCommand(
         const bool lifecycle_active, const bool lifecycle_inactive, const bool e_stop_active,
-        const bool motor_failsafe_latched);
+        const bool hardware_fault_latched);
 
     // Serializes `write_operation` against concurrent callers via try_lock (never blocks - see
     // the RT-safety contract above) and reports the outcome to the WRITE_CMDS error-filter
@@ -148,6 +176,8 @@ private:
     std::shared_ptr<RoverDriverInterface> rover_driver_;
     std::shared_ptr<EmergencyStopInterface> e_stop_;
     RoverErrorFilter & error_filter_;
+
+    ContactorMonitor contactor_monitor_;
 
     // Serializes calls to performWriteOperation() - the same single mutex write() (speed command)
     // and updateFaultFlagStatus() (error-flag reset) shared before this extraction, so the two

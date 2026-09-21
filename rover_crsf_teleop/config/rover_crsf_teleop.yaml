@@ -31,41 +31,106 @@
     publish_rc_topics: true
 
 
-    # Raw CRSF channel endpoints, exactly as the decoder produces them
-    # (see include/rover_crsf_teleop/domain/crsf/crsf_protocol.hpp). The midpoint matters most:
-    # the stick -> twist mapping is defined about it, so a centred stick produces exactly 0.0.
-    # If `ros2 topic echo /rover/rc/channels` shows a different resting value for this transmitter,
-    # set channel_in_mid to that value. Channels are an array now: channel N is channels[N-1].
-    channel_in_min: 172
-    channel_in_mid: 992
-    channel_in_max: 1811
+    # Per-channel raw CRSF endpoints, index N-1 = channel N (channel 3 is the third entry).
+    # A one-element list is expanded to all 16, which is both how a pre-array configuration
+    # migrates and the honest way to say "nothing here has been measured yet".
+    #
+    # These are the NOMINAL endpoints from include/rover_crsf_teleop/domain/crsf/crsf_protocol.hpp.
+    # They are a starting point, not a description of any particular transmitter: endpoints, trim
+    # and expo move all three numbers. Measure the real ones with the calibration flow below - it
+    # writes them to calibration_file, which overrides everything here, per channel.
+    #
+    # The midpoint matters most: the stick -> twist mapping is defined about it, so a centred
+    # stick produces exactly 0.0. Only the channels named under "Stick axes" are read per tick;
+    # the rest are carried so a calibration can be measured, stored and displayed whole.
+    #                  ch1   ch2   ch3   ch4   ch5   ch6   ch7   ch8   ch9  ch10  ch11  ch12  ch13  ch14  ch15  ch16
+    channel_in_min:  [  172,  172,  172,  172,  172,  172,  172,  172,  172,  172,  172,  172,  172,  172,  172,  172]
+    channel_in_mid:  [  992,  992,  992,  992,  992,  992,  992,  992,  992,  992,  992,  992,  992,  992,  992,  992]
+    channel_in_max:  [ 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811, 1811]
 
     # Half-width, in raw counts, of the band around channel_in_mid that maps to exactly 0.0.
-    # Size this against where the sticks actually REST, not against frame noise: measured on this
-    # transmitter, ch3 rests at 1004 and ch1 at 987, i.e. 12 and 5 counts off the 992 midpoint.
-    # Anything narrower leaves a permanent creep command, which makes the hardware interface's
-    # E-Stop reset invariant unsatisfiable ("velocity commands are not zero").
-    # 30 counts is ~3.7 % of the 819-count half-throw and costs ~0.07 m/s of resolution at centre.
-    # To re-measure: `ros2 topic echo /rover/rc/channels` with both sticks released, and read
-    # channels[2] / channels[0].
-    channel_deadband: 30
+    # Size it against where the stick actually RESTS, not against frame noise: on this
+    # transmitter ch3 rests at 1004 and ch1 at 987, 12 and 5 counts off the nominal 992 midpoint.
+    # A deadband narrower than that leaves a permanent creep command, which makes the hardware
+    # interface's E-Stop reset invariant ("velocity commands are not zero") unsatisfiable.
+    #
+    # 30 counts is the value that had to cover BOTH sticks back when there was a single global
+    # midpoint. Calibrating removes that constraint: each channel gets a midpoint of its own, so
+    # its deadband only has to cover its own jitter - typically 8-15 counts, which is resolution
+    # handed back at centre.
+    channel_deadband: [   30,   30,   30,   30,   30,   30,   30,   30,   30,   30,   30,   30,   30,   30,   30,   30]
 
-    # Stick axes
+    # Where a measured calibration is kept between runs. It OVERRIDES the four arrays above when
+    # it loads, and which source is in force is logged at startup and reported by the
+    # "RC calibration" diagnostic - it is never a guess. Delete the file to come back to the
+    # values above.
+    #
+    # /config is a balena named volume (see rover_docker/docker-compose.yml): a balenaOS device
+    # filesystem is read-only outside it. Leave this empty to turn persistence off - a
+    # calibration can still be measured and applied, it just will not survive a restart.
+    calibration_file: /config/rover_crsf_teleop/rc_calibration.yaml
+
+    # A calibration session holds teleop off for as long as it runs, so an abandoned one - a
+    # closed browser tab mid-sweep - must not be able to do so forever. On expiry the session is
+    # cancelled, the previous values stay in effect and teleop resumes.
+    calibration_timeout_s: 300
+    # How often rc/calibration/state is republished while a session runs. Only the heartbeat:
+    # every phase change and every service call publishes immediately regardless.
+    calibration_state_rate_hz: 5.0
+
+    # A calibration is gated on the rover's REAL E-Stop, read off
+    # hardware_interface/gpio_state, not on the operator's word for it. "Engaged" means any of
+    # the motion-inhibiting stops is active - hardware button, software button, motor-driver
+    # fault or the safety latch - which is the same set rover_twist_mux locks motion on, so
+    # "safe to calibrate" means exactly "twist_mux would refuse to move".
+    #
+    # These are active-high: `true` is engaged. The one inverted field in that message is
+    # gpio_pin_motor_contactor_engaged, which is not an E-Stop bit and is not used here.
+    #
+    # How long a gpio_state sample stays trustworthy. It is published at 20 Hz, so a second is 20
+    # missed messages. Past it the state is "cannot verify" and a calibration is REFUSED rather
+    # than assumed safe - which also means no calibration without rover_hardware_interface
+    # running, so not on a bench and not in simulation.
+    e_stop_state_timeout_s: 1.0
+    # How long the E-Stop must stay un-engaged before a running calibration is cancelled. Not
+    # zero: the driver reports a Modbus read error as "clear", and the IO behind it only
+    # refreshes at 2 Hz, so a single not-engaged sample is a hiccup rather than consent being
+    # withdrawn - and cancelling on it would throw away a measurement that took minutes.
+    e_stop_grace_s: 1.0
+
+    # Stick axes. Out limits match rover_drive_controller's linear.x / angular.z caps in
+    # rover_controller/config/wheel_01_controller.yaml: anything above them is clipped per axis
+    # by diff_drive, which bends the commanded arc.
     linear_x_channel: 3
-    linear_x_out_min: -2.0    # m/s
-    linear_x_out_max: 2.0     # m/s
+    linear_x_out_min: -1.2    # m/s
+    linear_x_out_max: 1.2     # m/s
     linear_x_invert: false
 
     angular_z_channel: 1
-    angular_z_out_min: -5.0   # rad/s
-    angular_z_out_max: 5.0    # rad/s
+    angular_z_out_min: -1.0   # rad/s
+    angular_z_out_max: 1.0    # rad/s
     angular_z_invert: true
+
+    # Outer-wheel rim speed budget. Stick commands with |v| + |w| * track / 2 above this are scaled
+    # down as a whole (same factor on v and w), so the rover drives the arc the sticks asked for,
+    # just slower. 1.7 m/s = 10.3 rad/s at r = 0.1651, under the 10.958 rad/s URDF wheel limit with
+    # room for the wheel PID's feedforward + I trim. 0.0 disables.
+    max_wheel_rim_speed: 1.7        # m/s
+    # wheel_separation * wheel_separation_multiplier from wheel_01_controller.yaml
+    # (0.62602 * 1.63). Update together with the multiplier.
+    effective_track_width: 1.0204   # m
 
     # Switch channels. A channel below channel_switch_threshold counts as "low": low on
     # e_stop_channel sets the SW User E-Stop, high resets it; low on
     # e_stop_latch_reset_channel resets the E-Stop latch.
     e_stop_channel: 5
     e_stop_latch_reset_channel: 4
+    # Deliberately an absolute raw value, not a fraction of the calibrated range: a switch sits at
+    # the ends of its travel, so comparing raw counts is right, and re-deriving a safety-critical
+    # threshold from a measurement an operator has just taken is a worse failure mode than leaving
+    # it explicit. What calibration does buy is a startup warning when this value has fallen
+    # outside a switch channel's measured range - which would leave that switch reading one
+    # position forever.
     channel_switch_threshold: 500
     # Control ticks (20 ms each) spent at startup learning where the switches rest, so their
     # resting position doesn't fire a spurious E-Stop set/reset. 100 = 2 s.
@@ -74,8 +139,10 @@
     # RC link failsafe. When the link is judged lost the node publishes ONE zero command and then
     # goes silent, so the rover stops immediately and twist_mux falls through to its next source.
     # The link is healthy only while all of these hold:
-    #   - an rc/channels frame arrived within channel_timeout_ms (the receiver sends at 50 Hz, so 200 ms
-    #     is 10 missed frames);
+    #   - an rc/channels frame arrived within channel_timeout_ms (at the A1's measured 250 Hz
+    #     packet rate, 200 ms is ~50 missed frames - it was sized as 10 missed frames back when
+    #     the link was assumed to be 50 Hz. Keep it at 200: the right question is how long the
+    #     rover may keep driving on stale sticks, which is wall-clock, not a frame count);
     #   - if require_link_stats: an rc/link report arrived within link_stats_timeout_ms, and the
     #     uplink link quality (CRSF LQ, %) has not dropped below link_quality_lost_below since it
     #     was last at or above link_quality_recovered_at (hysteresis, so it can't flap).
@@ -98,6 +165,10 @@
     # arrive (WARN only - link loss is reported by "RC link", a dead byte stream by "RC serial
     # link"). This counts frames decoded off the byte stream, not messages on a topic, so it
     # measures the receiver's real packet rate: set it to what `ros2 topic hz /rover/rc/channels`
-    # reports (the ELRS packet rate, 50 Hz on the A1). Read once at startup.
-    rc_channels_expected_hz: 50.0
+    # reports. Measured 2026-09-20 on the A1: ~243 Hz, i.e. the ELRS 250 Hz packet-rate mode, not
+    # the 50 Hz this was originally set to - which is what made this diagnostic read "Frequency
+    # too high". Re-measure and update BOTH this and the failsafe note above if the transmitter's
+    # packet rate is ever changed; the tolerance below is wide enough (200-300 Hz) that the 2.8%
+    # the real rate sits off the nominal 250 does not matter. Read once at startup.
+    rc_channels_expected_hz: 250.0
     rc_channels_rate_tolerance: 0.2

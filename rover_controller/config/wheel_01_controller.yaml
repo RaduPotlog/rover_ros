@@ -45,12 +45,31 @@
         node_options_args: ["-r", "~/imu:=imu/data",
                             "-r", "~/transition_event:=_rover_imu_broadcaster/transition_event"]
 
-  # Wheel PID gains (all four identical). Units: rad/s in, rad/s out.
+  # Wheel PID gains. Units: rad/s in, rad/s out. Same p/i/d on all four; i_clamp differs
+  # front/rear (see below). Tuned with wheel_step_response, wheels lifted.
   # The hardware command is already rad/s scaled to duty (open loop), so feedforward_gain 1.0
-  # carries the bulk and PI only trims load/battery/slip error. p = i = 0 with feedforward 1.0
-  # is exactly the old open-loop behaviour - use it for A/B runs:
-  #   ros2 param set <ns>/pid_controller_<wheel> gains.<joint>.p 0.0   (and .i)
+  # carries the bulk and PID only trims load/battery/slip error. p = i = d = 0 with feedforward
+  # 1.0 is exactly the old open-loop behaviour - use it for A/B runs:
+  #   ros2 param set <ns>/pid_controller_<wheel> gains.<joint>.p 0.0   (and .i, .d)
   # u_clamp is the hardware full-duty speed (2800 rpm / 23.3 = 12.58 rad/s).
+  # save_i_term false: the integral is cleared each time the PIDs are (re)activated
+  # (e-stop, controller switch), so a stale I-term never carries into the next drive.
+  #
+  # Why these values (encoders are 20 Hz, so dead time is ~0.2 s and loop gain must stay low):
+  #   p 0.05  - P is nearly useless here: p = 1.0 rang the loop to 40-90 % overshoot. Keep it small.
+  #   i 1.0   - the integral does all the steady-state work. Open loop the feedforward is ~21 %
+  #             slow at 0.2 m/s (friction/deadband) and ~3 % fast at 0.8 m/s, so a single
+  #             feedforward scale cannot fix both and the integral is genuinely needed.
+  #   d 0.04  - damps the overshoot the integral causes without touching steady state. There is
+  #             no derivative filter, so this is near the noise limit: d = 0.08 amplified encoder
+  #             quantisation and made overshoot much WORSE (up to 29 %). Do not raise it.
+  #   i_clamp - this, not i, is what bounds overshoot: the integral winds up through the dead
+  #             time and saturates, so peak overshoot ~ i_clamp / step amplitude. The required
+  #             trim is roughly constant in rad/s while the overshoot budget is a percentage,
+  #             so the clamp is set per wheel from measurement: fl/fr overshoot most and need
+  #             0.25; rl/rr need ~0.33 to beat low-speed friction and have the headroom for it.
+  # Measured with these gains (median of 4 wheels, wheels lifted, 3 consecutive runs):
+  # overshoot <= 9.6 % and |steady-state error| <= 2.3 % on every step. Re-check on the ground.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
@@ -63,7 +82,7 @@
         - velocity
         
       gains:
-        rl_wheel_base_to_rl_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
+        rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.33, "i_clamp_max": 0.33, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_rr_wheel_base_to_rr_wheel_joint:
     ros__parameters:
@@ -77,7 +96,7 @@
         - velocity
         
       gains:
-        rr_wheel_base_to_rr_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
+        rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.33, "i_clamp_max": 0.33, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_fl_wheel_base_to_fl_wheel_joint:
     ros__parameters:
@@ -91,7 +110,7 @@
         - velocity
         
       gains:
-        fl_wheel_base_to_fl_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
+        fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_fr_wheel_base_to_fr_wheel_joint:
     ros__parameters:
@@ -105,8 +124,8 @@
         - velocity
         
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 0.3, "i": 1.0, "d": 0.0, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "conditional_integration"}
-
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
+        
   rover_imu_broadcaster:
     ros__parameters:
       sensor_name: "<namespace>/imu"
@@ -130,7 +149,7 @@
       wheel_separation: 0.62602
       wheel_radius: 0.1651
 
-      wheel_separation_multiplier: 1.5
+      wheel_separation_multiplier: 1.63
 
       left_wheel_radius_multiplier: 1.0
       right_wheel_radius_multiplier: 1.0
@@ -151,25 +170,28 @@
       cmd_vel_timeout: 0.5
       publish_limited_velocity: true
 
-      # linear.x and angular.z are limited independently, so the outer wheel rim speed is
-      #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.4695
-      # Keep that <= 1.8 m/s (10.9 rad/s): under the URDF joint limit (10.958 rad/s) and
-      # ~10% under the 2 m/s wheel maximum (hardware clamps at 2800 rpm / 23.3 = 12.58 rad/s).
+      # linear.x and angular.z are limited independently, so the outer wheel rim speed can reach
+      #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.5102
+      # Keep that <= 1.7 m/s (10.3 rad/s at r = 0.1651), under the URDF joint limit (10.958 rad/s).
+      # The margin is for the wheel PIDs: their output is feedforward * reference + P + I + D,
+      # and u_clamp only bounds the P + I + D part, so up to ~i_clamp (0.25 front, 0.33 rear)
+      # of trim rides on top of the reference. Enforced by test/test_wheel_geometry.py. rover_crsf_teleop scales stick
+      # commands against the same budget (max_wheel_rim_speed / effective_track_width).
       linear:
         x:
-          max_velocity: 1.0 # m/s
-          min_velocity: -1.0 # m/s
-          max_acceleration: 1.7 # m/s^2
-          max_deceleration: -1.7 # m/s^2
-          max_acceleration_reverse: -1.7 # m/s^2
-          max_deceleration_reverse: 1.7 # m/s^2
+          max_velocity: 1.2 # m/s
+          min_velocity: -1.2 # m/s
+          max_acceleration: 2.7 # m/s^2
+          max_deceleration: -2.7 # m/s^2
+          max_acceleration_reverse: -2.7 # m/s^2
+          max_deceleration_reverse: 2.7 # m/s^2
           max_jerk: .NAN # m/s^3
           min_jerk: .NAN # m/s^3
 
       angular:
         z:
-          max_velocity: 1.7 # rad/s
-          min_velocity: -1.7 # rad/s
+          max_velocity: 1.0 # rad/s
+          min_velocity: -1.0 # rad/s
           max_acceleration: 3.74 # rad/s^2
           max_deceleration: -3.74 # rad/s^2
           max_acceleration_reverse: -3.74 # rad/s^2

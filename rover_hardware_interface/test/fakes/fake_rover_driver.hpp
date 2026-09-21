@@ -89,12 +89,15 @@ public:
 
     bool readEStopState() override { return user_e_stop_triggered; }
     bool readEStopLatchState() override { return latch_active; }
+
+    bool readContactorEngagedState() override { return contactor_engaged; }
     void setEStop() override {}
     void resetEStop() override {}
     void resetEStopLatch() override {}
 
     bool user_e_stop_triggered = false;
     bool latch_active = false;
+    bool contactor_engaged = true;
 };
 
 }  // namespace rover_hardware_interface

@@ -149,8 +149,8 @@ void SafetyNode::init()
         "hardware_interface/rover_driver_state", 10,
         std::bind(&SafetyNode::driverStateSubscriberCallback, this, _1));
     io_state_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<IOStateMsg>(
-        "hardware_interface/gpio_state",
-        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        "hardware_interface/safety_command_echo",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
         std::bind(&SafetyNode::ioStateSubscriberCallback, this, _1));
     system_status_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<SystemStatusMsg>(
         "system_status", latest_state_qos,
@@ -277,7 +277,7 @@ void SafetyNode::driverStateSubscriberCallback(const RoverDriverStateMsg::Shared
 
 void SafetyNode::ioStateSubscriberCallback(const IOStateMsg::SharedPtr io_state)
 {
-    safety_tree_->getBlackboard()->set<bool>("sw_e_stop_state", io_state->gpio_pin_sw_e_stop_user_button);
+    safety_tree_->getBlackboard()->set<bool>("sw_e_stop_state", io_state->sw_e_stop_user_button);
     last_gpio_stamp_ = std::chrono::steady_clock::now();
 }
 
@@ -417,12 +417,18 @@ void SafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & st
     const auto now = std::chrono::steady_clock::now();
     const double timeout = param_listener_->get_params().input_timeout;
 
-    // gpio_state is transient-local and published on change only, so it cannot go stale.
+    // safety_command_echo is graded against input_timeout like every other input. An earlier version
+    // passed std::nullopt here on the premise that the topic is "transient-local and published on
+    // change only, so it cannot go stale". That premise is wrong: RoverSystem publishes it
+    // periodically from read(), gated on driver_states_update_period_ (20 Hz), not on change. The
+    // transient-local durability only means a late joiner gets the last sample - it says nothing
+    // about the publisher still being alive. Leaving it ungraded meant a dead hardware interface
+    // showed up here as a large, quietly-unjudged age value.
     infrastructure::fillSafetyInputsStatus(
         {
             {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
             {"system_status", infrastructure::ageSeconds(last_system_status_stamp_, now), timeout},
-            {"hardware_interface/gpio_state", infrastructure::ageSeconds(last_gpio_stamp_, now), std::nullopt},
+            {"hardware_interface/safety_command_echo", infrastructure::ageSeconds(last_gpio_stamp_, now), timeout},
         },
         status);
 }

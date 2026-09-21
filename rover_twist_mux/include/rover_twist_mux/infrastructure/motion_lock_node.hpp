@@ -23,17 +23,19 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-#include "rover_msgs/msg/gpio_state.hpp"
+#include "rover_msgs/msg/safety_command_echo.hpp"
+#include "rover_msgs/msg/safety_status.hpp"
 
 #include "rover_twist_mux/domain/motion_lock_health.hpp"
 #include "rover_twist_mux/domain/safety_io_flags.hpp"
 #include "rover_twist_mux/motion_lock_params.hpp"
+#include "rover_utils/shutdown_gate.hpp"
 
 namespace rover_twist_mux
 {
 
 /**
- * @brief Translates rover_msgs/GpioState into the std_msgs/Bool lock topic twist_mux consumes.
+ * @brief Translates the safety topics into the std_msgs/Bool lock topic twist_mux consumes.
  * @details twist_mux locks are typed std_msgs/Bool and nothing in the stack published one, so
  *          the safety IO could not gate the mux. This node is that adapter and nothing more:
  *          the decision itself lives in domain::isMotionInhibited().
@@ -42,8 +44,10 @@ namespace rover_twist_mux
  *          subscription and a timer.
  *
  *          Two failure modes are handled explicitly, both by asserting the lock:
- *            - no gpio_state received yet (startup), and
- *            - gpio_state gone stale beyond `gpio_timeout` (hardware interface died).
+ *            - either safety topic not received yet (startup),
+ *            - either gone stale beyond `gpio_timeout` (hardware interface died), and
+ *            - SafetyStatus.link_healthy false (the hardware interface is alive but its
+ *              link to the safety PLC is not, so the flags are last-known-good).
  *          Both are reported on the "Motion lock" diagnostic as ERROR; a lock held by a stop
  *          condition is WARN with its reasons.
  *          The lock is republished on a timer rather than on message arrival, because twist_mux
@@ -59,7 +63,9 @@ public:
         const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
 private:
-    void gpioStateCallback(const rover_msgs::msg::GpioState::SharedPtr msg);
+    void safetyStatusCallback(const rover_msgs::msg::SafetyStatus::SharedPtr msg);
+
+    void safetyCommandEchoCallback(const rover_msgs::msg::SafetyCommandEcho::SharedPtr msg);
 
     void timerCallback();
 
@@ -71,9 +77,12 @@ private:
 
     std::shared_ptr<motion_lock::ParamListener> param_listener_;
 
-    std::optional<domain::SafetyIoFlags> flags_;
+    // Both halves are required before a decision can be made; see evaluateLock().
+    std::optional<rover_msgs::msg::SafetyStatus> last_status_;
+    std::optional<rover_msgs::msg::SafetyCommandEcho> last_echo_;
 
-    rclcpp::Time last_gpio_stamp_;
+    rclcpp::Time last_status_stamp_;
+    rclcpp::Time last_echo_stamp_;
 
     // What the timer last published; the diagnostic reports exactly this.
     std::optional<domain::MotionLockHealth> last_health_;
@@ -81,11 +90,15 @@ private:
     // Latches the transition so a held lock does not spam the log at publish_frequency.
     std::optional<bool> last_logged_lock_;
 
-    rclcpp::Subscription<rover_msgs::msg::GpioState>::SharedPtr gpio_state_sub_;
+    rclcpp::Subscription<rover_msgs::msg::SafetyStatus>::SharedPtr safety_status_sub_;
+    rclcpp::Subscription<rover_msgs::msg::SafetyCommandEcho>::SharedPtr safety_command_echo_sub_;
 
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr motion_lock_pub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
+
+    // Cancels timer_ once shutdown starts, before rmw_zenoh closes its session.
+    rover_utils::ros::ShutdownGate shutdown_gate_;
 
     // Last member: its timer must not fire into a partially destroyed node.
     diagnostic_updater::Updater diagnostic_updater_;

@@ -18,16 +18,22 @@ cmd_vel -> rover_drive_controller (diff_drive) -> pid_controller_<wheel> x4 -> h
 `rover_drive_controller`'s wheel names are `<pid controller>/<joint>`, so it writes
 each PID's reference interface and reads back the PID's exported state (the measured
 wheel velocity) for odometry. Each PID uses `feedforward_gain: 1.0` - the hardware
-velocity command is an open-loop, rad/s-scaled duty cycle - and PI trims the error
-that load, battery voltage and slip leave. With `p = i = 0` it is exactly the old
+velocity command is an open-loop, rad/s-scaled duty cycle - and PID trims the error
+that load, battery voltage and slip leave. With `p = i = d = 0` it is exactly the old
 open-loop drive, which is the quickest A/B comparison (gains are live parameters):
 
 ```bash
 ros2 param set <ns>/pid_controller_fl_wheel_base_to_fl_wheel_joint \
-  gains.fl_wheel_base_to_fl_wheel_joint.p 0.0     # likewise .i, and for each wheel
+  gains.fl_wheel_base_to_fl_wheel_joint.p 0.0     # likewise .i and .d, and for each wheel
 ```
 
+`i_clamp_max/min` is per wheel (fl/fr 0.25, rl/rr 0.33) and is the gain that actually
+bounds overshoot - see the comment above the gains in `config/wheel_01_controller.yaml`.
+
 Each PID publishes `<pid>/controller_state` (reference, feedback, error, output).
+`save_i_term: false` clears each PID's integral whenever it is (re)activated; pid_controller
+has no reset service, so to reset on demand deactivate and reactivate
+`rover_drive_controller` together with its PIDs.
 Listing plain joint names as wheel names instead drives the wheels open loop; the
 launch file then spawns no PIDs (see below).
 
@@ -44,9 +50,14 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
    first, then on the ground. Tune the PID gains until overshoot stays under 10 %
    and steady-state error under 3 %. The DCC1000 encoders report at most every
    50 ms (20 Hz), while the controllers run at 100 Hz, so each PID gets a new
-   measurement only every ~5 cycles. Keep the PI gains modest, and read measured
+   measurement only every ~5 cycles. Keep the PID gains modest, and read measured
    dead times as accurate to about 50 ms. The driver logs each channel's actual
    encoder interval at startup.
+
+   `docs/wheel_pid_tuning_notes.md` records the measurements behind the current
+   gains, what each knob actually does on this plant (`i_clamp` is what bounds
+   overshoot, not `i`; `p` above ~0.1 rings the loop; `d` above 0.04 amplifies
+   encoder noise) and the remaining on-ground work. Read it before changing a gain.
 
    ```bash
    ros2 run rover_controller wheel_step_response --ros-args -r __ns:=/<ns> -p enable_motion:=true

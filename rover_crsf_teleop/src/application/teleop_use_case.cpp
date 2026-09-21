@@ -19,6 +19,23 @@
 namespace rover_crsf_teleop
 {
 
+TeleopConfig applyCalibration(const TeleopConfig & config, const ChannelCalibration & calibration)
+{
+    TeleopConfig calibrated = config;
+    calibrated.calibration = calibration;
+
+    // Each axis takes the endpoints of the channel it actually reads, keeping the output limits
+    // and inversion that came from the parameters. This is what per-channel calibration buys: the
+    // linear stick's 1004 resting count and the angular one's 987 no longer have to share one
+    // midpoint and one deadband wide enough for the worse of the two.
+    calibrated.linear_x_mapping =
+        mergedMapping(config.linear_x_mapping, calibration, config.linear_x_channel);
+    calibrated.angular_z_mapping =
+        mergedMapping(config.angular_z_mapping, calibration, config.angular_z_channel);
+
+    return calibrated;
+}
+
 TeleopUseCase::TeleopUseCase(
     const TeleopConfig & config,
     std::shared_ptr<VelocityCommandPort> velocity_port,
@@ -45,6 +62,14 @@ void TeleopUseCase::onLinkStats(const std::uint8_t link_quality, const SteadyTim
 
 TickStatus TeleopUseCase::tick(const SteadyTime now)
 {
+    // First, and before the first-frame check, so no branch below can be reached while inhibited.
+    // publish() swallows a repeated zero, so this is one zero and then silence - the same shape
+    // as the link-lost path, and twist_mux falls through to its next source.
+    if (inhibited_) {
+        publish(VelocityCommand{});
+        return TickStatus::kInhibited;
+    }
+
     if (!last_frame_.has_value()) {
         return TickStatus::kWaitingForFirstFrame;
     }
@@ -57,7 +82,7 @@ TickStatus TeleopUseCase::tick(const SteadyTime now)
     VelocityCommand command;
     command.linear_x = mapChannel(config_.linear_x_channel, config_.linear_x_mapping);
     command.angular_z = mapChannel(config_.angular_z_channel, config_.angular_z_mapping);
-    publish(command);
+    publish(limitRimSpeed(command, config_.max_wheel_rim_speed, config_.half_track_width));
 
     evaluateSwitches();
 
@@ -67,6 +92,17 @@ TickStatus TeleopUseCase::tick(const SteadyTime now)
 void TeleopUseCase::stop()
 {
     publish(VelocityCommand{});
+}
+
+void TeleopUseCase::setCommandInhibited(const bool inhibited)
+{
+    inhibited_ = inhibited;
+}
+
+void TeleopUseCase::rearmSwitches()
+{
+    e_stop_switch_.rearm();
+    latch_reset_switch_.rearm();
 }
 
 void TeleopUseCase::publish(const VelocityCommand & command)
@@ -86,6 +122,7 @@ TeleopDiagnostics TeleopUseCase::diagnostics(const SteadyTime now) const
 {
     TeleopDiagnostics diagnostics;
     diagnostics.first_frame_received = last_frame_.has_value();
+    diagnostics.inhibited = inhibited_;
     diagnostics.link = link_monitor_.snapshot(now);
     diagnostics.health = evaluateTeleopHealth(diagnostics.first_frame_received, diagnostics.link);
     diagnostics.last_command = last_command_;

@@ -34,7 +34,9 @@
 
 #include "rover_msgs/msg/driver_state_named.hpp"
 #include "rover_msgs/msg/rover_driver_state.hpp"
-#include "rover_msgs/msg/gpio_state.hpp"
+#include "rover_hardware_interface/domain/safety_link_health.hpp"
+#include "rover_msgs/msg/safety_command_echo.hpp"
+#include "rover_msgs/msg/safety_status.hpp"
 
 #include "rover_hardware_interface/domain/driver.hpp"
 #include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
@@ -46,13 +48,13 @@ namespace rover_hardware_interface
 
 // Standard messages
 using BoolMsg = std_msgs::msg::Bool;
-using SetBoolSrv = std_srvs::srv::SetBool;
 using TriggerSrv = std_srvs::srv::Trigger;
 
 // Rover messages
 using RoverDriverStateMsg = rover_msgs::msg::RoverDriverState;
 using DriverStateNamedMsg = rover_msgs::msg::DriverStateNamed;
-using GpioStateMsg = rover_msgs::msg::GpioState;
+using SafetyStatusMsg = rover_msgs::msg::SafetyStatus;
+using SafetyCommandEchoMsg = rover_msgs::msg::SafetyCommandEcho;
 
 template <typename SrvT, typename CallbackT>
 class ROSServiceWrapper
@@ -129,14 +131,21 @@ public:
 
     void publishRobotDriverState();
 
+    // Fans the raw pin map out across the two safety messages. Which pin lands in which is the
+    // whole point of the split: plant readings go to SafetyStatus, echoes of coils we drive go to
+    // SafetyCommandEcho. See updateSafetyMsgs().
     void updateMsgGpioStates(
         const std::unordered_map<RoverControllerGpio, bool> & pin_state);
 
-    void publishGpioStateMsg();
+    // Fills in the parts that do not come from a pin: header stamps, io_sample_time (derived from
+    // how long ago the PLC was actually polled) and link_healthy.
+    void updateSafetyLinkState(const SafetyLinkHealth & health);
+
+    void publishSafetyMsgs();
 
 protected:
 
-    bool updateGpioStateMsg(const RoverControllerGpio pin, const bool pin_value);
+    bool updateSafetyMsgs(const RoverControllerGpio pin, const bool pin_value);
 
     rclcpp::CallbackGroup::SharedPtr getOrCreateNodeCallbackGroup(const unsigned group_id, rclcpp::CallbackGroupType callback_group_type);
 
@@ -151,13 +160,18 @@ protected:
 
     // Staging messages owned by the update thread; try_publish copies them under its lock.
     RoverDriverStateMsg driver_state_msg_;
-    GpioStateMsg gpio_state_msg_;
+    SafetyStatusMsg safety_status_msg_;
+    SafetyCommandEchoMsg safety_command_echo_msg_;
 
     rclcpp::Publisher<RoverDriverStateMsg>::SharedPtr driver_state_publisher_;
     std::unique_ptr<realtime_tools::RealtimePublisher<RoverDriverStateMsg>> realtime_driver_state_publisher_;
 
-    rclcpp::Publisher<GpioStateMsg>::SharedPtr gpio_state_publisher_;
-    std::unique_ptr<realtime_tools::RealtimePublisher<GpioStateMsg>> realtime_gpio_state_publisher_;
+    rclcpp::Publisher<SafetyStatusMsg>::SharedPtr safety_status_publisher_;
+    std::unique_ptr<realtime_tools::RealtimePublisher<SafetyStatusMsg>> realtime_safety_status_publisher_;
+
+    rclcpp::Publisher<SafetyCommandEchoMsg>::SharedPtr safety_command_echo_publisher_;
+    std::unique_ptr<realtime_tools::RealtimePublisher<SafetyCommandEchoMsg>>
+        realtime_safety_command_echo_publisher_;
 
     diagnostic_updater::Updater diagnostic_updater_;
 

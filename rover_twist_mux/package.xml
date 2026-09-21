@@ -17,6 +17,7 @@
 
   <!-- Rover dependency -->
   <depend>rover_msgs</depend>
+  <depend>rover_utils</depend>
 
   <!-- Hardware and simulation both run the mux (rover_twist_mux.launch.py). -->
   <exec_depend>twist_mux</exec_depend>

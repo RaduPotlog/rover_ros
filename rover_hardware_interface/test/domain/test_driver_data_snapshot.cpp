@@ -133,6 +133,20 @@ TEST_F(DriverDataSnapshotTest, DriverStateFaultFlagsMarkFlagAndOverallErrorButNo
     EXPECT_TRUE(snapshot_.getFaultFlag().isEmergencyStop());
 }
 
+TEST(DriverStateReadingTest, DriverCurrentIsScaledToAmps)
+{
+    // Phidget reports raw current in mA; the URDF scale of 0.001 turns it into amps.
+    DrivetrainSettings settings = makeDrivetrainSettings();
+    settings.raw_current_to_amps_scale = 0.001f;
+    DriverDataSnapshot snapshot(settings);
+
+    DriverState state{};
+    state.driver_current = -1500;
+    snapshot.setDriverState(state, false);
+
+    EXPECT_FLOAT_EQ(snapshot.getDriverState().getDriverCurrent(), -1.5f);
+}
+
 TEST_F(DriverDataSnapshotTest, GetMotorStateConvertsRawEncoderTicksUsingDrivetrainSettings)
 {
     // pos=4 ticks with encoder_resolution=4 -> 1 full revolution -> 2*pi radians.

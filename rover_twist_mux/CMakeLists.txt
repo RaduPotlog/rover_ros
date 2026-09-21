@@ -15,6 +15,7 @@ set(PACKAGE_DEPENDENCIES
     generate_parameter_library
     rclcpp
     rover_msgs
+    rover_utils
     std_msgs
 )
 
@@ -44,6 +45,7 @@ target_link_libraries(${PROJECT_NAME}_ros
                       ${PROJECT_NAME}_core
                       motion_lock_params
 )
+target_include_directories(${PROJECT_NAME}_ros PUBLIC ${rover_utils_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_ros
     ${diagnostic_msgs_TARGETS}
     ${diagnostic_updater_TARGETS}
@@ -69,6 +71,12 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_motion_lock_health test/unit/test_motion_lock_health.cpp)
   target_link_libraries(test_motion_lock_health ${PROJECT_NAME}_core)
+
+  # ROS-level: that the fail-safe behaviour the two suites above describe actually reaches the
+  # motion_lock topic twist_mux consumes. The QoS, topic names and both-topics-required rule all
+  # live in the node, and a mistake in any of them yields a lock that never asserts.
+  ament_add_gtest(test_motion_lock_node test/integration/test_motion_lock_node.cpp)
+  target_link_libraries(test_motion_lock_node ${PROJECT_NAME}_ros ${PROJECT_NAME}_core)
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})

@@ -25,26 +25,36 @@ MotionLockHealth evaluateMotionLockHealth(
     const std::optional<SafetyIoFlags> & flags,
     const double gpio_age_s,
     const double gpio_timeout_s,
-    const MotionLockPolicy & policy)
+    const MotionLockPolicy & policy,
+    const bool link_healthy)
 {
     MotionLockHealth health;
 
     // Nothing received yet: deny motion rather than assume the rover is safe to drive.
     if (!flags.has_value()) {
-        health.message = "No gpio_state received yet: motion locked.";
+        health.message = "No safety state received yet: motion locked.";
         return health;
     }
 
     if (gpio_age_s > gpio_timeout_s) {
         char buffer[128];
         std::snprintf(
-            buffer, sizeof(buffer), "gpio_state stale (%.2f s > %.2f s): motion locked.",
+            buffer, sizeof(buffer), "safety state stale (%.2f s > %.2f s): motion locked.",
             gpio_age_s, gpio_timeout_s);
         health.message = buffer;
         return health;
     }
 
     health.reasons = motionInhibitReasons(*flags, policy);
+
+    // A down link is an input-trust failure, not a stop condition, so it is graded Error like
+    // staleness rather than Warn - but unlike staleness the messages keep flowing, so nothing
+    // else would have caught it.
+    if (!link_healthy) {
+        health.reasons.push_back(MotionInhibitReason::SafetyLinkUnhealthy);
+        health.message = "Safety PLC link unhealthy: motion locked.";
+        return health;
+    }
 
     if (health.reasons.empty()) {
         health.level = HealthLevel::Ok;

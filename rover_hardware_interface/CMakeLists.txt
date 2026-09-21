@@ -68,6 +68,7 @@ add_library(
     src/domain/imu_calibration.cpp
     src/domain/emergency_stop.cpp
     src/domain/velocity_command_guard.cpp
+    src/domain/contactor_monitor.cpp
     src/application/rover_control_loop_use_case.cpp
     src/utils.cpp
 )
@@ -216,6 +217,11 @@ if(BUILD_TESTING)
     test_velocity_command_guard test/domain/test_velocity_command_guard.cpp)
   target_link_libraries(test_velocity_command_guard ${PROJECT_NAME}_core)
 
+  # Cross-check of the E-Stop latch against the contactor's aux-contact feedback (EDM). Time is
+  # injected, so these run instantly.
+  ament_add_gtest(test_contactor_monitor test/domain/test_contactor_monitor.cpp)
+  target_link_libraries(test_contactor_monitor ${PROJECT_NAME}_core)
+
   # Behavioral unit tests for the application-layer RT-loop decision logic (E-Stop state,
   # fault-flag reset, write-command gating/serialization), driven with fake domain ports the same
   # way test_emergency_stop above is - no ROS, no real hardware.
@@ -300,6 +306,14 @@ if(BUILD_TESTING)
   ament_add_gtest(
     test_rover_safety_controller test/rover_safety_controller/test_rover_safety_controller.cpp)
   target_link_libraries(test_rover_safety_controller ${PROJECT_NAME})
+
+  # Isolation tests for the two port adapters between the domain and RoverSafetyController. Each
+  # is a hand-written mapping from a named domain concept to one GPIO enumerator; a wrong mapping
+  # there is invisible everywhere else in this package.
+  ament_add_gtest(
+    test_safety_controller_adapters
+    test/rover_safety_controller/test_safety_controller_adapters.cpp)
+  target_link_libraries(test_safety_controller_adapters ${PROJECT_NAME})
 
   # The Modbus client's own tests (connection retry, wire encoding, and a real round trip
   # against MB::TCP::Server) moved with the code to rover_transport/rover_modbus_driver.

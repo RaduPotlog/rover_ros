@@ -86,4 +86,38 @@ TEST(SwitchDebouncerTest, ThresholdItselfCountsAsHigh)
     EXPECT_EQ(debouncer.update(kThreshold - 1), SwitchPosition::kLow);
 }
 
+TEST(SwitchDebouncerTest, RearmForgetsThePositionAndRestartsTheSettlePeriod)
+{
+    SwitchDebouncer debouncer(kThreshold, 3);
+    debouncer.update(kHigh);
+    debouncer.update(kHigh);
+    debouncer.update(kHigh);
+    ASSERT_EQ(debouncer.update(kLow), SwitchPosition::kLow);
+
+    debouncer.rearm();
+    EXPECT_FALSE(debouncer.position().has_value());
+
+    // The three settle frames run again: nothing is emitted while they last, however much the
+    // position changes.
+    EXPECT_FALSE(debouncer.update(kHigh).has_value());
+    EXPECT_FALSE(debouncer.update(kLow).has_value());
+    EXPECT_FALSE(debouncer.update(kHigh).has_value());
+
+    // Past the settle period, real edges get through again.
+    EXPECT_EQ(debouncer.update(kLow), SwitchPosition::kLow);
+}
+
+TEST(SwitchDebouncerTest, RearmSuppressesTheEdgeFromAChangeNothingWasWatching)
+{
+    // What an RC calibration sweep does: the switch is walked to the other end while no frames
+    // are reaching the debouncer. Without the re-arm, the first frame afterwards looks like a
+    // real edge and fires an E-Stop service call for a change the operator never asked for.
+    SwitchDebouncer debouncer(kThreshold, 0);
+    debouncer.update(kHigh);
+
+    debouncer.rearm();
+
+    EXPECT_FALSE(debouncer.update(kLow).has_value());
+}
+
 }  // namespace rover_crsf_teleop

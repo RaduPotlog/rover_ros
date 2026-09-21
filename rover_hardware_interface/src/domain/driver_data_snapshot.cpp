@@ -127,7 +127,8 @@ float MotorStateReading::getTorque() const
 }
 
 DriverDataSnapshot::DriverDataSnapshot(const DrivetrainSettings & drivetrain_settings)
-: motor_state_(drivetrain_settings)
+: motor_state_(drivetrain_settings),
+  driver_state_(drivetrain_settings)
 {
 
 }

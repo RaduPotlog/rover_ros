@@ -40,6 +40,7 @@
 #include "rover_led/infrastructure/led_controller_diagnostics.hpp"
 #include "rover_led/infrastructure/pluginlib_animation_factory.hpp"
 #include "rover_led/led_controller_parameters.hpp"
+#include "rover_utils/shutdown_gate.hpp"
 
 namespace rover_led
 {
@@ -85,6 +86,9 @@ private:
 
     void publishAnimationCatalog(const std::vector<LedAnimationDescription> & animations);
 
+    // Pre-shutdown: cancels the render and state timers.
+    void stopTimers();
+
     // Diagnostics (hardware ID "Bumper Led"). Same default callback group as the render timer
     // and the service, so the segments and the recorded state are never read while they change.
     void diagnoseController(diagnostic_updater::DiagnosticStatusWrapper & status);
@@ -116,6 +120,9 @@ private:
     rclcpp::TimerBase::SharedPtr controller_timer_;
 
     rclcpp::TimerBase::SharedPtr state_timer_;
+
+    // After the timers it cancels, so it is unregistered before they go away.
+    rover_utils::ros::ShutdownGate shutdown_gate_;
 
     LedControllerDiagnostics diagnostics_;
 

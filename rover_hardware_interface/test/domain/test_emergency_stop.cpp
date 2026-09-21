@@ -32,6 +32,8 @@ public:
 
     bool isLatchActive() override { return latch_active; }
 
+    bool isContactorEngaged() override { return contactor_engaged; }
+
     void triggerUserButton(const bool state) override
     {
         trigger_user_button_calls.push_back(state);
@@ -46,6 +48,7 @@ public:
 
     bool user_button_active = true;
     bool latch_active = true;
+    bool contactor_engaged = true;
     std::vector<bool> trigger_user_button_calls;
     unsigned reset_latch_calls = 0;
 };

@@ -24,6 +24,7 @@
 #include "rover_diag_manager/application/monitor_system_use_case.hpp"
 #include "rover_diag_manager/domain/ports/system_metrics_source_port.hpp"
 #include "rover_diag_manager/system_diag_params.hpp"
+#include "rover_utils/shutdown_gate.hpp"
 
 namespace rover_diag_manager
 {
@@ -50,6 +51,9 @@ private:
     std::unique_ptr<application::MonitorSystemUseCase> monitor_system_;
 
     rclcpp::TimerBase::SharedPtr timer_;
+
+    // Cancels timer_ once shutdown starts, before rmw_zenoh closes its session.
+    rover_utils::ros::ShutdownGate shutdown_gate_;
 
     // Declared last so it is destroyed first: it holds a raw pointer to the publisher's
     // diagnostic callback, and the publisher is owned by monitor_system_.

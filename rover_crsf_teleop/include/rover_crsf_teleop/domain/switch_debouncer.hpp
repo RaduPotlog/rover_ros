@@ -53,11 +53,21 @@ public:
     // Last classified position, nullopt before the first frame. Includes the settle period.
     std::optional<SwitchPosition> position() const { return position_; }
 
+    // Forgets the recorded position and restarts the settle period, as if the switch had never
+    // been seen.
+    //
+    // Needed whenever frames stopped being fed while the switch could still move - an RC
+    // calibration sweep walks the E-Stop switch through both ends with teleop inhibited. Without
+    // this, the first frame after the gap is compared against the position from before it and
+    // fires a real E-Stop service call for a change nothing was watching.
+    void rearm();
+
 private:
 
     SwitchPosition classify(int raw_value) const;
 
     int threshold_;
+    unsigned int settle_frames_;
     unsigned int settle_frames_remaining_;
     std::optional<SwitchPosition> position_;
 };

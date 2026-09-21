@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <future>
 #include <memory>
 
 #include "rclcpp/rclcpp.hpp"
@@ -26,9 +27,29 @@ int main(int argc, char * argv[])
 
     // Single-threaded on purpose - see RoverCrsfTeleopNode. The node starts unconfigured; the
     // launch file (LifecycleNode, autostart) or a lifecycle manager drives it to active.
-    rclcpp::spin(node->get_node_base_interface());
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node->get_node_base_interface());
 
+    // On Ctrl-C, run the lifecycle shutdown transition while the context is still valid, so
+    // on_shutdown() publishes the stop command before the node goes away. The callback runs on
+    // rclcpp's signal thread: stop the executor and wait for spin() to return first, so the
+    // transition never races controlTimerCallback() on the executor thread.
+    std::promise<void> spin_exited;
+    std::shared_future<void> spin_exited_future = spin_exited.get_future().share();
+    auto context = node->get_node_base_interface()->get_context();
+    const auto pre_shutdown_handle = context->add_pre_shutdown_callback(
+        [&executor, &node, spin_exited_future]() {
+            executor.cancel();
+            spin_exited_future.wait();
+            node->shutdown();
+        });
+
+    executor.spin();
+    spin_exited.set_value();
+
+    // No-op after Ctrl-C; otherwise this runs the callback above.
     rclcpp::shutdown();
+    context->remove_pre_shutdown_callback(pre_shutdown_handle);
 
     return 0;
 }

@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <rclcpp/clock.hpp>
+#include <rclcpp/context.hpp>
 #include <rclcpp_lifecycle/lifecycle_publisher.hpp>
 #include <udp_msgs/msg/udp_packet.hpp>
 
@@ -46,7 +47,8 @@ public:
     Ros2UdpPacketPublisher(
         PublisherPtr publisher,
         UdpEndpoint endpoint,
-        rclcpp::Clock::SharedPtr clock);
+        rclcpp::Clock::SharedPtr clock,
+        rclcpp::Context::SharedPtr context);
 
     void publish(const std::vector<uint8_t> & buffer, std::size_t length) override;
 
@@ -55,6 +57,7 @@ private:
     PublisherPtr publisher_;
     UdpEndpoint endpoint_;
     rclcpp::Clock::SharedPtr clock_;
+    rclcpp::Context::SharedPtr context_;
 };
 
 }  // namespace rover::transport::udp

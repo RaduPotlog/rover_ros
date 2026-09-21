@@ -60,6 +60,27 @@ const std::string & getRequiredParam(
     return it->second;
 }
 
+// Optional counterpart to getRequiredParam: hardware parameters that may be omitted, in which
+// case the caller's compiled-in default stands.
+unsigned readOptionalUnsignedParam(
+    const std::unordered_map<std::string, std::string> & params, const std::string & key,
+    const unsigned default_value)
+{
+    const auto it = params.find(key);
+
+    if (it == params.end()) {
+        return default_value;
+    }
+
+    const int value = std::stoi(it->second);
+
+    if (value < 0) {
+        throw std::invalid_argument("'" + key + "' must be >= 0, got " + it->second + ".");
+    }
+
+    return static_cast<unsigned>(value);
+}
+
 }  // namespace
 
 void RoverA1System::readRoverControllerSettings()
@@ -76,6 +97,31 @@ void RoverA1System::readRoverControllerSettings()
         std::stoi(getRequiredParam(info_.hardware_parameters, "modbus_connection_retry_count")));
     modbus_settings_.connection_retry_delay_ms = static_cast<unsigned>(std::stoi(
         getRequiredParam(info_.hardware_parameters, "modbus_connection_retry_delay_ms")));
+
+    // Optional; the compiled-in defaults are the documented values, so an older URDF keeps
+    // working. All three bound how long the safety link can stall the heartbeat, so they are
+    // validated rather than trusted - a zero period would spin, and a response timeout longer
+    // than the kick period lets one stalled transaction eat a whole tick.
+    modbus_settings_.response_timeout_ms = readOptionalUnsignedParam(
+        info_.hardware_parameters, "modbus_response_timeout_ms",
+        rover::transport::modbus::kDefaultResponseTimeoutMs);
+
+    safety_controller_settings_.wdg_kick_period_ms = readOptionalUnsignedParam(
+        info_.hardware_parameters, "safety_wdg_kick_period_ms", kDefaultWdgKickPeriodMs);
+
+    safety_controller_settings_.io_poll_period_ms = readOptionalUnsignedParam(
+        info_.hardware_parameters, "safety_io_poll_period_ms", kDefaultIoPollPeriodMs);
+
+    safety_controller_settings_.latch_reset_pulse_ms = readOptionalUnsignedParam(
+        info_.hardware_parameters, "safety_latch_reset_pulse_ms", kDefaultLatchResetPulseMs);
+
+    if (safety_controller_settings_.wdg_kick_period_ms == 0) {
+        throw std::invalid_argument("'safety_wdg_kick_period_ms' must be > 0.");
+    }
+
+    if (safety_controller_settings_.io_poll_period_ms == 0) {
+        throw std::invalid_argument("'safety_io_poll_period_ms' must be > 0.");
+    }
 }
 
 void RoverA1System::defineRoverController()
@@ -85,7 +131,7 @@ void RoverA1System::defineRoverController()
     // Modbus-backed type directly (see rover_system.hpp's RoverGpioPort/EmergencyStopInterface
     // member comments).
     auto rover_safety_controller_impl =
-        std::make_shared<RoverSafetyController>(modbus_settings_);
+        std::make_shared<RoverSafetyController>(modbus_settings_, safety_controller_settings_);
 
     rover_controller_ = std::make_shared<RoverSafetyControllerGpioAdapter>(rover_safety_controller_impl);
 
@@ -235,7 +281,7 @@ void RoverA1System::diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper &
         std::make_pair(std::string("Rear Right"), rear_right_driver_state)};
 
     for (const auto & [driver_name, driver_state] : driver_states_with_names) {
-        status.add(driver_name + " driver current (A)", driver_state.getDriverCurrent());
+        status.addf(driver_name + " driver current (A)", "%.2f", driver_state.getDriverCurrent());
         status.add(driver_name + " driver temperature (\u00B0C)", driver_state.getTemperature());
     }
 

@@ -32,7 +32,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
 
-#include "rover_msgs/msg/gpio_state.hpp"
+#include "rover_msgs/msg/safety_command_echo.hpp"
 #include "rover_msgs/msg/rover_driver_state.hpp"
 #include "rover_msgs/msg/system_status.hpp"
 
@@ -47,7 +47,12 @@ namespace rover_safety
 using BatteryStateMsg = sensor_msgs::msg::BatteryState;
 using BoolMsg = std_msgs::msg::Bool;
 using RoverDriverStateMsg = rover_msgs::msg::RoverDriverState;
-using IOStateMsg = rover_msgs::msg::GpioState;
+// The SW E-Stop request this system itself drives - which is exactly what the tree needs:
+// `_skipIf="sw_e_stop_state"` means "do not re-assert a stop we are already asserting".
+// That is a read-back of our own command, so it belongs to SafetyCommandEcho rather than
+// SafetyStatus, and skipping an action on it is safe in a way that permitting motion on it
+// would not be.
+using IOStateMsg = rover_msgs::msg::SafetyCommandEcho;
 using SystemStatusMsg = rover_msgs::msg::SystemStatus;
 using TriggerSrv = std_srvs::srv::Trigger;
 

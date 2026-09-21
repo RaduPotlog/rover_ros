@@ -47,4 +47,9 @@ RoverSafetyControllerGpioAdapter::queryControlInterfaceIOStates()
     return rover_controller_->queryControlInterfaceIOStates();
 }
 
+SafetyLinkHealth RoverSafetyControllerGpioAdapter::linkHealth() const
+{
+    return rover_controller_->getHealth();
+}
+
 }  // namespace rover_hardware_interface

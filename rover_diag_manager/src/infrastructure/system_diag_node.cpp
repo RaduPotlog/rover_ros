@@ -31,6 +31,11 @@ SystemDiagNode::SystemDiagNode(
     std::shared_ptr<domain::SystemMetricsSourcePort> metrics_source,
     const rclcpp::NodeOptions & options)
 : rclcpp::Node(node_name, options)
+, shutdown_gate_(get_node_base_interface()->get_context(), [this]() {
+    if (timer_) {
+        timer_->cancel();
+    }
+})
 {
     RCLCPP_INFO(get_logger(), "Initializing.");
 
