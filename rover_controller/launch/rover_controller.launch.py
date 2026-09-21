@@ -113,6 +113,16 @@ def generate_launch_description():
         ),
     )
 
+    extra_controller_config_path = LaunchConfiguration("extra_controller_config_path")
+    declare_extra_controller_config_path_arg = DeclareLaunchArgument(
+        "extra_controller_config_path",
+        default_value="",
+        description=(
+            "Optional parameter file the spawners load after controller_config_path, so its "
+            "values override it (e.g. simulation-only gains). Empty = none."
+        ),
+    )
+
     log_level = LaunchConfiguration("log_level")
     declare_log_level_arg = DeclareLaunchArgument(
         "log_level",
@@ -224,6 +234,8 @@ def generate_launch_description():
         # scoped configurations have been restored. Resolve values used by
         # delayed spawners now, while this launch's arguments are in scope.
         config_path = resolved_config.perform(context)
+        extra_config_path = extra_controller_config_path.perform(context)
+        param_files = [config_path] + ([extra_config_path] if extra_config_path else [])
         namespace_value = namespace.perform(context)
         log_level_value = log_level.perform(context)
         rcl_log_level = limit_log_level_to_info(
@@ -238,9 +250,9 @@ def generate_launch_description():
                 'controller_manager',
                 '--controller-manager-timeout',
                 '10',
-                '--param-file',
-                config_path,
             ]
+            for param_file in param_files:
+                arguments.extend(['--param-file', param_file])
             if group:
                 # One switch request, so controller_manager orders the chain (PIDs first).
                 arguments.append('--activate-as-group')
@@ -303,6 +315,7 @@ def generate_launch_description():
         declare_robot_model_arg,
         declare_wheel_type_arg,
         declare_controller_config_path_arg,
+        declare_extra_controller_config_path_arg,
         declare_namespace_arg,
         declare_use_sim_arg,
         declare_log_level_arg,

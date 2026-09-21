@@ -32,6 +32,9 @@ rover's router would join the simulated nodes to the real rover.
   - `include/spawn_robot.launch.py` spawns the URDF at `x`/`y`/`z`/`roll`/`pitch`/`yaw`
     (default `0, -2.0, 0.2`). The model is named after the namespace, else `rover_a1`.
   - `rover_controller` with `use_sim:=True`, so `gz_ros2_control` owns the controller manager.
+    `config/sim_wheel_pid.yaml` is loaded after the real controller config and sets the wheel
+    PIDs' `d` to 0: Gazebo's wheels have none of the encoder/motor lag that gain is tuned for,
+    and with it the loop oscillates between its limits.
   - `rover_localization` with `use_sim:=True use_ekf:=True`; `fuse_gps` follows `use_gps`, which
     adds `rover_gps_heading_node`, `rover_navsat_transform_node` and `rover_ekf_global_node`.
   - `rover_twist_mux` (mux + `rover_motion_lock_node`), as on the rover:

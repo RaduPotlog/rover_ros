@@ -1,0 +1,28 @@
+# Simulation-only overrides for the wheel PIDs, loaded after rover_controller's
+# wheel_01_controller.yaml (the spawner applies its param files in order, so these win).
+#
+# The real gains are tuned against 20 Hz encoders and ~0.2 s of motor dead time. Gazebo's
+# velocity joints have neither: the wheel reaches the commanded speed within one 10 ms control
+# step, so the derivative term acts with a loop gain of about d / dt = 0.04 / 0.01 = 4 and the
+# loop oscillates between +/-u_clamp even with the rover standing still. d = 0 keeps the rest of
+# the real tuning (feedforward, p, i, clamps) and is stable in simulation.
+/**:
+  pid_controller_rl_wheel_base_to_rl_wheel_joint:
+    ros__parameters:
+      gains:
+        rl_wheel_base_to_rl_wheel_joint: {"d": 0.0}
+
+  pid_controller_rr_wheel_base_to_rr_wheel_joint:
+    ros__parameters:
+      gains:
+        rr_wheel_base_to_rr_wheel_joint: {"d": 0.0}
+
+  pid_controller_fl_wheel_base_to_fl_wheel_joint:
+    ros__parameters:
+      gains:
+        fl_wheel_base_to_fl_wheel_joint: {"d": 0.0}
+
+  pid_controller_fr_wheel_base_to_fr_wheel_joint:
+    ros__parameters:
+      gains:
+        fr_wheel_base_to_fr_wheel_joint: {"d": 0.0}

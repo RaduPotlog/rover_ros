@@ -135,6 +135,9 @@ def generate_launch_description():
             "namespace": namespace,
             "publish_robot_state": "True",
             "use_sim": "True",
+            "extra_controller_config_path": PathJoinSubstitution(
+                [FindPackageShare("rover_gazebo"), "config", "sim_wheel_pid.yaml"]
+            ),
         }.items(),
     )
 
