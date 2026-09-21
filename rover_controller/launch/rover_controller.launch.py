@@ -242,7 +242,9 @@ def generate_launch_description():
                 config_path,
             ]
             if group:
-                # One switch request, so controller_manager orders the chain (PIDs first).
+                # One switch request, so controller_manager activates the chain together. It does
+                # NOT make the PIDs update before diff_drive on the first cycle; the PIDs'
+                # seeded exported state (SeededPidController) is what keeps that cycle valid.
                 arguments.append('--activate-as-group')
             if include_log_args:
                 arguments.extend([
