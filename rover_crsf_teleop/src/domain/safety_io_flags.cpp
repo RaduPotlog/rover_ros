@@ -17,11 +17,11 @@
 namespace rover_crsf_teleop
 {
 
-bool motionIsInhibited(const SafetyIoFlags & flags)
+bool isSafeToCalibrate(const SafetyIoFlags & flags)
 {
-    // Active-high, either one. Both are plant state read back from the PLC - see the header for
-    // why the two sw_* command echoes are deliberately not part of this decision.
-    return flags.hw_e_stop_user_button || flags.sw_e_stop_latch_status;
+    // AND, not OR: this grants a permit. See the header.
+    return flags.hw_e_stop_user_button && flags.sw_e_stop_latch_status &&
+           !flags.motor_contactor_engaged;
 }
 
 }  // namespace rover_crsf_teleop

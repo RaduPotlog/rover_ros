@@ -31,44 +31,52 @@ enum class EStopState
     kReleased,
 };
 
-// The PLANT state that decides whether the rover can actually move, as plain bools so the rules
-// stay free of ROS types. Sourced from rover_msgs/SafetyStatus only.
+// The plant state that decides whether it is safe to calibrate the RC sticks, as plain bools so
+// the rules stay free of ROS types. Sourced from rover_msgs/SafetyStatus only.
 //
-// Polarity: every field is `true` when that stop is ACTIVE. There is no inversion anywhere in the
-// chain - readDiscreteContact() returns the Modbus bit verbatim, the publisher assigns it
-// verbatim, and EmergencyStop::readEStopState() documents "the port reports `true` when the
-// E-Stop is triggered ... no negation".
+// THIS IS A PERMIT, NOT AN INHIBIT. rover_twist_mux reads the same kind of signals the other way
+// round: for it an active stop DENIES motion, so OR-ing in every stop it can find only ever stops
+// more, and more inputs are safer. Here an active stop GRANTS permission to sweep the sticks to
+// full throw while someone stands next to the rover. OR-ing more inputs into a permit only ever
+// permits more, so the evidence is AND-ed instead, and only evidence that cannot be undone from
+// somewhere else is accepted:
 //
-// WHY THE TWO sw_* STOPS ARE NOT HERE. They used to be, back when everything arrived on one
-// undifferentiated GpioState topic. They are read-backs of coils this system writes - "we asked
-// the PLC to trip" - and they now live in rover_msgs/SafetyCommandEcho. That distinction matters
-// specifically here, because of which way this node reasons: an active stop is what GRANTS
-// permission to sweep the sticks to full throw. Granting that on the strength of a request we
-// issued ourselves would be a fail-open if the PLC never acted on it. `latch_active` is the
-// PLC's own answer and follows a software stop request within one poll, so nothing is lost by
-// waiting for it.
+//   * hw_e_stop_user_button - the physical button. It is the only stop nothing can clear
+//     remotely: the PLC latch is set-dominant, so while the button is down no
+//     sw_e_stop_latch_reset call can re-energise the contactor. A latch set by the software
+//     E-Stop (the RC switch, rover_safety, a service call) is NOT enough, because any of those
+//     sources - or Foxglove, the Cockpit, a shell - can clear it with one Trigger call while the
+//     operator is mid-sweep. This used to be OR-ed with the latch, which let exactly that
+//     through: SW E-Stop on, latch set, physical button released, calibration allowed.
+//   * sw_e_stop_latch_status - the PLC has actually acted on it.
+//   * !motor_contactor_engaged - the drive is provably dead: the contacts are confirmed open by
+//     the contactor's auxiliary contact, which is genuine feedback, not a mirror of the latch.
 //
-// (rover_twist_mux does still gate on those echoes - but it only ever uses them to INHIBIT
-// motion, which is the safe direction. See rover_msgs/SafetyCommandEcho.)
+// The software stop *requests* (rover_msgs/SafetyCommandEcho) are deliberately absent: they are
+// read-backs of coils this system writes, and granting a permit on our own request is a
+// fail-open by construction.
 //
-// NOTE ON THE DEFAULTS. rover_twist_mux's equivalent struct defaults every flag to `true`,
-// because for it "assume a stop is active" denies motion and is therefore the safe guess. Here
-// the meaning is reversed, so defaulting to `true` would be a silent fail-open. These default to
-// `false`, and a node that has heard nothing reports kUnknown rather than building a
-// default-constructed value and calling it engaged.
+// DEFAULTS are the non-permitting values - button released, latch clear, contactor engaged
+// (drive assumed live). rover_twist_mux defaults the other way for the same reason in reverse.
+// A node that has heard nothing reports kUnknown anyway rather than building one of these.
 struct SafetyIoFlags
 {
     // Physical E-Stop button, from the PLC's discrete input. `true` = pressed.
     bool hw_e_stop_user_button{false};
 
-    // The PLC's own E-Stop latch. `true` = latched, a stop is being held until an explicit reset.
-    // This is the authoritative "the PLC has tripped" signal.
+    // The PLC's own E-Stop latch. `true` = latched.
     bool sw_e_stop_latch_status{false};
+
+    // Motor contactor aux-contact feedback. `true` = contacts CLOSED, drive live. Note the
+    // inverted sense relative to the two fields above.
+    bool motor_contactor_engaged{true};
 };
 
-// True when a stop is confirmed by the PLC itself, i.e. the rover cannot be driven and it is safe
-// to sweep the sticks to full throw.
-bool motionIsInhibited(const SafetyIoFlags & flags);
+// True only when the physical E-Stop is pressed, the PLC has latched, and the contactor has
+// actually opened - i.e. the rover cannot be driven and nothing remote can change that. Named
+// for what it decides rather than after rover_twist_mux's isMotionInhibited(): the two used to
+// share a name while meaning opposite things, which is part of how the OR-ed version survived.
+bool isSafeToCalibrate(const SafetyIoFlags & flags);
 
 }  // namespace rover_crsf_teleop
 

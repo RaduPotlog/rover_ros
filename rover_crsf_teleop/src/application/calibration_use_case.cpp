@@ -85,8 +85,11 @@ namespace
 std::string eStopRefusal(const EStopState e_stop)
 {
     if (e_stop == EStopState::kReleased) {
-        return "Engage the E-Stop before calibrating: the sweep drives the sticks to full throw, "
-               "and RC teleop is not the only thing that can command this rover.";
+        return "Press the physical E-Stop button on the rover before calibrating. The sweep drives "
+               "the sticks to full throw and RC teleop is not the only thing that can command this "
+               "rover. A software E-Stop is not enough: it can be cleared remotely while you are "
+               "standing next to the rover, and the physical button cannot. Start stays disabled "
+               "until the button is pressed and the motor contactor has opened.";
     }
 
     return "Cannot verify the E-Stop: nothing recent on hardware_interface/safety_status. Is "
@@ -150,7 +153,7 @@ void CalibrationUseCase::onEStop(const EStopState e_stop, const SteadyTime now)
     }
 
     // Only after the grace window. The driver reports a Modbus read error as "clear" and the
-    // underlying IO refreshes at 2 Hz, so one not-engaged sample is a hiccup, not consent being
+    // underlying IO refreshes at 10 Hz, so one not-engaged sample is a hiccup, not consent being
     // withdrawn - and cancelling on it would throw away a measurement that took minutes.
     if ((now - *e_stop_lost_at_) < e_stop_grace_) {
         return;

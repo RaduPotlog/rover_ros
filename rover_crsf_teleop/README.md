@@ -84,12 +84,16 @@ deactivate ──▶ start(e_stop_confirmed) ──▶ sweep ──▶ finish �
                       kCenter              kSweep    kReview     kIdle
 ```
 
-1. **Engage the E-Stop and deactivate the node.** Three independent interlocks, because the sweep
-   drives the sticks to full throw and RC teleop is not the only thing that can command this
-   rover:
-   - the node reads `hardware_interface/gpio_state` itself and refuses unless a stop is actually
-     active. Not the operator's word for it, and **"cannot verify" refuses too** — no
-     `rover_hardware_interface`, no calibration, on a bench or anywhere else;
+1. **Press the physical E-Stop and deactivate the node.** Three independent interlocks, because
+   the sweep drives the sticks to full throw and RC teleop is not the only thing that can command
+   this rover:
+   - the node reads `hardware_interface/safety_status` itself and refuses unless the **physical
+     button is pressed, the PLC has latched, and the motor contactor has opened** — all three.
+     A software E-Stop (RC switch, service call) does not count even though it also sets the
+     latch: it can be cleared remotely while the operator is standing at the rover, and the
+     physical button cannot, because the PLC latch is set-dominant. Not the operator's word for
+     it either, and **"cannot verify" refuses too** — no `rover_hardware_interface`, no
+     calibration, on a bench or anywhere else;
    - the operator still confirms it, which the node also requires. Evidence and intent are
      separate conditions: the topic can be right while nobody is standing at the rover;
    - `start` refuses while the node is ACTIVE, and `on_activate` refuses while a session runs.

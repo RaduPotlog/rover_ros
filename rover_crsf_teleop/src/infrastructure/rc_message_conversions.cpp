@@ -156,6 +156,7 @@ SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::SafetyStatus & message)
     SafetyIoFlags flags;
     flags.hw_e_stop_user_button = message.hw_e_stop_user_button;
     flags.sw_e_stop_latch_status = message.latch_active;
+    flags.motor_contactor_engaged = message.motor_contactor_engaged;
     return flags;
 }
 

@@ -479,7 +479,7 @@ TEST(CalibrationUseCaseTest, StartIsRefusedWhileTheEStopIsReleased)
         use_case.start(true, EStopState::kReleased, fixture.now);
 
     EXPECT_FALSE(outcome.ok);
-    EXPECT_NE(outcome.message.find("Engage the E-Stop"), std::string::npos);
+    EXPECT_NE(outcome.message.find("Press the physical E-Stop"), std::string::npos);
     EXPECT_FALSE(fixture.teleop.inhibited());
 }
 

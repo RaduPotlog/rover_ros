@@ -165,13 +165,30 @@ public:
     // Channel N is channels()[N - 1].
     RcFrame & channels() { return channels_; }
 
-    // Publishes the safety status with the E-Stop engaged or released. Active-high: `true` is
-    // engaged, which is what permits a calibration. link_healthy is set because a node that is
-    // told the PLC link is down must report "cannot verify" regardless of the pin values.
+    // Publishes the safety status as a real press of the physical E-Stop looks (button in, PLC
+    // latched, contactor open) or as a released one. Engaged is what permits a calibration.
+    // link_healthy is set because a node that is told the PLC link is down must report "cannot
+    // verify" regardless of the pin values.
     void publishEStop(const bool engaged)
     {
         SafetyStatus message;
         message.hw_e_stop_user_button = engaged;
+        message.latch_active = engaged;
+        message.motor_contactor_engaged = !engaged;
+        message.link_healthy = true;
+        gpio_state_ = message;
+        gpio_state_pub_->publish(message);
+    }
+
+    // The state reported from the rover: the software E-Stop (RC switch) has set the PLC latch
+    // and the contactor has opened, but the physical button is released. Any Trigger call can
+    // clear that latch, so it must not count as engaged.
+    void publishSoftwareEStopOnly()
+    {
+        SafetyStatus message;
+        message.hw_e_stop_user_button = false;
+        message.latch_active = true;
+        message.motor_contactor_engaged = false;
         message.link_healthy = true;
         gpio_state_ = message;
         gpio_state_pub_->publish(message);
@@ -838,7 +855,26 @@ TEST_F(TeleopCalibrationTest, StartIsRefusedWhileTheEStopIsReleased)
     const auto response = startCalibration(true);
 
     EXPECT_FALSE(response->success);
-    EXPECT_NE(response->message.find("Engage the E-Stop"), std::string::npos);
+    EXPECT_NE(response->message.find("Press the physical E-Stop"), std::string::npos);
+}
+
+// Reproduces the report from the rover: SW E-Stop on, latch set, physical button released - and
+// Start went ahead. A software-set latch can be cleared remotely while the operator is standing
+// next to the rover, so only the physical button may grant the permit.
+TEST_F(TeleopCalibrationTest, StartIsRefusedOnASoftwareEStopWithoutThePhysicalButton)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    harness_->publishSoftwareEStopOnly();
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->e_stop == RcCalibrationState::ESTOP_RELEASED;
+    })) << "a software-only E-Stop was still reported as engaged";
+
+    const auto response = startCalibration(true);
+
+    EXPECT_FALSE(response->success);
+    EXPECT_NE(response->message.find("Press the physical E-Stop"), std::string::npos);
 }
 
 TEST_F(TeleopCalibrationTest, ReleasingTheEStopCancelsARunningCalibration)

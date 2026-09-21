@@ -689,7 +689,7 @@ EStopState RoverCrsfTeleopNode::eStopState(const SteadyTime now) const
         return EStopState::kUnknown;
     }
 
-    return motionIsInhibited(*last_safety_io_) ? EStopState::kEngaged : EStopState::kReleased;
+    return isSafeToCalibrate(*last_safety_io_) ? EStopState::kEngaged : EStopState::kReleased;
 }
 
 void RoverCrsfTeleopNode::updateCalibrationEStop()
