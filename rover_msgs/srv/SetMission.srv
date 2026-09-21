@@ -1,0 +1,8 @@
+# Replace the active mission with these waypoints and start it (rover_mission_manager).
+# Cancel it with run_mission (std_srvs/SetBool, data: false).
+
+string mission_id                        # Label for status reporting; empty = generated
+geometry_msgs/PoseStamped[] waypoints    # Visited in order; frame_id empty or the manager's goal frame
+---
+bool success
+string message

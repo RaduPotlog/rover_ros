@@ -1,0 +1,7 @@
+# Create (empty id) or update a place on the active map
+
+rover_msgs/Place place
+---
+bool success
+string message
+rover_msgs/Place place      # As stored, with its id

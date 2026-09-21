@@ -1,0 +1,6 @@
+# Delete a saved map and its places. The active map cannot be deleted.
+
+string name
+---
+bool success
+string message

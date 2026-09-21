@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(
@@ -34,6 +35,12 @@ rosidl_generate_interfaces(
     "msg/RcCalibrationState.msg"
     "msg/RcChannels.msg"
     "msg/RcLinkStatus.msg"
+    "msg/MissionState.msg"
+    "msg/Place.msg"
+    "msg/PlaceList.msg"
+    "msg/MapInfo.msg"
+    "msg/MapList.msg"
+    "msg/LocalizationState.msg"
 
     "srv/SetLedBrightness.srv"
     "srv/SetLedAnimation.srv"
@@ -41,9 +48,16 @@ rosidl_generate_interfaces(
     "srv/StopLedAnimation.srv"
     "srv/SetRcCalibration.srv"
     "srv/StartRcCalibration.srv"
+    "srv/SetMission.srv"
+    "srv/SavePlace.srv"
+    "srv/DeletePlace.srv"
+    "srv/SaveMap.srv"
+    "srv/LoadMap.srv"
+    "srv/DeleteMap.srv"
 
     DEPENDENCIES
         builtin_interfaces
+        geometry_msgs
         std_msgs
 )
 
