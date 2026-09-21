@@ -2,6 +2,11 @@
 # diff_drive writes each PID's reference interface (its wheel names are
 # "<pid controller>/<joint>"), and each PID closes the loop on the encoder velocity.
 # The launch file spawns the PIDs named there together with the drive controller.
+# The PIDs are rover_controller/SeededPidController, not the stock pid_controller/PidController:
+# the stock one exports NaN until its first update, the chained diff_drive reads that on its
+# first cycle ("Either the left or right wheel velocity is invalid"), and controller_manager
+# then deactivates the whole chain - on the real rover, every single activation.
+# See include/rover_controller/seeded_pid_controller.hpp.
 /**:
   controller_manager:
     ros__parameters:
@@ -19,19 +24,19 @@
         node_options_args: ["-r", "~/transition_event:=_rover_joint_state_broadcaster/transition_event"]
    
       pid_controller_rl_wheel_base_to_rl_wheel_joint:
-        type: pid_controller/PidController
+        type: rover_controller/SeededPidController
         node_options_args: ["-r", "~/transition_event:=_pid_controller_rl_wheel_base_to_rl_wheel_joint/transition_event"]
 
       pid_controller_rr_wheel_base_to_rr_wheel_joint:
-        type: pid_controller/PidController
+        type: rover_controller/SeededPidController
         node_options_args: ["-r", "~/transition_event:=_pid_controller_rr_wheel_base_to_rr_wheel_joint/transition_event"]
 
       pid_controller_fl_wheel_base_to_fl_wheel_joint:
-        type: pid_controller/PidController
+        type: rover_controller/SeededPidController
         node_options_args: ["-r", "~/transition_event:=_pid_controller_fl_wheel_base_to_fl_wheel_joint/transition_event"]
 
       pid_controller_fr_wheel_base_to_fr_wheel_joint:
-        type: pid_controller/PidController
+        type: rover_controller/SeededPidController
         node_options_args: ["-r", "~/transition_event:=_pid_controller_fr_wheel_base_to_fr_wheel_joint/transition_event"]
             
       rover_drive_controller:

@@ -1,0 +1,6 @@
+# Save the map being built (MAPPING mode) under /maps/<name>/
+
+string name                 # [A-Za-z0-9_-], 1..64 characters
+---
+bool success
+string message

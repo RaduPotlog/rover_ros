@@ -1,0 +1,10 @@
+# Switch to LOCALIZATION on a saved map (map_server + AMCL)
+
+string name
+bool set_initial_pose       # true = seed AMCL at (x, y, theta) below
+float64 x
+float64 y
+float64 theta
+---
+bool success
+string message

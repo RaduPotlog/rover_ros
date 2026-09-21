@@ -56,7 +56,8 @@ def test_drive_controller_chains_through_declared_wheel_pids(wheel_type):
     assert len(wheels) == 2 * drive['wheels_per_side']
     for wheel in wheels:
         pid_name, joint = wheel.split('/', 1)
-        assert manager[pid_name]['type'] == 'pid_controller/PidController'
+        # Seeded, not the stock PidController: see seeded_pid_controller.hpp.
+        assert manager[pid_name]['type'] == 'rover_controller/SeededPidController'
         pid = config[pid_name]['ros__parameters']
         assert pid['dof_names'] == [joint]
         assert pid['command_interface'] == 'velocity'

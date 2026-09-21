@@ -1,0 +1,11 @@
+<library path="rover_controller">
+  <class name="rover_controller/SeededPidController"
+         type="rover_controller::SeededPidController"
+         base_class_type="controller_interface::ChainableControllerInterface">
+    <description>
+      pid_controller/PidController whose exported state is seeded from the hardware on
+      activation, so a chained diff_drive_controller never reads NaN wheel feedback on its
+      first cycle (which deactivates the whole chain on the real rover).
+    </description>
+  </class>
+</library>
