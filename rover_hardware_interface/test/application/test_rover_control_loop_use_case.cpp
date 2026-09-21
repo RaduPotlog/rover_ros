@@ -258,4 +258,81 @@ TEST(RoverControlLoopUseCaseNoEStopTest, UpdateEStopActiveStateFailsSafeWithNoES
     EXPECT_TRUE(use_case.updateEStopActiveState());
 }
 
+
+// --- Contactor plausibility (EDM) ---------------------------------------------------------
+//
+// The rover's relay routes the contactor's aux contact back as a readable input, so a contactor
+// that fails to open is observable. Before this, nothing consumed it: the latch read asserted,
+// the rover was believed stopped, and the motors could still be live.
+
+class ContactorPlausibilityTest : public ::testing::Test
+{
+protected:
+    std::shared_ptr<FakeRoverDriver> driver = std::make_shared<FakeRoverDriver>();
+    std::shared_ptr<FakeEmergencyStop> e_stop = std::make_shared<FakeEmergencyStop>();
+    RoverErrorFilter error_filter{1, 1, 1, 1, 1};
+    RoverControlLoopUseCase use_case{driver, e_stop, error_filter, std::chrono::milliseconds(500)};
+
+    std::chrono::steady_clock::time_point t0 {};
+};
+
+TEST_F(ContactorPlausibilityTest, NoFaultWhileTheContactorAgreesWithTheLatch)
+{
+    e_stop->latch_active = true;
+    e_stop->contactor_engaged = false;
+
+    EXPECT_EQ(use_case.updateContactorPlausibility(t0), ContactorFault::kNone);
+    EXPECT_FALSE(use_case.isContactorFaultLatched());
+    EXPECT_FALSE(use_case.isHardwareFaultLatched());
+}
+
+TEST_F(ContactorPlausibilityTest, LatchedContactorFaultInhibitsMotion)
+{
+    e_stop->latch_active = true;
+    e_stop->contactor_engaged = true;
+
+    ASSERT_EQ(use_case.updateContactorPlausibility(t0), ContactorFault::kNone);
+    ASSERT_EQ(
+        use_case.updateContactorPlausibility(t0 + std::chrono::milliseconds(600)),
+        ContactorFault::kWeldedSuspected);
+
+    EXPECT_TRUE(use_case.isContactorFaultLatched());
+    EXPECT_TRUE(use_case.isHardwareFaultLatched());
+
+    // Even with the lifecycle active and the E-Stop otherwise clear, a welded contactor must not
+    // let commands through.
+    EXPECT_EQ(
+        RoverControlLoopUseCase::decideWriteCommand(true, false, false,
+            use_case.isHardwareFaultLatched()),
+        WriteCommandMode::kCommandZero);
+}
+
+TEST_F(ContactorPlausibilityTest, HardwareFaultLatchedCoversTheMotorFailsafeToo)
+{
+    EXPECT_FALSE(use_case.isHardwareFaultLatched());
+
+    driver->failsafe_tripped = true;
+    use_case.updateMotorFailsafeTrippedStatus();
+
+    EXPECT_TRUE(use_case.isHardwareFaultLatched());
+    EXPECT_FALSE(use_case.isContactorFaultLatched());
+}
+
+TEST_F(ContactorPlausibilityTest, ResetContactorFaultClearsTheLatch)
+{
+    e_stop->latch_active = true;
+    e_stop->contactor_engaged = true;
+
+    ASSERT_EQ(use_case.updateContactorPlausibility(t0), ContactorFault::kNone);
+    ASSERT_EQ(
+        use_case.updateContactorPlausibility(t0 + std::chrono::milliseconds(600)),
+        ContactorFault::kWeldedSuspected);
+    ASSERT_TRUE(use_case.isContactorFaultLatched());
+
+    use_case.resetContactorFault();
+
+    EXPECT_FALSE(use_case.isContactorFaultLatched());
+    EXPECT_FALSE(use_case.isHardwareFaultLatched());
+}
+
 }  // namespace rover_hardware_interface

@@ -21,7 +21,8 @@
         timeout : 0.5
         priority: 5
 
-    # Safety lock, fed by rover_motion_lock_node from hardware_interface/gpio_state.
+    # Safety lock, fed by rover_motion_lock_node from hardware_interface/safety_status
+    # and hardware_interface/safety_command_echo.
     #
     # twist_mux masks an input when `input priority < active lock priority` (strictly), so
     # priority 200 outranks all three inputs above and stops the rover outright while any

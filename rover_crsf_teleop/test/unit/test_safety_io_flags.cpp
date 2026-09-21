@@ -28,17 +28,24 @@ TEST(SafetyIoFlagsTest, NothingActiveMeansMotionIsNotInhibited)
 
 TEST(SafetyIoFlagsTest, AnyOneStopInhibitsMotionOnItsOwn)
 {
-    // Active-high, every one of them: there is no inversion anywhere between the Modbus bit and
-    // this struct.
+    // Active-high, both of them: there is no inversion anywhere between the Modbus bit and this
+    // struct.
     for (bool SafetyIoFlags::* const field :
-         {&SafetyIoFlags::hw_e_stop_user_button, &SafetyIoFlags::sw_e_stop_user_button,
-          &SafetyIoFlags::sw_e_stop_motor_driver_fault, &SafetyIoFlags::sw_e_stop_latch_status})
+         {&SafetyIoFlags::hw_e_stop_user_button, &SafetyIoFlags::sw_e_stop_latch_status})
     {
         SafetyIoFlags flags;
         flags.*field = true;
         EXPECT_TRUE(motionIsInhibited(flags));
     }
 }
+
+// Regression guard for the reason the two sw_* stops were removed. They are read-backs of coils
+// this system writes, so treating one as proof the rover is safe to sweep would be a fail-open if
+// the PLC never acted on the request. This node must only ever be convinced by plant state, which
+// is what SafetyStatus carries; the request path reaches it solely through latch_active.
+static_assert(sizeof(SafetyIoFlags) == 2 * sizeof(bool),
+    "SafetyIoFlags must carry plant state only - see domain/safety_io_flags.hpp before adding a "
+    "field, and never add a SafetyCommandEcho read-back here.");
 
 TEST(SafetyIoFlagsTest, TheDefaultsAreNotEngaged)
 {
@@ -50,8 +57,6 @@ TEST(SafetyIoFlagsTest, TheDefaultsAreNotEngaged)
     const SafetyIoFlags defaults;
 
     EXPECT_FALSE(defaults.hw_e_stop_user_button);
-    EXPECT_FALSE(defaults.sw_e_stop_user_button);
-    EXPECT_FALSE(defaults.sw_e_stop_motor_driver_fault);
     EXPECT_FALSE(defaults.sw_e_stop_latch_status);
 }
 

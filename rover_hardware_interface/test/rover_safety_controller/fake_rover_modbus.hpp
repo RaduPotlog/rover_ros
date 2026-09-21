@@ -15,7 +15,13 @@
 #ifndef ROVER_HARDWARE_INTERFACE_TEST_ROVER_SAFETY_CONTROLLER_FAKE_ROVER_MODBUS_HPP_
 #define ROVER_HARDWARE_INTERFACE_TEST_ROVER_SAFETY_CONTROLLER_FAKE_ROVER_MODBUS_HPP_
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <map>
 #include <mutex>
+#include <stdexcept>
+#include <thread>
 #include <vector>
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
@@ -36,10 +42,30 @@ struct CoilWrite
     }
 };
 
+// A coil write with the steady_clock time it was accepted, so timing tests can measure the
+// interval between consecutive heartbeat toggles.
+struct TimedCoilWrite
+{
+    Coil coil;
+    bool state;
+    std::chrono::steady_clock::time_point at;
+};
+
 // Thread-safe in-memory fake of the driver's DiscreteIoPort: records every coil write (so tests can
 // assert what ContactCoilHandler/RoverSafetyController sent) and returns a configurable canned
 // value for reads. No real Modbus/network I/O - safe to construct and drive from a unit test,
-// including from ContactCoilHandler's background poll thread.
+// including from ContactCoilHandler's background threads.
+//
+// It models two behaviours of the real ModbusDiscreteIoClient that tests depend on:
+//
+//  * `is_coil_engage_allowed` - a write to a read-only coil is refused and recorded separately,
+//    exactly as ModbusDiscreteIoClient::writeDiscreteCoil() does. The fake used to ignore the
+//    flag, which let test_contact_coil_handler assert that COIL_0/COIL_5 were written when in
+//    production those writes were rejected and logged as errors.
+//
+//  * read latency and faults - `setReadDelay()` stalls each read the way a slow or timing-out
+//    Modbus round-trip does, and `setFailReadsWithException()` throws from a read. Both exist so
+//    the heartbeat's independence from the IO poll can be tested directly rather than inferred.
 class FakeRoverModbus : public DiscreteIoPort
 {
 
@@ -48,6 +74,8 @@ public:
     uint16_t readDiscreteContact(const ContactInfo & contact) override
     {
         (void)contact;
+        applyTransactionDelay();
+        throwIfReadsFail();
         std::lock_guard<std::mutex> lock(mutex_);
         return contact_read_value_;
     }
@@ -55,14 +83,29 @@ public:
     uint16_t readDiscreteCoil(const CoilInfo & coil) override
     {
         (void)coil;
+        applyTransactionDelay();
+        throwIfReadsFail();
         std::lock_guard<std::mutex> lock(mutex_);
-        return coil_read_value_;
+
+        const auto override_it = coil_read_overrides_.find(coil.coil);
+
+        return (override_it != coil_read_overrides_.end()) ? override_it->second
+                                                           : coil_read_value_;
     }
 
     void writeDiscreteCoil(const CoilInfo & coil, const bool coil_state) override
     {
+        // Mirrors ModbusDiscreteIoClient::writeDiscreteCoil(): the guard is checked before any
+        // transaction happens, so a refused write costs no time on the wire.
+        if (!coil.is_coil_engage_allowed) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            refused_writes_.push_back({coil.coil, coil_state});
+            return;
+        }
+
         std::lock_guard<std::mutex> lock(mutex_);
         writes_.push_back({coil.coil, coil_state});
+        timed_writes_.push_back({coil.coil, coil_state, std::chrono::steady_clock::now()});
     }
 
     // --- Test-only helpers below; not part of DiscreteIoPort. ---
@@ -73,10 +116,33 @@ public:
         return writes_;
     }
 
+    std::vector<CoilWrite> refusedWritesSnapshot() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return refused_writes_;
+    }
+
+    std::vector<TimedCoilWrite> timedWritesSnapshot() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return timed_writes_;
+    }
+
     bool hasWrite(const CoilWrite & write) const
     {
         std::lock_guard<std::mutex> lock(mutex_);
         for (const auto & recorded : writes_) {
+            if (recorded == write) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool hasRefusedWrite(const CoilWrite & write) const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto & recorded : refused_writes_) {
             if (recorded == write) {
                 return true;
             }
@@ -96,12 +162,55 @@ public:
         coil_read_value_ = value;
     }
 
+    // Per-coil read value, for tests that need two coils to disagree (e.g. latch asserted while
+    // the contactor is still engaged).
+    void setCoilReadValueFor(const Coil coil, const uint16_t value)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        coil_read_overrides_[coil] = value;
+    }
+
+    // Stalls every *read*, standing in for a slow link or a response timeout during the IO
+    // poll. Writes stay fast on purpose: the question these tests ask is whether a slow poll can
+    // delay the heartbeat write, so slowing the write too would mask the answer.
+    void setReadDelay(const std::chrono::milliseconds delay)
+    {
+        read_delay_ms_ = static_cast<uint64_t>(delay.count());
+    }
+
+    void setFailReadsWithException(const bool fail)
+    {
+        fail_reads_ = fail;
+    }
+
 private:
+
+    void applyTransactionDelay() const
+    {
+        const uint64_t delay_ms = read_delay_ms_.load();
+
+        if (delay_ms > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+        }
+    }
+
+    void throwIfReadsFail() const
+    {
+        if (fail_reads_.load()) {
+            throw std::runtime_error("fake modbus read failure");
+        }
+    }
 
     mutable std::mutex mutex_;
     std::vector<CoilWrite> writes_;
+    std::vector<CoilWrite> refused_writes_;
+    std::vector<TimedCoilWrite> timed_writes_;
+    std::map<Coil, uint16_t> coil_read_overrides_;
     uint16_t contact_read_value_ = 0;
     uint16_t coil_read_value_ = 0;
+
+    std::atomic_uint64_t read_delay_ms_ {0};
+    std::atomic_bool fail_reads_ {false};
 };
 
 }  // namespace test

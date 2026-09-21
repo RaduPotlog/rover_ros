@@ -36,6 +36,8 @@ public:
 
     bool isLatchActive() override;
 
+    bool isContactorEngaged() override;
+
     void triggerUserButton(const bool state) override;
 
     void resetLatch() override;

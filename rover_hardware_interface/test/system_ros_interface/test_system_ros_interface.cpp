@@ -151,17 +151,17 @@ TEST_F(SystemROSInterfaceTest, PublishesDriverStateAfterUpdate)
     EXPECT_EQ(received.driver_states.size(), 4u);
 }
 
-TEST_F(SystemROSInterfaceTest, PublishesGpioStateAfterUpdate)
+TEST_F(SystemROSInterfaceTest, RoutesPlantReadingsToSafetyStatus)
 {
-    SystemROSInterface ros_interface("test_system_ros_interface_gpio");
-    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_gpio_client");
+    SystemROSInterface ros_interface("test_system_ros_interface_safety_status");
+    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_safety_status_client");
 
-    GpioStateMsg received;
+    SafetyStatusMsg received;
     std::atomic_bool got_msg{false};
-    auto subscription = client_node->create_subscription<GpioStateMsg>(
-        "hardware_interface/gpio_state",
-        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
-        [&](const GpioStateMsg::SharedPtr msg) {
+    auto subscription = client_node->create_subscription<SafetyStatusMsg>(
+        "hardware_interface/safety_status",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
+        [&](const SafetyStatusMsg::SharedPtr msg) {
             received = *msg;
             got_msg = true;
         });
@@ -173,12 +173,91 @@ TEST_F(SystemROSInterfaceTest, PublishesGpioStateAfterUpdate)
     ros_interface.updateMsgGpioStates({
         {RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN, true},
         {RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED, false},
+        {RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS, true},
     });
-    ros_interface.publishGpioStateMsg();
+
+    SafetyLinkHealth health;
+    health.watchdog_running = true;
+    health.poll_running = true;
+    health.last_poll_age_ms = 20;
+    ros_interface.updateSafetyLinkState(health);
+
+    ros_interface.publishSafetyMsgs();
 
     ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
-    EXPECT_TRUE(received.gpio_pin_hw_e_stop_user_button);
-    EXPECT_FALSE(received.gpio_pin_motor_contactor_engaged);
+    EXPECT_TRUE(received.hw_e_stop_user_button);
+    EXPECT_FALSE(received.motor_contactor_engaged);
+    EXPECT_TRUE(received.latch_active);
+    EXPECT_TRUE(received.link_healthy);
+    EXPECT_EQ(received.latch_cause, SafetyStatusMsg::LATCH_CAUSE_UNKNOWN);
+}
+
+// The coils software drives must land in the echo message, never in the one consumers gate on.
+TEST_F(SystemROSInterfaceTest, RoutesCommandEchoesToSafetyCommandEcho)
+{
+    SystemROSInterface ros_interface("test_system_ros_interface_safety_echo");
+    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_safety_echo_client");
+
+    SafetyCommandEchoMsg received;
+    std::atomic_bool got_msg{false};
+    auto subscription = client_node->create_subscription<SafetyCommandEchoMsg>(
+        "hardware_interface/safety_command_echo",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
+        [&](const SafetyCommandEchoMsg::SharedPtr msg) {
+            received = *msg;
+            got_msg = true;
+        });
+
+    ASSERT_TRUE(spinUntil(
+        client_node, [&]() { return subscription->get_publisher_count() > 0; },
+        std::chrono::seconds(5)));
+
+    ros_interface.updateMsgGpioStates({
+        {RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON, true},
+        {RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT, false},
+        {RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT, true},
+        {RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET, false},
+    });
+    ros_interface.updateSafetyLinkState(SafetyLinkHealth{});
+    ros_interface.publishSafetyMsgs();
+
+    ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
+    EXPECT_TRUE(received.sw_e_stop_user_button);
+    EXPECT_FALSE(received.sw_e_stop_motor_driver_fault);
+    EXPECT_TRUE(received.cpu_wdg_heartbeat);
+    EXPECT_FALSE(received.sw_e_stop_latch_reset);
+}
+
+// A link that has never polled must not claim to be healthy - the pin values in that case are
+// default-constructed, not observed.
+TEST_F(SystemROSInterfaceTest, LinkIsNotHealthyBeforeTheFirstSuccessfulPoll)
+{
+    SystemROSInterface ros_interface("test_system_ros_interface_safety_link");
+    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_safety_link_client");
+
+    SafetyStatusMsg received;
+    std::atomic_bool got_msg{false};
+    auto subscription = client_node->create_subscription<SafetyStatusMsg>(
+        "hardware_interface/safety_status",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
+        [&](const SafetyStatusMsg::SharedPtr msg) {
+            received = *msg;
+            got_msg = true;
+        });
+
+    ASSERT_TRUE(spinUntil(
+        client_node, [&]() { return subscription->get_publisher_count() > 0; },
+        std::chrono::seconds(5)));
+
+    SafetyLinkHealth health;
+    health.watchdog_running = true;
+    health.poll_running = true;
+    // last_poll_age_ms stays kUnknownAgeMs.
+    ros_interface.updateSafetyLinkState(health);
+    ros_interface.publishSafetyMsgs();
+
+    ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
+    EXPECT_FALSE(received.link_healthy);
 }
 
 }  // namespace rover_hardware_interface

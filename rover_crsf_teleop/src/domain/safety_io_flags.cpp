@@ -19,10 +19,9 @@ namespace rover_crsf_teleop
 
 bool motionIsInhibited(const SafetyIoFlags & flags)
 {
-    // Active-high, any one of them: see the header for why the heartbeat and the latch-reset
-    // pulse are not in the struct at all.
-    return flags.hw_e_stop_user_button || flags.sw_e_stop_user_button ||
-           flags.sw_e_stop_motor_driver_fault || flags.sw_e_stop_latch_status;
+    // Active-high, either one. Both are plant state read back from the PLC - see the header for
+    // why the two sw_* command echoes are deliberately not part of this decision.
+    return flags.hw_e_stop_user_button || flags.sw_e_stop_latch_status;
 }
 
 }  // namespace rover_crsf_teleop

@@ -30,7 +30,7 @@
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
-#include <rover_msgs/msg/gpio_state.hpp>
+#include <rover_msgs/msg/safety_status.hpp>
 #include <rover_msgs/msg/rc_calibration_state.hpp>
 #include <rover_msgs/srv/set_rc_calibration.hpp>
 #include <rover_msgs/srv/start_rc_calibration.hpp>
@@ -144,7 +144,7 @@ private:
     void publishCalibrationState();
 
     // What the node can currently say about the rover's E-Stop. kUnknown when nothing has
-    // arrived on gpio_state or the last sample is older than e_stop_state_timeout_ - GpioState
+    // arrived on safety_status or the last sample is older than e_stop_state_timeout_ - SafetyStatus
     // carries no header, so freshness is measured from when it arrived here.
     EStopState eStopState(SteadyTime now) const;
 
@@ -219,13 +219,13 @@ private:
     // The rover's safety IO, which is what actually gates a calibration. Subscribed in
     // on_configure with the publisher's exact QoS (reliable + transient local, depth 1): miss any
     // of the three and nothing is delivered at all.
-    rclcpp::Subscription<rover_msgs::msg::GpioState>::SharedPtr gpio_state_subscriber_;
+    rclcpp::Subscription<rover_msgs::msg::SafetyStatus>::SharedPtr safety_status_subscriber_;
     std::optional<SafetyIoFlags> last_safety_io_;
     std::optional<SteadyTime> last_safety_io_at_;
     std::chrono::milliseconds e_stop_state_timeout_{1000};
 
     // Last E-Stop state put on the wire, so the state topic is republished when it changes
-    // rather than on every 20 Hz gpio_state message.
+    // rather than on every 20 Hz safety_status message.
     EStopState reported_e_stop_{EStopState::kUnknown};
 
     // Always on, unlike the session heartbeat: a publisher that dies while nothing is

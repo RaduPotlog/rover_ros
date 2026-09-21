@@ -37,6 +37,11 @@ public:
 
     virtual bool isLatchActive() = 0;
 
+    // The contactor's auxiliary-contact feedback: true while the contacts are closed (motors
+    // powered). Genuine plant state, not an echo of anything we commanded - it is what makes the
+    // welded-contactor check in ContactorMonitor possible.
+    virtual bool isContactorEngaged() = 0;
+
     virtual void triggerUserButton(const bool state) = 0;
 
     virtual void resetLatch() = 0;
@@ -54,6 +59,8 @@ public:
     virtual bool readEStopState() = 0;
 
     virtual bool readEStopLatchState() = 0;
+
+    virtual bool readContactorEngagedState() = 0;
 
     virtual void setEStop() = 0;
 
@@ -80,6 +87,8 @@ public:
 
     bool readEStopLatchState() override;
 
+    bool readContactorEngagedState() override;
+
     void setEStop() override;
 
     void resetEStop() override;
@@ -98,6 +107,12 @@ protected:
     // can't return each other's last-known value under lock contention.
     std::atomic_bool user_e_stop_triggered_ = true;
     std::atomic_bool latch_triggered_ = true;
+
+    // Fail-safe default is `true` (contacts closed / motors possibly live) for the same reason
+    // as the two above: before anything has been read, assume the state that demands caution.
+    // Paired with a latched E-Stop that is also assumed active, this reads as "disagreement",
+    // which ContactorMonitor's drop-out tolerance absorbs long before it could latch a fault.
+    std::atomic_bool contactor_engaged_ = true;
 };
 
 }  // namespace rover_hardware_interface

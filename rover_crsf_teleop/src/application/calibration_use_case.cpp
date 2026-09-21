@@ -89,7 +89,7 @@ std::string eStopRefusal(const EStopState e_stop)
                "and RC teleop is not the only thing that can command this rover.";
     }
 
-    return "Cannot verify the E-Stop: nothing recent on hardware_interface/gpio_state. Is "
+    return "Cannot verify the E-Stop: nothing recent on hardware_interface/safety_status. Is "
            "rover_hardware_interface running? Calibration is refused rather than assumed safe.";
 }
 

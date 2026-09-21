@@ -43,7 +43,7 @@ constexpr char kRcChannelsTopic[] = "rc/channels";
 constexpr char kRcLinkTopic[] = "rc/link";
 constexpr auto kControlPeriod = 20ms;
 
-constexpr char kGpioStateTopic[] = "hardware_interface/gpio_state";
+constexpr char kSafetyStatusTopic[] = "hardware_interface/safety_status";
 constexpr char kCalibrationStateTopic[] = "rc/calibration/state";
 constexpr char kCalibrationStartService[] = "rc/calibration/start";
 constexpr char kCalibrationSweepService[] = "rc/calibration/sweep";
@@ -119,7 +119,7 @@ void RoverCrsfTeleopNode::declareParameters()
     // to do so forever.
     declare_parameter<int>("calibration_timeout_s", 300);
     declare_parameter<double>("calibration_state_rate_hz", 5.0);
-    // How long a gpio_state sample stays trustworthy. It is published at 20 Hz, so a second is
+    // How long a safety_status sample stays trustworthy. It is published at 20 Hz, so a second is
     // 20 missed messages; matches rover_twist_mux's gpio_timeout.
     declare_parameter<double>("e_stop_state_timeout_s", 1.0);
     // How long the E-Stop must stay un-engaged before a running calibration is cancelled. The
@@ -473,12 +473,24 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
 
     // Created here rather than in on_activate on purpose: a calibration runs while the node is
     // INACTIVE - that is the interlock - so its services and state topic have to work there.
-    // The publisher's QoS exactly (system_ros_interface.cpp): reliable, transient local, depth 1.
-    // Transient local means the latched sample arrives on subscribe, so a freshly configured node
-    // knows the E-Stop state without waiting for the next 20 Hz cycle.
-    gpio_state_subscriber_ = create_subscription<rover_msgs::msg::GpioState>(
-        kGpioStateTopic, rclcpp::QoS(1).reliable().transient_local(),
-        [this](const rover_msgs::msg::GpioState & msg) {
+    // The publisher's QoS exactly (system_ros_interface.cpp): reliable, volatile, depth 1. It
+    // used to be transient_local, which handed a freshly configured node a latched sample without
+    // waiting for the next cycle - convenient, but a latched sample from a publisher that has
+    // since died looks perfectly fresh, and here a stale "engaged" is what grants permission to
+    // sweep the sticks. The first sample now costs up to one 20 Hz cycle instead.
+    safety_status_subscriber_ = create_subscription<rover_msgs::msg::SafetyStatus>(
+        kSafetyStatusTopic, rclcpp::QoS(1).reliable().durability_volatile(),
+        [this](const rover_msgs::msg::SafetyStatus & msg) {
+            // An unhealthy link means the fields are last-known-good rather than current. Drop
+            // the sample rather than age it: "cannot verify" is the honest answer, and it is what
+            // an absent sample already produces.
+            if (!msg.link_healthy) {
+                last_safety_io_.reset();
+                last_safety_io_at_.reset();
+                updateCalibrationEStop();
+                return;
+            }
+
             last_safety_io_ = toSafetyIoFlags(msg);
             last_safety_io_at_ = std::chrono::steady_clock::now();
             updateCalibrationEStop();
@@ -668,10 +680,9 @@ void RoverCrsfTeleopNode::stopCalibrationHeartbeat()
 
 EStopState RoverCrsfTeleopNode::eStopState(const SteadyTime now) const
 {
-    // GpioState carries no header, so this is arrival time here, not the time the pin was read.
-    // Anything older than the timeout is "cannot verify" rather than "still whatever it was":
-    // a transient-local sample from a publisher that has since died looks perfectly fresh until
-    // it is aged.
+    // Arrival time, not SafetyStatus.io_sample_time: the two differ by at most one poll period
+    // and arrival is what detects a publisher that has stopped. Anything older than the timeout
+    // is "cannot verify" rather than "still whatever it was".
     if (!last_safety_io_.has_value() || !last_safety_io_at_.has_value() ||
         (now - *last_safety_io_at_) > e_stop_state_timeout_)
     {
@@ -704,7 +715,7 @@ void RoverCrsfTeleopNode::updateCalibrationEStop()
         return;
     }
 
-    // On change only. gpio_state arrives at 20 Hz and this message is not small; the page needs
+    // On change only. safety_status arrives at 20 Hz and this message is not small; the page needs
     // to know when the button moves, not that it is still where it was.
     if (e_stop != reported_e_stop_) {
         reported_e_stop_ = e_stop;
@@ -882,7 +893,7 @@ void RoverCrsfTeleopNode::releaseResources()
     calibration_.reset();
     calibration_store_.reset();
     e_stop_watchdog_timer_.reset();
-    gpio_state_subscriber_.reset();
+    safety_status_subscriber_.reset();
     last_safety_io_.reset();
     last_safety_io_at_.reset();
     calibration_state_publisher_.reset();

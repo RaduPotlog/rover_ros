@@ -36,6 +36,11 @@ bool RoverSafetyControllerEStopIo::isLatchActive()
     return rover_controller_->isPinActive(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS);
 }
 
+bool RoverSafetyControllerEStopIo::isContactorEngaged()
+{
+    return rover_controller_->isPinActive(RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED);
+}
+
 void RoverSafetyControllerEStopIo::triggerUserButton(const bool state)
 {
     rover_controller_->eStopUserBtnTrigger(state);

@@ -17,6 +17,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -25,6 +27,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "rover_hardware_interface/domain/safety_link_health.hpp"
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 #include "rover_modbus_driver/domain/client_settings.hpp"
 #include "rover_modbus_driver/domain/discrete_io_port.hpp"
@@ -33,15 +36,78 @@
 namespace rover_hardware_interface
 {
 
+// Serializes access to the single Modbus link, with priority for the CPU watchdog heartbeat and
+// the E-Stop commands over the periodic IO poll.
+//
+// A plain mutex - even a timed one - is not sufficient here. Under sustained slow IO the poll
+// thread releases and immediately re-acquires between transactions, and neither std::mutex nor
+// std::timed_mutex makes any fairness guarantee, so a heartbeat tick can lose the race
+// arbitrarily many times in a row. That is precisely the failure this whole rework exists to
+// prevent. With this lock a waiting priority holder blocks *new* poll acquisitions, so the
+// heartbeat waits at most one already-in-flight transaction.
+class ModbusLink
+{
+
+public:
+
+    // Blocks until the link is free. Priority acquirers also overtake any queued poll acquirers.
+    void acquire(const bool priority);
+
+    void release();
+
+private:
+
+    std::mutex mtx_;
+    std::condition_variable cv_;
+    bool busy_ = false;
+    unsigned priority_waiters_ = 0;
+};
+
+// RAII holder for ModbusLink.
+class ModbusLinkGuard
+{
+
+public:
+
+    ModbusLinkGuard(ModbusLink & link, const bool priority)
+    : link_(link), held_(true)
+    {
+        link_.acquire(priority);
+    }
+
+    ~ModbusLinkGuard()
+    {
+        if (held_) {
+            link_.release();
+        }
+    }
+
+    ModbusLinkGuard(const ModbusLinkGuard &) = delete;
+    ModbusLinkGuard & operator=(const ModbusLinkGuard &) = delete;
+
+private:
+
+    ModbusLink & link_;
+    bool held_;
+};
+
 // Depends on DiscreteIoPort (not the concrete ModbusDiscreteIoClient) so it can be unit-tested
 // with a fake - see rover_modbus_driver/domain/discrete_io_port.hpp and
 // test/rover_safety_controller/.
+//
+// Threading: the heartbeat and the IO poll run on *separate* threads with separate periods.
+// They used to share one loop, which made the heartbeat interval "poll period + every Modbus
+// round-trip the poll performed" - a single response timeout pushed the toggle past the relay's
+// ~1 s watchdog window and latched the E-Stop. The heartbeat is safety-critical timing; the poll
+// is telemetry. They must not share a period, a deadline, or a lock hold.
 class ContactCoilHandler
 {
 
 public:
 
-    explicit ContactCoilHandler(std::shared_ptr<DiscreteIoPort> rover_modbus);
+    ContactCoilHandler(
+        std::shared_ptr<DiscreteIoPort> rover_modbus,
+        const SafetyControllerSettings & settings = SafetyControllerSettings {});
 
     ~ContactCoilHandler();
 
@@ -60,8 +126,11 @@ public:
 
     // Fills `io_state` from the last-polled IO state. Non-blocking: on lock contention with the
     // poll thread, `io_state` is left unchanged (i.e. the caller's own last-known-good values),
-    // so this is safe to call from the RT thread.
+    // so this is safe to call from the RT thread. Contends only with a map copy (io_state_mtx_),
+    // never with a Modbus transaction.
     void getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state);
+
+    SafetyLinkHealth getHealth() const;
 
 private:
 
@@ -71,27 +140,47 @@ private:
 
     bool readDiscreteCoil(const CoilInfo &coil);
 
+    // Performs the Modbus reads, taking modbus_link_mtx_ once per transaction rather than once
+    // for the whole sweep, so a heartbeat tick waits at most one round-trip to reach the link.
     std::unordered_map<RoverControllerGpio, bool> queryControlInterfaceIOStates();
 
-    void contactCoilHandlerThread();
+    void contactCoilHandlerWatchdogThread();
 
-    std::thread contact_coil_handler_thread_;
+    void contactCoilHandlerPollThread();
+
+    static uint64_t steadyNowMs();
+
+    std::thread contact_coil_handler_watchdog_thread_;
+    std::thread contact_coil_handler_poll_thread_;
     std::atomic_bool contact_coil_handler_enabled_ = false;
 
     std::shared_ptr<DiscreteIoPort> rover_modbus_;
 
+    const SafetyControllerSettings settings_;
+
     static const std::vector<RoverControllerContactInfo> contacts_config_info_storage_;
     static const std::vector<RoverControllerCoilInfo> coils_config_info_storage_;
 
-    std::mutex modbus_io_mtx_;
+    // Serializes access to the Modbus link, with heartbeat/E-Stop priority over the IO poll.
+    ModbusLink modbus_link_;
+
+    // Guards io_state_ only. Held for a map copy, never across a Modbus transaction, which is
+    // what keeps getIoState()'s try_lock succeeding on the RT thread.
+    mutable std::mutex io_state_mtx_;
 
     std::unordered_map<RoverControllerGpio, bool> io_state_;
 
-    // Heartbeat level for GPIO_CPU_WDG_HEARTBEAT, flipped once per
-    // contactCoilHandlerThread() loop iteration. Instance state (not a function-local static) -
-    // guarded by modbus_io_mtx_ like the rest of that loop body, so multiple
-    // ContactCoilHandler instances/threads never share it.
+    // Heartbeat level for GPIO_CPU_WDG_HEARTBEAT, flipped once per heartbeat tick. Touched only
+    // by contactCoilHandlerWatchdogThread(), so it needs no lock of its own.
     bool wdg_state_ = false;
+
+    std::atomic_uint64_t last_kick_ms_ {0};
+    std::atomic_uint64_t last_poll_ms_ {0};
+    std::atomic_uint64_t wdg_miss_count_ {0};
+    std::atomic_uint64_t wdg_error_count_ {0};
+    std::atomic_uint64_t poll_error_count_ {0};
+    std::atomic_bool wdg_thread_running_ {false};
+    std::atomic_bool poll_thread_running_ {false};
 };
 
 class RoverSafetyController
@@ -99,15 +188,19 @@ class RoverSafetyController
 
 public:
 
-    explicit RoverSafetyController(const ModbusSettings & modbus_settings);
+    explicit RoverSafetyController(
+        const ModbusSettings & modbus_settings,
+        const SafetyControllerSettings & settings = SafetyControllerSettings {});
 
     // Test-only constructor: injects rover_modbus directly instead of dialing a real Modbus TCP
     // endpoint, so RoverSafetyController's/ContactCoilHandler's coil-mapping and enabled-guard
     // logic can be unit-tested against a fake DiscreteIoPort (see
     // test/rover_safety_controller/). Production code always uses the constructor above.
-    explicit RoverSafetyController(std::shared_ptr<DiscreteIoPort> rover_modbus);
+    explicit RoverSafetyController(
+        std::shared_ptr<DiscreteIoPort> rover_modbus,
+        const SafetyControllerSettings & settings = SafetyControllerSettings {});
 
-    // Start resources and ContactCoilHandler thread
+    // Start resources and ContactCoilHandler threads
     void start();
 
     // SW E-STOP USER BTN - sw_e_stop_user_button
@@ -120,17 +213,23 @@ public:
     void eStopLatchReset();
 
     // Non-blocking; returns a reference to a cache owned by this RoverSafetyController, refreshed
-    // in place on each call (best-effort — see ContactCoilHandler::getIoState()). Safe to call
+    // in place on each call (best-effort - see ContactCoilHandler::getIoState()). Safe to call
     // from the RT thread; avoids allocating a new map on every call.
     const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates();
 
     bool isPinActive(const RoverControllerGpio pin);
+
+    // Background-thread health for the diagnostics task. Returns a default-constructed (all
+    // stopped) snapshot before start().
+    SafetyLinkHealth getHealth() const;
 
 private:
 
     std::unique_ptr<ContactCoilHandler> contactCoilHandler_;
 
     std::shared_ptr<DiscreteIoPort> rover_modbus_;
+
+    const SafetyControllerSettings settings_;
 
     // Reused across calls by queryControlInterfaceIOStates() to avoid allocating on the RT thread.
     std::unordered_map<RoverControllerGpio, bool> io_state_cache_;

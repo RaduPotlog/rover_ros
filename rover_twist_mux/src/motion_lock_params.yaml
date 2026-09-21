@@ -10,7 +10,8 @@ motion_lock:
     type: double
     default_value: 1.0
     description: >
-      How long [s] a received gpio_state stays trusted. If nothing arrives within this window the
+      How long [s] a received safety message stays trusted. It applies to both safety_status and
+      safety_command_echo, whichever is older. If nothing arrives within this window the
       hardware interface is presumed dead and the lock is asserted.
     validation: { bounds<>: [0.1, 10.0] }
   use_hw_e_stop_user_button:

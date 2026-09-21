@@ -30,6 +30,24 @@ namespace rover_hardware_interface
 // merely rounded near zero made the E-Stop unresettable.
 constexpr double kDefaultVelocityCommandZeroTolerance = 0.01;
 
+// Default tolerance (rad/s at the wheel) below which a *measured* wheel velocity counts as
+// "not moving", for the second half of the same invariant.
+//
+// The command check alone turned out to be a weak guarantee in practice. The wheel PIDs run with
+// feedforward_gain 1.0 and an integral clamped at i_clamp_max (0.25-0.33 rad/s, see
+// wheel_01_controller.yaml). While motion is inhibited the reference and the measured velocity
+// are both zero, so the error is zero - and a PI integrator holds its value at zero error rather
+// than decaying. The command therefore parks at the frozen I-term, up to ~0.33 rad/s, which no
+// amount of tightening the *command* tolerance can get below without making the E-Stop
+// unresettable. That is why the URDF had been widened to 1.2 rad/s (~0.2 m/s): a workaround for
+// a PID artifact, which silently gave away the actual invariant.
+//
+// Measured velocity has no such artifact: a stationary wheel reads zero regardless of what the
+// integrator remembers. Checking it closes the real hazard - clearing the E-Stop while the rover
+// is still rolling - directly rather than by proxy. 0.05 rad/s is ~8 mm/s at the A1's 0.1651 m
+// wheel radius, comfortably above 20 Hz encoder quantisation and far below walking pace.
+constexpr double kDefaultVelocityStateZeroTolerance = 0.05;
+
 // True when every command is finite and within `tolerance` of zero. A non-finite command (NaN
 // from an uninitialized/faulted controller, inf) returns false: `std::abs(NaN) > tolerance` is
 // false, so a naive comparison would let NaN silently pass the guard and clear the E-Stop while

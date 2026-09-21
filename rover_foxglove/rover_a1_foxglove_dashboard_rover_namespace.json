@@ -180,7 +180,7 @@
       "diffEnabled": false
     },
     "Indicator!1ja73dx": {
-      "path": "/rover/hardware_interface/gpio_state.gpio_pin_sw_e_stop_user_button",
+      "path": "/rover/hardware_interface/safety_command_echo.sw_e_stop_user_button",
       "style": "bulb",
       "fontSize": 36,
       "fallbackColor": "#ff0000",
@@ -216,7 +216,7 @@
       "foxglovePanelTitle": "SW-E-STOP Button"
     },
     "Indicator!3nvxjn7": {
-      "path": "/rover/hardware_interface/gpio_state.gpio_pin_sw_e_stop_latch_status",
+      "path": "/rover/hardware_interface/safety_status.latch_active",
       "style": "bulb",
       "fontSize": 36,
       "fallbackColor": "#00ff1a",
@@ -242,7 +242,7 @@
       "buttonColor": "#33f24d"
     },
     "Indicator!25x422y": {
-      "path": "/rover/hardware_interface/gpio_state.gpio_pin_hw_e_stop_user_button",
+      "path": "/rover/hardware_interface/safety_status.hw_e_stop_user_button",
       "style": "bulb",
       "fontSize": 30,
       "fallbackColor": "#ff0000",
@@ -258,7 +258,7 @@
       "foxglovePanelTitle": "HW-E-STOP Button"
     },
     "Indicator!6s1jl": {
-      "path": "/rover/hardware_interface/gpio_state.gpio_pin_motor_contactor_engaged",
+      "path": "/rover/hardware_interface/safety_status.motor_contactor_engaged",
       "style": "bulb",
       "fontSize": 30,
       "fallbackColor": "#ff0000",
@@ -274,7 +274,7 @@
       "foxglovePanelTitle": "Motor Contactor Engaged Status"
     },
     "Indicator!2lcrs0u": {
-      "path": "/rover/hardware_interface/gpio_state.gpio_pin_cpu_wdg_heartbeat",
+      "path": "/rover/hardware_interface/safety_command_echo.cpu_wdg_heartbeat",
       "style": "bulb",
       "fontSize": 30,
       "fallbackColor": "#ff0000",
@@ -290,7 +290,7 @@
       "foxglovePanelTitle": "Watchdog"
     },
     "Indicator!mid9o6": {
-      "path": "/rover/hardware_interface/gpio_state.gpio_pin_sw_e_stop_motor_driver_fault",
+      "path": "/rover/hardware_interface/safety_command_echo.sw_e_stop_motor_driver_fault",
       "style": "bulb",
       "fontSize": 36,
       "fallbackColor": "#00ff32",

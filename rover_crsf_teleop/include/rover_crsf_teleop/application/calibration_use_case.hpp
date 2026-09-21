@@ -154,7 +154,7 @@ public:
     // the operator confirms it. All three are checked here rather than in the UI, so no client
     // can skip any of them.
     //
-    // `e_stop` is evidence - what the node read off hardware_interface/gpio_state -
+    // `e_stop` is evidence - what the node read off hardware_interface/safety_status -
     // while `e_stop_confirmed` is the operator's assertion. They are kept separate on purpose:
     // the first can be wrong because the rover is not publishing, the second because someone
     // ticked a box without looking, and neither failure mode covers the other.

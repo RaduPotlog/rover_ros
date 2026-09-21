@@ -15,6 +15,8 @@
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
 #include <array>
+#include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <thread>
@@ -28,6 +30,12 @@
 
 namespace rover_hardware_interface
 {
+
+// A poll older than this makes SafetyStatus.link_healthy false. Generous against the default
+// 100 ms poll period so ordinary scheduling jitter never flaps it, tight enough that a link that
+// has actually stopped is called out well inside rover_twist_mux's 1.0 s motion-lock timeout.
+constexpr uint64_t kSafetyLinkStalePollAgeMs = 500;
+
 
 namespace
 {
@@ -69,7 +77,12 @@ rover_msgs::msg::RuntimeError toRuntimeErrorMsg(const RuntimeError & runtime_err
 
 }  // namespace
 
-template class ROSServiceWrapper<std_srvs::srv::SetBool, std::function<void(bool)>>;
+// Trigger is the only service type this component exposes. A SetBool specialisation and its
+// explicit instantiation used to sit here too, but nothing ever registered a SetBool service -
+// dead code that read like a supported path. That is not an oversight to be corrected: the safety
+// commands are deliberately three named Triggers (sw_user_e_stop_set / sw_user_e_stop_reset /
+// sw_e_stop_latch_reset) rather than one parameterised setter, because a named service is what
+// makes the intent and the authorisation legible at the call site and in a log.
 template class ROSServiceWrapper<std_srvs::srv::Trigger, std::function<void()>>;
 
 template <typename SrvT, typename CallbackT>
@@ -98,12 +111,6 @@ void ROSServiceWrapper<SrvT, CallbackT>::callbackWrapper(SrvRequestConstPtr requ
             rclcpp::get_logger("ROSServiceWrapper"),
             "An exception occurred while handling the request: " << err.what());
     }
-}
-
-template <>
-void ROSServiceWrapper<std_srvs::srv::SetBool, std::function<void(bool)>>::proccessCallback(SrvRequestConstPtr request)
-{
-    callback_(request->data);
 }
 
 template <>
@@ -147,8 +154,23 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
         driver_state_msg_.driver_states.push_back(driver_state_named);
     }
 
-    gpio_state_publisher_ = node_->create_publisher<GpioStateMsg>("hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
-    realtime_gpio_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<GpioStateMsg>>(gpio_state_publisher_);
+    // Volatile, not transient_local. The old gpio_state topic was latched, which is durability
+    // meant for configuration that is published once; this is a periodic 20 Hz status stream. The
+    // combination actively misled two consumers into commenting that the topic "cannot go stale"
+    // and skipping their staleness checks - a latched sample tells a late joiner what was true
+    // when the publisher last ran, not that it is still running. Consumers time this out instead.
+    const auto safety_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile();
+
+    safety_status_publisher_ =
+        node_->create_publisher<SafetyStatusMsg>("hardware_interface/safety_status", safety_qos);
+    realtime_safety_status_publisher_ =
+        std::make_unique<realtime_tools::RealtimePublisher<SafetyStatusMsg>>(safety_status_publisher_);
+
+    safety_command_echo_publisher_ = node_->create_publisher<SafetyCommandEchoMsg>(
+        "hardware_interface/safety_command_echo", safety_qos);
+    realtime_safety_command_echo_publisher_ =
+        std::make_unique<realtime_tools::RealtimePublisher<SafetyCommandEchoMsg>>(
+            safety_command_echo_publisher_);
 
     diagnostic_updater_.setHardwareID("Rover System");
 
@@ -170,8 +192,10 @@ SystemROSInterface::~SystemROSInterface()
     realtime_driver_state_publisher_.reset();
     driver_state_publisher_.reset();
 
-    realtime_gpio_state_publisher_.reset();
-    gpio_state_publisher_.reset();
+    realtime_safety_status_publisher_.reset();
+    safety_status_publisher_.reset();
+    realtime_safety_command_echo_publisher_.reset();
+    safety_command_echo_publisher_.reset();
 
     service_wrappers_storage_.clear();
     node_.reset();
@@ -222,42 +246,75 @@ void SystemROSInterface::updateMsgGpioStates(
     const std::unordered_map<RoverControllerGpio, bool> & pin_state)
 {
     for (const auto & [pin, pin_value] : pin_state) {
-        updateGpioStateMsg(pin, pin_value);
+        updateSafetyMsgs(pin, pin_value);
     }
 }
 
-void SystemROSInterface::publishGpioStateMsg()
+void SystemROSInterface::updateSafetyLinkState(const SafetyLinkHealth & health)
 {
-    realtime_gpio_state_publisher_->try_publish(gpio_state_msg_);
+    const auto now = node_->get_clock()->now();
+
+    safety_status_msg_.header.stamp = now;
+    safety_command_echo_msg_.header.stamp = now;
+
+    // io_sample_time is when the PLC was actually polled, which is what a staleness check should
+    // be measuring. It is reconstructed from the poll age rather than stamped in the poll thread
+    // because that thread runs on steady_clock and must not touch a ROS clock.
+    const rclcpp::Time sample_time =
+        (health.last_poll_age_ms == SafetyLinkHealth::kUnknownAgeMs)
+            ? rclcpp::Time(0, 0, now.get_clock_type())
+            : now - rclcpp::Duration(std::chrono::milliseconds(health.last_poll_age_ms));
+
+    safety_status_msg_.io_sample_time = sample_time;
+    safety_command_echo_msg_.io_sample_time = sample_time;
+
+    // Both threads alive and a poll that has actually succeeded recently. Without this a consumer
+    // could only infer link trouble from the message drying up, which is exactly the inference
+    // the latched-topic mistake made unreliable.
+    const bool poll_is_fresh = health.last_poll_age_ms != SafetyLinkHealth::kUnknownAgeMs &&
+                               health.last_poll_age_ms <= kSafetyLinkStalePollAgeMs;
+
+    safety_status_msg_.link_healthy =
+        health.watchdog_running && health.poll_running && poll_is_fresh;
 }
 
-bool SystemROSInterface::updateGpioStateMsg(const RoverControllerGpio pin, const bool pin_value)
+void SystemROSInterface::publishSafetyMsgs()
 {
-    auto & pin_state_msg = gpio_state_msg_;
+    realtime_safety_status_publisher_->try_publish(safety_status_msg_);
+    realtime_safety_command_echo_publisher_->try_publish(safety_command_echo_msg_);
+}
 
+// Routes one pin to whichever of the two safety messages it belongs in. Returns false for pins
+// that are not mapped into either - GPIO_1..7 and GPIO_14/15 are physically present on the
+// controller but carry nothing this system uses.
+bool SystemROSInterface::updateSafetyMsgs(const RoverControllerGpio pin, const bool pin_value)
+{
     switch (pin) {
+        // --- Plant state: what the hardware is doing. ---
         case RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN:
-            pin_state_msg.gpio_pin_hw_e_stop_user_button = pin_value;
+            safety_status_msg_.hw_e_stop_user_button = pin_value;
             break;
         case RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED:
-            pin_state_msg.gpio_pin_motor_contactor_engaged = pin_value;
-            break;
-        case RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT:
-            // Liveness heartbeat, not a stop condition - see ContactCoilHandler's watchdog kick.
-            pin_state_msg.gpio_pin_cpu_wdg_heartbeat = pin_value;
-            break;
-        case RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON:
-            pin_state_msg.gpio_pin_sw_e_stop_user_button = pin_value;
-            break;
-        case RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT:
-            pin_state_msg.gpio_pin_sw_e_stop_motor_driver_fault = pin_value;
-            break;
-        case RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET:
-            pin_state_msg.gpio_pin_sw_e_stop_latch_reset = pin_value;
+            safety_status_msg_.motor_contactor_engaged = pin_value;
             break;
         case RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS:
-            pin_state_msg.gpio_pin_sw_e_stop_latch_status = pin_value;
+            safety_status_msg_.latch_active = pin_value;
             break;
+
+        // --- Command echoes: read-backs of coils we drive. Diagnostic only. ---
+        case RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON:
+            safety_command_echo_msg_.sw_e_stop_user_button = pin_value;
+            break;
+        case RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT:
+            safety_command_echo_msg_.sw_e_stop_motor_driver_fault = pin_value;
+            break;
+        case RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET:
+            safety_command_echo_msg_.sw_e_stop_latch_reset = pin_value;
+            break;
+        case RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT:
+            safety_command_echo_msg_.cpu_wdg_heartbeat = pin_value;
+            break;
+
         default:
             return false;
     }

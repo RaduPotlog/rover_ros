@@ -31,7 +31,7 @@
 #include <sensor_msgs/msg/battery_state.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
-#include "rover_msgs/msg/gpio_state.hpp"
+#include "rover_msgs/msg/safety_command_echo.hpp"
 #include "rover_msgs/msg/system_status.hpp"
 
 #include "rover_safety/safety_node.hpp"
@@ -210,8 +210,9 @@ TEST_F(SafetyNodeShutdownTest, FatalBatteryTemperatureShutsDown)
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
     auto battery_pub = hardware_node_->create_publisher<sensor_msgs::msg::BatteryState>(
         "rover_battery/battery_status", qos);
-    auto gpio_pub = hardware_node_->create_publisher<rover_msgs::msg::GpioState>(
-        "hardware_interface/gpio_state", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+    auto gpio_pub = hardware_node_->create_publisher<rover_msgs::msg::SafetyCommandEcho>(
+        "hardware_interface/safety_command_echo",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());
     auto system_pub = hardware_node_->create_publisher<rover_msgs::msg::SystemStatus>("system_status", qos);
 
     sensor_msgs::msg::BatteryState battery;
@@ -219,7 +220,7 @@ TEST_F(SafetyNodeShutdownTest, FatalBatteryTemperatureShutsDown)
     battery.power_supply_health = sensor_msgs::msg::BatteryState::POWER_SUPPLY_HEALTH_OVERHEAT;
     battery.temperature = 75.0f;  // above the default fatal limit of 60 C
 
-    gpio_pub->publish(rover_msgs::msg::GpioState());
+    gpio_pub->publish(rover_msgs::msg::SafetyCommandEcho());
 
     // Published until the tree reacts: the subscriptions may not be matched yet.
     ASSERT_TRUE(waitFor([&]() {

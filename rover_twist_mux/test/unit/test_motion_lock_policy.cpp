@@ -150,7 +150,7 @@ TEST(MotionLockPolicy, AnySingleActiveStopIsEnough)
 
 TEST(MotionLockPolicy, CpuWatchdogHeartbeatIsNotAStopCondition)
 {
-    // Regression: GpioState.gpio_pin_cpu_wdg_heartbeat is a ~1 Hz square wave the safety
+    // Regression: SafetyCommandEcho.cpu_wdg_heartbeat is a ~1 Hz square wave the safety
     // controller drives to feed the relay's watchdog. It used to be wired in as an active-high
     // stop, which made the published motion lock oscillate with it. SafetyIoFlags deliberately has
     // no member for it, so this is a compile-time guarantee - the test pins the intent: with every

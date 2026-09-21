@@ -24,6 +24,7 @@ const char * toString(MotionInhibitReason reason)
         case MotionInhibitReason::SwEStopUserButton: return "software E-Stop triggered";
         case MotionInhibitReason::MotorDriverFault: return "motor driver fault";
         case MotionInhibitReason::EStopLatched: return "safety latch held";
+        case MotionInhibitReason::SafetyLinkUnhealthy: return "safety PLC link unhealthy";
         case MotionInhibitReason::MotorContactorDisengaged: return "motor contactor not engaged";
     }
 

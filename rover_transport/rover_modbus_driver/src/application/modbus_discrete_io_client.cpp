@@ -17,6 +17,7 @@
 #include <chrono>
 #include <limits>
 #include <stdexcept>
+#include <algorithm>
 #include <string>
 #include <thread>
 #include <vector>
@@ -66,7 +67,7 @@ ModbusDiscreteIoClient::ModbusDiscreteIoClient(
     TransportFactory transport_factory,
     const ClientSettings & settings,
     std::shared_ptr<LoggerPort> logger)
-: logger_(std::move(logger))
+: transport_factory_(transport_factory), settings_(settings), logger_(std::move(logger))
 {
     if (!transport_factory) {
         throw std::invalid_argument("A transport factory is required.");
@@ -99,6 +100,78 @@ ModbusDiscreteIoClient::ModbusDiscreteIoClient(
             std::to_string(settings.port) + " after " +
             std::to_string(settings.connection_retry_count) + " attempts.");
     }
+}
+
+bool ModbusDiscreteIoClient::isConnected() const
+{
+    return transport_ != nullptr;
+}
+
+void ModbusDiscreteIoClient::dropTransport()
+{
+    if (!transport_) {
+        return;
+    }
+
+    try {
+        transport_->close();
+    } catch (...) {
+        // Closing a socket that is already broken is not worth reporting, and this runs from an
+        // error path that is about to rethrow something more useful.
+    }
+
+    transport_.reset();
+
+    // First failure gets the configured delay; each subsequent one doubles, capped. Starting at
+    // the configured delay rather than zero keeps a flapping link from being re-dialled on every
+    // single transaction.
+    reconnect_backoff_ = (reconnect_backoff_.count() == 0)
+        ? std::chrono::milliseconds(std::max(settings_.connection_retry_delay_ms, 1u))
+        : std::min(
+              reconnect_backoff_ * 2,
+              std::chrono::duration_cast<std::chrono::milliseconds>(kMaxReconnectBackoff));
+
+    next_reconnect_at_ = std::chrono::steady_clock::now() + reconnect_backoff_;
+
+    logger_->warn(
+        "Modbus link to " + settings_.host + ":" + std::to_string(settings_.port) +
+        " dropped; next reconnection attempt in " + std::to_string(reconnect_backoff_.count()) +
+        " ms.");
+}
+
+void ModbusDiscreteIoClient::ensureConnected()
+{
+    if (transport_) {
+        return;
+    }
+
+    if (std::chrono::steady_clock::now() < next_reconnect_at_) {
+        // Inside the backoff window: fail fast rather than dial. See the header for why an
+        // attempt is expensive enough to be worth rationing.
+        throw std::runtime_error(
+            "Modbus link to " + settings_.host + ":" + std::to_string(settings_.port) +
+            " is down; waiting out the reconnection backoff.");
+    }
+
+    try {
+        transport_ = transport_factory_();
+    } catch (const std::exception & e) {
+        next_reconnect_at_ = std::chrono::steady_clock::now() + reconnect_backoff_;
+        throw std::runtime_error(
+            "Modbus reconnection to " + settings_.host + ":" + std::to_string(settings_.port) +
+            " failed: " + e.what());
+    }
+
+    if (!transport_) {
+        next_reconnect_at_ = std::chrono::steady_clock::now() + reconnect_backoff_;
+        throw std::runtime_error(
+            "Modbus reconnection to " + settings_.host + ":" + std::to_string(settings_.port) +
+            " produced no transport.");
+    }
+
+    reconnect_backoff_ = std::chrono::milliseconds(0);
+    logger_->warn(
+        "Modbus link to " + settings_.host + ":" + std::to_string(settings_.port) + " restored.");
 }
 
 ModbusDiscreteIoClient::~ModbusDiscreteIoClient()
@@ -186,10 +259,16 @@ void ModbusDiscreteIoClient::writeDiscreteCoil(const CoilInfo & coil, const bool
 
 MB::ModbusResponse ModbusDiscreteIoClient::sendRequest(const MB::ModbusRequest & request)
 {
+    ensureConnected();
+
     try {
         return transport_->sendRequest(request);
     } catch (const MB::ModbusException & ex) {
         logger_->error(std::string("Modbus exception: ") + ex.what());
+        dropTransport();
+        throw;
+    } catch (...) {
+        dropTransport();
         throw;
     }
 }

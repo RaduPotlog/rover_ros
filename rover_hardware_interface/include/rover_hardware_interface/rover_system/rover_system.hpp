@@ -156,6 +156,13 @@ protected:
     void updateDriverStateDataTimedOut();
     void updateFlagErrors();
     void updateEStopState();
+
+    void updateContactorPlausibility();
+
+    double readPositiveToleranceParam(
+        const std::string & key, const double default_value) const;
+
+    void diagnoseSafetyLink(diagnostic_updater::DiagnosticStatusWrapper & status);
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 
     virtual void updateDriverStateMsg() = 0;
@@ -232,11 +239,16 @@ protected:
     // Largest |command| seen by the last refreshVelocityCommandsZeroFlag() pass, published so
     // the refusal can name a number instead of just saying "not zero". Diagnostics only.
     std::atomic<double> max_abs_velocity_command_{0.0};
+    std::atomic<double> max_abs_velocity_state_{0.0};
     // Cached result of the last refreshVelocityCommandsZeroFlag() pass; gates the E-Stop reset.
     // Defaults to false (fail-safe: refuse the reset until an RT cycle has actually observed a
     // zero command). resetEStop() already requires PRIMARY_STATE_ACTIVE, where write() ticks at
     // the controller_manager's update_rate, so this is populated well before any reset can land.
     std::atomic_bool commands_are_zero_{false};
+
+    // Second half of the E-Stop reset invariant: the wheels must also not actually be
+    // turning. Fail-safe default false, like commands_are_zero_.
+    std::atomic_bool states_are_zero_{false};
 
     // Drive train system settings
     DrivetrainSettings drivetrain_settings_;
@@ -251,6 +263,7 @@ protected:
     // reset invariant. Optional in the URDF, unlike the parameters above - absent means
     // kDefaultVelocityCommandZeroTolerance, so an existing URDF keeps working unchanged.
     double velocity_command_zero_tolerance_{kDefaultVelocityCommandZeroTolerance};
+    double velocity_state_zero_tolerance_{kDefaultVelocityStateZeroTolerance};
 
     rclcpp::Logger logger_{rclcpp::get_logger("RoverSystem")};
     rclcpp::Clock steady_clock_{RCL_STEADY_TIME};

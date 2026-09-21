@@ -43,7 +43,7 @@ TEST(SafetyDiagnostics, StaleInputsAreErrorWithOneValuePerInput)
 {
     diagnostic_updater::DiagnosticStatusWrapper status;
     infrastructure::fillSafetyInputsStatus(
-        {{"battery", 10.0, 5.0}, {"gpio_state", std::nullopt, std::nullopt}}, status);
+        {{"battery", 10.0, 5.0}, {"safety_status", std::nullopt, std::nullopt}}, status);
 
     EXPECT_EQ(status.level, DiagnosticStatus::ERROR);
     EXPECT_EQ(status.values.size(), 2u);

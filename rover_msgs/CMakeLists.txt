@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(
@@ -18,7 +19,8 @@ rosidl_generate_interfaces(
     "msg/FaultFlag.msg"
     "msg/RuntimeError.msg"
     "msg/SystemStatus.msg"
-    "msg/GpioState.msg"
+    "msg/SafetyStatus.msg"
+    "msg/SafetyCommandEcho.msg"
     "msg/ChargingStatus.msg"
     "msg/LedAnimation.msg"
     "msg/LedAnimationCatalog.msg"
@@ -41,6 +43,7 @@ rosidl_generate_interfaces(
     "srv/StartRcCalibration.srv"
 
     DEPENDENCIES
+        builtin_interfaces
         std_msgs
 )
 

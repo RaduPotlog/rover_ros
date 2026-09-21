@@ -21,7 +21,7 @@
 
 #include <rclcpp/time.hpp>
 
-#include "rover_msgs/msg/gpio_state.hpp"
+#include "rover_msgs/msg/safety_status.hpp"
 #include "rover_msgs/msg/rc_calibration.hpp"
 #include "rover_msgs/msg/rc_calibration_state.hpp"
 #include "rover_msgs/msg/rc_channels.hpp"
@@ -56,12 +56,12 @@ ChannelCalibration fromRcCalibrationMsg(const rover_msgs::msg::RcCalibration & m
 // The per-channel array as a ROS integer-array parameter value.
 std::vector<int64_t> toParameterArray(const std::array<int, RcFrame::kChannelCount> & values);
 
-// The motion-inhibiting subset of GpioState, as plain bools.
+// The motion-inhibiting subset of SafetyStatus, as plain bools.
 //
 // Field for field, no inversion: every *_e_stop_* pin is true when that stop is active. Two
 // fields are deliberately dropped - see domain/safety_io_flags.hpp for why including either the
 // watchdog heartbeat or the latch-reset pulse would be a bug.
-SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::GpioState & message);
+SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::SafetyStatus & message);
 
 }  // namespace rover_crsf_teleop
 

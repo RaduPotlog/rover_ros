@@ -99,8 +99,8 @@ void LedSafetyNode::init()
         std::bind(&LedSafetyNode::batteryCallback, this, _1));
     
     gpio_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<GpioMsg>(
-        "hardware_interface/gpio_state",
-        rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
+        "hardware_interface/safety_status",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
         std::bind(&LedSafetyNode::gpioCallback, this, _1));
     
     joy_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<JoyMsg>(
@@ -203,7 +203,7 @@ void LedSafetyNode::batteryCallback(const BatteryStateMsg::SharedPtr battery_sta
 
 void LedSafetyNode::gpioCallback(const GpioMsg::SharedPtr gpio_state)
 {
-    led_tree_->getBlackboard()->set<bool>("e_stop_state", gpio_state->gpio_pin_hw_e_stop_user_button);
+    led_tree_->getBlackboard()->set<bool>("e_stop_state", gpio_state->hw_e_stop_user_button);
     last_gpio_stamp_ = std::chrono::steady_clock::now();
 }
 
@@ -248,7 +248,15 @@ void LedSafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper &
     const double timeout = param_listener_->get_params().input_timeout;
 
     // joy is optional for the tree (it only selects the drive animation), so it is reported as a
-    // value but not graded; gpio_state is on-change only and cannot go stale.
+    // value but not graded.
+    //
+    // safety_status is graded against input_timeout like every other input. An earlier version
+    // passed std::nullopt here on the premise that the topic is "transient-local and published on
+    // change only, so it cannot go stale". That premise is wrong: RoverSystem publishes it
+    // periodically from read(), gated on driver_states_update_period_ (20 Hz), not on change. The
+    // transient-local durability only means a late joiner gets the last sample - it says nothing
+    // about the publisher still being alive. Leaving it ungraded meant a dead hardware interface
+    // showed up here as a large, quietly-unjudged age value.
     status.add("joy age (s)", last_joy_stamp_ ?
         std::to_string(*infrastructure::ageSeconds(last_joy_stamp_, now)) :
         std::string("never received"));
@@ -257,7 +265,7 @@ void LedSafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper &
     infrastructure::fillSafetyInputsStatus(
         {
             {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
-            {"hardware_interface/gpio_state", infrastructure::ageSeconds(last_gpio_stamp_, now), std::nullopt},
+            {"hardware_interface/safety_status", infrastructure::ageSeconds(last_gpio_stamp_, now), timeout},
         },
         status);
 }

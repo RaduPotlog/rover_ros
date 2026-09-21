@@ -32,7 +32,7 @@
 #include "std_msgs/msg/bool.hpp"
 
 #include "rover_msgs/msg/led_animation.hpp"
-#include "rover_msgs/msg/gpio_state.hpp"
+#include "rover_msgs/msg/safety_status.hpp"
 
 #include "rover_safety/behavior_tree.hpp"
 #include "rover_safety/led_safety_parameters.hpp"
@@ -44,7 +44,8 @@ using BatteryStateMsg = sensor_msgs::msg::BatteryState;
 using BoolMsg = std_msgs::msg::Bool;
 using LedAnimationMsg = rover_msgs::msg::LedAnimation;
 using JoyMsg = sensor_msgs::msg::Joy;
-using GpioMsg = rover_msgs::msg::GpioState; 
+// The physical E-Stop button is plant state, so it comes from SafetyStatus.
+using GpioMsg = rover_msgs::msg::SafetyStatus;
 
 class LedSafetyNode : public nav2::LifecycleNode
 {

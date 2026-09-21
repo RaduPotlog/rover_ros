@@ -50,15 +50,22 @@ struct MotionLockHealth
 
 /**
  * @brief Grades the motion lock.
- * @param flags          Last received safety-IO state, or nullopt when nothing arrived yet.
- * @param gpio_age_s     Seconds since `flags` was received. Ignored when `flags` is nullopt.
+ * @param flags          Last received safety-IO state, or nullopt when either safety topic has
+ *                       not arrived yet. Both are required: a half-populated view would silently
+ *                       treat the missing half as "no stop".
+ * @param gpio_age_s     Seconds since the OLDER of the two safety messages was received. Ignored
+ *                       when `flags` is nullopt.
  * @param gpio_timeout_s How long `flags` stays trusted.
+ * @param link_healthy   SafetyStatus.link_healthy: whether the hardware interface's link to the
+ *                       safety PLC is up. False means the flags are last-known-good rather than
+ *                       current - the messages still arrive, so staleness alone will not catch it.
  */
 MotionLockHealth evaluateMotionLockHealth(
     const std::optional<SafetyIoFlags> & flags,
     double gpio_age_s,
     double gpio_timeout_s,
-    const MotionLockPolicy & policy);
+    const MotionLockPolicy & policy,
+    bool link_healthy = true);
 
 }  // namespace rover_twist_mux::domain
 

@@ -40,7 +40,7 @@
 
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 
-#include <rover_msgs/msg/gpio_state.hpp>
+#include <rover_msgs/msg/safety_status.hpp>
 #include <rover_msgs/msg/rc_calibration_state.hpp>
 #include <rover_msgs/srv/set_rc_calibration.hpp>
 #include <rover_msgs/srv/start_rc_calibration.hpp>
@@ -59,7 +59,7 @@ namespace
 using namespace std::chrono_literals;
 using Twist = geometry_msgs::msg::TwistStamped;
 using Trigger = std_srvs::srv::Trigger;
-using GpioState = rover_msgs::msg::GpioState;
+using SafetyStatus = rover_msgs::msg::SafetyStatus;
 using RcCalibrationState = rover_msgs::msg::RcCalibrationState;
 using SetRcCalibration = rover_msgs::srv::SetRcCalibration;
 using StartRcCalibration = rover_msgs::srv::StartRcCalibration;
@@ -136,10 +136,10 @@ public:
         channels_.channels[3] = kSwitchHigh;   // channel 4: E-Stop latch reset
         channels_.channels[4] = kSwitchHigh;   // channel 5: E-Stop
 
-        // The hardware interface's safety IO, with its exact QoS - reliable, transient local,
+        // The hardware interface's safety status, with its exact QoS - reliable, volatile,
         // depth 1. Miss any of the three and the node's subscription gets nothing at all.
-        gpio_state_pub_ = node_->create_publisher<GpioState>(
-            "hardware_interface/gpio_state", rclcpp::QoS(1).reliable().transient_local());
+        gpio_state_pub_ = node_->create_publisher<SafetyStatus>(
+            "hardware_interface/safety_status", rclcpp::QoS(1).reliable().durability_volatile());
 
         // The hardware interface republishes the safety IO every cycle at 20 Hz rather than on
         // change, and the node ages a silent publisher into "unverified" after a second. A
@@ -165,12 +165,25 @@ public:
     // Channel N is channels()[N - 1].
     RcFrame & channels() { return channels_; }
 
-    // Publishes the safety IO with the E-Stop engaged or released. Active-high: `true` is
-    // engaged, which is what permits a calibration.
+    // Publishes the safety status with the E-Stop engaged or released. Active-high: `true` is
+    // engaged, which is what permits a calibration. link_healthy is set because a node that is
+    // told the PLC link is down must report "cannot verify" regardless of the pin values.
     void publishEStop(const bool engaged)
     {
-        GpioState message;
-        message.gpio_pin_hw_e_stop_user_button = engaged;
+        SafetyStatus message;
+        message.hw_e_stop_user_button = engaged;
+        message.link_healthy = true;
+        gpio_state_ = message;
+        gpio_state_pub_->publish(message);
+    }
+
+    // Publishes an otherwise-engaged safety status whose link the hardware interface reports as
+    // down, so the values in it are last-known-good rather than current.
+    void publishEStopWithUnhealthyLink()
+    {
+        SafetyStatus message;
+        message.hw_e_stop_user_button = true;
+        message.link_healthy = false;
         gpio_state_ = message;
         gpio_state_pub_->publish(message);
     }
@@ -250,9 +263,9 @@ private:
 
     rclcpp::Node::SharedPtr node_;
     rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr serial_pub_;
-    rclcpp::Publisher<GpioState>::SharedPtr gpio_state_pub_;
+    rclcpp::Publisher<SafetyStatus>::SharedPtr gpio_state_pub_;
     rclcpp::TimerBase::SharedPtr gpio_timer_;
-    std::optional<GpioState> gpio_state_;
+    std::optional<SafetyStatus> gpio_state_;
     rclcpp::Subscription<Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Service<Trigger>::SharedPtr e_stop_set_srv_;
     rclcpp::Service<Trigger>::SharedPtr e_stop_reset_srv_;
@@ -859,7 +872,7 @@ TEST_F(TeleopCalibrationTest, TheStateTopicReportsTheVerifiedEStop)
     EXPECT_EQ(harness_->calibration_state->e_stop, RcCalibrationState::ESTOP_RELEASED);
 }
 
-// Without the harness publishing gpio_state at all, which is how a bench or a sim looks.
+// Without the harness publishing safety_status at all, which is how a bench or a sim looks.
 class TeleopCalibrationNoSafetyIoTest : public TeleopNodeTest
 {
 

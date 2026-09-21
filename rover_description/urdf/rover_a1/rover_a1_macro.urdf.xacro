@@ -143,6 +143,39 @@
                instead fail on_configure() cleanly after that many attempts. -->
           <param name="modbus_connection_retry_count">0</param>
           <param name="modbus_connection_retry_delay_ms">1000</param>
+          <!-- Per-transaction Modbus response timeout (ms). Bounds how long one stalled read or
+               write can hold the safety link and delay the watchdog heartbeat below, so it must
+               stay comfortably under safety_wdg_kick_period_ms. Optional - omitting it keeps the
+               compiled-in kDefaultResponseTimeoutMs (500), which is longer than a kick period
+               and is why a single slow transaction used to be able to trip the relay. -->
+          <param name="modbus_response_timeout_ms">150</param>
+
+          <!-- Period (ms) of the CPU watchdog heartbeat toggle on GPIO_CPU_WDG_HEARTBEAT
+               (COIL_1). The safety relay latches the E-Stop if this level stops changing for
+               longer than its watchdog window, measured at ~1 s on the A1, so this value is
+               dimensioned against real hardware and is not a free tuning knob: 200 ms gives ~5x
+               margin, enough to absorb several consecutive ticks lost to Modbus contention. The
+               heartbeat runs on its own thread with absolute steady_clock deadlines and does not
+               share a lock hold with the IO poll below. Raise only with a re-measured window;
+               lowering it costs Modbus bandwidth but is otherwise safe. -->
+          <param name="safety_wdg_kick_period_ms">200</param>
+
+          <!-- Period (ms) of the discrete-IO poll that refreshes the cache read() serves to
+               GpioState and the E-Stop mirror. Telemetry only - a missed poll degrades freshness
+               and is caught by rover_twist_mux's 1.0 s gpio_state staleness timeout; it never
+               endangers the relay's watchdog window. 100 ms keeps link duty low; it is also the
+               floor on how quickly software notices a latch trip, which is defense-in-depth
+               behind the contactor opening in hardware. -->
+          <param name="safety_io_poll_period_ms">100</param>
+
+          <!-- How long (ms) the latch-reset coil is held true before being driven back to false.
+               The reset is a pulse, not a level; it used to be written true-then-false with no
+               dwell, making it one Modbus round-trip wide and narrower than anyone had checked
+               against the relay's discrete-input filter. A pulse the relay cannot see fails
+               silently - the service returns success and the latch stays held. Optional;
+               omitting it keeps kDefaultLatchResetPulseMs (100). Narrow it only against a
+               scope measurement of the relay input. -->
+          <param name="safety_latch_reset_pulse_ms">100</param>
 
           <!-- Driver controller update frequency and maximum attempts to initilize and activate -->
           <param name="driver_states_update_frequency">20.0</param>
@@ -214,12 +247,32 @@
           <!-- Deadband (rad/s at the wheel) below which a velocity command counts as zero for
                the "can't clear the E-Stop while the rover is still being commanded to move"
                invariant (see domain/emergency_stop.cpp). Optional: omitting it keeps the
-               compiled-in kDefaultVelocityCommandZeroTolerance. 0.01 rad/s is ~1.65 mm/s at the
-               A1's 0.1651 m wheel radius - well below anything that moves the rover, and well
-               above the floating-point residue a controller's kinematics leave behind. Raise it
-               only if a controller is known to idle with a larger steady-state output. 
-               Set to 0.8 - workaround until the solution to reset the PID will be find -->
-          <param name="velocity_command_zero_tolerance">1.2</param>
+               compiled-in kDefaultVelocityCommandZeroTolerance (0.01).
+
+               Why 0.35 and not 0.01: the wheel PIDs run with feedforward_gain 1.0 and an
+               integral clamped at i_clamp_max (0.25 front, 0.33 rear - see
+               rover_controller/config/wheel_01_controller.yaml). While motion is inhibited the
+               reference and the measured velocity are both zero, so the PID error is zero, and a
+               PI integrator holds its value at zero error instead of decaying. The command
+               therefore parks at the frozen I-term - up to 0.33 rad/s - and no command-side
+               tolerance below that can ever be satisfied. 0.35 is the smallest value that clears
+               the largest i_clamp with a little margin.
+
+               This was previously 1.2 (~0.2 m/s at the A1's 0.1651 m wheel radius), which is
+               fast enough to walk beside and made the invariant largely decorative. The way to
+               get back to 0.01 is to reset the PID I-term when motion is inhibited, not to keep
+               widening this - hence velocity_state_zero_tolerance below, which closes the real
+               hazard in the meantime. -->
+          <param name="velocity_command_zero_tolerance">0.35</param>
+
+          <!-- Deadband (rad/s at the wheel) below which a *measured* wheel velocity counts as
+               "not moving", the second half of the same invariant. Unlike the command check
+               above this has no PID artifact to work around - a stationary wheel reads zero
+               whatever the integrator remembers - so it is the condition that actually prevents
+               clearing the E-Stop while the rover is still rolling. Optional; omitting it keeps
+               kDefaultVelocityStateZeroTolerance (0.05). 0.05 rad/s is ~8 mm/s, above 20 Hz
+               encoder quantisation and far below walking pace. -->
+          <param name="velocity_state_zero_tolerance">0.05</param>
 
         </xacro:unless>
       </hardware>

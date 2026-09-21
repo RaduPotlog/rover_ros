@@ -40,8 +40,10 @@ struct SafetyInput
     /** Seconds since the last message; nullopt when nothing arrived yet. */
     std::optional<double> age_s;
     /**
-     * How long a message stays trusted; nullopt for inputs published only on change (e.g. the
-     * transient-local gpio_state), which can never go stale.
+     * How long a message stays trusted; nullopt for an input that genuinely cannot go stale.
+     * Note that "transient-local, so it cannot go stale" is NOT such a case and was a real bug
+     * here: a latched sample tells a late joiner what was true when the publisher last ran, not
+     * that it is still running. Both safety topics are periodic and are graded.
      */
     std::optional<double> timeout_s;
 };

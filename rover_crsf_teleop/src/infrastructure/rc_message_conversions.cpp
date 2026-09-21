@@ -151,13 +151,11 @@ std::vector<int64_t> toParameterArray(const std::array<int, RcFrame::kChannelCou
     return std::vector<int64_t>(values.cbegin(), values.cend());
 }
 
-SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::GpioState & message)
+SafetyIoFlags toSafetyIoFlags(const rover_msgs::msg::SafetyStatus & message)
 {
     SafetyIoFlags flags;
-    flags.hw_e_stop_user_button = message.gpio_pin_hw_e_stop_user_button;
-    flags.sw_e_stop_user_button = message.gpio_pin_sw_e_stop_user_button;
-    flags.sw_e_stop_motor_driver_fault = message.gpio_pin_sw_e_stop_motor_driver_fault;
-    flags.sw_e_stop_latch_status = message.gpio_pin_sw_e_stop_latch_status;
+    flags.hw_e_stop_user_button = message.hw_e_stop_user_button;
+    flags.sw_e_stop_latch_status = message.latch_active;
     return flags;
 }
 

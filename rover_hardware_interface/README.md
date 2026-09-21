@@ -32,18 +32,23 @@ Reference datasheets: `docs/DCC1000_reference.pdf` (motor controller),
 | Direction | Name | Type |
 |-----------|------|------|
 | pub | `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` |
-| pub | `hardware_interface/gpio_state` | `rover_msgs/GpioState` (transient local) - E-Stop, contactor, watchdog pins |
+| pub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` - plant state: HW E-Stop button, contactor feedback, latch, link health |
+| pub | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` - read-backs of the coils *we* drive; diagnostic, may only ever inhibit |
 | srv | `hardware_interface/sw_user_e_stop_set` | `std_srvs/Trigger` - set the software E-Stop |
 | srv | `hardware_interface/sw_user_e_stop_reset` | `std_srvs/Trigger` - reset the software E-Stop |
 | srv | `hardware_interface/sw_e_stop_latch_reset` | `std_srvs/Trigger` - clear the safety relay latch |
 | pub | `diagnostics` | hardware id `Rover System`: driver and safety controller status |
 
-Consumers: `rover_safety` (driver state, GPIO, e-stop set), `rover_twist_mux`'s
-`rover_motion_lock_node` (GPIO), `rover_crsf_teleop` (e-stop services) and the Foxglove
-dashboard.
+Consumers: `rover_safety` (driver state, the SW E-Stop echo, e-stop set), `rover_twist_mux`'s
+`rover_motion_lock_node` (both safety topics), `rover_crsf_teleop` (safety status + e-stop
+services) and the Foxglove dashboard.
+
+The two safety topics replaced a single `gpio_state` of seven undifferentiated bools. Plant state
+and command read-backs are separated because the difference decides what a consumer is allowed to
+conclude — see `rover_arch/SAFETY_CHAIN.md` §4 and the message files themselves.
 
 ```bash
-ros2 topic echo /rover/hardware_interface/gpio_state
+ros2 topic echo /rover/hardware_interface/safety_status
 ros2 service call /rover/hardware_interface/sw_user_e_stop_reset std_srvs/srv/Trigger
 ros2 control list_hardware_components
 ```

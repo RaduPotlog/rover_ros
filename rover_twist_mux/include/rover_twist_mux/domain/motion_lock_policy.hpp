@@ -56,6 +56,11 @@ enum class MotionInhibitReason
     MotorDriverFault,
     EStopLatched,
     MotorContactorDisengaged,
+
+    /// The hardware interface reports its link to the safety PLC is down, so every flag above is
+    /// last-known-good rather than current. Distinct from staleness: the messages keep arriving,
+    /// they just cannot be trusted.
+    SafetyLinkUnhealthy,
 };
 
 /** @brief Human-readable label for logs and diagnostics. */

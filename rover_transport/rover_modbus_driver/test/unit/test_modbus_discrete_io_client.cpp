@@ -234,4 +234,124 @@ TEST(ModbusDiscreteIoClientTest, DestructorClosesTheTransport)
     EXPECT_TRUE(journal->closed);
 }
 
+
+// --- Reconnection --------------------------------------------------------------------------
+//
+// The transport used to be built once in the constructor and never rebuilt, so any drop after
+// on_configure() was permanent until the whole ros2_control component was re-configured. On the
+// safety path that meant one Modbus hiccup disabled the link for good.
+
+namespace
+{
+
+// Builds a client whose factory counts its calls and can be made to fail, so a reconnection is
+// observable without a socket.
+struct ReconnectFixture
+{
+    std::shared_ptr<Journal> journal{std::make_shared<Journal>()};
+    std::shared_ptr<FakeLogger> logger{std::make_shared<FakeLogger>()};
+    std::unique_ptr<ModbusDiscreteIoClient> client;
+
+    explicit ReconnectFixture(const unsigned retry_delay_ms = 0)
+    {
+        auto journal_copy = journal;
+
+        auto s = settings();
+        s.connection_retry_delay_ms = retry_delay_ms;
+
+        client = std::make_unique<ModbusDiscreteIoClient>(
+            [journal_copy]() -> std::unique_ptr<ModbusTransportPort> {
+                journal_copy->transports_created++;
+
+                if (journal_copy->factory_fails) {
+                    throw std::runtime_error("connection refused");
+                }
+
+                return std::make_unique<FakeModbusTransport>(journal_copy);
+            },
+            s, logger);
+    }
+};
+
+}  // namespace
+
+TEST(ModbusDiscreteIoClientTest, AFailedOperationDropsTheTransport)
+{
+    ReconnectFixture f;
+    ASSERT_TRUE(f.client->isConnected());
+    ASSERT_EQ(f.journal->transports_created, 1);
+
+    f.journal->throw_error = MB::utils::Timeout;
+    EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), MB::ModbusException);
+
+    EXPECT_FALSE(f.client->isConnected());
+    EXPECT_TRUE(f.journal->closed);
+}
+
+TEST(ModbusDiscreteIoClientTest, ReDialsAfterADropAndResumesWorking)
+{
+    // Zero configured delay so the backoff window has already elapsed by the next call.
+    ReconnectFixture f;
+
+    f.journal->throw_error = MB::utils::Timeout;
+    EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), MB::ModbusException);
+    ASSERT_FALSE(f.client->isConnected());
+
+    // Link comes back.
+    f.journal->throw_error.reset();
+    f.journal->coil_value = true;
+
+    // Even a zero configured delay keeps a 1 ms floor, so that an unreachable host is not
+    // re-dialled on literally every transaction. Retry until the window has passed rather than
+    // sleeping a fixed amount, so this cannot flake either way.
+    uint16_t value = 0;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        try {
+            value = f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false});
+            break;
+        } catch (const std::runtime_error &) {
+            // Still inside the backoff window.
+        }
+    }
+
+    EXPECT_EQ(value, 1U);
+    EXPECT_TRUE(f.client->isConnected());
+    EXPECT_EQ(f.journal->transports_created, 2) << "the client did not re-dial";
+}
+
+TEST(ModbusDiscreteIoClientTest, FailsFastInsideTheBackoffWindowInsteadOfDialling)
+{
+    // A long delay means the window is still open on the very next call. MB::TCP::Connection's
+    // ::connect() is blocking and untimed, so dialling on every transaction against a dead host
+    // would stall the caller repeatedly - the whole reason the attempts are rationed.
+    ReconnectFixture f{60000};
+
+    f.journal->throw_error = MB::utils::Timeout;
+    EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), MB::ModbusException);
+    ASSERT_FALSE(f.client->isConnected());
+
+    f.journal->throw_error.reset();
+
+    const int created_before = f.journal->transports_created;
+    EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), std::runtime_error);
+    EXPECT_EQ(f.journal->transports_created, created_before)
+        << "a reconnection was attempted inside the backoff window";
+}
+
+TEST(ModbusDiscreteIoClientTest, AFailedReDialLeavesTheClientDisconnectedAndThrowing)
+{
+    ReconnectFixture f;
+
+    f.journal->throw_error = MB::utils::Timeout;
+    EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), MB::ModbusException);
+
+    f.journal->throw_error.reset();
+    f.journal->factory_fails = true;
+
+    EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), std::runtime_error);
+    EXPECT_FALSE(f.client->isConnected());
+}
+
 }  // namespace rover::transport::modbus::test
