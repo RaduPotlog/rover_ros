@@ -37,7 +37,8 @@ rover's router would join the simulated nodes to the real rover.
   - `rover_twist_mux` (mux + `rover_motion_lock_node`), as on the rover:
     `nav_cmd_vel_stamped` / teleop → `cmd_vel`, gated by `motion_lock`.
   - `sim_gpio_state_publisher` (`scripts/sim_gpio_state.py`): an all-clear
-    `hardware_interface/gpio_state`, which `rover_motion_lock_node` needs to open the lock.
+    `hardware_interface/safety_status` + `hardware_interface/safety_command_echo`, which
+    `rover_motion_lock_node` needs to open the lock.
     `ros2 param set <ns>/sim_gpio_state_publisher e_stop true` simulates a software E-Stop.
   - `gz_bridge` (`ros_gz_bridge/parameter_bridge`) configured by `config/gz_bridge.yaml`.
   - `rover_rs16_lidar_scan` (`pointcloud_to_laserscan`): `scan` sliced from `rslidar_points`
