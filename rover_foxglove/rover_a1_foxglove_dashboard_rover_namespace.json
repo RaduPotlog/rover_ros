@@ -90,11 +90,32 @@
         "imageTopic": "/rover/led/channel_2_frame"
       }
     },
+    "map!1db5dg0": {
+      "zoomLevel": 17,
+      "customTileUrl": "",
+      "disabledTopics": [],
+      "followTopic": "",
+      "followFrame": "",
+      "layer": "map",
+      "topicColors": {},
+      "maxNativeZoom": 18,
+      "topicConfig": {
+        "/rover/gps/filtered": {
+          "historyMode": "none",
+          "pointSize": 6
+        },
+        "/rover/gps/fix": {
+          "historyMode": "none",
+          "pointSize": 6
+        }
+      },
+      "layers": []
+    },
     "Stack!1s3ez02": {
       "panels": [
         {
           "panelId": "Image!2zxrowa",
-          "size": 0.25
+          "size": 0.17985972158367883
         },
         {
           "panelId": "Image!27i71en",
@@ -114,18 +135,6 @@
       "showTimezone": true,
       "showName": true,
       "showSourceLocation": true
-    },
-    "Plot!3l2jzfi": {
-      "paths": [
-        {
-          "value": "/rover/system_status.avg_load_percent",
-          "enabled": true,
-          "timestampMethod": "receiveTime",
-          "showLine": true,
-          "color": "#4e98e2",
-          "id": "9b302063-8277-49fd-8e8d-34af3a65a5f5"
-        }
-      ]
     },
     "Plot!2i966dm": {
       "yAxisLabel": "",
@@ -164,25 +173,148 @@
           "label": "RL"
         }
       ],
-      "foxglovePanelTitle": "ddsasd",
+      "foxglovePanelTitle": "Feedback speed",
       "isSynced": true,
       "xAxisVal": "timestamp",
       "showLegend": true
+    },
+    "Plot!3l2jzfi": {
+      "paths": [
+        {
+          "value": "/rover/system_status.avg_load_percent",
+          "enabled": true,
+          "timestampMethod": "receiveTime",
+          "showLine": true,
+          "color": "#4e98e2",
+          "id": "9b302063-8277-49fd-8e8d-34af3a65a5f5"
+        }
+      ]
+    },
+    "3D!4l65y0a": {
+      "cameraState": {
+        "distance": 6.4706708994679705,
+        "perspective": true,
+        "phi": 58.68913754468374,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0.2825693287543072,
+          0.06057068017463302,
+          -1.7296057580901586e-16
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": -47.69749745967911,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-heading",
+      "followTf": "rover/odom",
+      "enuFrameId": "rover/odom",
+      "scene": {
+        "transforms": {
+          "visible": true,
+          "showLabel": false
+        },
+        "syncCamera": false
+      },
+      "transforms": {},
+      "topics": {},
+      "layers": {
+        "grid": {
+          "visible": true,
+          "drawBehind": false,
+          "instanceId": "82087910-c3ff-4be5-bfe9-31dbc2e5edd1",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ]
+        },
+        "c2adc0d4-9f48-488c-83de-4977e198b654": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "/rover/joint_states",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": true,
+          "axisScale": 1,
+          "showOutlines": true,
+          "opacity": 1,
+          "visible": false,
+          "instanceId": "c2adc0d4-9f48-488c-83de-4977e198b654",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/rover/robot_description",
+          "framePrefix": "",
+          "order": 1,
+          "links": {
+            "base_link": {
+              "visible": true
+            },
+            "body_link": {
+              "visible": true
+            }
+          }
+        },
+        "170f757e-424a-48be-8506-130851335665": {
+          "visible": false,
+          "serverConfig": "map",
+          "instanceId": "170f757e-424a-48be-8506-130851335665",
+          "layerId": "foxglove.TiledMap",
+          "opacity": 1,
+          "zPosition": 0.01,
+          "drawBehind": true,
+          "order": 2
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "synchronize": false,
+      "imageMode": {}
     },
     "RawMessages!ql9qq3": {
       "defaultExpanded": false,
       "topicPath": "/rover/joint_states",
       "diffEnabled": false
     },
-    "RawMessages!e9nfl6": {
+    "RawMessages!16msonw": {
       "defaultExpanded": false,
-      "topicPath": "/rover/diagnostics",
+      "topicPath": "/rover/hardware_interface/rover_driver_state.driver_states[0].state",
       "diffEnabled": false
     },
     "Indicator!1ja73dx": {
       "path": "/rover/hardware_interface/safety_command_echo.sw_e_stop_user_button",
       "style": "bulb",
-      "fontSize": 36,
+      "fontSize": 24,
       "fallbackColor": "#ff0000",
       "fallbackLabel": "PRESSED",
       "rules": [
@@ -190,7 +322,7 @@
           "operator": "=",
           "rawValue": "false",
           "color": "#33ff00",
-          "label": "READY"
+          "label": "RELEASED"
         }
       ],
       "foxglovePanelTitle": "SW-E-STOP Button"
@@ -201,7 +333,7 @@
       "timeoutSeconds": 10,
       "serviceName": "/rover/hardware_interface/sw_user_e_stop_reset",
       "editingMode": false,
-      "buttonText": "SW_USER_E_STOP_ACTUATE",
+      "buttonText": "SW_USER_E_STOP",
       "buttonColor": "#33f247",
       "foxglovePanelTitle": "SW-E-STOP Button"
     },
@@ -211,22 +343,22 @@
       "timeoutSeconds": 10,
       "serviceName": "/rover/hardware_interface/sw_user_e_stop_set",
       "editingMode": false,
-      "buttonText": "SW_USER_E_STOP_PRESS",
+      "buttonText": "SW_USER_E_STOP",
       "buttonColor": "#ff0000",
       "foxglovePanelTitle": "SW-E-STOP Button"
     },
     "Indicator!3nvxjn7": {
       "path": "/rover/hardware_interface/safety_status.latch_active",
       "style": "bulb",
-      "fontSize": 36,
-      "fallbackColor": "#00ff1a",
-      "fallbackLabel": "TRUE",
+      "fontSize": 24,
+      "fallbackColor": "#e34b4b",
+      "fallbackLabel": "OFF",
       "rules": [
         {
           "operator": "=",
           "rawValue": "true",
-          "color": "#e34b4b",
-          "label": "FALSE"
+          "color": "#00ff1a",
+          "label": "ON"
         }
       ],
       "foxglovePanelTitle": "SW-E-STOP-LATCH STATUS"
@@ -244,39 +376,23 @@
     "Indicator!25x422y": {
       "path": "/rover/hardware_interface/safety_status.hw_e_stop_user_button",
       "style": "bulb",
-      "fontSize": 30,
+      "fontSize": 24,
       "fallbackColor": "#ff0000",
-      "fallbackLabel": "SET",
+      "fallbackLabel": "PRESSED",
       "rules": [
         {
           "operator": "=",
           "rawValue": "false",
           "color": "#33ff00",
-          "label": "READY"
+          "label": "RELEASED"
         }
       ],
       "foxglovePanelTitle": "HW-E-STOP Button"
     },
-    "Indicator!6s1jl": {
-      "path": "/rover/hardware_interface/safety_status.motor_contactor_engaged",
-      "style": "bulb",
-      "fontSize": 30,
-      "fallbackColor": "#ff0000",
-      "fallbackLabel": "NOT READY",
-      "rules": [
-        {
-          "operator": "=",
-          "rawValue": "true",
-          "color": "#00ff1a",
-          "label": "READY"
-        }
-      ],
-      "foxglovePanelTitle": "Motor Contactor Engaged Status"
-    },
     "Indicator!2lcrs0u": {
       "path": "/rover/hardware_interface/safety_command_echo.cpu_wdg_heartbeat",
       "style": "bulb",
-      "fontSize": 30,
+      "fontSize": 24,
       "fallbackColor": "#ff0000",
       "fallbackLabel": "FALSE",
       "rules": [
@@ -292,34 +408,50 @@
     "Indicator!mid9o6": {
       "path": "/rover/hardware_interface/safety_command_echo.sw_e_stop_motor_driver_fault",
       "style": "bulb",
-      "fontSize": 36,
+      "fontSize": 24,
       "fallbackColor": "#00ff32",
-      "fallbackLabel": "FALSE",
+      "fallbackLabel": "NO FAULT",
       "rules": [
         {
           "operator": "=",
           "rawValue": "true",
           "color": "#e34b4b",
-          "label": "TRUE"
+          "label": "FAULT"
         }
       ],
       "foxglovePanelTitle": "MOTOR DRIVER FAULT"
     },
-    "Indicator!4j5axg9": {
-      "path": "/rover/motion_lock.data",
+    "Indicator!6s1jl": {
+      "path": "/rover/hardware_interface/safety_status.motor_contactor_engaged",
       "style": "bulb",
-      "fontSize": 36,
+      "fontSize": 24,
       "fallbackColor": "#ff0000",
-      "fallbackLabel": "FALSE",
+      "fallbackLabel": "NOT READY",
       "rules": [
         {
           "operator": "=",
           "rawValue": "true",
-          "color": "#00ff48",
-          "label": "TRUE"
+          "color": "#00ff1a",
+          "label": "READY"
         }
       ],
-      "foxglovePanelTitle": "MOTION_LOCK"
+      "foxglovePanelTitle": "Motor Contactor Engaged Status"
+    },
+    "Indicator!4j5axg9": {
+      "path": "/rover/motion_lock.data",
+      "style": "bulb",
+      "fontSize": 24,
+      "fallbackColor": "#ff0000",
+      "fallbackLabel": "NO",
+      "rules": [
+        {
+          "operator": "=",
+          "rawValue": "false",
+          "color": "#00ff48",
+          "label": "READY"
+        }
+      ],
+      "foxglovePanelTitle": "MOTION_ALLOWED"
     },
     "Gauge!2x8cm1e": {
       "path": "/rover/rover_battery/battery_status.temperature",
@@ -341,7 +473,7 @@
     "Gauge!410rqfx": {
       "path": "/rover/rover_battery/battery_status.current",
       "style": "dial",
-      "minValue": -10,
+      "minValue": -20,
       "maxValue": 10,
       "tickInterval": 1,
       "showTicks": true,
@@ -390,46 +522,53 @@
     "speed": 1
   },
   "layout": {
-    "first": {
-      "first": {
-        "first": {
-          "first": {
-            "first": "Stack!1s3ez02",
-            "second": "RosOut!c5eeu",
-            "direction": "column"
-          },
-          "second": "Plot!3l2jzfi",
-          "direction": "row",
-          "splitPercentage": 60.93344857389802
-        },
-        "second": "Plot!2i966dm",
-        "direction": "row",
-        "splitPercentage": 82.50458348061741
-      },
-      "second": {
-        "first": "RawMessages!ql9qq3",
-        "second": "RawMessages!e9nfl6",
-        "direction": "column"
-      },
-      "direction": "row",
-      "splitPercentage": 68.40713813615334
-    },
+    "direction": "row",
+    "first": "map!1db5dg0",
     "second": {
       "first": {
         "first": {
           "first": {
             "first": {
-              "first": "Indicator!1ja73dx",
-              "second": "CallService!dze8fj",
+              "first": "Stack!1s3ez02",
+              "second": "RosOut!c5eeu",
               "direction": "column",
-              "splitPercentage": 52.94117647058824
+              "splitPercentage": 49.232585672436954
             },
-            "second": "CallService!4ayccr2",
-            "direction": "column",
-            "splitPercentage": 68.0591164681927
+            "second": {
+              "first": "Plot!2i966dm",
+              "second": "Plot!3l2jzfi",
+              "direction": "column"
+            },
+            "direction": "row",
+            "splitPercentage": 62.47173943761483
           },
-          "second": {
+          "second": "3D!4l65y0a",
+          "direction": "row",
+          "splitPercentage": 67.38025038688863
+        },
+        "second": {
+          "first": "RawMessages!ql9qq3",
+          "second": "RawMessages!16msonw",
+          "direction": "column"
+        },
+        "direction": "row",
+        "splitPercentage": 79.65853658536585
+      },
+      "second": {
+        "first": {
+          "first": {
             "first": {
+              "first": {
+                "first": "Indicator!1ja73dx",
+                "second": "CallService!dze8fj",
+                "direction": "column",
+                "splitPercentage": 50.00000000000002
+              },
+              "second": "CallService!4ayccr2",
+              "direction": "column",
+              "splitPercentage": 66.67956954759002
+            },
+            "second": {
               "first": {
                 "first": {
                   "first": "Indicator!3nvxjn7",
@@ -440,51 +579,54 @@
                 "direction": "row",
                 "splitPercentage": 54.33673469387753
               },
-              "second": "Indicator!6s1jl",
-              "direction": "row",
-              "splitPercentage": 63.92092257001648
-            },
-            "second": {
-              "first": "Indicator!2lcrs0u",
               "second": {
-                "first": "Indicator!mid9o6",
-                "second": "Indicator!4j5axg9",
+                "first": "Indicator!2lcrs0u",
+                "second": {
+                  "first": "Indicator!mid9o6",
+                  "second": {
+                    "first": "Indicator!6s1jl",
+                    "second": "Indicator!4j5axg9",
+                    "direction": "row",
+                    "splitPercentage": 42.461386846672426
+                  },
+                  "direction": "row",
+                  "splitPercentage": 26.58067366520355
+                },
                 "direction": "row",
-                "splitPercentage": 49.06668061433009
+                "splitPercentage": 18.57133360358823
               },
               "direction": "row",
-              "splitPercentage": 30.68181818181821
+              "splitPercentage": 34.65992368084424
             },
             "direction": "row",
-            "splitPercentage": 51.8103448275862
+            "splitPercentage": 17.261055634807416
           },
-          "direction": "row",
-          "splitPercentage": 17.261055634807416
-        },
-        "second": {
-          "first": {
+          "second": {
             "first": {
-              "first": "Gauge!2x8cm1e",
-              "second": "Gauge!410rqfx",
+              "first": {
+                "first": "Gauge!2x8cm1e",
+                "second": "Gauge!410rqfx",
+                "direction": "row",
+                "splitPercentage": 46.9951923076923
+              },
+              "second": "Gauge!2p2ph1m",
               "direction": "row",
-              "splitPercentage": 46.9951923076923
+              "splitPercentage": 66.7535853976532
             },
-            "second": "Gauge!2p2ph1m",
+            "second": "virtual-joystick.Virtual Joystick!1g1w7co",
             "direction": "row",
-            "splitPercentage": 66.7535853976532
+            "splitPercentage": 72.32088181261481
           },
-          "second": "virtual-joystick.Virtual Joystick!1g1w7co",
-          "direction": "row",
-          "splitPercentage": 66.307415288918
+          "direction": "column",
+          "splitPercentage": 47.62921587679531
         },
-        "direction": "column",
-        "splitPercentage": 52.641578781770335
+        "second": "DiagnosticStatusPanel!41058qk",
+        "direction": "row",
+        "splitPercentage": 79.65853658536585
       },
-      "second": "DiagnosticStatusPanel!41058qk",
-      "direction": "row",
-      "splitPercentage": 68.27033218785796
+      "direction": "column",
+      "splitPercentage": 49.692747709025085
     },
-    "direction": "column",
-    "splitPercentage": 48.25890915413552
+    "splitPercentage": 15.21951219512195
   }
 }
