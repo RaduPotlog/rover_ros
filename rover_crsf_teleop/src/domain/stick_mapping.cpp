@@ -15,6 +15,7 @@
 #include "rover_crsf_teleop/domain/stick_mapping.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 namespace rover_crsf_teleop
@@ -39,8 +40,10 @@ double mapAxis(const int raw_value, const AxisMapping & mapping)
         return 0.0;
     }
 
-    const double magnitude = static_cast<double>(std::abs(deflection) - mapping.deadband_counts) /
-                             static_cast<double>(half_span);
+    const double linear = static_cast<double>(std::abs(deflection) - mapping.deadband_counts) /
+                          static_cast<double>(half_span);
+    const double expo = std::isfinite(mapping.expo) ? std::clamp(mapping.expo, 0.0, 1.0) : 0.0;
+    const double magnitude = (1.0 - expo) * linear + expo * linear * linear * linear;
 
     double normalized = (deflection > 0) ? magnitude : -magnitude;
 

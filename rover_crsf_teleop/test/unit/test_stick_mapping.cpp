@@ -14,6 +14,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include "rover_crsf_teleop/domain/stick_mapping.hpp"
 
 namespace rover_crsf_teleop
@@ -152,6 +154,74 @@ TEST(StickMappingTest, DegenerateMappingReturnsZeroInsteadOfDividingByZero)
 
     EXPECT_EQ(mapAxis(kDefaultCrsfChannelMax, mapping), 0.0);
     EXPECT_EQ(mapAxis(kDefaultCrsfChannelMin, mapping), 0.0);
+}
+
+namespace
+{
+
+// Round numbers so the expected values can be written down: half throw is exactly m = 0.5.
+AxisMapping expoMapping(const double expo, const bool invert = false, const int deadband = 0)
+{
+    AxisMapping mapping;
+    mapping.in_min = 0;
+    mapping.in_mid = 1000;
+    mapping.in_max = 2000;
+    mapping.out_min = -2.0;
+    mapping.out_max = 2.0;
+    mapping.deadband_counts = deadband;
+    mapping.invert = invert;
+    mapping.expo = expo;
+    return mapping;
+}
+
+}  // namespace
+
+TEST(StickMappingExpoTest, ZeroExpoIsTheLinearMapping)
+{
+    EXPECT_DOUBLE_EQ(mapAxis(1500, expoMapping(0.0)), 1.0);
+    EXPECT_DOUBLE_EQ(mapAxis(1250, expoMapping(0.0)), 0.5);
+}
+
+TEST(StickMappingExpoTest, FullThrowStillReachesTheLimits)
+{
+    for (const double expo : {0.0, 0.3, 0.5, 1.0}) {
+        EXPECT_DOUBLE_EQ(mapAxis(2000, expoMapping(expo)), 2.0);
+        EXPECT_DOUBLE_EQ(mapAxis(0, expoMapping(expo)), -2.0);
+    }
+}
+
+TEST(StickMappingExpoTest, HalfThrowIsSofter)
+{
+    // m = 0.5, e = 0.5: 0.5 * 0.5 + 0.5 * 0.125 = 0.3125 of out_max.
+    EXPECT_DOUBLE_EQ(mapAxis(1500, expoMapping(0.5)), 0.625);
+    EXPECT_DOUBLE_EQ(mapAxis(500, expoMapping(0.5)), -0.625);
+}
+
+TEST(StickMappingExpoTest, WorksWithInvertAndKeepsTheCentreAtZero)
+{
+    EXPECT_DOUBLE_EQ(mapAxis(1500, expoMapping(0.5, true)), -0.625);
+    EXPECT_EQ(mapAxis(1000, expoMapping(0.5)), 0.0);
+    // Deadband edge is still exactly zero; just past it is tiny, not a jump.
+    EXPECT_EQ(mapAxis(1030, expoMapping(0.5, false, 30)), 0.0);
+    const double just_past = mapAxis(1031, expoMapping(0.5, false, 30));
+    EXPECT_GT(just_past, 0.0);
+    EXPECT_LT(just_past, 0.002);
+}
+
+TEST(StickMappingExpoTest, AsymmetricRangeStillReachesBothLimits)
+{
+    AxisMapping mapping = expoMapping(0.5);
+    mapping.in_mid = 1004;  // a trimmed, off-centre stick
+    EXPECT_DOUBLE_EQ(mapAxis(2000, mapping), 2.0);
+    EXPECT_DOUBLE_EQ(mapAxis(0, mapping), -2.0);
+    EXPECT_EQ(mapAxis(1004, mapping), 0.0);
+}
+
+TEST(StickMappingExpoTest, OutOfRangeExpoIsClamped)
+{
+    EXPECT_DOUBLE_EQ(mapAxis(1500, expoMapping(2.0)), mapAxis(1500, expoMapping(1.0)));
+    EXPECT_DOUBLE_EQ(mapAxis(1500, expoMapping(-1.0)), 1.0);
+    EXPECT_DOUBLE_EQ(mapAxis(1500, expoMapping(std::nan(""))), 1.0);
 }
 
 }  // namespace rover_crsf_teleop

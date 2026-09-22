@@ -111,6 +111,14 @@
     angular_z_out_max: 1.0    # rad/s
     angular_z_invert: true
 
+    # Stick expo per axis: (1 - e) * m + e * m^3 on the normalized deflection m. 0 = linear,
+    # 1 = softest. Small moves give much less speed (30 % turn stick -> 16 % at 0.5), full stick
+    # is still out_min/out_max. Same values as the web joystick (ROVER_DRIVE_EXPO_*). This is ON
+    # TOP of any expo in the transmitter model - keep the radio's expo at 0 %. Calibration is
+    # unaffected: it measures raw endpoints and midpoint, expo only reshapes the curve between.
+    linear_x_expo: 0.3
+    angular_z_expo: 0.5
+
     # Outer-wheel rim speed budget. Stick commands with |v| + |w| * track / 2 above this are scaled
     # down as a whole (same factor on v and w), so the rover drives the arc the sticks asked for,
     # just slower. 1.7 m/s = 10.3 rad/s at r = 0.1651, under the 10.958 rad/s URDF wheel limit with

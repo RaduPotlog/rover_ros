@@ -59,6 +59,13 @@ struct AxisMapping
     // Negates the normalized stick deflection before the output limits are applied, for an axis
     // whose stick direction is opposite to the robot's sign convention.
     bool invert{false};
+
+    // RC-style expo on the normalized deflection m (0..1, after the deadband):
+    // (1 - expo) * m + expo * m^3. Small stick moves give much less speed, full throw is still
+    // out_min/out_max, so fine control improves without losing top speed. 0 is linear; values
+    // outside [0, 1] are clamped. Same curve as the web drive interface's joystick. It comes on
+    // top of any expo set in the transmitter, so keep the radio's expo at 0 %.
+    double expo{0.0};
 };
 
 // Maps a raw channel count to a physical command.
@@ -68,7 +75,8 @@ struct AxisMapping
 //   - `in_min`/`in_max` return `out_min`/`out_max` (swapped when `invert`);
 //   - values outside [in_min, in_max] are clamped, so a glitched frame can't exceed the limits;
 //   - a degenerate mapping (zero or negative half-span, e.g. a deadband wider than the throw)
-//     returns 0.0 rather than dividing by zero.
+//     returns 0.0 rather than dividing by zero;
+//   - `expo` only reshapes the curve between the deadband edge and full throw.
 double mapAxis(const int raw_value, const AxisMapping & mapping);
 
 }  // namespace rover_crsf_teleop

@@ -138,6 +138,9 @@ void RoverCrsfTeleopNode::declareParameters()
     // The original implementation inverted this axis by swapping in_min/in_max; the mapping is
     // defined about the midpoint now, so the inversion is explicit.
     declare_parameter<bool>("angular_z_invert", true);
+    // Stick expo, 0 (linear) .. 1 (softest around centre); see AxisMapping::expo.
+    declare_parameter<double>("linear_x_expo", 0.0);
+    declare_parameter<double>("angular_z_expo", 0.0);
 
     // Outer-wheel rim speed budget (m/s) and wheel_separation * wheel_separation_multiplier (m).
     // 0.0 disables the limit; see domain/rim_speed_limit.hpp.
@@ -278,10 +281,12 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
     config.linear_x_mapping.out_min = get_parameter("linear_x_out_min").as_double();
     config.linear_x_mapping.out_max = get_parameter("linear_x_out_max").as_double();
     config.linear_x_mapping.invert = get_parameter("linear_x_invert").as_bool();
+    config.linear_x_mapping.expo = get_parameter("linear_x_expo").as_double();
 
     config.angular_z_mapping.out_min = get_parameter("angular_z_out_min").as_double();
     config.angular_z_mapping.out_max = get_parameter("angular_z_out_max").as_double();
     config.angular_z_mapping.invert = get_parameter("angular_z_invert").as_bool();
+    config.angular_z_mapping.expo = get_parameter("angular_z_expo").as_double();
 
     config.max_wheel_rim_speed = get_parameter("max_wheel_rim_speed").as_double();
     config.half_track_width = get_parameter("effective_track_width").as_double() / 2.0;

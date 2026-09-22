@@ -56,6 +56,10 @@ deactivated. Channel N is `channels[N-1]`.
   moment teleop is activated. The launch file brings it straight to active (`autostart`).
 - **Zero once.** A centred stick maps to exactly 0.0 (see `domain/stick_mapping.hpp`) and a zero
   command is published only once, so an idle transmitter doesn't hold `twist_mux` on this source.
+- **Expo.** `linear_x_expo` / `angular_z_expo` (0.3 / 0.5 in the config, 0 = linear) shape each
+  stick as `(1 - e)·m + e·m³` after the deadband: small moves give much less speed, full stick is
+  still `out_min`/`out_max`. Same curve as the web joystick. It stacks with any expo in the
+  transmitter model, so keep the radio's expo at 0 %.
 - **RC link failsafe.** The link is healthy while decoded frames are fresh (`channel_timeout_ms`)
   and — with `require_link_stats` — link statistics are fresh (`link_stats_timeout_ms`) and the
   uplink link quality has not dropped below `link_quality_lost_below` (it recovers at
