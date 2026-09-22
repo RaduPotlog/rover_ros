@@ -14,6 +14,17 @@ git clone -b master https://github.com/RaduPotlog/rover_ros.git src/rover_ros
 
 ### Setup environment variables
 
+One step: write the **rover-pc setup** block into `~/.bashrc`. It covers ROS, the workspace
+overlay, `ROVER_*`, and the Zenoh settings to reach the rover at `192.168.1.201`. It's safe to
+re-run; see [rover_scripts/README.md](rover_scripts/README.md) for the options.
+
+```bash
+src/rover_ros/rover_scripts/setup_rover_pc.sh
+source ~/.bashrc
+```
+
+Or by hand:
+
 ```bash
 export ROS_DISTRO=lyrical
 export ROVER_NAMESPACE=rover
