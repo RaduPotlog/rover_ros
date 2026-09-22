@@ -15,11 +15,7 @@ git clone -b master https://github.com/RaduPotlog/rover_ros.git src/rover_ros
 ### Setup environment variables
 
 ```bash
-# Every $ROS_DISTRO below is expanded before ROS is sourced, so set it explicitly.
 export ROS_DISTRO=lyrical
-
-# Default namespace of every rover_ros launch file. The rover runs under `rover`, so the
-# orchestrator computer must export the same value or the topics never meet.
 export ROVER_NAMESPACE=rover
 ```
 
@@ -34,9 +30,6 @@ export ROVER_ROS_BUILD_TYPE=hardware
 ```bash
 export ROVER_ROS_BUILD_TYPE=simulation
 ```
-
-Only needed to clone and build by hand: `rover_sim.sh` (see [Running](#running)) sets it for
-its own session, and `rover_sim.sh --build` builds the simulation workspace.
 
 ### Clone dependency
 
