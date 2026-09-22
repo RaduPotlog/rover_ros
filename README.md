@@ -86,20 +86,8 @@ ros2 launch rover_bringup rover_bringup.launch.py
 #### Simulated rover:
 
 ```bash
-# Sets up the simulation environment itself, whatever ~/.bashrc exports for the real rover:
-# ROVER_ROS_BUILD_TYPE=simulation, ROVER_NAMESPACE (default rover), no ZENOH_CONFIG_OVERRIDE,
-# and a local zenoh router on 127.0.0.1:7447. --build builds the workspace first; extra
-# arguments go to simulation.launch.py.
-~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh
-~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh --build use_rviz:=False
-
-# Second terminal (ros2 CLI, orchestrator) on the same local middleware:
-source ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh
-ros2 launch rover_navigation bringup.launch.py use_sim_time:=True localization_source:=slam
+src/rover_ros/rover_gazebo/scripts/rover_sim.sh
 ```
-
-See [rover_gazebo/README.md](rover_gazebo/README.md#running) for the details and the manual
-`ros2 launch rover_gazebo simulation.launch.py` form.
 
 ### Testing
 
