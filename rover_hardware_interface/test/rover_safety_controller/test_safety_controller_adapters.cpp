@@ -23,7 +23,9 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <memory>
+#include <thread>
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller.hpp"
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_e_stop_io.hpp"
@@ -191,6 +193,48 @@ TEST_F(AdapterFixture, GpioAdapterReadsTheAuxPinsFromTheirOwnCoils)
     EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_IN_1));
     EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_OUT_5));
     EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_OUT_0));
+}
+
+// Regression, seen on the rover: the poll read coils 0..19 in one request, and the Portenta
+// PLC IDE answers a read that crosses from its Digital Outputs area (0..7) into its
+// Programmable DIO area (8..19) from the first area only - every aux bit came back false.
+// The fake models that with setCoilAreas(); the safety coils and the aux coils must both read
+// true here.
+TEST(AdapterPlcAreasTest, AuxAndSafetyCoilsBothReadCorrectlyAcrossPlcMemoryAreas)
+{
+    auto modbus = std::make_shared<FakeRoverModbus>();
+    modbus->setCoilAreas({{0, 8}, {8, 12}});
+    modbus->setCoilReadValueFor(Coil::COIL_5, 1);   // latch status, Digital Outputs area
+    modbus->setCoilReadValueFor(Coil::COIL_8, 1);   // DIO00 -> GPIO_AUX_OUT_0
+    modbus->setCoilReadValueFor(Coil::COIL_14, 1);  // DIO06 -> GPIO_AUX_IN_0
+
+    auto controller = std::make_shared<RoverSafetyController>(modbus);
+    controller->start();
+
+    RoverSafetyControllerGpioAdapter adapter(controller);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (adapter.queryControlInterfaceIOStates().empty() &&
+           std::chrono::steady_clock::now() < deadline)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    const auto & states = adapter.queryControlInterfaceIOStates();
+    ASSERT_FALSE(states.empty());
+
+    EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS));
+    EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_OUT_0));
+    EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_IN_0));
+    EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_OUT_1));
+
+    // And no read ever asked the PLC to cross an area boundary.
+    for (const auto & request : modbus->coilReadRequests()) {
+        const bool in_digital_outputs = request.first + request.count <= 8;
+        const bool in_programmable_dio = request.first >= 8 && request.first + request.count <= 20;
+        EXPECT_TRUE(in_digital_outputs || in_programmable_dio)
+            << "coil read " << request.first << " x" << request.count << " crosses a PLC area";
+    }
 }
 
 TEST_F(AdapterFixture, GpioAdapterSetAuxOutputWritesItsOwnCoil)

@@ -127,12 +127,30 @@ public:
         throwIfReadsFail();
         std::lock_guard<std::mutex> lock(mutex_);
         read_transactions_++;
+        coil_read_requests_.push_back({static_cast<uint16_t>(first), count});
+
+        // With a PLC area map set, behave like the Portenta PLC IDE: a read is served from the
+        // area its first address falls in, and bits past that area's end come back false.
+        const uint16_t first_address = static_cast<uint16_t>(first);
+        uint16_t served_end = UINT16_MAX;
+
+        for (const auto & area : coil_areas_) {
+            if (first_address >= area.first && first_address < area.first + area.count) {
+                served_end = static_cast<uint16_t>(area.first + area.count);
+            }
+        }
 
         std::vector<bool> bits(count);
 
         for (uint16_t i = 0; i < count; ++i) {
-            const auto coil = static_cast<Coil>(static_cast<uint16_t>(first) + i);
-            const auto override_it = coil_read_overrides_.find(coil);
+            const uint16_t address = static_cast<uint16_t>(first_address + i);
+
+            if (address >= served_end) {
+                bits[i] = false;
+                continue;
+            }
+
+            const auto override_it = coil_read_overrides_.find(static_cast<Coil>(address));
 
             bits[i] = toBit(
                 (override_it != coil_read_overrides_.end()) ? override_it->second : coil_read_value_);
@@ -142,6 +160,26 @@ public:
     }
 
     // --- Test-only helpers below; not part of DiscreteIoPort. ---
+
+    struct CoilRange
+    {
+        uint16_t first;
+        uint16_t count;
+    };
+
+    // The PLC's coil memory areas. Unset (the default), coils form one flat array.
+    void setCoilAreas(const std::vector<CoilRange> & areas)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        coil_areas_ = areas;
+    }
+
+    // (first, count) of every batched coil read, in order.
+    std::vector<CoilRange> coilReadRequests() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return coil_read_requests_;
+    }
 
     // Number of read transactions served by the batched reads - how many round-trips one IO
     // sweep costs.
@@ -257,6 +295,8 @@ private:
     uint16_t contact_read_value_ = 0;
     uint16_t coil_read_value_ = 0;
     uint64_t read_transactions_ = 0;
+    std::vector<CoilRange> coil_areas_;
+    std::vector<CoilRange> coil_read_requests_;
 
     std::atomic_uint64_t read_delay_ms_ {0};
     std::atomic_bool fail_reads_ {false};

@@ -100,19 +100,24 @@ constexpr std::size_t kEStopMotorDriverFaultCoilIdx = 3;
 constexpr std::size_t kEStopLatchResetCoilIdx = 4;
 constexpr std::size_t kFirstAuxOutputCoilIdx = 6;
 
-// Number of consecutive objects, starting at address 0, that one batched read must span to cover
-// every entry of a table.
-template <typename InfoT, typename AddressOf>
-uint16_t spanFromZero(const std::vector<InfoT> & table, AddressOf address_of)
+// One batched FC1 read per PLC coil memory area. The Portenta PLC IDE keeps its Digital Outputs
+// (addresses 0..7, IDE "Modbus Coil 1..8") and its Programmable DIO (8..19, "Modbus Coil 9..20")
+// in separate areas, and answers a read that crosses from one into the other from the first
+// area only: coils 0..19 in one request returned every aux bit as false on the rover. Never
+// merge these blocks, and give any newly mapped coil the block of its PLC area.
+struct CoilReadBlock
 {
-    uint16_t span = 0;
+    Coil first;
+    uint16_t count;
+};
 
-    for (const auto & entry : table) {
-        span = std::max<uint16_t>(span, static_cast<uint16_t>(address_of(entry) + 1));
-    }
+const std::vector<CoilReadBlock> kCoilReadBlocks = {
+    {Coil::COIL_0, 6},   // Digital Outputs area: the safety relay coils 0..5
+    {Coil::COIL_8, 12},  // Programmable DIO area: DIO00..11, the aux IO
+};
 
-    return span;
-}
+// CONTACT_0 is the only mapped discrete input.
+constexpr uint16_t kContactReadCount = 1;
 
 void ModbusLink::acquire(const bool priority)
 {
@@ -309,36 +314,40 @@ void ContactCoilHandler::initCoils()
     }
 }
 
-// Two transactions per sweep regardless of how many points are mapped: one FC2 read across the
-// contacts, one FC1 read across the coils, each spanning address 0 up to the highest address in
-// its table. With single-bit reads the sweep cost one round-trip per point (7, then 19 with the
-// aux IO), which on a slow link could age the poll past kSafetyLinkStalePollAgeMs.
+// Three transactions per sweep however many points are mapped: one FC2 read for the contacts
+// and one FC1 read per PLC coil area (kCoilReadBlocks). With single-bit reads the sweep cost one
+// round-trip per point (7, then 19 with the aux IO), which on a slow link could age the poll
+// past kSafetyLinkStalePollAgeMs.
 //
 // A failed read throws out of the sweep; the poll thread counts it and io_state_ keeps its
-// previous values.
+// previous values. So does a table entry outside every read block (std::logic_error) - a
+// mapping mistake the unit tests catch before it could ship.
 std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::queryControlInterfaceIOStates()
 {
-    static const uint16_t contact_span = spanFromZero(
-        contacts_config_info_storage_,
-        [](const RoverControllerContactInfo & c) { return static_cast<uint16_t>(c.contact_info.contact); });
-    static const uint16_t coil_span = spanFromZero(
-        coils_config_info_storage_,
-        [](const RoverControllerCoilInfo & c) { return static_cast<uint16_t>(c.coil_info.coil); });
-
     std::vector<bool> contact_bits;
-    std::vector<bool> coil_bits;
 
     {
         // One lock hold per transaction, not one for the whole sweep: a heartbeat tick waiting
         // on the link then waits at most a single round-trip. Non-priority, so a waiting
         // heartbeat overtakes the next read.
         ModbusLinkGuard lck(modbus_link_, false);
-        contact_bits = rover_modbus_->readDiscreteContacts(Contact::CONTACT_0, contact_span);
+        contact_bits = rover_modbus_->readDiscreteContacts(Contact::CONTACT_0, kContactReadCount);
     }
 
-    {
-        ModbusLinkGuard lck(modbus_link_, false);
-        coil_bits = rover_modbus_->readDiscreteCoils(Coil::COIL_0, coil_span);
+    // Coil value by address, filled block by block.
+    std::unordered_map<uint16_t, bool> coil_values;
+
+    for (const auto & block : kCoilReadBlocks) {
+        std::vector<bool> bits;
+
+        {
+            ModbusLinkGuard lck(modbus_link_, false);
+            bits = rover_modbus_->readDiscreteCoils(block.first, block.count);
+        }
+
+        for (uint16_t i = 0; i < block.count; ++i) {
+            coil_values[static_cast<uint16_t>(static_cast<uint16_t>(block.first) + i)] = bits.at(i);
+        }
     }
 
     std::unordered_map<RoverControllerGpio, bool> io_state;
@@ -348,7 +357,15 @@ std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::queryControlIn
     }
 
     for (const auto & coil : coils_config_info_storage_) {
-        io_state.emplace(coil.pin, coil_bits.at(static_cast<size_t>(coil.coil_info.coil)));
+        const auto it = coil_values.find(static_cast<uint16_t>(coil.coil_info.coil));
+
+        if (it == coil_values.end()) {
+            throw std::logic_error(
+                "Coil " + std::to_string(static_cast<unsigned>(coil.coil_info.coil)) +
+                " is mapped but not covered by any kCoilReadBlocks entry.");
+        }
+
+        io_state.emplace(coil.pin, it->second);
     }
 
     return io_state;

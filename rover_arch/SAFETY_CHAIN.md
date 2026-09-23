@@ -44,7 +44,12 @@ software. That is what makes a welded contactor detectable; see §5.
 Modbus TCP to the safety controller at `192.168.88.11:502` (URDF
 `modbus_host` / `modbus_port`), unit id 255. FC1 read coils, FC2 read discrete
 inputs, FC5 write single coil. Reads are batched: the IO poll reads every mapped
-object in two transactions (one FC2, one FC1 spanning coils 0..19).
+object in three transactions: one FC2 for `CONTACT_0`, and one FC1 per PLC coil
+memory area (coils 0..5 in the Digital Outputs area, coils 8..19 in the
+Programmable DIO area). The two areas must never be read in one request. The
+Portenta PLC IDE answers a read that crosses from one area into the next from the
+first area only, so a single 0..19 read returned every aux bit as `false`
+(`kCoilReadBlocks` in `rover_safety_controller.cpp`).
 
 | Signal | Modbus object | Direction | Writable |
 |---|---|---|---|
@@ -97,7 +102,7 @@ Two background threads inside `ContactCoilHandler` own the link:
 | Thread | Period | Job |
 |---|---|---|
 | watchdog | `safety_wdg_kick_period_ms` (200 ms) | toggles `COIL_1` to feed the relay's watchdog |
-| IO poll | `safety_io_poll_period_ms` (100 ms) | reads all 19 mapped objects into a cache, in 2 batched transactions |
+| IO poll | `safety_io_poll_period_ms` (100 ms) | reads all 19 mapped objects into a cache, in 3 batched transactions (one per PLC memory area) |
 
 `read()` copies that cache under a `try_lock` and never performs I/O, which is
 what keeps the RT path clean (enforced by `scripts/check_rt_path_purity.sh`).

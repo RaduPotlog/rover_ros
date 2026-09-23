@@ -69,6 +69,11 @@ const std::vector<bool> coils = client->readDiscreteCoils(Coil::COIL_0, 20);    
 const std::vector<bool> contacts = client->readDiscreteContacts(Contact::CONTACT_0, 1);  // FC2
 ```
 
+Keep a batched read inside one of the device's memory areas. The Portenta PLC IDE serves a
+range that crosses an area boundary (e.g. its Digital Outputs at 0..7 and Programmable DIO
+at 8..19) from the first area only, and fills the rest with `false` without reporting an
+error.
+
 The unit id is fixed at 255 (`ModbusDiscreteIoClient::kModbusDeviceId`), and each
 `Contact`/`Coil` enum value **is** its Modbus address. `COIL_8..COIL_19` are the Portenta
 Machine Control's programmable DIO00..DIO11 (PLC IDE "Modbus Coil 9..20").
