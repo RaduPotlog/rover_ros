@@ -37,19 +37,25 @@ unsigned char toDiagnosticLevel(domain::HealthLevel level);
 /** Seconds since `stamp`, or nullopt when it was never set. */
 std::optional<double> ageSeconds(const std::optional<SteadyTime> & stamp, SteadyTime now);
 
-/** Formats evaluateSafetyInputs() plus one "<input> age (s)" value per input. */
+/**
+ * Formats evaluateSafetyInputs() plus one "<input> age (s)" value per input. When the node has
+ * not subscribed yet (it is not configured), reports that instead: its inputs are not late, nothing
+ * is listening for them.
+ */
 void fillSafetyInputsStatus(
-    const std::vector<domain::SafetyInput> & inputs,
+    bool subscribed, const std::vector<domain::SafetyInput> & inputs,
     diagnostic_updater::DiagnosticStatusWrapper & status);
 
 /**
  * Formats a safety behavior tree's state:
- *  - not configured, or waiting for its inputs (not ticking) -> WARN;
+ *  - configure failed (`last_configure_error` set) -> ERROR, with the error;
+ *  - not configured yet, or waiting for its inputs (not ticking) -> WARN;
  *  - last tick returned FAILURE -> WARN;
  *  - otherwise -> OK.
  */
 void fillBehaviorTreeStatus(
     bool configured, bool ticking, BT::NodeStatus tree_status,
+    unsigned failed_configure_attempts, const std::string & last_configure_error,
     diagnostic_updater::DiagnosticStatusWrapper & status);
 
 /**

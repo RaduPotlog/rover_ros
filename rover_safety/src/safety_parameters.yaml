@@ -150,3 +150,10 @@ safety:
     type: double
     default_value: 10.0
     description: Frequency in Hz at which safety tree will be ticked.
+
+  configure_retry_period:
+    type: double
+    default_value: 5.0
+    description: Seconds between retries of a failed autostart configure, e.g. while a service the behavior tree calls is not up yet.
+    read_only: true
+    validation: { gt<>: 0.0 }

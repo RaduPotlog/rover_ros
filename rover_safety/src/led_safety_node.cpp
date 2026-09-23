@@ -46,6 +46,9 @@ LedSafetyNode::LedSafetyNode(
 
     battery_percent_ = 0.0;
 
+    configure_retry_ = std::make_unique<infrastructure::ConfigureRetry>(
+        *this, std::chrono::duration<double>(params_.configure_retry_period));
+
     diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this);
     diagnostic_updater_->setHardwareID("Bumper Led");
     diagnostic_updater_->add("LED safety inputs", this, &LedSafetyNode::diagnoseInputs);
@@ -69,9 +72,11 @@ nav2::CallbackReturn LedSafetyNode::on_configure(const rclcpp_lifecycle::State &
         // tree is built. Stay unconfigured so the transition can be retried.
         RCLCPP_ERROR(this->get_logger(), "Configuration failed: %s", e.what());
         led_tree_timer_.reset();
+        configure_retry_->onFailure(e.what());
         return nav2::CallbackReturn::FAILURE;
     }
 
+    configure_retry_->onSuccess();
     return nav2::CallbackReturn::SUCCESS;
 }
 
@@ -263,6 +268,7 @@ void LedSafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper &
     status.add("Battery percent", battery_percent_);
 
     infrastructure::fillSafetyInputsStatus(
+        configured_,
         {
             {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
             {"hardware_interface/safety_status", infrastructure::ageSeconds(last_gpio_stamp_, now), timeout},
@@ -276,7 +282,8 @@ void LedSafetyNode::diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWra
 
     infrastructure::fillBehaviorTreeStatus(
         configured_, system_ready_,
-        configured_ ? led_tree_->getTreeStatus() : BT::NodeStatus::IDLE, status);
+        configured_ ? led_tree_->getTreeStatus() : BT::NodeStatus::IDLE,
+        configure_retry_->failedAttempts(), configure_retry_->lastError(), status);
 }
 
 }  // namespace husarion_ugv_manager

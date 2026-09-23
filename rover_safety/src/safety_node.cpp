@@ -73,6 +73,9 @@ SafetyNode::SafetyNode(
 , battery_thresholds_(params_.battery.temp.critical, params_.battery.temp.fatal)
 , shutdown_sequence_(std::chrono::duration<double>(params_.shutdown.retry_backoff))
 {
+    configure_retry_ = std::make_unique<infrastructure::ConfigureRetry>(
+        *this, std::chrono::duration<double>(params_.configure_retry_period));
+
     // Created here, not in on_configure: diagnostics must report an unconfigured node too, and a
     // re-configure must not declare diagnostic_updater.period twice.
     diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(this);
@@ -101,9 +104,11 @@ nav2::CallbackReturn SafetyNode::on_configure(const rclcpp_lifecycle::State & pr
         RCLCPP_ERROR(this->get_logger(), "Configuration failed: %s", e.what());
         safety_tree_timer_.reset();
         shutdown_service_.reset();
+        configure_retry_->onFailure(e.what());
         return nav2::CallbackReturn::FAILURE;
     }
 
+    configure_retry_->onSuccess();
     return nav2::CallbackReturn::SUCCESS;
 }
 
@@ -425,6 +430,7 @@ void SafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & st
     // about the publisher still being alive. Leaving it ungraded meant a dead hardware interface
     // showed up here as a large, quietly-unjudged age value.
     infrastructure::fillSafetyInputsStatus(
+        configured_,
         {
             {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
             {"system_status", infrastructure::ageSeconds(last_system_status_stamp_, now), timeout},
@@ -465,7 +471,8 @@ void SafetyNode::diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrappe
 
     infrastructure::fillBehaviorTreeStatus(
         configured_, system_ready_,
-        configured_ ? safety_tree_->getTreeStatus() : BT::NodeStatus::IDLE, status);
+        configured_ ? safety_tree_->getTreeStatus() : BT::NodeStatus::IDLE,
+        configure_retry_->failedAttempts(), configure_retry_->lastError(), status);
 }
 
 }  // namespace rover_safety

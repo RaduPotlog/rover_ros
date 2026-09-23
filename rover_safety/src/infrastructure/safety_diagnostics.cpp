@@ -15,6 +15,7 @@
 
 #include "rover_safety/infrastructure/safety_diagnostics.hpp"
 
+#include <string>
 #include <vector>
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
@@ -60,9 +61,14 @@ std::optional<double> ageSeconds(const std::optional<SteadyTime> & stamp, const 
 }
 
 void fillSafetyInputsStatus(
-    const std::vector<domain::SafetyInput> & inputs,
+    const bool subscribed, const std::vector<domain::SafetyInput> & inputs,
     diagnostic_updater::DiagnosticStatusWrapper & status)
 {
+    if (!subscribed) {
+        status.summary(DiagnosticStatus::WARN, "Inputs not subscribed: node is not configured.");
+        return;
+    }
+
     for (const auto & input : inputs) {
         if (input.age_s.has_value()) {
             status.add(input.name + " age (s)", *input.age_s);
@@ -77,12 +83,19 @@ void fillSafetyInputsStatus(
 
 void fillBehaviorTreeStatus(
     const bool configured, const bool ticking, const BT::NodeStatus tree_status,
+    const unsigned failed_configure_attempts, const std::string & last_configure_error,
     diagnostic_updater::DiagnosticStatusWrapper & status)
 {
     status.add("Ticking", ticking);
     status.add("Last tree status", toString(tree_status));
+    status.add("Failed configure attempts", failed_configure_attempts);
 
-    if (!configured) {
+    if (!configured && !last_configure_error.empty()) {
+        status.add("Last configure error", last_configure_error);
+        status.summary(
+            DiagnosticStatus::ERROR,
+            "Behavior tree not configured: " + last_configure_error);
+    } else if (!configured) {
         status.summary(DiagnosticStatus::WARN, "Behavior tree not configured.");
     } else if (!ticking) {
         status.summary(

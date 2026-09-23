@@ -54,6 +54,15 @@ target_link_libraries(${PROJECT_NAME}_diagnostics PUBLIC
     ${diagnostic_updater_TARGETS}
 )
 
+# Infrastructure: retries a failed autostart configure of either safety node.
+add_library(${PROJECT_NAME}_configure_retry STATIC
+    src/infrastructure/configure_retry.cpp
+)
+target_link_libraries(${PROJECT_NAME}_configure_retry PUBLIC
+    nav2_ros_common::nav2_ros_common
+    ${rclcpp_TARGETS}
+)
+
 # Infrastructure: bash command the shutdown tree runs to power off the ROS controller.
 add_library(${PROJECT_NAME}_shutdown_command STATIC
     src/infrastructure/shutdown_command.cpp
@@ -141,6 +150,7 @@ target_link_libraries(${PROJECT_NAME}_node
     safety_parameters
     ${PROJECT_NAME}_core
     ${PROJECT_NAME}_diagnostics
+    ${PROJECT_NAME}_configure_retry
     ${PROJECT_NAME}_shutdown_command
 )
 
@@ -167,6 +177,7 @@ generate_parameter_library(led_safety_parameters
 target_link_libraries(led_safety_node ${plugin_libs}
                       led_safety_parameters
                       ${PROJECT_NAME}_diagnostics
+                      ${PROJECT_NAME}_configure_retry
 )
 
 install(TARGETS ${plugin_libs} 
@@ -291,7 +302,31 @@ if(BUILD_TESTING)
         safety_parameters
         ${PROJECT_NAME}_core
         ${PROJECT_NAME}_diagnostics
+        ${PROJECT_NAME}_configure_retry
         ${PROJECT_NAME}_shutdown_command
+    )
+
+    # The real rover_led_safety_node, in-process, started before its led/set_animation server.
+    ament_add_gtest(test_led_safety_configure_retry
+                    test/integration/test_led_safety_configure_retry.cpp
+                    src/led_safety_node.cpp
+                    TIMEOUT 120
+                    APPEND_LIBRARY_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+    add_dependencies(test_led_safety_configure_retry ${plugin_libs})
+    target_compile_definitions(test_led_safety_configure_retry PRIVATE
+        ROVER_SAFETY_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(test_led_safety_configure_retry PRIVATE ${rover_utils_INCLUDE_DIRS})
+    target_link_libraries(test_led_safety_configure_retry
+        nav2_ros_common::nav2_ros_common
+        ${behaviortree_cpp_TARGETS}
+        ${diagnostic_msgs_TARGETS}
+        ${diagnostic_updater_TARGETS}
+        ${rover_msgs_TARGETS}
+        ${rclcpp_TARGETS}
+        ${sensor_msgs_TARGETS}
+        led_safety_parameters
+        ${PROJECT_NAME}_diagnostics
+        ${PROJECT_NAME}_configure_retry
     )
 
     ament_add_test(test_shutdown_script

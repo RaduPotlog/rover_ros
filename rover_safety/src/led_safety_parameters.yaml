@@ -84,3 +84,10 @@ led_safety:
     default_value: 5.0
     description: Seconds after which the battery_status input is reported stale on diagnostics.
     validation: { gt<>: 0.0 }
+
+  configure_retry_period:
+    type: double
+    default_value: 5.0
+    description: Seconds between retries of a failed autostart configure, e.g. while a service the behavior tree calls is not up yet.
+    read_only: true
+    validation: { gt<>: 0.0 }

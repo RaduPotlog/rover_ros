@@ -39,6 +39,7 @@
 #include "rover_safety/behavior_tree.hpp"
 #include "rover_safety/domain/battery_safety_policy.hpp"
 #include "rover_safety/domain/shutdown_sequence.hpp"
+#include "rover_safety/infrastructure/configure_retry.hpp"
 #include "rover_safety/safety_parameters.hpp"
 
 namespace rover_safety
@@ -142,6 +143,8 @@ private:
     bool system_ready_{false};
     // Set only once init() completed; a configure that threw leaves a half-built tree behind.
     bool configured_{false};
+
+    std::unique_ptr<infrastructure::ConfigureRetry> configure_retry_;
 
     // Last member: destroyed first, so its timer never runs a task on a half-destroyed node.
     std::unique_ptr<diagnostic_updater::Updater> diagnostic_updater_;
