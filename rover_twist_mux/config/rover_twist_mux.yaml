@@ -6,13 +6,19 @@
         topic   : teleop_elrs_cmd_vel_stamped
         timeout : 0.5
         priority: 10
+      # Driver UI (rover_drive_interface) Manual mode. Below the RC transmitter, so the
+      # physical RC always wins, but above Nav 2 so manual driving preempts autonomy.
+      driver_interface:
+        topic   : teleop_driver_interface_cmd_vel_stamped
+        timeout : 0.5
+        priority: 8
       joystick:
         topic   : teleop_foxglove_cmd_vel_stamped
         timeout : 0.5
         priority: 100
       # Nav2 autonomy, running on the separate orchestrator computer. Lowest
-      # priority, so either teleop source preempts it deterministically rather
-      # than the two racing each other on /cmd_vel. The 0.5 s timeout also makes
+      # priority, so every teleop source preempts it deterministically rather
+      # than them racing each other on /cmd_vel. The 0.5 s timeout also makes
       # a LAN partition a defined transition: the nav input goes stale and the
       # mux falls through, instead of relying on the drive controller's own
       # cmd_vel_timeout as a backstop.
@@ -25,9 +31,9 @@
     # and hardware_interface/safety_command_echo.
     #
     # twist_mux masks an input when `input priority < active lock priority` (strictly), so
-    # priority 200 outranks all three inputs above and stops the rover outright while any
-    # E-Stop condition is active. To gate autonomy ONLY and leave both teleop sources free,
-    # drop this to 7 (above nav's 5, below cmd_elrs's 10).
+    # priority 200 outranks all the inputs above and stops the rover outright while any
+    # E-Stop condition is active. To gate autonomy ONLY and leave all teleop sources free,
+    # drop this to 7 (above nav's 5, below driver_interface's 8).
     #
     # The timeout is what makes this fail-safe: twist_mux treats a stale lock topic as LOCKED
     # (isLocked() == hasExpired() || data), so if rover_motion_lock_node dies the mux closes rather

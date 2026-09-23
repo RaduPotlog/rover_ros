@@ -13,10 +13,11 @@ highest priority wins, and each input has a 0.5 s timeout:
 |---------:|-------|-------|--------|
 | 100 | `joystick` | `teleop_foxglove_cmd_vel_stamped` | Foxglove |
 | 10 | `cmd_elrs` | `teleop_elrs_cmd_vel_stamped` | ELRS RC teleop |
+| 8 | `driver_interface` | `teleop_driver_interface_cmd_vel_stamped` | Driver UI (rover_drive_interface) Manual mode |
 | 5 | `nav` | `nav_cmd_vel_stamped` | Nav 2, on the separate orchestrator computer |
 
-Nav 2 sits lowest so either teleop source preempts autonomy deterministically, rather than the
-two racing each other on `cmd_vel`. The timeout also makes a LAN partition a defined
+Nav 2 sits lowest so every teleop source preempts autonomy deterministically, rather than
+them racing each other on `cmd_vel`. The timeout also makes a LAN partition a defined
 transition: the nav input goes stale and the mux falls through, instead of relying on
 `diff_drive_controller`'s own `cmd_vel_timeout` as a backstop.
 
@@ -64,7 +65,7 @@ rover will not accept velocity commands at all. That is intended — no safety I
 Simulation is unaffected, as it does not launch this package.
 
 At the default lock priority of 200 an active E-Stop stops the rover outright. To gate autonomy
-only and leave both teleop sources free, lower it to 7; see the comment in
+only and leave all teleop sources free, lower it to 7; see the comment in
 `config/rover_twist_mux.yaml`.
 
 ## Config Files
