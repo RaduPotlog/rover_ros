@@ -129,6 +129,12 @@ public:
         read_transactions_++;
         coil_read_requests_.push_back({static_cast<uint16_t>(first), count});
 
+        // The Portenta sends a short reply for more than 8 coils, which the hardened codec
+        // rejects - model the resulting exception, not the garbage it used to produce.
+        if (portenta_quirks_ && count > 8) {
+            throw std::runtime_error("fake Portenta: short FC1 reply for more than 8 coils");
+        }
+
         // With a PLC area map set, behave like the Portenta PLC IDE: a read is served from the
         // area its first address falls in, and bits past that area's end come back false.
         const uint16_t first_address = static_cast<uint16_t>(first);
@@ -172,6 +178,15 @@ public:
     {
         std::lock_guard<std::mutex> lock(mutex_);
         coil_areas_ = areas;
+    }
+
+    // Everything the rover's Portenta PLC IDE does to batched coil reads: separate Digital Outputs
+    // (0..7) and Programmable DIO (8..19) areas, and a failed read above 8 coils.
+    void setPortentaReadQuirks()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        coil_areas_ = {{0, 8}, {8, 12}};
+        portenta_quirks_ = true;
     }
 
     // (first, count) of every batched coil read, in order.
@@ -297,6 +312,7 @@ private:
     uint64_t read_transactions_ = 0;
     std::vector<CoilRange> coil_areas_;
     std::vector<CoilRange> coil_read_requests_;
+    bool portenta_quirks_ = false;
 
     std::atomic_uint64_t read_delay_ms_ {0};
     std::atomic_bool fail_reads_ {false};

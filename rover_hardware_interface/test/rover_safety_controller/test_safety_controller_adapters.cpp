@@ -195,15 +195,16 @@ TEST_F(AdapterFixture, GpioAdapterReadsTheAuxPinsFromTheirOwnCoils)
     EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_OUT_0));
 }
 
-// Regression, seen on the rover: the poll read coils 0..19 in one request, and the Portenta
-// PLC IDE answers a read that crosses from its Digital Outputs area (0..7) into its
-// Programmable DIO area (8..19) from the first area only - every aux bit came back false.
-// The fake models that with setCoilAreas(); the safety coils and the aux coils must both read
-// true here.
-TEST(AdapterPlcAreasTest, AuxAndSafetyCoilsBothReadCorrectlyAcrossPlcMemoryAreas)
+// Regressions, both seen on the rover's Portenta PLC IDE:
+//  - a read crossing from its Digital Outputs area (0..7) into its Programmable DIO area (8..19)
+//    is served from the first area only, so every aux bit came back false;
+//  - a read of more than 8 coils gets a reply claiming two data bytes but carrying one, so the
+//    aux inputs DIO08..11 came back as random garbage (now a rejected reply).
+// With the fake modelling both, safety and aux coils must all read their true values.
+TEST(AdapterPlcAreasTest, AuxAndSafetyCoilsBothReadCorrectlyOnThePortenta)
 {
     auto modbus = std::make_shared<FakeRoverModbus>();
-    modbus->setCoilAreas({{0, 8}, {8, 12}});
+    modbus->setPortentaReadQuirks();
     modbus->setCoilReadValueFor(Coil::COIL_5, 1);   // latch status, Digital Outputs area
     modbus->setCoilReadValueFor(Coil::COIL_8, 1);   // DIO00 -> GPIO_AUX_OUT_0
     modbus->setCoilReadValueFor(Coil::COIL_14, 1);  // DIO06 -> GPIO_AUX_IN_0
@@ -227,6 +228,10 @@ TEST(AdapterPlcAreasTest, AuxAndSafetyCoilsBothReadCorrectlyAcrossPlcMemoryAreas
     EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_OUT_0));
     EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_IN_0));
     EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_OUT_1));
+    for (unsigned i = 1; i < kAuxInputCount; ++i) {
+        EXPECT_FALSE(states.at(auxInputPin(i))) << "aux input " << i;
+    }
+    EXPECT_EQ(controller->getHealth().poll_error_count, 0u);
 
     // And no read ever asked the PLC to cross an area boundary.
     for (const auto & request : modbus->coilReadRequests()) {
@@ -234,6 +239,8 @@ TEST(AdapterPlcAreasTest, AuxAndSafetyCoilsBothReadCorrectlyAcrossPlcMemoryAreas
         const bool in_programmable_dio = request.first >= 8 && request.first + request.count <= 20;
         EXPECT_TRUE(in_digital_outputs || in_programmable_dio)
             << "coil read " << request.first << " x" << request.count << " crosses a PLC area";
+        EXPECT_LE(request.count, 8u)
+            << "coil read " << request.first << " x" << request.count << " exceeds one reply byte";
     }
 }
 

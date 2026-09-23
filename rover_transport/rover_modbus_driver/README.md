@@ -69,10 +69,14 @@ const std::vector<bool> coils = client->readDiscreteCoils(Coil::COIL_0, 20);    
 const std::vector<bool> contacts = client->readDiscreteContacts(Contact::CONTACT_0, 1);  // FC2
 ```
 
-Keep a batched read inside one of the device's memory areas. The Portenta PLC IDE serves a
-range that crosses an area boundary (e.g. its Digital Outputs at 0..7 and Programmable DIO
-at 8..19) from the first area only, and fills the rest with `false` without reporting an
-error.
+On the Portenta PLC IDE, keep every batched read within one of its memory areas and at
+most 8 coils:
+- A range that crosses an area boundary (e.g. its Digital Outputs at 0..7 and Programmable
+  DIO at 8..19) is served from the first area only, and the rest comes back `false` with no
+  error.
+- A read of more than 8 coils is answered with `byte_count = 2` but only one data byte.
+  `MB::ModbusResponse` now rejects any reply shorter than its byte count (it used to decode
+  bytes from past the end of the frame), so such a read throws `MB::ModbusException`.
 
 The unit id is fixed at 255 (`ModbusDiscreteIoClient::kModbusDeviceId`), and each
 `Contact`/`Coil` enum value **is** its Modbus address. `COIL_8..COIL_19` are the Portenta

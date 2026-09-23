@@ -310,10 +310,10 @@ TEST_F(HeartbeatTimingTest, HeartbeatSurvivesIoPollExceptions)
     EXPECT_GT(handler->getHealth().poll_error_count, 0u);
 }
 
-// The sweep cost must stay at three round-trips (the contacts, plus one per PLC coil area)
+// The sweep cost must stay at four round-trips (the contacts, plus one per one-byte coil block)
 // however many points are mapped - 19 single-bit reads on a slow link would age the poll past
 // the staleness bound safety_status is judged by.
-TEST_F(HeartbeatTimingTest, OneIoSweepCostsThreeReadTransactions)
+TEST_F(HeartbeatTimingTest, OneIoSweepCostsFourReadTransactions)
 {
     // Long enough that a second sweep cannot start before the count is taken; short enough that
     // TearDown's join does not wait out a long poll sleep.
@@ -323,7 +323,7 @@ TEST_F(HeartbeatTimingTest, OneIoSweepCostsThreeReadTransactions)
         [this] { return handler->getHealth().last_poll_age_ms != SafetyLinkHealth::kUnknownAgeMs; },
         std::chrono::milliseconds(2000)));
 
-    EXPECT_EQ(modbus->readTransactionCount(), 3u);
+    EXPECT_EQ(modbus->readTransactionCount(), 4u);
 }
 
 // Aux writes share the one link with the heartbeat but take it without priority, so hammering

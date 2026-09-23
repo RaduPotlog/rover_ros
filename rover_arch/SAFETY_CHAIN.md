@@ -44,12 +44,23 @@ software. That is what makes a welded contactor detectable; see §5.
 Modbus TCP to the safety controller at `192.168.88.11:502` (URDF
 `modbus_host` / `modbus_port`), unit id 255. FC1 read coils, FC2 read discrete
 inputs, FC5 write single coil. Reads are batched: the IO poll reads every mapped
-object in three transactions: one FC2 for `CONTACT_0`, and one FC1 per PLC coil
-memory area (coils 0..5 in the Digital Outputs area, coils 8..19 in the
-Programmable DIO area). The two areas must never be read in one request. The
-Portenta PLC IDE answers a read that crosses from one area into the next from the
-first area only, so a single 0..19 read returned every aux bit as `false`
-(`kCoilReadBlocks` in `rover_safety_controller.cpp`).
+object in four transactions: one FC2 for `CONTACT_0`, and three FC1 reads for
+coils 0..5 (Digital Outputs area), 8..13 (aux outputs) and 14..19 (aux inputs).
+See `kCoilReadBlocks` in `rover_safety_controller.cpp`.
+
+The blocks are shaped by two quirks of the Portenta PLC IDE's Modbus server,
+both captured on the rover:
+
+* **Memory areas.** Digital Outputs (0..7) and Programmable DIO (8..19) are
+  separate areas. A read that crosses from one into the other is answered from
+  the first area only, so a single 0..19 read returned every aux bit as `false`.
+* **At most 8 coils per read.** A 12-coil read is answered with `byte_count = 2`
+  but only one data byte (MBAP length 4). The Modbus codec used to read the
+  missing byte from past the end of the frame, which showed up as random aux
+  inputs. It now rejects such a reply.
+
+So every coil read must stay inside one area and within 8 coils. A `static_assert`
+enforces the 8-coil limit.
 
 | Signal | Modbus object | Direction | Writable |
 |---|---|---|---|
@@ -102,7 +113,7 @@ Two background threads inside `ContactCoilHandler` own the link:
 | Thread | Period | Job |
 |---|---|---|
 | watchdog | `safety_wdg_kick_period_ms` (200 ms) | toggles `COIL_1` to feed the relay's watchdog |
-| IO poll | `safety_io_poll_period_ms` (100 ms) | reads all 19 mapped objects into a cache, in 3 batched transactions (one per PLC memory area) |
+| IO poll | `safety_io_poll_period_ms` (100 ms) | reads all 19 mapped objects into a cache, in 4 batched transactions (each within one PLC area and one reply byte) |
 
 `read()` copies that cache under a `try_lock` and never performs I/O, which is
 what keeps the RT path clean (enforced by `scripts/check_rt_path_purity.sh`).

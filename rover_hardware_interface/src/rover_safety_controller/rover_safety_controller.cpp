@@ -15,6 +15,7 @@
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -100,21 +101,45 @@ constexpr std::size_t kEStopMotorDriverFaultCoilIdx = 3;
 constexpr std::size_t kEStopLatchResetCoilIdx = 4;
 constexpr std::size_t kFirstAuxOutputCoilIdx = 6;
 
-// One batched FC1 read per PLC coil memory area. The Portenta PLC IDE keeps its Digital Outputs
-// (addresses 0..7, IDE "Modbus Coil 1..8") and its Programmable DIO (8..19, "Modbus Coil 9..20")
-// in separate areas, and answers a read that crosses from one into the other from the first
-// area only: coils 0..19 in one request returned every aux bit as false on the rover. Never
-// merge these blocks, and give any newly mapped coil the block of its PLC area.
+// Batched FC1 coil reads, shaped by two quirks of the Portenta PLC IDE's Modbus server, both
+// seen on the rover:
+//  - Its Digital Outputs (addresses 0..7, IDE "Modbus Coil 1..8") and Programmable DIO (8..19,
+//    "Modbus Coil 9..20") are separate memory areas. A read crossing from one into the other is
+//    answered from the first area only (coils 0..19 in one request returned every aux bit as
+//    false).
+//  - A read of more than 8 coils gets a reply claiming byte_count = 2 but carrying one data byte
+//    (captured: MBAP length 4, data 00). The codec now rejects that; it used to read the missing
+//    byte from past the end of the frame, which showed up as random aux inputs.
+// So every block stays inside one PLC area and inside one reply byte. Give a newly mapped coil a
+// block of its own area rather than growing one past 8.
 struct CoilReadBlock
 {
     Coil first;
     uint16_t count;
 };
 
-const std::vector<CoilReadBlock> kCoilReadBlocks = {
+constexpr uint16_t kMaxCoilsPerRead = 8;
+
+constexpr std::array<CoilReadBlock, 3> kCoilReadBlocks = {{
     {Coil::COIL_0, 6},   // Digital Outputs area: the safety relay coils 0..5
-    {Coil::COIL_8, 12},  // Programmable DIO area: DIO00..11, the aux IO
-};
+    {Coil::COIL_8, 6},   // Programmable DIO area: DIO00..05, the aux outputs
+    {Coil::COIL_14, 6},  // Programmable DIO area: DIO06..11, the aux inputs
+}};
+
+constexpr bool coilReadBlocksFitOneReplyByte()
+{
+    for (const auto & block : kCoilReadBlocks) {
+        if (block.count == 0 || block.count > kMaxCoilsPerRead) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static_assert(
+    coilReadBlocksFitOneReplyByte(),
+    "Each kCoilReadBlocks entry must read 1..8 coils: the Portenta mangles longer replies.");
 
 // CONTACT_0 is the only mapped discrete input.
 constexpr uint16_t kContactReadCount = 1;
@@ -314,8 +339,8 @@ void ContactCoilHandler::initCoils()
     }
 }
 
-// Three transactions per sweep however many points are mapped: one FC2 read for the contacts
-// and one FC1 read per PLC coil area (kCoilReadBlocks). With single-bit reads the sweep cost one
+// Four transactions per sweep however many points are mapped: one FC2 read for the contacts
+// and one FC1 read per coil block (kCoilReadBlocks). With single-bit reads the sweep cost one
 // round-trip per point (7, then 19 with the aux IO), which on a slow link could age the poll
 // past kSafetyLinkStalePollAgeMs.
 //

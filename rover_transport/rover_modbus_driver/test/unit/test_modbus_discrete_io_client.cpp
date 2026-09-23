@@ -28,6 +28,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include <MB/modbusException.hpp>
+#include <MB/modbusResponse.hpp>
 #include <MB/modbusUtils.hpp>
 
 #include "fakes/fake_logger.hpp"
@@ -421,6 +423,39 @@ TEST(ModbusDiscreteIoClientTest, AFailedReDialLeavesTheClientDisconnectedAndThro
 
     EXPECT_THROW(f.client->readDiscreteCoil(CoilInfo{Coil::COIL_0, false, false}), std::runtime_error);
     EXPECT_FALSE(f.client->isConnected());
+}
+
+// The codec below the client. On the rover the Portenta PLC IDE answered a 12-coil FC1 read
+// with byte_count = 2 but only one data byte (MBAP length 4). The decoder trusted byte_count and
+// read the missing byte from past the end of the frame, which surfaced as random aux inputs.
+// A reply shorter than its own byte count must be rejected, not decoded.
+TEST(ModbusResponseDecodeTest, ACoilReplyShorterThanItsByteCountIsRejected)
+{
+    const std::vector<uint8_t> portenta_reply = {255, MB::utils::ReadDiscreteOutputCoils, 2, 0x00};
+
+    EXPECT_THROW(MB::ModbusResponse::fromRaw(portenta_reply), MB::ModbusException);
+}
+
+TEST(ModbusResponseDecodeTest, ARegisterReplyShorterThanItsByteCountIsRejected)
+{
+    const std::vector<uint8_t> short_reply = {
+        255, MB::utils::ReadAnalogOutputHoldingRegisters, 4, 0x00, 0x01};
+
+    EXPECT_THROW(MB::ModbusResponse::fromRaw(short_reply), MB::ModbusException);
+}
+
+TEST(ModbusResponseDecodeTest, AWellFormedTwoByteCoilReplyStillDecodes)
+{
+    const std::vector<uint8_t> reply = {255, MB::utils::ReadDiscreteOutputCoils, 2, 0x01, 0x08};
+
+    const auto response = MB::ModbusResponse::fromRaw(reply);
+    const auto & values = response.registerValues();
+
+    ASSERT_EQ(values.size(), 16U);
+    EXPECT_TRUE(values[0].coil());
+    EXPECT_FALSE(values[1].coil());
+    EXPECT_TRUE(values[11].coil());
+    EXPECT_FALSE(values[15].coil());
 }
 
 }  // namespace rover::transport::modbus::test

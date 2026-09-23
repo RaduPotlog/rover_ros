@@ -7,6 +7,7 @@
 #include "modbusUtils.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <sstream>
 
@@ -65,6 +66,12 @@ ModbusResponse::ModbusResponse(std::vector<uint8_t> inputData, bool CRC) {
         case utils::ReadDiscreteOutputCoils:
         case utils::ReadDiscreteInputContacts:
             bytes            = inputData[2];
+            // Modified 2026 by Mechatronics Academy: reject a reply shorter than its own byte
+            // count. The Portenta PLC IDE answers an FC1 read of more than 8 coils with
+            // byte_count = 2 but a single data byte, and the loop below used to read the missing
+            // byte from past the end of inputData - heap garbage reported as coil values.
+            if (inputData.size() < 3 + static_cast<std::size_t>(bytes))
+                throw ModbusException(utils::NumberOfValuesInvalid);
             _registersNumber = bytes * 8;
             _values          = std::vector<ModbusCell>(_registersNumber);
             for (auto i = 0; i < _registersNumber; i++) {
@@ -75,6 +82,9 @@ ModbusResponse::ModbusResponse(std::vector<uint8_t> inputData, bool CRC) {
         case utils::ReadAnalogOutputHoldingRegisters:
         case utils::ReadAnalogInputRegisters:
             bytes            = inputData[2];
+            // Modified 2026 by Mechatronics Academy: same short-reply guard as the coil case.
+            if (inputData.size() < 3 + static_cast<std::size_t>(bytes))
+                throw ModbusException(utils::NumberOfValuesInvalid);
             _registersNumber = bytes / 2;
             for (auto i = 0; i < bytes / 2; i++) {
                 _values.emplace_back(utils::bigEndianConv(&inputData[3 + (i * 2)]));
