@@ -2,6 +2,65 @@
 
 Mechatronics Academy's Rover A1 ROS2.
 
+**Bringup & simulation**
+
+- [`rover_bringup`](rover_bringup/README.md) - top-level launch files that start the whole
+  stack on real hardware.
+- [`rover_gazebo`](rover_gazebo/README.md) - Gazebo Sim bringup: the robot with
+  `gz_ros2_control`, the same controllers, EKFs and twist_mux as the real rover, simulated
+  lidar and GNSS, the ROS–Gazebo bridge and RViz.
+- [`rover_world`](rover_world/README.md) - Gazebo Sim worlds for the simulation.
+- [`rover_description`](rover_description/README.md) - URDF/xacro model: links, joints,
+  meshes, sensors and the `<ros2_control>` hardware components.
+- [`rover_metapackage`](rover_metapackage/README.md) - metapackage pulling in the entry point
+  for the build type, plus the `vcs` `.repos` dependency lists.
+
+**Control & hardware**
+
+- [`rover_hardware_interface`](rover_hardware_interface/README.md) - ros2_control plugins
+  `RoverA1System` (wheel motors and safety controller) and `PhidgetImuSensor`.
+- [`rover_controller`](rover_controller/README.md) - ros2_control controller configuration
+  and launch.
+- [`rover_twist_mux`](rover_twist_mux/README.md) - velocity command arbitration with
+  `twist_mux`, plus `rover_motion_lock_node`.
+- [`rover_crsf_teleop`](rover_crsf_teleop/README.md) - CRSF (ExpressLRS) RC teleop, software
+  E-Stop switches and RC link failsafe.
+
+**Localization**
+
+- [`rover_localization`](rover_localization/README.md) - `robot_localization` EKFs fusing
+  wheel odometry and IMU, optionally GPS (`ROVER_USE_GPS`).
+- [`rover_gps_heading`](rover_gps_heading/README.md) - ENU heading from GNSS course for
+  `navsat_transform_node`.
+
+**Safety, power & status**
+
+- [`rover_safety`](rover_safety/README.md) - behavior-tree safety supervision: software
+  E-Stop, shutdown and LED animation selection.
+- [`rover_battery`](rover_battery/README.md) - decodes BMS telemetry received over UDP and
+  publishes the battery state.
+- [`rover_led`](rover_led/README.md) - SK9822 bumper LED panels: animation controller and
+  driver.
+- [`rover_diag_manager`](rover_diag_manager/README.md) - the rover's diagnostic nodes.
+
+**Interfaces, transport & utilities**
+
+- [`rover_msgs`](rover_msgs/README.md) - custom messages and services.
+- [`rover_utils`](rover_utils/README.md) - shared header-only C++ utilities and Python launch
+  helpers.
+- [`rover_transport`](rover_transport/README.md) - hard fork of `transport_drivers`: serial,
+  UDP and Modbus TCP drivers on top of `rover_io_context`.
+- [`rover_modbus`](rover_modbus/README.md) - vendored Modbus library for modern C++.
+
+**Not ROS packages**
+
+- [`rover_arch`](rover_arch/README.md) - firmware architecture docs and diagrams, including
+  the safety chain.
+- [`rover_foxglove`](rover_foxglove/README.md) - Foxglove dashboard layout for the `rover`
+  namespace.
+- [`rover_scripts`](rover_scripts/README.md) - development PC helper scripts
+  (`setup_rover_pc.sh`).
+
 ## Quick start
 
 ### Create workspace
