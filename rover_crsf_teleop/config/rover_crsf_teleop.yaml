@@ -128,6 +128,12 @@
     # (0.62602 * 1.63). Update together with the multiplier.
     effective_track_width: 1.0204   # m
 
+    # A stop (stick centred, link lost, calibration inhibit) publishes zeros for this long and then
+    # goes silent, so twist_mux falls through to its next source. A burst rather than one message,
+    # so a single lost zero cannot leave the last motion command standing until the mux timeout.
+    # 300 ms = 15 control ticks. 0 = a single zero.
+    zero_burst_duration_ms: 300
+
     # Switch channels. A channel below channel_switch_threshold counts as "low": low on
     # e_stop_channel sets the SW User E-Stop, high resets it; low on
     # e_stop_latch_reset_channel resets the E-Stop latch.
@@ -144,8 +150,8 @@
     # resting position doesn't fire a spurious E-Stop set/reset. 100 = 2 s.
     switch_settle_frames: 100
 
-    # RC link failsafe. When the link is judged lost the node publishes ONE zero command and then
-    # goes silent, so the rover stops immediately and twist_mux falls through to its next source.
+    # RC link failsafe. When the link is judged lost the node publishes a short zero burst
+    # (zero_burst_duration_ms) and then goes silent, so the rover stops immediately and twist_mux falls through to its next source.
     # The link is healthy only while all of these hold:
     #   - an rc/channels frame arrived within channel_timeout_ms (at the A1's measured 250 Hz
     #     packet rate, 200 ms is ~50 missed frames - it was sized as 10 missed frames back when

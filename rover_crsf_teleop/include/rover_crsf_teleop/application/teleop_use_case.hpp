@@ -15,6 +15,7 @@
 #ifndef ROVER_CRSF_TELEOP_APPLICATION_TELEOP_USE_CASE_HPP_
 #define ROVER_CRSF_TELEOP_APPLICATION_TELEOP_USE_CASE_HPP_
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -49,6 +50,11 @@ struct TeleopConfig
     // domain/rim_speed_limit.hpp). Either <= 0 disables the limit.
     double max_wheel_rim_speed{0.0};
     double half_track_width{0.0};
+
+    // How long a stop (centred stick or lost link) keeps publishing zeros before going silent,
+    // so one lost message cannot leave the last motion command standing. 0 = a single zero.
+    std::chrono::milliseconds zero_burst_duration{0};
+
     int e_stop_channel{5};
     int e_stop_latch_reset_channel{4};
 
@@ -126,8 +132,8 @@ public:
 
     TickStatus tick(SteadyTime now);
 
-    // Stops commanding: publishes one zero unless the last command already was zero. Called when
-    // teleop is being deactivated.
+    // Stops commanding: publishes one zero unless zeros already went out (there is no later tick
+    // to repeat it on). Called when teleop is being deactivated.
     void stop();
 
     // Holds teleop off while something else owns the sticks - today, an RC calibration session.
@@ -144,8 +150,11 @@ public:
 
 private:
 
-    // Publishes `command`, except a zero that has already been published.
-    void publish(const VelocityCommand & command);
+    // Publishes `command`. Zeros go out for config_.zero_burst_duration after the first one, then
+    // are swallowed until the next non-zero command.
+    void publish(const VelocityCommand & command, SteadyTime now);
+
+    void send(const VelocityCommand & command);
 
     double mapChannel(int channel_number, const AxisMapping & mapping) const;
 
@@ -162,9 +171,11 @@ private:
 
     std::optional<RcFrame> last_frame_;
 
-    // Shared by the link-lost and centred-stick paths, so going from one to the other doesn't
-    // publish a second zero.
-    bool zero_sent_{false};
+    // Zero-burst state, shared by the link-lost and centred-stick paths, so going from one to the
+    // other doesn't restart the burst: when the current run of zeros started, and whether its
+    // burst is over.
+    std::optional<SteadyTime> zero_since_;
+    bool zero_burst_over_{false};
 
     VelocityCommand last_command_;
 

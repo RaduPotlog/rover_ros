@@ -351,6 +351,112 @@ TEST_F(TeleopUseCaseTest, StopPublishesZeroOnlyIfStillMoving)
     EXPECT_TRUE(velocity_->published[1].isZero());
 }
 
+// With a zero burst configured, a stop repeats its zero for the burst duration and only then
+// goes silent, so one lost message cannot leave the last motion command standing.
+class TeleopUseCaseZeroBurstTest : public TeleopUseCaseTest
+{
+
+protected:
+
+    void SetUp() override
+    {
+        TeleopUseCaseTest::SetUp();
+        config_.zero_burst_duration = 300ms;
+        use_case_ = std::make_unique<TeleopUseCase>(config_, velocity_, safety_);
+    }
+
+    // Ticks every 20 ms (the node's control period) for `duration`.
+    void tickFor(const std::chrono::milliseconds duration)
+    {
+        for (auto elapsed = 0ms; elapsed < duration; elapsed += 20ms) {
+            now_ += 20ms;
+            feedAndTick();
+        }
+    }
+
+    std::size_t zerosPublished() const
+    {
+        std::size_t zeros = 0;
+        for (const auto & command : velocity_->published) {
+            zeros += command.isZero() ? 1 : 0;
+        }
+        return zeros;
+    }
+};
+
+TEST_F(TeleopUseCaseZeroBurstTest, ReleasedStickPublishesZerosForTheBurstThenGoesSilent)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    feedAndTick();
+
+    setChannel(kLinearChannel, kDefaultCrsfChannelMid);
+    feedAndTick();  // first zero, at t = 0 of the burst
+    tickFor(1000ms);
+
+    // Zeros at 0, 20, ... 280 ms: 15 of them, then nothing.
+    EXPECT_EQ(zerosPublished(), 15u);
+    ASSERT_EQ(velocity_->published.size(), 16u);
+    EXPECT_FALSE(velocity_->published[0].isZero());
+}
+
+TEST_F(TeleopUseCaseZeroBurstTest, LinkLossPublishesAZeroBurst)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    feedAndTick();
+
+    // No more frames: the channel timeout expires, then the loop keeps ticking.
+    now_ += 201ms;
+    for (int i = 0; i < 50; ++i) {
+        EXPECT_EQ(use_case_->tick(now_), TickStatus::kLinkLost);
+        now_ += 20ms;
+    }
+
+    EXPECT_EQ(zerosPublished(), 15u);
+}
+
+TEST_F(TeleopUseCaseZeroBurstTest, DeflectingMidBurstPublishesAtOnceAndRestartsTheBurst)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    feedAndTick();
+    setChannel(kLinearChannel, kDefaultCrsfChannelMid);
+    tickFor(100ms);  // 5 zeros of the first burst
+
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    now_ += 20ms;
+    feedAndTick();
+    EXPECT_FALSE(velocity_->published.back().isZero());
+
+    setChannel(kLinearChannel, kDefaultCrsfChannelMid);
+    tickFor(1000ms);  // a full second burst
+
+    EXPECT_EQ(zerosPublished(), 5u + 15u);
+}
+
+TEST_F(TeleopUseCaseZeroBurstTest, StopAfterABurstPublishesNothing)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    feedAndTick();
+    setChannel(kLinearChannel, kDefaultCrsfChannelMid);
+    tickFor(100ms);
+    const auto published = velocity_->published.size();
+
+    use_case_->stop();
+
+    EXPECT_EQ(velocity_->published.size(), published);
+}
+
+TEST_F(TeleopUseCaseZeroBurstTest, StopWhileMovingPublishesOneZero)
+{
+    setChannel(kLinearChannel, kDefaultCrsfChannelMax);
+    feedAndTick();
+
+    use_case_->stop();
+    use_case_->stop();
+
+    ASSERT_EQ(velocity_->published.size(), 2u);
+    EXPECT_TRUE(velocity_->published[1].isZero());
+}
+
 TEST_F(TeleopUseCaseTest, InvalidAxisChannelCommandsNothingOnThatAxis)
 {
     config_.linear_x_channel = 17;

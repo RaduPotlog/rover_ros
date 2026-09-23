@@ -54,8 +54,10 @@ deactivated. Channel N is `channels[N-1]`.
   parser; `activate` starts the 20 ms control loop; `deactivate` publishes one zero command and
   stops. Input is decoded even while inactive, so the link is already known healthy (or not) the
   moment teleop is activated. The launch file brings it straight to active (`autostart`).
-- **Zero once.** A centred stick maps to exactly 0.0 (see `domain/stick_mapping.hpp`) and a zero
-  command is published only once, so an idle transmitter doesn't hold `twist_mux` on this source.
+- **Zero burst.** A centred stick maps to exactly 0.0 (see `domain/stick_mapping.hpp`). Zeros are
+  published for `zero_burst_duration_ms` (300 ms in the config; 0 = a single zero) and then not
+  at all, so one lost message cannot leave the rover moving and an idle transmitter doesn't hold
+  `twist_mux` on this source.
 - **Expo.** `linear_x_expo` / `angular_z_expo` (0.3 / 0.5 in the config, 0 = linear) shape each
   stick as `(1 - e)·m + e·m³` after the deadband: small moves give much less speed, full stick is
   still `out_min`/`out_max`. Same curve as the web joystick. It stacks with any expo in the
@@ -63,7 +65,7 @@ deactivated. Channel N is `channels[N-1]`.
 - **RC link failsafe.** The link is healthy while decoded frames are fresh (`channel_timeout_ms`)
   and — with `require_link_stats` — link statistics are fresh (`link_stats_timeout_ms`) and the
   uplink link quality has not dropped below `link_quality_lost_below` (it recovers at
-  `link_quality_recovered_at`). When it isn't, the node publishes **one zero command and goes
+  `link_quality_recovered_at`). When it isn't, the node publishes **a short zero burst and goes
   silent**: the rover stops at once and `twist_mux` falls through to its next source. The E-Stop
   is not triggered. Switches are ignored while the link is lost.
 - **Switches.** Only a change of switch position fires a service call: e-stop channel low = set,

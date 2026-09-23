@@ -63,10 +63,10 @@ void TeleopUseCase::onLinkStats(const std::uint8_t link_quality, const SteadyTim
 TickStatus TeleopUseCase::tick(const SteadyTime now)
 {
     // First, and before the first-frame check, so no branch below can be reached while inhibited.
-    // publish() swallows a repeated zero, so this is one zero and then silence - the same shape
+    // publish() limits zeros to a short burst, so this is a stop and then silence - the same shape
     // as the link-lost path, and twist_mux falls through to its next source.
     if (inhibited_) {
-        publish(VelocityCommand{});
+        publish(VelocityCommand{}, now);
         return TickStatus::kInhibited;
     }
 
@@ -75,14 +75,14 @@ TickStatus TeleopUseCase::tick(const SteadyTime now)
     }
 
     if (!link_monitor_.isHealthy(now)) {
-        publish(VelocityCommand{});
+        publish(VelocityCommand{}, now);
         return TickStatus::kLinkLost;
     }
 
     VelocityCommand command;
     command.linear_x = mapChannel(config_.linear_x_channel, config_.linear_x_mapping);
     command.angular_z = mapChannel(config_.angular_z_channel, config_.angular_z_mapping);
-    publish(limitRimSpeed(command, config_.max_wheel_rim_speed, config_.half_track_width));
+    publish(limitRimSpeed(command, config_.max_wheel_rim_speed, config_.half_track_width), now);
 
     evaluateSwitches();
 
@@ -91,7 +91,11 @@ TickStatus TeleopUseCase::tick(const SteadyTime now)
 
 void TeleopUseCase::stop()
 {
-    publish(VelocityCommand{});
+    if (!zero_since_.has_value() && !zero_burst_over_) {
+        send(VelocityCommand{});
+    }
+    zero_since_.reset();
+    zero_burst_over_ = true;
 }
 
 void TeleopUseCase::setCommandInhibited(const bool inhibited)
@@ -105,16 +109,32 @@ void TeleopUseCase::rearmSwitches()
     latch_reset_switch_.rearm();
 }
 
-void TeleopUseCase::publish(const VelocityCommand & command)
+void TeleopUseCase::publish(const VelocityCommand & command, const SteadyTime now)
 {
     // A centred stick maps to exactly 0.0 (see domain/stick_mapping.hpp), so "zero" here really
     // means "released", not "nearly released".
-    if (command.isZero() && zero_sent_) {
+    if (!command.isZero()) {
+        zero_since_.reset();
+        zero_burst_over_ = false;
+        send(command);
         return;
     }
 
+    if (zero_burst_over_) {
+        return;
+    }
+    if (!zero_since_.has_value()) {
+        zero_since_ = now;
+    } else if (now - *zero_since_ >= config_.zero_burst_duration) {
+        zero_burst_over_ = true;
+        return;
+    }
+    send(command);
+}
+
+void TeleopUseCase::send(const VelocityCommand & command)
+{
     velocity_port_->publish(command);
-    zero_sent_ = command.isZero();
     last_command_ = command;
 }
 

@@ -147,6 +147,9 @@ void RoverCrsfTeleopNode::declareParameters()
     declare_parameter<double>("max_wheel_rim_speed", 0.0);
     declare_parameter<double>("effective_track_width", 0.0);
 
+    // How long a stop keeps publishing zeros before going silent. 0 = a single zero.
+    declare_parameter<int>("zero_burst_duration_ms", 0);
+
     declare_parameter<int>("e_stop_channel", 5);
     declare_parameter<int>("e_stop_latch_reset_channel", 4);
     declare_parameter<int>("channel_switch_threshold", 500);
@@ -378,6 +381,13 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
     const int64_t link_stats_timeout_ms = get_parameter("link_stats_timeout_ms").as_int();
     const int64_t lq_lost_below = get_parameter("link_quality_lost_below").as_int();
     const int64_t lq_recovered_at = get_parameter("link_quality_recovered_at").as_int();
+    const int64_t zero_burst_duration_ms = get_parameter("zero_burst_duration_ms").as_int();
+
+    if (zero_burst_duration_ms < 0) {
+        RCLCPP_ERROR(get_logger(), "zero_burst_duration_ms must be >= 0.");
+        return std::nullopt;
+    }
+    config.zero_burst_duration = std::chrono::milliseconds(zero_burst_duration_ms);
 
     if (settle_frames < 0 || channel_timeout_ms <= 0 || link_stats_timeout_ms <= 0) {
         RCLCPP_ERROR(
