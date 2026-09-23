@@ -44,6 +44,11 @@ public:
     // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
     virtual void eStopMotorDriverFaultTrigger(const bool state) = 0;
 
+    // Drives general-purpose output GPIO_AUX_OUT_<index> (index < kAuxOutputCount). NOT RT-safe:
+    // blocks for a Modbus round-trip and throws on failure, an out-of-range index, or before
+    // start(). Call from a service thread only, never from read()/write().
+    virtual void setAuxOutput(const unsigned index, const bool state) = 0;
+
     // Non-blocking; returns a reference to a cache owned by the implementation. Safe to call
     // from the RT thread (see RoverSafetyController::queryControlInterfaceIOStates()).
     virtual const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() = 0;

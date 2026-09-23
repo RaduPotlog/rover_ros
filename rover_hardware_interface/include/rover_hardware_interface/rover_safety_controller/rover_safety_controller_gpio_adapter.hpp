@@ -40,6 +40,8 @@ public:
 
     void eStopMotorDriverFaultTrigger(const bool state) override;
 
+    void setAuxOutput(const unsigned index, const bool state) override;
+
     const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() override;
 
     SafetyLinkHealth linkHealth() const override;

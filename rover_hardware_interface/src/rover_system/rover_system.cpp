@@ -139,6 +139,16 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
             "hardware_interface/sw_e_stop_latch_reset", std::bind(&RoverSystem::resetEStopLatch, this), 2,
             rclcpp::CallbackGroupType::MutuallyExclusive, e_stop_latch_reset_qos);
 
+        // General-purpose aux outputs. Group 3, not the E-Stop groups 1/2: an aux write blocks for
+        // a Modbus round-trip, and must never hold up an E-Stop service call. Each callback throws
+        // on failure, which the wrapper turns into success=false with the reason.
+        for (unsigned i = 0; i < kAuxOutputCount; ++i) {
+            system_ros_interface_->addService<SetBoolSrv, std::function<void(bool)>>(
+                "hardware_interface/aux_output_" + std::to_string(i) + "/set",
+                [this, i](const bool state) { rover_controller_->setAuxOutput(i, state); }, 3,
+                rclcpp::CallbackGroupType::MutuallyExclusive);
+        }
+
         system_ros_interface_->addDiagnosticTask(
         std::string("system errors"), this, &RoverSystem::diagnoseErrors);
 

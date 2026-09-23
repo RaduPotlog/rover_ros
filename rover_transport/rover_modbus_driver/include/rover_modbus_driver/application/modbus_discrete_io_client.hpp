@@ -19,9 +19,11 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include <MB/modbusRequest.hpp>
 #include <MB/modbusResponse.hpp>
+#include <MB/modbusUtils.hpp>
 
 #include "rover_modbus_driver/domain/client_settings.hpp"
 #include "rover_modbus_driver/domain/contact_coil_types.hpp"
@@ -91,6 +93,10 @@ public:
 
     void writeDiscreteCoil(const CoilInfo & coil, const bool coil_state) override;
 
+    std::vector<bool> readDiscreteContacts(const Contact first, const uint16_t count) override;
+
+    std::vector<bool> readDiscreteCoils(const Coil first, const uint16_t count) override;
+
 private:
 
     MB::ModbusResponse sendRequest(const MB::ModbusRequest & request);
@@ -107,6 +113,12 @@ private:
     // Reads the single coil value out of a response, or kDiscreteReadUnavailable if the
     // device answered with something else.
     uint16_t firstCoilValue(const MB::ModbusResponse & response) const;
+
+    // One FC1/FC2 transaction for `count` consecutive bits. The reply is padded to whole bytes,
+    // so it carries more cells than asked for; only the first `count` are returned.
+    std::vector<bool> readBits(
+        const MB::utils::MBFunctionCode function_code, const uint16_t first_address,
+        const uint16_t count);
 
     std::unique_ptr<ModbusTransportPort> transport_;
 

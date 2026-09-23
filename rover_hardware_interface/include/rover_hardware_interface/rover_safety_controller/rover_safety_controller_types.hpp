@@ -98,7 +98,19 @@ const std::map<RoverControllerGpio, std::string> gpio_names_
     { RoverControllerGpio::GPIO_SW_E_STOP_USER_BUTTON,          "GPIO_SW_E_STOP_USER_BUTTON"            },
     { RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT,   "GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT"     },
     { RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET,          "GPIO_SW_E_STOP_LATCH_RESET"            },
-    { RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS,         "GPIO_SW_E_STOP_LATCH_STATUS"           }
+    { RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS,         "GPIO_SW_E_STOP_LATCH_STATUS"           },
+    { RoverControllerGpio::GPIO_AUX_OUT_0,                      "GPIO_AUX_OUT_0"                        },
+    { RoverControllerGpio::GPIO_AUX_OUT_1,                      "GPIO_AUX_OUT_1"                        },
+    { RoverControllerGpio::GPIO_AUX_OUT_2,                      "GPIO_AUX_OUT_2"                        },
+    { RoverControllerGpio::GPIO_AUX_OUT_3,                      "GPIO_AUX_OUT_3"                        },
+    { RoverControllerGpio::GPIO_AUX_OUT_4,                      "GPIO_AUX_OUT_4"                        },
+    { RoverControllerGpio::GPIO_AUX_OUT_5,                      "GPIO_AUX_OUT_5"                        },
+    { RoverControllerGpio::GPIO_AUX_IN_0,                       "GPIO_AUX_IN_0"                         },
+    { RoverControllerGpio::GPIO_AUX_IN_1,                       "GPIO_AUX_IN_1"                         },
+    { RoverControllerGpio::GPIO_AUX_IN_2,                       "GPIO_AUX_IN_2"                         },
+    { RoverControllerGpio::GPIO_AUX_IN_3,                       "GPIO_AUX_IN_3"                         },
+    { RoverControllerGpio::GPIO_AUX_IN_4,                       "GPIO_AUX_IN_4"                         },
+    { RoverControllerGpio::GPIO_AUX_IN_5,                       "GPIO_AUX_IN_5"                         }
 };
 
 struct RoverControllerGpioInfo

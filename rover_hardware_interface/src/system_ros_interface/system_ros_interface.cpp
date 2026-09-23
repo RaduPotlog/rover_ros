@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <tuple>
 
 #include "diagnostic_updater/diagnostic_updater.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -77,13 +78,13 @@ rover_msgs::msg::RuntimeError toRuntimeErrorMsg(const RuntimeError & runtime_err
 
 }  // namespace
 
-// Trigger is the only service type this component exposes. A SetBool specialisation and its
-// explicit instantiation used to sit here too, but nothing ever registered a SetBool service -
-// dead code that read like a supported path. That is not an oversight to be corrected: the safety
-// commands are deliberately three named Triggers (sw_user_e_stop_set / sw_user_e_stop_reset /
-// sw_e_stop_latch_reset) rather than one parameterised setter, because a named service is what
-// makes the intent and the authorisation legible at the call site and in a log.
+// The safety commands are deliberately three named Triggers (sw_user_e_stop_set /
+// sw_user_e_stop_reset / sw_e_stop_latch_reset) rather than one parameterised setter, because a
+// named service is what makes the intent and the authorisation legible at the call site and in a
+// log. SetBool is used only for the general-purpose aux outputs (aux_output_<i>/set), which are
+// not part of the safety chain - do not reach for it for a safety command.
 template class ROSServiceWrapper<std_srvs::srv::Trigger, std::function<void()>>;
+template class ROSServiceWrapper<std_srvs::srv::SetBool, std::function<void(bool)>>;
 
 template <typename SrvT, typename CallbackT>
 void ROSServiceWrapper<SrvT, CallbackT>::registerService(
@@ -117,6 +118,12 @@ template <>
 void ROSServiceWrapper<std_srvs::srv::Trigger, std::function<void()>>::proccessCallback(SrvRequestConstPtr /* request */)
 {
     callback_();
+}
+
+template <>
+void ROSServiceWrapper<std_srvs::srv::SetBool, std::function<void(bool)>>::proccessCallback(SrvRequestConstPtr request)
+{
+    callback_(request->data);
 }
 
 SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclcpp::NodeOptions & node_options)
@@ -172,6 +179,12 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
         std::make_unique<realtime_tools::RealtimePublisher<SafetyCommandEchoMsg>>(
             safety_command_echo_publisher_);
 
+    // Same QoS as the safety pair: periodic 20 Hz status, consumers time it out.
+    aux_io_state_publisher_ =
+        node_->create_publisher<AuxIoStateMsg>("hardware_interface/aux_io_state", safety_qos);
+    realtime_aux_io_state_publisher_ =
+        std::make_unique<realtime_tools::RealtimePublisher<AuxIoStateMsg>>(aux_io_state_publisher_);
+
     diagnostic_updater_.setHardwareID("Rover System");
 
     RCLCPP_INFO(rclcpp::get_logger("SystemROSInterface"), "Node constructed successfully.");
@@ -196,6 +209,8 @@ SystemROSInterface::~SystemROSInterface()
     safety_status_publisher_.reset();
     realtime_safety_command_echo_publisher_.reset();
     safety_command_echo_publisher_.reset();
+    realtime_aux_io_state_publisher_.reset();
+    aux_io_state_publisher_.reset();
 
     service_wrappers_storage_.clear();
     node_.reset();
@@ -256,6 +271,7 @@ void SystemROSInterface::updateSafetyLinkState(const SafetyLinkHealth & health)
 
     safety_status_msg_.header.stamp = now;
     safety_command_echo_msg_.header.stamp = now;
+    aux_io_state_msg_.header.stamp = now;
 
     // io_sample_time is when the PLC was actually polled, which is what a staleness check should
     // be measuring. It is reconstructed from the poll age rather than stamped in the poll thread
@@ -267,6 +283,7 @@ void SystemROSInterface::updateSafetyLinkState(const SafetyLinkHealth & health)
 
     safety_status_msg_.io_sample_time = sample_time;
     safety_command_echo_msg_.io_sample_time = sample_time;
+    aux_io_state_msg_.io_sample_time = sample_time;
 
     // Both threads alive and a poll that has actually succeeded recently. Without this a consumer
     // could only infer link trouble from the message drying up, which is exactly the inference
@@ -276,15 +293,22 @@ void SystemROSInterface::updateSafetyLinkState(const SafetyLinkHealth & health)
 
     safety_status_msg_.link_healthy =
         health.watchdog_running && health.poll_running && poll_is_fresh;
+    aux_io_state_msg_.link_healthy = safety_status_msg_.link_healthy;
 }
 
 void SystemROSInterface::publishSafetyMsgs()
 {
     realtime_safety_status_publisher_->try_publish(safety_status_msg_);
     realtime_safety_command_echo_publisher_->try_publish(safety_command_echo_msg_);
+    realtime_aux_io_state_publisher_->try_publish(aux_io_state_msg_);
 }
 
-// Routes one pin to whichever of the two safety messages it belongs in. Returns false for pins
+static_assert(
+    std::tuple_size<AuxIoStateMsg::_inputs_type>::value == kAuxInputCount &&
+    std::tuple_size<AuxIoStateMsg::_outputs_type>::value == kAuxOutputCount,
+    "AuxIoState.msg array sizes must match kAuxInputCount / kAuxOutputCount");
+
+// Routes one pin to whichever of the two safety messages (or the aux IO message) it belongs in. Returns false for pins
 // that are not mapped into either - GPIO_1..7 and GPIO_14/15 are physically present on the
 // controller but carry nothing this system uses.
 bool SystemROSInterface::updateSafetyMsgs(const RoverControllerGpio pin, const bool pin_value)
@@ -313,6 +337,28 @@ bool SystemROSInterface::updateSafetyMsgs(const RoverControllerGpio pin, const b
             break;
         case RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT:
             safety_command_echo_msg_.cpu_wdg_heartbeat = pin_value;
+            break;
+
+        // --- General-purpose aux IO: not safety, its own message. ---
+        case RoverControllerGpio::GPIO_AUX_OUT_0:
+        case RoverControllerGpio::GPIO_AUX_OUT_1:
+        case RoverControllerGpio::GPIO_AUX_OUT_2:
+        case RoverControllerGpio::GPIO_AUX_OUT_3:
+        case RoverControllerGpio::GPIO_AUX_OUT_4:
+        case RoverControllerGpio::GPIO_AUX_OUT_5:
+            aux_io_state_msg_.outputs[
+                static_cast<unsigned>(pin) - static_cast<unsigned>(RoverControllerGpio::GPIO_AUX_OUT_0)] =
+                pin_value;
+            break;
+        case RoverControllerGpio::GPIO_AUX_IN_0:
+        case RoverControllerGpio::GPIO_AUX_IN_1:
+        case RoverControllerGpio::GPIO_AUX_IN_2:
+        case RoverControllerGpio::GPIO_AUX_IN_3:
+        case RoverControllerGpio::GPIO_AUX_IN_4:
+        case RoverControllerGpio::GPIO_AUX_IN_5:
+            aux_io_state_msg_.inputs[
+                static_cast<unsigned>(pin) - static_cast<unsigned>(RoverControllerGpio::GPIO_AUX_IN_0)] =
+                pin_value;
             break;
 
         default:

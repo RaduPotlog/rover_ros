@@ -35,6 +35,7 @@
 #include "rover_msgs/msg/driver_state_named.hpp"
 #include "rover_msgs/msg/rover_driver_state.hpp"
 #include "rover_hardware_interface/domain/safety_link_health.hpp"
+#include "rover_msgs/msg/aux_io_state.hpp"
 #include "rover_msgs/msg/safety_command_echo.hpp"
 #include "rover_msgs/msg/safety_status.hpp"
 
@@ -55,6 +56,8 @@ using RoverDriverStateMsg = rover_msgs::msg::RoverDriverState;
 using DriverStateNamedMsg = rover_msgs::msg::DriverStateNamed;
 using SafetyStatusMsg = rover_msgs::msg::SafetyStatus;
 using SafetyCommandEchoMsg = rover_msgs::msg::SafetyCommandEcho;
+using AuxIoStateMsg = rover_msgs::msg::AuxIoState;
+using SetBoolSrv = std_srvs::srv::SetBool;
 
 template <typename SrvT, typename CallbackT>
 class ROSServiceWrapper
@@ -133,7 +136,7 @@ public:
 
     // Fans the raw pin map out across the two safety messages. Which pin lands in which is the
     // whole point of the split: plant readings go to SafetyStatus, echoes of coils we drive go to
-    // SafetyCommandEcho. See updateSafetyMsgs().
+    // SafetyCommandEcho. See updateSafetyMsgs(). The general-purpose aux pins go to AuxIoState.
     void updateMsgGpioStates(
         const std::unordered_map<RoverControllerGpio, bool> & pin_state);
 
@@ -162,6 +165,7 @@ protected:
     RoverDriverStateMsg driver_state_msg_;
     SafetyStatusMsg safety_status_msg_;
     SafetyCommandEchoMsg safety_command_echo_msg_;
+    AuxIoStateMsg aux_io_state_msg_;
 
     rclcpp::Publisher<RoverDriverStateMsg>::SharedPtr driver_state_publisher_;
     std::unique_ptr<realtime_tools::RealtimePublisher<RoverDriverStateMsg>> realtime_driver_state_publisher_;
@@ -172,6 +176,9 @@ protected:
     rclcpp::Publisher<SafetyCommandEchoMsg>::SharedPtr safety_command_echo_publisher_;
     std::unique_ptr<realtime_tools::RealtimePublisher<SafetyCommandEchoMsg>>
         realtime_safety_command_echo_publisher_;
+
+    rclcpp::Publisher<AuxIoStateMsg>::SharedPtr aux_io_state_publisher_;
+    std::unique_ptr<realtime_tools::RealtimePublisher<AuxIoStateMsg>> realtime_aux_io_state_publisher_;
 
     diagnostic_updater::Updater diagnostic_updater_;
 

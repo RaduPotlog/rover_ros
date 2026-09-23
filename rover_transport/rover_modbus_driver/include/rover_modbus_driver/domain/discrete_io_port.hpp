@@ -16,6 +16,7 @@
 #define ROVER_MODBUS_DRIVER_DOMAIN_DISCRETE_IO_PORT_HPP_
 
 #include <cstdint>
+#include <vector>
 
 #include "rover_modbus_driver/domain/contact_coil_types.hpp"
 
@@ -47,6 +48,13 @@ public:
     virtual uint16_t readDiscreteCoil(const CoilInfo & coil) = 0;
 
     virtual void writeDiscreteCoil(const CoilInfo & coil, const bool coil_state) = 0;
+
+    // Read `count` consecutive objects starting at `first` in a single transaction (FC2 / FC1).
+    // Returns exactly `count` values, element i being address first + i. Failures throw, like the
+    // single reads - there is no sentinel. Allocates, so not for the RT path.
+    virtual std::vector<bool> readDiscreteContacts(const Contact first, const uint16_t count) = 0;
+
+    virtual std::vector<bool> readDiscreteCoils(const Coil first, const uint16_t count) = 0;
 };
 
 }  // namespace rover::transport::modbus

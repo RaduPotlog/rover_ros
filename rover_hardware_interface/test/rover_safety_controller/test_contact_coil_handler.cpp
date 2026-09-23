@@ -21,8 +21,10 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -180,6 +182,44 @@ TEST_F(ContactCoilHandlerTest, StartDoesNotWriteReadOnlyCoils)
     EXPECT_FALSE(modbus->hasRefusedWrite({Coil::COIL_5, false}));
 }
 
+// The aux outputs come up OFF on every start, so a restart never leaves a load switched on from
+// before; the aux inputs are PLC-owned and must never be written, not even refused.
+TEST_F(ContactCoilHandlerTest, StartDrivesAuxOutputsOffAndNeverWritesAuxInputs)
+{
+    ASSERT_TRUE(handler->start());
+
+    for (unsigned i = 0; i < kAuxOutputCount; ++i) {
+        const auto coil = static_cast<Coil>(static_cast<unsigned>(Coil::COIL_8) + i);
+        EXPECT_TRUE(modbus->hasWrite({coil, false})) << "aux output " << i;
+    }
+
+    for (unsigned i = 0; i < kAuxInputCount; ++i) {
+        const auto coil = static_cast<Coil>(static_cast<unsigned>(Coil::COIL_14) + i);
+        EXPECT_FALSE(modbus->hasWrite({coil, false})) << "aux input " << i;
+        EXPECT_FALSE(modbus->hasRefusedWrite({coil, false})) << "aux input " << i;
+    }
+}
+
+TEST_F(ContactCoilHandlerTest, SetAuxOutputWritesDio00To05)
+{
+    for (unsigned i = 0; i < kAuxOutputCount; ++i) {
+        handler->setAuxOutput(i, true);
+    }
+
+    for (unsigned i = 0; i < kAuxOutputCount; ++i) {
+        const auto coil = static_cast<Coil>(static_cast<unsigned>(Coil::COIL_8) + i);
+        EXPECT_TRUE(modbus->hasWrite({coil, true})) << "aux output " << i;
+    }
+}
+
+// An index past the last output must not wrap into the aux inputs (COIL_14+) or anything else.
+TEST_F(ContactCoilHandlerTest, SetAuxOutputOutOfRangeThrowsAndWritesNothing)
+{
+    EXPECT_THROW(handler->setAuxOutput(kAuxOutputCount, true), std::out_of_range);
+    EXPECT_TRUE(modbus->writesSnapshot().empty());
+    EXPECT_TRUE(modbus->refusedWritesSnapshot().empty());
+}
+
 TEST_F(ContactCoilHandlerTest, StartIsIdempotent)
 {
     ASSERT_TRUE(handler->start());
@@ -226,9 +266,9 @@ protected:
 
 TEST_F(HeartbeatTimingTest, HeartbeatHoldsItsPeriodWhileTheIoPollStalls)
 {
-    // Each read takes 120 ms; a full sweep is 7 of them, so the poll thread is effectively
-    // holding the link continuously. Under the old single-loop design the heartbeat interval
-    // would have been ~50 ms + 7 x 120 ms = ~890 ms.
+    // Each read takes 120 ms and the poll period is 10 ms, so the poll thread is effectively
+    // holding the link continuously. Under the old single-loop design (7 single-bit reads per
+    // sweep) the heartbeat interval would have been ~50 ms + 7 x 120 ms = ~890 ms.
     modbus->setReadDelay(std::chrono::milliseconds(120));
 
     startHandler(50, 10);
@@ -268,6 +308,53 @@ TEST_F(HeartbeatTimingTest, HeartbeatSurvivesIoPollExceptions)
         << "heartbeat stopped when the IO poll started throwing";
 
     EXPECT_GT(handler->getHealth().poll_error_count, 0u);
+}
+
+// The sweep cost must stay at two round-trips however many points are mapped - 19 single-bit
+// reads on a slow link would age the poll past the staleness bound safety_status is judged by.
+TEST_F(HeartbeatTimingTest, OneIoSweepCostsTwoReadTransactions)
+{
+    startHandler(1000, 10000);
+
+    ASSERT_TRUE(waitFor(
+        [this] { return handler->getHealth().last_poll_age_ms != SafetyLinkHealth::kUnknownAgeMs; },
+        std::chrono::milliseconds(2000)));
+
+    EXPECT_EQ(modbus->readTransactionCount(), 2u);
+}
+
+// Aux writes share the one link with the heartbeat but take it without priority, so hammering
+// them - on top of a stalled poll - must not stretch the heartbeat interval.
+TEST_F(HeartbeatTimingTest, HeartbeatHoldsItsPeriodWhileAuxWritesContend)
+{
+    modbus->setReadDelay(std::chrono::milliseconds(120));
+
+    startHandler(50, 10);
+
+    std::atomic_bool stop {false};
+    std::thread hammer([this, &stop] {
+        bool level = false;
+        while (!stop) {
+            handler->setAuxOutput(0, level);
+            level = !level;
+        }
+    });
+
+    const bool ticked = waitFor(
+        [this] { return heartbeatKickCount(modbus->timedWritesSnapshot()) >= 6; },
+        std::chrono::milliseconds(4000));
+
+    stop = true;
+    hammer.join();
+
+    ASSERT_TRUE(ticked) << "heartbeat starved by aux output writes";
+
+    const auto intervals = heartbeatIntervalsMs(modbus->timedWritesSnapshot());
+    ASSERT_FALSE(intervals.empty());
+
+    const int64_t worst = *std::max_element(intervals.begin(), intervals.end());
+
+    EXPECT_LT(worst, 300) << "worst heartbeat interval was " << worst << " ms";
 }
 
 TEST_F(HeartbeatTimingTest, HeartbeatTogglesRatherThanRepeatingALevel)

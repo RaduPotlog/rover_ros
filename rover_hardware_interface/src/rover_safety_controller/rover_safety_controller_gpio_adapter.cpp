@@ -41,6 +41,11 @@ void RoverSafetyControllerGpioAdapter::eStopMotorDriverFaultTrigger(const bool s
     rover_controller_->eStopMotorDriverFaultTrigger(state);
 }
 
+void RoverSafetyControllerGpioAdapter::setAuxOutput(const unsigned index, const bool state)
+{
+    rover_controller_->setAuxOutput(index, state);
+}
+
 const std::unordered_map<RoverControllerGpio, bool> &
 RoverSafetyControllerGpioAdapter::queryControlInterfaceIOStates()
 {

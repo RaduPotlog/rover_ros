@@ -22,8 +22,10 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 
@@ -71,6 +73,22 @@ const std::vector<RoverControllerCoilInfo> ContactCoilHandler::coils_config_info
         RoverControllerGpio {RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS},
         CoilInfo { Coil::COIL_5, false, false},
     },
+
+    // General-purpose aux IO on the PLC's programmable digital I/O (DIO00..DIO11). Outputs are
+    // driven OFF by initCoils() on every start; inputs are PLC-owned and marked non-engageable so
+    // the driver refuses any write to them.
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_0, CoilInfo { Coil::COIL_8,  false, true  } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_1, CoilInfo { Coil::COIL_9,  false, true  } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_2, CoilInfo { Coil::COIL_10, false, true  } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_3, CoilInfo { Coil::COIL_11, false, true  } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_4, CoilInfo { Coil::COIL_12, false, true  } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_5, CoilInfo { Coil::COIL_13, false, true  } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_IN_0,  CoilInfo { Coil::COIL_14, false, false } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_IN_1,  CoilInfo { Coil::COIL_15, false, false } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_IN_2,  CoilInfo { Coil::COIL_16, false, false } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_IN_3,  CoilInfo { Coil::COIL_17, false, false } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_IN_4,  CoilInfo { Coil::COIL_18, false, false } },
+    RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_IN_5,  CoilInfo { Coil::COIL_19, false, false } },
 };
 
 // Indices into coils_config_info_storage_ for the coils addressed by name below. Spelled out
@@ -80,6 +98,21 @@ constexpr std::size_t kCpuWdgHeartbeatCoilIdx = 1;
 constexpr std::size_t kEStopUserBtnCoilIdx = 2;
 constexpr std::size_t kEStopMotorDriverFaultCoilIdx = 3;
 constexpr std::size_t kEStopLatchResetCoilIdx = 4;
+constexpr std::size_t kFirstAuxOutputCoilIdx = 6;
+
+// Number of consecutive objects, starting at address 0, that one batched read must span to cover
+// every entry of a table.
+template <typename InfoT, typename AddressOf>
+uint16_t spanFromZero(const std::vector<InfoT> & table, AddressOf address_of)
+{
+    uint16_t span = 0;
+
+    for (const auto & entry : table) {
+        span = std::max<uint16_t>(span, static_cast<uint16_t>(address_of(entry) + 1));
+    }
+
+    return span;
+}
 
 void ModbusLink::acquire(const bool priority)
 {
@@ -201,6 +234,21 @@ void ContactCoilHandler::eStopLatchReset()
     rover_modbus_->writeDiscreteCoil(coil, false);
 }
 
+// General-purpose output, not a safety command: non-priority on the link, so it queues behind the
+// heartbeat and any E-Stop write exactly like an IO poll transaction does.
+void ContactCoilHandler::setAuxOutput(const unsigned index, const bool state)
+{
+    if (index >= kAuxOutputCount) {
+        throw std::out_of_range(
+            "Aux output index " + std::to_string(index) + " out of range (0.." +
+            std::to_string(kAuxOutputCount - 1) + ").");
+    }
+
+    ModbusLinkGuard lck(modbus_link_, false);
+    rover_modbus_->writeDiscreteCoil(
+        coils_config_info_storage_[kFirstAuxOutputCoilIdx + index].coil_info, state);
+}
+
 void ContactCoilHandler::getIoState(std::unordered_map<RoverControllerGpio, bool> & io_state)
 {
     if (io_state_mtx_.try_lock()) {
@@ -261,54 +309,47 @@ void ContactCoilHandler::initCoils()
     }
 }
 
-// Modbus reports an unknown/error discrete state as the sentinel value 255 (0xFF), distinct from
-// a legitimate 0/1 reading - treated as "not active" rather than propagated as true.
-constexpr uint16_t kUnknownDiscreteState = 255;
-
-bool ContactCoilHandler::readDiscreteContact(const ContactInfo &contact)
+// Two transactions per sweep regardless of how many points are mapped: one FC2 read across the
+// contacts, one FC1 read across the coils, each spanning address 0 up to the highest address in
+// its table. With single-bit reads the sweep cost one round-trip per point (7, then 19 with the
+// aux IO), which on a slow link could age the poll past kSafetyLinkStalePollAgeMs.
+//
+// A failed read throws out of the sweep; the poll thread counts it and io_state_ keeps its
+// previous values.
+std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::queryControlInterfaceIOStates()
 {
-    uint16_t contact_state;
+    static const uint16_t contact_span = spanFromZero(
+        contacts_config_info_storage_,
+        [](const RoverControllerContactInfo & c) { return static_cast<uint16_t>(c.contact_info.contact); });
+    static const uint16_t coil_span = spanFromZero(
+        coils_config_info_storage_,
+        [](const RoverControllerCoilInfo & c) { return static_cast<uint16_t>(c.coil_info.coil); });
+
+    std::vector<bool> contact_bits;
+    std::vector<bool> coil_bits;
 
     {
         // One lock hold per transaction, not one for the whole sweep: a heartbeat tick waiting
-        // on the link then waits at most a single round-trip, instead of every read the poll
-        // still has left to do. Non-priority, so a waiting heartbeat overtakes the next read.
+        // on the link then waits at most a single round-trip. Non-priority, so a waiting
+        // heartbeat overtakes the next read.
         ModbusLinkGuard lck(modbus_link_, false);
-        contact_state = rover_modbus_->readDiscreteContact(contact);
+        contact_bits = rover_modbus_->readDiscreteContacts(Contact::CONTACT_0, contact_span);
     }
-
-    return (contact_state == kUnknownDiscreteState ? false : (contact_state & 0xFFU));
-}
-
-bool ContactCoilHandler::readDiscreteCoil(const CoilInfo &coil)
-{
-    uint16_t coil_state;
 
     {
         ModbusLinkGuard lck(modbus_link_, false);
-        coil_state = rover_modbus_->readDiscreteCoil(coil);
+        coil_bits = rover_modbus_->readDiscreteCoils(Coil::COIL_0, coil_span);
     }
 
-    return (coil_state == kUnknownDiscreteState ? false : (coil_state & 0xFFU));
-}
-
-std::unordered_map<RoverControllerGpio, bool> ContactCoilHandler::queryControlInterfaceIOStates()
-{
     std::unordered_map<RoverControllerGpio, bool> io_state;
 
-    // TODO(mechatronics-academy): COIL_0..COIL_5 are consecutive, so FC1 could read all six in a
-    // single request and the whole sweep would cost 2 round-trips instead of 7. That needs a
-    // multi-bit read on DiscreteIoPort (and its fake); tracked separately from the heartbeat
-    // decoupling this loop already got.
-    std::for_each(contacts_config_info_storage_.begin(), contacts_config_info_storage_.end(), [&](RoverControllerContactInfo contact) {
-        bool is_active = readDiscreteContact(contact.contact_info);
-        io_state.emplace(static_cast<RoverControllerGpio>(contact.pin), is_active);
-    });
+    for (const auto & contact : contacts_config_info_storage_) {
+        io_state.emplace(contact.pin, contact_bits.at(static_cast<size_t>(contact.contact_info.contact)));
+    }
 
-    std::for_each(coils_config_info_storage_.begin(), coils_config_info_storage_.end(), [&](RoverControllerCoilInfo coil) {
-        bool is_active = readDiscreteCoil(coil.coil_info);
-        io_state.emplace(static_cast<RoverControllerGpio>(coil.pin), is_active);
-    });
+    for (const auto & coil : coils_config_info_storage_) {
+        io_state.emplace(coil.pin, coil_bits.at(static_cast<size_t>(coil.coil_info.coil)));
+    }
 
     return io_state;
 }
@@ -482,6 +523,17 @@ void RoverSafetyController::eStopLatchReset()
     }
 
     contactCoilHandler_->eStopLatchReset();
+}
+
+void RoverSafetyController::setAuxOutput(const unsigned index, const bool state)
+{
+    // Unlike the E-Stop triggers this must not be a silent no-op: it answers a service call,
+    // and the caller has to learn that nothing was switched.
+    if (!contactCoilHandler_ || !contactCoilHandler_->isContactCoilHandlerEnabled()) {
+        throw std::runtime_error("Safety controller not started; aux output not switched.");
+    }
+
+    contactCoilHandler_->setAuxOutput(index, state);
 }
 
 const std::unordered_map<RoverControllerGpio, bool> & RoverSafetyController::queryControlInterfaceIOStates()

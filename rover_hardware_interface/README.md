@@ -34,10 +34,15 @@ Reference datasheets: `docs/DCC1000_reference.pdf` (motor controller),
 | pub | `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` |
 | pub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` - plant state: HW E-Stop button, contactor feedback, latch, link health |
 | pub | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` - read-backs of the coils *we* drive; diagnostic, may only ever inhibit |
+| pub | `hardware_interface/aux_io_state` | `rover_msgs/AuxIoState` - general-purpose aux IO (PLC DIO06..11 inputs, DIO00..05 output read-backs). Not safety |
 | srv | `hardware_interface/sw_user_e_stop_set` | `std_srvs/Trigger` - set the software E-Stop |
 | srv | `hardware_interface/sw_user_e_stop_reset` | `std_srvs/Trigger` - reset the software E-Stop |
 | srv | `hardware_interface/sw_e_stop_latch_reset` | `std_srvs/Trigger` - clear the safety relay latch |
+| srv | `hardware_interface/aux_output_<0..5>/set` | `std_srvs/SetBool` - switch aux output DIO00..05 ON/OFF; replies after the PLC acknowledges the write |
 | pub | `diagnostics` | hardware id `Rover System`: driver and safety controller status |
+
+The aux IO topic and services exist only on real hardware: in simulation `gz_ros2_control`
+replaces `RoverA1System`, so nothing talks to the PLC.
 
 Consumers: `rover_safety` (driver state, the SW E-Stop echo, e-stop set), `rover_twist_mux`'s
 `rover_motion_lock_node` (both safety topics), `rover_crsf_teleop` (safety status + e-stop

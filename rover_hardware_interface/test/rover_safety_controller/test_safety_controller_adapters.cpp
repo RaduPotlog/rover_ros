@@ -156,9 +156,9 @@ TEST_F(AdapterFixture, GpioAdapterExposesEveryMappedPin)
     RoverSafetyControllerGpioAdapter adapter(controller);
     const auto & states = adapter.queryControlInterfaceIOStates();
 
-    // One contact plus six coils. A pin missing here would silently default-construct as false in
-    // the published safety messages.
-    EXPECT_EQ(states.size(), 7u);
+    // One contact, six safety coils and twelve aux coils. A pin missing here would silently
+    // default-construct as false in the published messages.
+    EXPECT_EQ(states.size(), 19u);
     EXPECT_EQ(states.count(RoverControllerGpio::GPIO_HW_E_STOP_USER_BTN), 1u);
     EXPECT_EQ(states.count(RoverControllerGpio::GPIO_MOTOR_CONTACTOR_ENGAGED), 1u);
     EXPECT_EQ(states.count(RoverControllerGpio::GPIO_CPU_WDG_HEARTBEAT), 1u);
@@ -166,6 +166,42 @@ TEST_F(AdapterFixture, GpioAdapterExposesEveryMappedPin)
     EXPECT_EQ(states.count(RoverControllerGpio::GPIO_SW_E_STOP_MOTOR_DRIVER_FAULT), 1u);
     EXPECT_EQ(states.count(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_RESET), 1u);
     EXPECT_EQ(states.count(RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS), 1u);
+
+    for (unsigned i = 0; i < kAuxOutputCount; ++i) {
+        EXPECT_EQ(states.count(auxOutputPin(i)), 1u) << "aux output " << i;
+    }
+
+    for (unsigned i = 0; i < kAuxInputCount; ++i) {
+        EXPECT_EQ(states.count(auxInputPin(i)), 1u) << "aux input " << i;
+    }
+}
+
+// DIO06 is COIL_14 and DIO00 is COIL_8; the aux pins must read their own coils, not a neighbour
+// or a safety coil.
+TEST_F(AdapterFixture, GpioAdapterReadsTheAuxPinsFromTheirOwnCoils)
+{
+    modbus->setCoilReadValueFor(Coil::COIL_14, 1);  // DIO06 -> GPIO_AUX_IN_0
+    modbus->setCoilReadValueFor(Coil::COIL_13, 1);  // DIO05 -> GPIO_AUX_OUT_5
+    ASSERT_TRUE(waitForFirstPoll());
+
+    RoverSafetyControllerGpioAdapter adapter(controller);
+    const auto & states = adapter.queryControlInterfaceIOStates();
+
+    EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_IN_0));
+    EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_IN_1));
+    EXPECT_TRUE(states.at(RoverControllerGpio::GPIO_AUX_OUT_5));
+    EXPECT_FALSE(states.at(RoverControllerGpio::GPIO_AUX_OUT_0));
+}
+
+TEST_F(AdapterFixture, GpioAdapterSetAuxOutputWritesItsOwnCoil)
+{
+    RoverSafetyControllerGpioAdapter adapter(controller);
+
+    adapter.setAuxOutput(0, true);
+    adapter.setAuxOutput(5, true);
+
+    EXPECT_TRUE(modbus->hasWrite({Coil::COIL_8, true}));
+    EXPECT_TRUE(modbus->hasWrite({Coil::COIL_13, true}));
 }
 
 TEST_F(AdapterFixture, GpioAdapterReportsLinkHealthOnceRunning)

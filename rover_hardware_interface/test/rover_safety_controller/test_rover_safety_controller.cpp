@@ -22,6 +22,7 @@
 
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller.hpp"
@@ -112,6 +113,23 @@ TEST_F(RoverSafetyControllerTest, EStopLatchResetDelegatesAfterStart)
 
     EXPECT_TRUE(modbus->hasWrite({Coil::COIL_4, true}));
     EXPECT_TRUE(modbus->hasWrite({Coil::COIL_4, false}));
+}
+
+// setAuxOutput answers a service call, so unlike the E-Stop triggers it must not be a silent
+// no-op before start(): the caller has to be told nothing was switched.
+TEST_F(RoverSafetyControllerTest, SetAuxOutputBeforeStartThrowsAndWritesNothing)
+{
+    EXPECT_THROW(controller->setAuxOutput(0, true), std::runtime_error);
+    EXPECT_TRUE(modbus->writesSnapshot().empty());
+}
+
+TEST_F(RoverSafetyControllerTest, SetAuxOutputDelegatesAfterStart)
+{
+    controller->start();
+
+    controller->setAuxOutput(2, true);
+
+    EXPECT_TRUE(modbus->hasWrite({Coil::COIL_10, true}));
 }
 
 TEST_F(RoverSafetyControllerTest, IsPinActiveReflectsConfiguredContactReadValue)

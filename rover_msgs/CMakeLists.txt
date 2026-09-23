@@ -22,6 +22,7 @@ rosidl_generate_interfaces(
     "msg/SystemStatus.msg"
     "msg/SafetyStatus.msg"
     "msg/SafetyCommandEcho.msg"
+    "msg/AuxIoState.msg"
     "msg/ChargingStatus.msg"
     "msg/LedAnimation.msg"
     "msg/LedAnimationCatalog.msg"

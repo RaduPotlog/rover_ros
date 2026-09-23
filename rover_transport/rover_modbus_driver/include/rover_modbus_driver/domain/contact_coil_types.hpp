@@ -43,6 +43,22 @@ enum class Coil
     COIL_5,
     COIL_6,
     COIL_7,
+
+    // Portenta Machine Control programmable digital I/O. The PLC IDE labels these "Modbus Coil
+    // 9..20"; the IDE counts from 1, the PDU address counts from 0, so DIO00 is address 8.
+    // Inputs are exposed as coils too (FC1), not as discrete inputs (FC2).
+    COIL_8,   // DIO00
+    COIL_9,   // DIO01
+    COIL_10,  // DIO02
+    COIL_11,  // DIO03
+    COIL_12,  // DIO04
+    COIL_13,  // DIO05
+    COIL_14,  // DIO06
+    COIL_15,  // DIO07
+    COIL_16,  // DIO08
+    COIL_17,  // DIO09
+    COIL_18,  // DIO10
+    COIL_19,  // DIO11
 };
 
 struct ContactInfo

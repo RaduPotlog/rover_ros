@@ -124,6 +124,10 @@ public:
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
 
+    // Drives GPIO_AUX_OUT_<index>. Blocks for one Modbus write, taking the link without priority.
+    // Throws std::out_of_range for index >= kAuxOutputCount, and whatever the write throws.
+    void setAuxOutput(const unsigned index, const bool state);
+
     // Fills `io_state` from the last-polled IO state. Non-blocking: on lock contention with the
     // poll thread, `io_state` is left unchanged (i.e. the caller's own last-known-good values),
     // so this is safe to call from the RT thread. Contends only with a map copy (io_state_mtx_),
@@ -136,12 +140,9 @@ private:
 
     void initCoils();
 
-    bool readDiscreteContact(const ContactInfo &contact);
-
-    bool readDiscreteCoil(const CoilInfo &coil);
-
-    // Performs the Modbus reads, taking modbus_link_mtx_ once per transaction rather than once
-    // for the whole sweep, so a heartbeat tick waits at most one round-trip to reach the link.
+    // Performs the Modbus reads - one batched transaction for the contacts, one for the coils -
+    // taking modbus_link_ once per transaction rather than once for the whole sweep, so a
+    // heartbeat tick waits at most one round-trip to reach the link.
     std::unordered_map<RoverControllerGpio, bool> queryControlInterfaceIOStates();
 
     void contactCoilHandlerWatchdogThread();
@@ -211,6 +212,10 @@ public:
 
     // SW E-STOP LATCH RESET - sw_e_stop_latch_reset
     void eStopLatchReset();
+
+    // Drives GPIO_AUX_OUT_<index>. Not RT-safe (one blocking Modbus write). Throws if called
+    // before start(), for an out-of-range index, or when the write fails.
+    void setAuxOutput(const unsigned index, const bool state);
 
     // Non-blocking; returns a reference to a cache owned by this RoverSafetyController, refreshed
     // in place on each call (best-effort - see ContactCoilHandler::getIoState()). Safe to call

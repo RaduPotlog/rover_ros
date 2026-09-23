@@ -236,6 +236,56 @@ uint16_t ModbusDiscreteIoClient::readDiscreteCoil(const CoilInfo & coil)
     }
 }
 
+std::vector<bool> ModbusDiscreteIoClient::readBits(
+    const MB::utils::MBFunctionCode function_code, const uint16_t first_address,
+    const uint16_t count)
+{
+    MB::ModbusRequest request(kModbusDeviceId, function_code, first_address, count);
+
+    const MB::ModbusResponse response = sendRequest(request);
+    const auto & values = response.registerValues();
+
+    if (values.size() < count) {
+        throw MB::ModbusException(
+            MB::utils::NumberOfValuesInvalid, kModbusDeviceId, function_code);
+    }
+
+    std::vector<bool> bits(count);
+
+    for (uint16_t i = 0; i < count; ++i) {
+        if (!values[i].isCoil()) {
+            throw MB::ModbusException(
+                MB::utils::NumberOfValuesInvalid, kModbusDeviceId, function_code);
+        }
+
+        bits[i] = values[i].coil();
+    }
+
+    return bits;
+}
+
+std::vector<bool> ModbusDiscreteIoClient::readDiscreteContacts(
+    const Contact first, const uint16_t count)
+{
+    try {
+        return readBits(
+            MB::utils::ReadDiscreteInputContacts, static_cast<uint16_t>(first), count);
+    } catch (const MB::ModbusException &) {
+        logger_->error("Failed to read contacts");
+        throw;
+    }
+}
+
+std::vector<bool> ModbusDiscreteIoClient::readDiscreteCoils(const Coil first, const uint16_t count)
+{
+    try {
+        return readBits(MB::utils::ReadDiscreteOutputCoils, static_cast<uint16_t>(first), count);
+    } catch (const MB::ModbusException &) {
+        logger_->error("Failed to read coils");
+        throw;
+    }
+}
+
 void ModbusDiscreteIoClient::writeDiscreteCoil(const CoilInfo & coil, const bool coil_state)
 {
     if (!coil.is_coil_engage_allowed) {

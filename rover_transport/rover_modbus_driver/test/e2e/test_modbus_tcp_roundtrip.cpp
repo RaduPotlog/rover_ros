@@ -33,6 +33,7 @@
 #include <memory>
 #include <optional>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <MB/modbusCell.hpp>
@@ -55,7 +56,8 @@ int testPort(const int offset)
 }
 
 // A one-shot Modbus server: accepts a single connection, then answers every request with
-// a single coil set to `coil_value`, recording what it was asked for.
+// a single coil set to `coil_value` (or with `bits`, when given), recording what it was asked
+// for.
 class OneShotServer
 {
 
@@ -63,6 +65,13 @@ public:
 
     OneShotServer(const int port, const bool coil_value, const int requests_to_serve)
     : server_(port), coil_value_(coil_value), requests_to_serve_(requests_to_serve)
+    {
+        thread_ = std::thread([this]() { run(); });
+    }
+
+    OneShotServer(const int port, std::vector<bool> bits, const int requests_to_serve)
+    : server_(port), coil_value_(false), bits_(std::move(bits)),
+      requests_to_serve_(requests_to_serve)
     {
         thread_ = std::thread([this]() { run(); });
     }
@@ -96,7 +105,15 @@ private:
                 const MB::ModbusRequest request = connection->awaitRequest();
                 served_.push_back(request);
 
-                const std::vector<MB::ModbusCell> values = {MB::ModbusCell(coil_value_)};
+                std::vector<MB::ModbusCell> values;
+
+                if (bits_.empty()) {
+                    values.push_back(MB::ModbusCell(coil_value_));
+                } else {
+                    for (const bool bit : bits_) {
+                        values.push_back(MB::ModbusCell(bit));
+                    }
+                }
 
                 MB::ModbusResponse response(
                     request.slaveID(), request.functionCode(), request.registerAddress(),
@@ -111,6 +128,7 @@ private:
 
     MB::TCP::Server server_;
     bool coil_value_;
+    std::vector<bool> bits_;
     int requests_to_serve_;
     std::vector<MB::ModbusRequest> served_;
     std::atomic<bool> stop_{false};
@@ -176,6 +194,22 @@ TEST(ModbusTcpRoundTripTest, ConsecutiveTransactionsUseDistinctTransactionIds)
         ASSERT_EQ(response.registerValues().size(), 8U) << "transaction " << n;
         EXPECT_FALSE(response.registerValues().front().coil()) << "transaction " << n;
     }
+}
+
+// The batched read the safety controller's IO poll depends on: 12 bits go out as two bytes and
+// must come back decoded in address order, with the byte padding dropped.
+TEST(ModbusTcpRoundTripTest, BatchedCoilReadDecodesEveryBitAgainstARealServer)
+{
+    const int port = testPort(3);
+
+    const std::vector<bool> bits = {
+        true, false, false, true, false, true, true, false, false, false, true, true};
+
+    OneShotServer server(port, bits, /*requests_to_serve=*/1);
+
+    auto client = makeModbusTcpDiscreteIoClient(settingsFor(port));
+
+    EXPECT_EQ(client->readDiscreteCoils(Coil::COIL_8, 12), bits);
 }
 
 }  // namespace rover::transport::modbus::test

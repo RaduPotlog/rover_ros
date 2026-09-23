@@ -26,6 +26,7 @@
 #include <chrono>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 #include <MB/modbusUtils.hpp>
 
@@ -131,6 +132,74 @@ TEST(ModbusDiscreteIoClientTest, WriteDiscreteCoilEncodesFunctionCodeAddressAndV
     EXPECT_EQ(req.registerAddress(), 4U);
     ASSERT_EQ(req.registerValues().size(), 1U);
     EXPECT_TRUE(req.registerValues().front().coil());
+}
+
+TEST(ModbusDiscreteIoClientTest, ReadDiscreteCoilsIsOneFc1TransactionForTheWholeRange)
+{
+    Fixture f;
+    f.journal->bit_values = std::vector<bool>{true, false, true, true, false, false};
+
+    const auto bits = f.client->readDiscreteCoils(Coil::COIL_14, 6);
+
+    ASSERT_EQ(f.journal->requests.size(), 1U);
+
+    const auto & req = f.journal->requests.front();
+    EXPECT_EQ(req.slaveID(), ModbusDiscreteIoClient::kModbusDeviceId);
+    EXPECT_EQ(req.functionCode(), MB::utils::ReadDiscreteOutputCoils);
+    EXPECT_EQ(req.registerAddress(), 14U);
+    EXPECT_EQ(req.numberOfRegisters(), 6U);
+
+    EXPECT_EQ(bits, (std::vector<bool>{true, false, true, true, false, false}));
+}
+
+TEST(ModbusDiscreteIoClientTest, ReadDiscreteContactsIsOneFc2Transaction)
+{
+    Fixture f;
+    f.journal->bit_values = std::vector<bool>{true, false};
+
+    const auto bits = f.client->readDiscreteContacts(Contact::CONTACT_0, 2);
+
+    ASSERT_EQ(f.journal->requests.size(), 1U);
+    EXPECT_EQ(f.journal->requests.front().functionCode(), MB::utils::ReadDiscreteInputContacts);
+    EXPECT_EQ(f.journal->requests.front().registerAddress(), 0U);
+    EXPECT_EQ(f.journal->requests.front().numberOfRegisters(), 2U);
+    EXPECT_EQ(bits, (std::vector<bool>{true, false}));
+}
+
+// A real device answers a bit read in whole bytes, so a 12-bit read comes back with 16 cells.
+// Only the requested bits may be handed back - the padding is not data.
+TEST(ModbusDiscreteIoClientTest, BatchedReadDropsTheByteAlignmentPadding)
+{
+    Fixture f;
+    std::vector<bool> padded(16, false);
+    padded[0]  = true;
+    padded[11] = true;
+    padded[15] = true;  // padding - must not leak out
+    f.journal->bit_values = padded;
+
+    const auto bits = f.client->readDiscreteCoils(Coil::COIL_8, 12);
+
+    ASSERT_EQ(bits.size(), 12U);
+    EXPECT_TRUE(bits[0]);
+    EXPECT_TRUE(bits[11]);
+}
+
+TEST(ModbusDiscreteIoClientTest, BatchedReadWithTooFewValuesThrowsAndIsLogged)
+{
+    Fixture f;
+    f.journal->bit_values = std::vector<bool>{true, true, true};
+
+    EXPECT_THROW(f.client->readDiscreteCoils(Coil::COIL_0, 20), MB::ModbusException);
+    EXPECT_FALSE(f.logger->errors.empty());
+}
+
+TEST(ModbusDiscreteIoClientTest, BatchedReadTransportFailureDropsTheTransport)
+{
+    Fixture f;
+    f.journal->throw_error = MB::utils::Timeout;
+
+    EXPECT_THROW(f.client->readDiscreteCoils(Coil::COIL_0, 20), MB::ModbusException);
+    EXPECT_FALSE(f.client->isConnected());
 }
 
 // The safety-relevant one: a coil the board marks as read-only must never be driven.

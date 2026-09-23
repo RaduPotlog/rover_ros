@@ -56,6 +56,7 @@ public:
     void start() override {}
     void eStopUserBtnTrigger(const bool /* state */) override {}
     void eStopMotorDriverFaultTrigger(const bool /* state */) override {}
+    void setAuxOutput(const unsigned /* index */, const bool /* state */) override {}
 
     const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() override
     {

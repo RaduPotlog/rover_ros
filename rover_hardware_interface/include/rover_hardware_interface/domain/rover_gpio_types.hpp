@@ -42,7 +42,38 @@ enum class RoverControllerGpio
     GPIO_SW_E_STOP_LATCH_STATUS         = 13,  // sw_e_stop_latch_status
     GPIO_14                             = 14,
     GPIO_15                             = 15,
+
+    // General-purpose aux IO on the PLC's programmable digital I/O. Not part of the safety chain:
+    // nothing here may feed E-Stop or motion-inhibit logic.
+    GPIO_AUX_OUT_0                      = 16,  // DIO00
+    GPIO_AUX_OUT_1                      = 17,  // DIO01
+    GPIO_AUX_OUT_2                      = 18,  // DIO02
+    GPIO_AUX_OUT_3                      = 19,  // DIO03
+    GPIO_AUX_OUT_4                      = 20,  // DIO04
+    GPIO_AUX_OUT_5                      = 21,  // DIO05
+    GPIO_AUX_IN_0                       = 22,  // DIO06
+    GPIO_AUX_IN_1                       = 23,  // DIO07
+    GPIO_AUX_IN_2                       = 24,  // DIO08
+    GPIO_AUX_IN_3                       = 25,  // DIO09
+    GPIO_AUX_IN_4                       = 26,  // DIO10
+    GPIO_AUX_IN_5                       = 27,  // DIO11
 };
+
+constexpr unsigned kAuxOutputCount = 6;
+constexpr unsigned kAuxInputCount = 6;
+
+// GPIO_AUX_OUT_<index> / GPIO_AUX_IN_<index>; index must be below the matching count.
+constexpr RoverControllerGpio auxOutputPin(const unsigned index)
+{
+    return static_cast<RoverControllerGpio>(
+        static_cast<unsigned>(RoverControllerGpio::GPIO_AUX_OUT_0) + index);
+}
+
+constexpr RoverControllerGpio auxInputPin(const unsigned index)
+{
+    return static_cast<RoverControllerGpio>(
+        static_cast<unsigned>(RoverControllerGpio::GPIO_AUX_IN_0) + index);
+}
 
 }  // namespace rover_hardware_interface
 

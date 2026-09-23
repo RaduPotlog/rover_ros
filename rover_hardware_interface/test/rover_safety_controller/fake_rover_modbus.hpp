@@ -108,7 +108,48 @@ public:
         timed_writes_.push_back({coil.coil, coil_state, std::chrono::steady_clock::now()});
     }
 
+    // Batched reads: one "transaction" (one delay, one counted read) for the whole range, each
+    // bit derived from the same canned values the single reads return.
+    std::vector<bool> readDiscreteContacts(const Contact first, const uint16_t count) override
+    {
+        (void)first;
+        applyTransactionDelay();
+        throwIfReadsFail();
+        std::lock_guard<std::mutex> lock(mutex_);
+        read_transactions_++;
+
+        return std::vector<bool>(count, toBit(contact_read_value_));
+    }
+
+    std::vector<bool> readDiscreteCoils(const Coil first, const uint16_t count) override
+    {
+        applyTransactionDelay();
+        throwIfReadsFail();
+        std::lock_guard<std::mutex> lock(mutex_);
+        read_transactions_++;
+
+        std::vector<bool> bits(count);
+
+        for (uint16_t i = 0; i < count; ++i) {
+            const auto coil = static_cast<Coil>(static_cast<uint16_t>(first) + i);
+            const auto override_it = coil_read_overrides_.find(coil);
+
+            bits[i] = toBit(
+                (override_it != coil_read_overrides_.end()) ? override_it->second : coil_read_value_);
+        }
+
+        return bits;
+    }
+
     // --- Test-only helpers below; not part of DiscreteIoPort. ---
+
+    // Number of read transactions served by the batched reads - how many round-trips one IO
+    // sweep costs.
+    uint64_t readTransactionCount() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return read_transactions_;
+    }
 
     std::vector<CoilWrite> writesSnapshot() const
     {
@@ -185,6 +226,13 @@ public:
 
 private:
 
+    // Same reading of a canned value as the controller applied to single reads: the 255
+    // "unavailable" sentinel is inactive, otherwise the low byte decides.
+    static bool toBit(const uint16_t value)
+    {
+        return value != rover::transport::modbus::kDiscreteReadUnavailable && (value & 0xFFU) != 0;
+    }
+
     void applyTransactionDelay() const
     {
         const uint64_t delay_ms = read_delay_ms_.load();
@@ -208,6 +256,7 @@ private:
     std::map<Coil, uint16_t> coil_read_overrides_;
     uint16_t contact_read_value_ = 0;
     uint16_t coil_read_value_ = 0;
+    uint64_t read_transactions_ = 0;
 
     std::atomic_uint64_t read_delay_ms_ {0};
     std::atomic_bool fail_reads_ {false};

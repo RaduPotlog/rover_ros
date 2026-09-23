@@ -41,6 +41,10 @@ struct Journal
     // Value the next read should report back.
     bool coil_value{true};
 
+    // When set, a read replies with exactly these cells instead of the single coil_value - for
+    // the batched reads, including replies padded past or cut short of the requested count.
+    std::optional<std::vector<bool>> bit_values;
+
     // When set, sendRequest throws this instead of answering.
     std::optional<MB::utils::MBErrorCode> throw_error;
 
@@ -78,7 +82,11 @@ public:
 
         std::vector<MB::ModbusCell> values;
 
-        if (!journal_->reply_empty) {
+        if (journal_->bit_values.has_value()) {
+            for (const bool bit : *journal_->bit_values) {
+                values.push_back(MB::ModbusCell(bit));
+            }
+        } else if (!journal_->reply_empty) {
             values.push_back(MB::ModbusCell(journal_->coil_value));
         }
 

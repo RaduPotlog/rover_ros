@@ -61,8 +61,17 @@ const uint16_t pressed = client->readDiscreteContact(ContactInfo{Contact::CONTAC
 client->writeDiscreteCoil(CoilInfo{Coil::COIL_1, true, /*is_coil_engage_allowed=*/true}, true);
 ```
 
+To read a range in one round-trip, use the batched reads. They return exactly `count` values
+(element `i` is address `first + i`), with the reply's byte padding dropped:
+
+```cpp
+const std::vector<bool> coils = client->readDiscreteCoils(Coil::COIL_0, 20);        // FC1
+const std::vector<bool> contacts = client->readDiscreteContacts(Contact::CONTACT_0, 1);  // FC2
+```
+
 The unit id is fixed at 255 (`ModbusDiscreteIoClient::kModbusDeviceId`), and each
-`Contact`/`Coil` enum value **is** its Modbus address.
+`Contact`/`Coil` enum value **is** its Modbus address. `COIL_8..COIL_19` are the Portenta
+Machine Control's programmable DIO00..DIO11 (PLC IDE "Modbus Coil 9..20").
 
 Reads report failure by throwing `MB::ModbusException`, not by returning a sentinel - see
 the note on `kDiscreteReadUnavailable` in `domain/discrete_io_port.hpp`.

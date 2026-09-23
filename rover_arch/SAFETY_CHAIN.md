@@ -42,8 +42,9 @@ software. That is what makes a welded contactor detectable; see §5.
 ## 2. Transport and object map
 
 Modbus TCP to the safety controller at `192.168.88.11:502` (URDF
-`modbus_host` / `modbus_port`), unit id 255, single-bit function codes only
-(FC1 read coil, FC2 read discrete input, FC5 write single coil).
+`modbus_host` / `modbus_port`), unit id 255. FC1 read coils, FC2 read discrete
+inputs, FC5 write single coil. Reads are batched: the IO poll reads every mapped
+object in two transactions (one FC2, one FC1 spanning coils 0..19).
 
 | Signal | Modbus object | Direction | Writable |
 |---|---|---|---|
@@ -59,6 +60,29 @@ Modbus TCP to the safety controller at `192.168.88.11:502` (URDF
 `false` for both, and `ModbusDiscreteIoClient::writeDiscreteCoil()` refuses a
 write to either.
 
+### General-purpose aux IO (not safety)
+
+The PLC's programmable digital I/O carries 12 general-purpose points on the
+same link. They are **outside the safety chain**: nothing may gate motion or
+E-Stop logic on them.
+
+| Signal | PLC pin | Modbus object | Direction | Writable |
+|---|---|---|---|---|
+| `aux_output_0..5` | DIO00..DIO05 | `COIL_8..COIL_13` | us → PLC | yes |
+| `aux_input_0..5` | DIO06..DIO11 | `COIL_14..COIL_19` | PLC → us | no |
+
+* The inputs are exposed by the PLC as **coils** (read with FC1), not as
+  discrete inputs like `CONTACT_0`.
+* The PLC IDE labels them "Modbus Coil 9..20". The IDE counts from 1 and the
+  PDU address counts from 0, so DIO00 is address 8 (`COIL_8`). Check this on
+  the hardware (`mbpoll -t 0 -0 -r 0 -c 20`) after changing the PLC mapping.
+* The PLC refreshes them on its 100 ms slow task.
+* Outputs are driven OFF on every safety-controller start. They are switched
+  by `hardware_interface/aux_output_<i>/set` (`std_srvs/SetBool`), taking the
+  link *without* priority, so they never delay the heartbeat or an E-Stop
+  write. State is published on `hardware_interface/aux_io_state`
+  (`rover_msgs/AuxIoState`).
+
 Source of truth: `rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp`
 (the contact and coil tables) and `domain/rover_gpio_types.hpp` (the enum).
 
@@ -73,7 +97,7 @@ Two background threads inside `ContactCoilHandler` own the link:
 | Thread | Period | Job |
 |---|---|---|
 | watchdog | `safety_wdg_kick_period_ms` (200 ms) | toggles `COIL_1` to feed the relay's watchdog |
-| IO poll | `safety_io_poll_period_ms` (100 ms) | reads all 7 objects into a cache |
+| IO poll | `safety_io_poll_period_ms` (100 ms) | reads all 19 mapped objects into a cache, in 2 batched transactions |
 
 `read()` copies that cache under a `try_lock` and never performs I/O, which is
 what keeps the RT path clean (enforced by `scripts/check_rt_path_purity.sh`).

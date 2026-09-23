@@ -26,6 +26,7 @@
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
@@ -258,6 +259,96 @@ TEST_F(SystemROSInterfaceTest, LinkIsNotHealthyBeforeTheFirstSuccessfulPoll)
 
     ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
     EXPECT_FALSE(received.link_healthy);
+}
+
+// The aux output services: the requested level reaches the callback, and a failure (e.g. the
+// Modbus write threw) comes back as success=false with the reason rather than a silent success.
+TEST_F(SystemROSInterfaceTest, SetBoolServicePassesTheLevelAndReportsFailures)
+{
+    SystemROSInterface ros_interface("test_system_ros_interface_set_bool");
+
+    std::atomic_int calls{0};
+    std::atomic_bool last_level{false};
+
+    ros_interface.addService<SetBoolSrv, std::function<void(bool)>>(
+        "test_set_bool_service", std::function<void(bool)>([&](const bool level) {
+            calls++;
+            last_level = level;
+            if (!level) {
+                throw std::runtime_error("deliberate aux failure");
+            }
+        }));
+
+    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_set_bool_client");
+    auto client = client_node->create_client<SetBoolSrv>("test_set_bool_service");
+
+    ASSERT_TRUE(client->wait_for_service(std::chrono::seconds(5)));
+
+    auto on = std::make_shared<SetBoolSrv::Request>();
+    on->data = true;
+    auto on_future = client->async_send_request(on);
+    ASSERT_EQ(
+        rclcpp::spin_until_future_complete(client_node, on_future, std::chrono::seconds(5)),
+        rclcpp::FutureReturnCode::SUCCESS);
+    EXPECT_TRUE(on_future.get()->success);
+    EXPECT_TRUE(last_level);
+
+    auto off = std::make_shared<SetBoolSrv::Request>();
+    off->data = false;
+    auto off_future = client->async_send_request(off);
+    ASSERT_EQ(
+        rclcpp::spin_until_future_complete(client_node, off_future, std::chrono::seconds(5)),
+        rclcpp::FutureReturnCode::SUCCESS);
+
+    const auto response = off_future.get();
+    EXPECT_FALSE(response->success);
+    EXPECT_EQ(response->message, "deliberate aux failure");
+    EXPECT_EQ(calls.load(), 2);
+}
+
+TEST_F(SystemROSInterfaceTest, RoutesAuxPinsToAuxIoState)
+{
+    SystemROSInterface ros_interface("test_system_ros_interface_aux_io");
+    auto client_node = std::make_shared<rclcpp::Node>("test_system_ros_interface_aux_io_client");
+
+    AuxIoStateMsg received;
+    std::atomic_bool got_msg{false};
+    auto subscription = client_node->create_subscription<AuxIoStateMsg>(
+        "hardware_interface/aux_io_state",
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
+        [&](const AuxIoStateMsg::SharedPtr msg) {
+            received = *msg;
+            got_msg = true;
+        });
+
+    ASSERT_TRUE(spinUntil(
+        client_node, [&]() { return subscription->get_publisher_count() > 0; },
+        std::chrono::seconds(5)));
+
+    ros_interface.updateMsgGpioStates({
+        {RoverControllerGpio::GPIO_AUX_IN_0, true},
+        {RoverControllerGpio::GPIO_AUX_IN_5, true},
+        {RoverControllerGpio::GPIO_AUX_OUT_2, true},
+        // A safety pin in the same map must not leak into the aux message.
+        {RoverControllerGpio::GPIO_SW_E_STOP_LATCH_STATUS, true},
+    });
+
+    SafetyLinkHealth health;
+    health.watchdog_running = true;
+    health.poll_running = true;
+    health.last_poll_age_ms = 10;
+    ros_interface.updateSafetyLinkState(health);
+    ros_interface.publishSafetyMsgs();
+
+    ASSERT_TRUE(spinUntil(client_node, [&]() { return got_msg.load(); }, std::chrono::seconds(5)));
+
+    EXPECT_TRUE(received.inputs[0]);
+    EXPECT_FALSE(received.inputs[1]);
+    EXPECT_TRUE(received.inputs[5]);
+    EXPECT_TRUE(received.outputs[2]);
+    EXPECT_FALSE(received.outputs[0]);
+    EXPECT_TRUE(received.link_healthy);
+    EXPECT_NE(rclcpp::Time(received.io_sample_time).nanoseconds(), 0);
 }
 
 }  // namespace rover_hardware_interface
