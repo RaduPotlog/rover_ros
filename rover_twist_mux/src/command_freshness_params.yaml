@@ -1,0 +1,43 @@
+command_freshness:
+  input_topic:
+    type: string
+    default_value: "teleop_driver_interface_cmd_vel_stamped"
+    read_only: true
+    description: TwistStamped commands to check, as sent by the Driver UI.
+  output_topic:
+    type: string
+    default_value: "teleop_driver_interface_cmd_vel_fresh_stamped"
+    read_only: true
+    description: Where fresh commands are republished unchanged; the twist_mux input.
+  max_delay:
+    type: double
+    default_value: 0.3
+    read_only: true
+    description: >
+      How much later [s] than the best recent delivery a command may arrive and still be
+      driven on. Later ones sat in a buffer (a Wi-Fi stall holding the websocket) and are dropped.
+    validation: { bounds<>: [0.05, 5.0] }
+  max_clock_drift:
+    type: double
+    default_value: 0.001
+    read_only: true
+    description: >
+      How fast [s per s of traffic] the latency baseline may rise, to follow clock drift between
+      the sender and the rover. A backlog growing faster than this is eventually dropped.
+    validation: { bounds<>: [0.0, 0.1] }
+  resync_time:
+    type: double
+    default_value: 2.0
+    read_only: true
+    description: >
+      How long [s] a steady run of rejected commands must last before the filter re-baselines,
+      to recover from the sender's clock stepping backwards.
+    validation: { bounds<>: [0.5, 60.0] }
+  resync_gap:
+    type: double
+    default_value: 1.0
+    read_only: true
+    description: >
+      Silence [s] that must precede a run of rejected commands for it to be allowed to resync.
+      A backlog building up while commands flow has none, so it can never re-baseline itself.
+    validation: { bounds<>: [0.1, 60.0] }

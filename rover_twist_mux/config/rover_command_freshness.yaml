@@ -1,0 +1,17 @@
+/**/rover_command_freshness_node:
+  ros__parameters:
+    # The Driver UI's topic, and the twist_mux driver_interface input (rover_twist_mux.yaml).
+    input_topic: teleop_driver_interface_cmd_vel_stamped
+    output_topic: teleop_driver_interface_cmd_vel_fresh_stamped
+
+    # A command arriving more than this [s] later than the best recent delivery is dropped.
+    # Matches the driver_interface timeout: a command that late would have timed out anyway.
+    max_delay: 0.3
+
+    # Clock drift between browser and rover the baseline may follow [s per s].
+    max_clock_drift: 0.001
+
+    # Recovery from the browser's clock stepping backwards: after this much silence [s], a run of
+    # late commands that stays steady for resync_time [s] re-baselines the filter.
+    resync_gap: 1.0
+    resync_time: 2.0

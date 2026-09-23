@@ -12,6 +12,7 @@
   <depend>diagnostic_msgs</depend>
   <depend>diagnostic_updater</depend>
   <depend>generate_parameter_library</depend>
+  <depend>geometry_msgs</depend>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
 

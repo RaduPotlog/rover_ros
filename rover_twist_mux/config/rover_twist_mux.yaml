@@ -11,9 +11,17 @@
         priority: 110
       # Driver UI (rover_drive_interface) Manual mode. Below the RC transmitter and Foxglove,
       # above Nav 2 so manual driving preempts autonomy.
+      #
+      # Read from rover_command_freshness_node, not from the UI's own topic
+      # (teleop_driver_interface_cmd_vel_stamped): the UI's commands cross a websocket, which holds
+      # them through a Wi-Fi stall and delivers them late in a burst, and twist_mux would replay
+      # that old motion. The node drops commands that arrive late.
+      #
+      # 0.3 s timeout, not 0.5: three periods of the UI's 10 Hz stream, so a dead browser or link
+      # stops the rover sooner. The RC keeps 0.5 s; it has its own link-loss failsafe.
       driver_interface:
-        topic   : teleop_driver_interface_cmd_vel_stamped
-        timeout : 0.5
+        topic   : teleop_driver_interface_cmd_vel_fresh_stamped
+        timeout : 0.3
         priority: 8
       joystick:
         topic   : teleop_foxglove_cmd_vel_stamped

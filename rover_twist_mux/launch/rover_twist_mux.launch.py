@@ -68,6 +68,19 @@ def generate_launch_description():
         description="Specify the path to the motion lock configuration file.",
     )
 
+    command_freshness_config_path = LaunchConfiguration("command_freshness_config_path")
+    declare_command_freshness_config_path_arg = DeclareLaunchArgument(
+        "command_freshness_config_path",
+        default_value=PathJoinSubstitution(
+            [
+                FindPackageShare("rover_twist_mux"),
+                "config",
+                "rover_command_freshness.yaml",
+            ]
+        ),
+        description="Specify the path to the Driver UI command freshness configuration file.",
+    )
+
     # Feeds the twist_mux `locks` entry. Started alongside the mux on purpose: the lock is
     # fail-safe on staleness, so a mux running without this node would refuse every command.
     motion_lock_node = Node(
@@ -77,6 +90,19 @@ def generate_launch_description():
         namespace=namespace,
         output="screen",
         parameters=[motion_lock_config_path],
+        remappings=[("/diagnostics", "diagnostics")],
+        arguments=["--ros-args", "--log-level", log_level],
+    )
+
+    # Feeds the twist_mux `driver_interface` input: the Driver UI's commands, minus any that
+    # arrive late (held in the websocket through a Wi-Fi stall).
+    command_freshness_node = Node(
+        package="rover_twist_mux",
+        executable="command_freshness_node",
+        name="rover_command_freshness_node",
+        namespace=namespace,
+        output="screen",
+        parameters=[command_freshness_config_path],
         remappings=[("/diagnostics", "diagnostics")],
         arguments=["--ros-args", "--log-level", log_level],
     )
@@ -97,7 +123,9 @@ def generate_launch_description():
         declare_namespace_arg,
         declare_twist_mux_config_path_arg,
         declare_motion_lock_config_path_arg,
+        declare_command_freshness_config_path_arg,
         motion_lock_node,
+        command_freshness_node,
         rover_twist_mux_node,
     ]
 
