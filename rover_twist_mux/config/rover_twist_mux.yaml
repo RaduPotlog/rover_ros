@@ -2,12 +2,15 @@
   ros__parameters:
     use_stamped: true
     topics:
+      # ELRS RC transmitter: the operator with line of sight gets the last word, so it outranks
+      # every other input. rover_crsf_teleop publishes a centred stick's zero only once, so an
+      # idle transmitter does not hold the mux on this source.
       cmd_elrs:
         topic   : teleop_elrs_cmd_vel_stamped
         timeout : 0.5
-        priority: 10
-      # Driver UI (rover_drive_interface) Manual mode. Below the RC transmitter, so the
-      # physical RC always wins, but above Nav 2 so manual driving preempts autonomy.
+        priority: 110
+      # Driver UI (rover_drive_interface) Manual mode. Below the RC transmitter and Foxglove,
+      # above Nav 2 so manual driving preempts autonomy.
       driver_interface:
         topic   : teleop_driver_interface_cmd_vel_stamped
         timeout : 0.5

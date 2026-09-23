@@ -11,12 +11,14 @@ highest priority wins, and each input has a 0.5 s timeout:
 
 | Priority | Input | Topic | Source |
 |---------:|-------|-------|--------|
+| 110 | `cmd_elrs` | `teleop_elrs_cmd_vel_stamped` | ELRS RC teleop |
 | 100 | `joystick` | `teleop_foxglove_cmd_vel_stamped` | Foxglove |
-| 10 | `cmd_elrs` | `teleop_elrs_cmd_vel_stamped` | ELRS RC teleop |
 | 8 | `driver_interface` | `teleop_driver_interface_cmd_vel_stamped` | Driver UI (rover_drive_interface) Manual mode |
 | 5 | `nav` | `nav_cmd_vel_stamped` | Nav 2, on the separate orchestrator computer |
 
-Nav 2 sits lowest so every teleop source preempts autonomy deterministically, rather than
+The RC transmitter sits highest, so the operator with line of sight always has the last word;
+an idle transmitter publishes its zero command only once, so it does not hold the mux. Nav 2
+sits lowest so every teleop source preempts autonomy deterministically, rather than
 them racing each other on `cmd_vel`. The timeout also makes a LAN partition a defined
 transition: the nav input goes stale and the mux falls through, instead of relying on
 `diff_drive_controller`'s own `cmd_vel_timeout` as a backstop.
