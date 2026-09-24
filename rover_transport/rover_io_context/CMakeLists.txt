@@ -63,6 +63,9 @@ if(BUILD_TESTING)
   # the precedent in rover_crsf_teleop.
   ament_add_gtest(test_io_context test/unit/test_io_context.cpp)
   target_link_libraries(test_io_context ${PROJECT_NAME}_asio)
+
+  ament_add_gtest(test_async_op_guard test/unit/test_async_op_guard.cpp TIMEOUT 60)
+  target_link_libraries(test_async_op_guard ${PROJECT_NAME}_asio)
 endif()
 
 ament_package()
