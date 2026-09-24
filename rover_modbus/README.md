@@ -181,6 +181,11 @@ This tree is a hard fork; upstream is no longer merged. Beyond fork commit `c5d5
 The rover-facing client that uses this library lives in
 `rover_ros/rover_transport/rover_modbus_driver`.
 
+**Tests.** With the upstream suite gone, this package has no tests of its own. The codec is
+covered through `rover_modbus_driver`: `test_modbus_discrete_io_client` checks request
+encoding and response decoding, and the e2e `test_modbus_tcp_roundtrip` runs full
+transactions against a real TCP server. A change here should be checked by running those.
+
 # API
 
 API documentation is generated using [Doxygen](https://www.doxygen.nl) and it is available online under this [link](https://mazurel.github.io/docs/modbus/index.html).

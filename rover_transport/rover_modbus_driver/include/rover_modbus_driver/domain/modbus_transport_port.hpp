@@ -27,7 +27,9 @@ namespace rover::transport::modbus
 //
 // This was ModbusConnection in rover_hardware_interface. Note that it names MB:: types,
 // which is why this package's _core library links Modbus_Core - those are pure frame
-// codecs with no sockets behind them, so _core stays OS-free.
+// codecs with no sockets behind them, so _core stays OS-free. Treating them as this
+// package's domain vocabulary is deliberate: it exists to drive that codec. Packages above
+// it (rover_hardware_interface's check_domain_purity.sh) keep MB:: out of their domain.
 class ModbusTransportPort
 {
 
