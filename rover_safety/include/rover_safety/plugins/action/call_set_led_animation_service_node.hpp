@@ -15,6 +15,7 @@
 #ifndef ROVER_SAFETY_PLUGINS_ACTION_CALL_SET_LED_ANIMATION_SERVICE_NODE_HPP_
 #define ROVER_SAFETY_PLUGINS_ACTION_CALL_SET_LED_ANIMATION_SERVICE_NODE_HPP_
 
+#include <memory>
 #include <string>
 
 #include <behaviortree_cpp/behavior_tree.h>
@@ -26,6 +27,11 @@
 namespace rover_safety
 {
 
+/**
+ * Calls rover_msgs/SetLedAnimation with the `id`, `param` and `repeating` ports. RUNNING while
+ * waiting for the response, SUCCESS only when the LED server answers success=true, FAILURE on
+ * success=false or server_timeout.
+ */
 class CallSetLedAnimationService : public nav2_behavior_tree::BtServiceNode<rover_msgs::srv::SetLedAnimation>
 {
 
@@ -38,13 +44,10 @@ public:
 
     static BT::PortsList providedPorts();
 
-    BT::NodeStatus tick() override;
-    
-private:
+    void on_tick() override;
 
-    std::string service_name_;
-
-    nav2::LifecycleNode::SharedPtr node_;
+    BT::NodeStatus on_completion(
+        std::shared_ptr<rover_msgs::srv::SetLedAnimation::Response> response) override;
 };
 
 }  // namespace rover_safety
