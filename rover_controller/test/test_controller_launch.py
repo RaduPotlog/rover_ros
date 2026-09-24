@@ -116,7 +116,9 @@ def test_configuration_consumers(controller_launch, monkeypatch, tmp_path,
     assert list(manager[1].get('remappings') or []) == [('/diagnostics', 'diagnostics')], \
         'controller remaps belong in node_options_args'
     assert sum(args['executable'] == 'ros2_control_node' for _, args in nodes) == 1
-    parameters = evaluate_parameters(context, normalize_parameters(manager[1]['parameters']))
+    # Log calls from the real-time update() must not publish on /rosout (see the launch file).
+    assert '--disable-rosout-logs' in manager[1]['arguments']
+    parameters =evaluate_parameters(context, normalize_parameters(manager[1]['parameters']))
     assert len(parameters) == 1
     paths = [str(parameters[0]), resolve(context, includes[0]['controller_config_path'])]
     for _, args in nodes:
