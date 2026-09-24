@@ -71,6 +71,8 @@ public:
 
     bool isFailsafeTripped() override;
 
+    std::uint32_t getDroppedCommandCount(const DriverNames name) override;
+
     DriverDataSnapshot getData(const DriverNames name) override;
 
 protected:

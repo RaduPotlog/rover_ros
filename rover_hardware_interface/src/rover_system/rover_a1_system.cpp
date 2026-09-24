@@ -19,6 +19,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -275,14 +276,16 @@ void RoverA1System::diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper &
     const auto rear_right_driver_state = rover_driver_->getData(DriverNames::REAR_RIGHT).getDriverState();
 
     auto driver_states_with_names = {
-        std::make_pair(std::string("Front Left"), front_left_driver_state),
-        std::make_pair(std::string("Front Right"), front_right_driver_state),
-        std::make_pair(std::string("Rear Left"), rear_left_driver_state),
-        std::make_pair(std::string("Rear Right"), rear_right_driver_state)};
+        std::make_tuple(std::string("Front Left"), DriverNames::FRONT_LEFT, front_left_driver_state),
+        std::make_tuple(std::string("Front Right"), DriverNames::FRONT_RIGHT, front_right_driver_state),
+        std::make_tuple(std::string("Rear Left"), DriverNames::REAR_LEFT, rear_left_driver_state),
+        std::make_tuple(std::string("Rear Right"), DriverNames::REAR_RIGHT, rear_right_driver_state)};
 
-    for (const auto & [driver_name, driver_state] : driver_states_with_names) {
+    for (const auto & [driver_name, driver_id, driver_state] : driver_states_with_names) {
         status.addf(driver_name + " driver current (A)", "%.2f", driver_state.getDriverCurrent());
         status.add(driver_name + " driver temperature (\u00B0C)", driver_state.getTemperature());
+        status.add(
+            driver_name + " dropped commands", rover_driver_->getDroppedCommandCount(driver_id));
     }
 
     status.summary(level, message);

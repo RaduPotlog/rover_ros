@@ -70,6 +70,7 @@ public:
     void armFailsafe() override { ++arm_failsafe_calls; }
     void resetFailsafe() override { ++reset_failsafe_calls; }
     bool isFailsafeTripped() override { return failsafe_tripped; }
+    std::uint32_t getDroppedCommandCount(const DriverNames) override { return 0; }
 
     bool motor_states_data_timed_out = false;
     bool driver_state_data_timed_out = false;
