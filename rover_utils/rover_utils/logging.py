@@ -22,17 +22,18 @@ def limit_log_level_to_info(unit: SomeSubstitutionsType, log_level: SomeSubstitu
     """
     Return a `--log-level` value for `unit` that follows `log_level` but never goes below INFO.
 
-    The comparison has to happen inside the PythonExpression: `log_level` is only known when
+    The mapping has to happen inside the PythonExpression: `log_level` is only known when
     launch performs the substitution, so a Python `if` here would test the Substitution object
-    itself (always truthy).
+    itself (always truthy). WARNING, which the launch files offer, becomes WARN: rcl rejects
+    "WARNING" and would refuse to start the node.
     """
     return PythonExpression(
         [
             "'",
             unit,
-            ":=' + ('INFO' if '",
+            ":=' + {'DEBUG': 'INFO', 'WARNING': 'WARN'}.get('",
             log_level,
-            "'.upper() == 'DEBUG' else '",
+            "'.upper(), '",
             log_level,
             "'.upper())",
         ]
