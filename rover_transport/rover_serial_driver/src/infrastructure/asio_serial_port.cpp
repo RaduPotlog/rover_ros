@@ -15,7 +15,8 @@
 //
 // Modified 2026 by Mechatronics Academy: relayouted from serial_driver/src/serial_port.cpp
 // (ros-drivers/transport_drivers v1.2.0). Two defects fixed while moving - see asyncSend()
-// and asyncReceiveHandler().
+// and asyncReceiveHandler(). Later: close() waits for the port's handlers (AsyncOpGuard), so
+// the owner can destroy what the callback uses.
 
 #include "rover_serial_driver/infrastructure/asio_serial_port.hpp"
 
@@ -38,6 +39,7 @@ AsioSerialPort::AsioSerialPort(
     const SerialPortConfig & serial_port_config)
 : ctx_(ctx),
   device_name_(device_name),
+  guard_(ctx.ios()),
   serial_port_(ctx.ios()),
   port_config_(serial_port_config)
 {
@@ -68,23 +70,37 @@ void AsioSerialPort::asyncSend(const std::vector<uint8_t> & buffer)
     // memory. Owning a copy for the lifetime of the operation is the cheap, correct fix.
     auto payload = std::make_shared<std::vector<uint8_t>>(buffer);
 
-    serial_port_.async_write_some(
-        asio::buffer(*payload),
-        [this, payload](std::error_code error, std::size_t bytes_transferred)
+    guard_.post(
+        [this, payload]()
         {
-            asyncSendHandler(error, bytes_transferred);
+            if (!serial_port_.is_open()) {
+                return;  // Closed after this write was queued.
+            }
+            serial_port_.async_write_some(
+                asio::buffer(*payload),
+                guard_.wrap(
+                    [this, payload](std::error_code error, std::size_t bytes_transferred)
+                    {
+                        asyncSendHandler(error, bytes_transferred);
+                    }));
         });
 }
 
 void AsioSerialPort::asyncReceive(ByteReceiveCallback callback)
 {
     callback_ = std::move(callback);
+    guard_.post([this]() {armReceive();});
+}
+
+void AsioSerialPort::armReceive()
+{
     serial_port_.async_read_some(
         asio::buffer(recv_buffer_),
-        [this](std::error_code error, std::size_t bytes_transferred)
-        {
-            asyncReceiveHandler(error, bytes_transferred);
-        });
+        guard_.wrap(
+            [this](std::error_code error, std::size_t bytes_transferred)
+            {
+                asyncReceiveHandler(error, bytes_transferred);
+            }));
 }
 
 bool AsioSerialPort::sendBreak()
@@ -112,8 +128,10 @@ void AsioSerialPort::asyncReceiveHandler(
     const asio::error_code & error,
     std::size_t bytes_transferred)
 {
-    if (error == asio::error::operation_aborted) {
-        // close() cancelled the pending read - a normal part of shutdown/cleanup.
+    if (error == asio::error::operation_aborted || !serial_port_.is_open()) {
+        // close() cancelled the pending read, or ran after these bytes arrived but before
+        // their handler did - a normal part of shutdown/cleanup. Either way the callback's
+        // targets may be going away: don't deliver, don't re-arm.
         return;
     }
 
@@ -128,14 +146,7 @@ void AsioSerialPort::asyncReceiveHandler(
 
     if (bytes_transferred > 0 && callback_) {
         callback_(recv_buffer_, bytes_transferred);
-        // Upstream re-armed with a lambda whose parameters shadowed this function's own
-        // `error` / `bytes_transferred`, which trips -Wshadow. Renamed, no behaviour change.
-        serial_port_.async_read_some(
-            asio::buffer(recv_buffer_),
-            [this](std::error_code next_error, std::size_t next_bytes_transferred)
-            {
-                asyncReceiveHandler(next_error, next_bytes_transferred);
-            });
+        armReceive();
     }
 }
 
@@ -162,11 +173,18 @@ void AsioSerialPort::open()
 
 void AsioSerialPort::close()
 {
-    asio::error_code error;
-    serial_port_.close(error);
-    if (error) {
-        RCLCPP_ERROR_STREAM(rclcpp::get_logger("AsioSerialPort::close"), error.message());
-    }
+    // Returns only once no handler of this port is running or queued, so the caller may
+    // destroy the receive callback's targets (and this port) right after. From a handler
+    // (asyncReceiveHandler() on a read error) it closes straight away.
+    guard_.closeAndDrain(
+        [this]()
+        {
+            asio::error_code error;
+            serial_port_.close(error);
+            if (error) {
+                RCLCPP_ERROR_STREAM(rclcpp::get_logger("AsioSerialPort::close"), error.message());
+            }
+        });
 }
 
 bool AsioSerialPort::isOpen() const
