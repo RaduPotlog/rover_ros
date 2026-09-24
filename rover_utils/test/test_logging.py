@@ -32,6 +32,7 @@ def perform(substitution, log_level):
         ('debug', 'rcl:=INFO'),
         ('INFO', 'rcl:=INFO'),
         ('warn', 'rcl:=WARN'),
+        ('WARNING', 'rcl:=WARN'),
         ('ERROR', 'rcl:=ERROR'),
         ('FATAL', 'rcl:=FATAL'),
     ],
