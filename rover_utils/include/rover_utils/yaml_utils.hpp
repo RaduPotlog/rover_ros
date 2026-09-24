@@ -23,11 +23,22 @@
 namespace rover_utils
 {
 
+// Thrown by getYAMLKeyValue() when the key is absent, as opposed to present but not convertible.
+// A std::runtime_error, so existing catches still see it.
+class MissingYAMLKeyError : public std::runtime_error
+{
+public:
+    explicit MissingYAMLKeyError(const std::string & key)
+    : std::runtime_error("Missing '" + key + "' in description.")
+    {
+    }
+};
+
 template <typename T>
 T getYAMLKeyValue(const YAML::Node & description, const std::string & key)
 {
     if (!description[key]) {
-        throw std::runtime_error("Missing '" + static_cast<std::string>(key) + "' in description.");
+        throw MissingYAMLKeyError(key);
     }
     
     try {
@@ -42,13 +53,8 @@ T getYAMLKeyValue(const YAML::Node & description, const std::string & key, const
 {
     try {
         return getYAMLKeyValue<T>(description, key);
-    } catch (const std::runtime_error & e) {
-    
-        if (std::string(e.what()).find("Missing '" + static_cast<std::string>(key) + "' in description") != std::string::npos) {
-            return default_value;
-        }
-
-        throw;
+    } catch (const MissingYAMLKeyError &) {
+        return default_value;
     }
 }
 
