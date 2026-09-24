@@ -169,6 +169,12 @@ public:
     // Serializes `write_operation` against concurrent callers via try_lock (never blocks - see
     // the RT-safety contract above) and reports the outcome to the WRITE_CMDS error-filter
     // category. On contention, `write_operation` is not invoked at all.
+    //
+    // Allocation-free only while callers' lambdas fit std::function's small-buffer storage: the
+    // write() call sites capture just `[this]`, which libstdc++ stores inline (it does so for
+    // trivially copyable captures up to two pointers in size - an implementation detail, not a
+    // language guarantee). A lambda that captures more may
+    // heap-allocate on every RT write() - capture a pointer to state rather than the state itself.
     WriteOperationResult performWriteOperation(const std::function<void()> & write_operation);
 
 private:
