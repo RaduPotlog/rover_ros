@@ -17,13 +17,26 @@
 from launch.some_substitutions_type import SomeSubstitutionsType
 from launch.substitutions import PythonExpression
 
-def limit_log_level_to_info(unit: SomeSubstitutionsType, log_level: SomeSubstitutionsType):
-    log_level = PythonExpression(["'", log_level, "'.upper()'"])
 
-    if PythonExpression(["'", log_level, "' == 'DEBUG'"]):
-        return PythonExpression(["'", unit, "' + ':=' + 'INFO'"])
-    else:
-        return PythonExpression(["'", unit, "' + ':=' + ", log_level])
+def limit_log_level_to_info(unit: SomeSubstitutionsType, log_level: SomeSubstitutionsType):
+    """
+    Return a `--log-level` value for `unit` that follows `log_level` but never goes below INFO.
+
+    The comparison has to happen inside the PythonExpression: `log_level` is only known when
+    launch performs the substitution, so a Python `if` here would test the Substitution object
+    itself (always truthy).
+    """
+    return PythonExpression(
+        [
+            "'",
+            unit,
+            ":=' + ('INFO' if '",
+            log_level,
+            "'.upper() == 'DEBUG' else '",
+            log_level,
+            "'.upper())",
+        ]
+    )
 
 def quiet_rmw_zenoh(log_level: SomeSubstitutionsType):
     """
