@@ -29,8 +29,8 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/udp_endpoint.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
-                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                           $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(${PROJECT_NAME}_core PUBLIC rover_io_context::rover_io_context_core)
 set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -54,7 +54,7 @@ target_link_libraries(${PROJECT_NAME}_ros PUBLIC
 )
 # SYSTEM so the house -Wold-style-cast / -Wpedantic do not fire inside ASIO's headers.
 target_include_directories(${PROJECT_NAME}_ros SYSTEM PUBLIC
-                           $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
+  $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
 )
 target_compile_definitions(${PROJECT_NAME}_ros PUBLIC ${ASIO_DEFINITIONS})
 
@@ -79,6 +79,11 @@ install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 
 if(BUILD_TESTING)
+  # The house uses a 4-space style that uncrustify's ament profile disagrees with.
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_uncrustify)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+
   find_package(ament_cmake_gtest REQUIRED)
 
   # Pure domain - no ROS, no ASIO.

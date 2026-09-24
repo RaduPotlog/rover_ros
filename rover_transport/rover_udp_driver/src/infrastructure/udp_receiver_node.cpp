@@ -95,6 +95,8 @@ UdpReceiverNode::CallbackReturn UdpReceiverNode::on_configure(
         return CallbackReturn::FAILURE;
     }
 
+    // Reliable, depth 100: every datagram is a complete message (rover_battery's battery data),
+    // and the depth absorbs a burst while a subscriber is briefly slow.
     publisher_ = create_publisher<UdpPacket>(kReadTopic, rclcpp::QoS(100));
 
     try {

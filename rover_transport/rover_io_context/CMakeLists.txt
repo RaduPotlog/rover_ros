@@ -20,8 +20,8 @@ add_library(${PROJECT_NAME}_core STATIC
             src/application/outbound_byte_bridge.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
-                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                           $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -34,7 +34,7 @@ add_library(${PROJECT_NAME}_asio STATIC
 )
 target_link_libraries(${PROJECT_NAME}_asio PUBLIC ${PROJECT_NAME}_core)
 target_include_directories(${PROJECT_NAME}_asio SYSTEM PUBLIC
-                           $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
+  $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
 )
 target_compile_definitions(${PROJECT_NAME}_asio PUBLIC ${ASIO_DEFINITIONS})
 set_target_properties(${PROJECT_NAME}_asio PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -53,6 +53,11 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 
 if(BUILD_TESTING)
+  # The house uses a 4-space style that uncrustify's ament profile disagrees with.
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_uncrustify)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+
   find_package(ament_cmake_gtest REQUIRED)
 
   # Pure domain / application - no ROS, no ASIO.
