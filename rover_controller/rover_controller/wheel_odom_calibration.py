@@ -24,7 +24,8 @@ from sensor_msgs.msg import Imu, JointState
 import yaml
 
 from rover_controller.calibration_analysis import calibrate_separation, SpinSegment
-from rover_controller.drive_session import build_schedule, DriveSession
+from rover_controller.drive_session import DriveSession
+from rover_controller.schedule import build_schedule
 
 LEFT = ['fl_wheel_base_to_fl_wheel_joint', 'rl_wheel_base_to_rl_wheel_joint']
 RIGHT = ['fr_wheel_base_to_fr_wheel_joint', 'rr_wheel_base_to_rr_wheel_joint']
