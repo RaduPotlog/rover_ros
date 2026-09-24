@@ -24,8 +24,8 @@ def limit_log_level_to_info(unit: SomeSubstitutionsType, log_level: SomeSubstitu
 
     The mapping has to happen inside the PythonExpression: `log_level` is only known when
     launch performs the substitution, so a Python `if` here would test the Substitution object
-    itself (always truthy). WARNING, which the launch files offer, becomes WARN: rcl rejects
-    "WARNING" and would refuse to start the node.
+    itself (always truthy). WARNING (the Python logging name) becomes WARN: rcl rejects
+    "WARNING" and would refuse to start the node. The launch files offer WARN.
     """
     return PythonExpression(
         [
