@@ -5,6 +5,7 @@
 // the unit level: right after activation, before any update(), what does a PID export to the
 // diff_drive_controller chained in front of it?
 
+#include <array>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -77,6 +78,57 @@ protected:
     return exported_.at(0)->get_optional().value();
   }
 
+  // Two wheels in one PID, each with its own hardware velocity. `claimed_order` is the order the
+  // state interfaces are loaned in; controller_manager uses the controller's configured order.
+  std::shared_ptr<rover_controller::SeededPidController> activate_two_wheels(
+    const std::vector<size_t> & claimed_order)
+  {
+    auto controller = std::make_shared<rover_controller::SeededPidController>();
+    controller_interface::ControllerInterfaceParams params;
+    params.controller_name = "pid_controller_test";
+    params.update_rate = 100;
+    params.controller_manager_update_rate = 100;
+    params.node_options = rclcpp::NodeOptions().parameter_overrides({
+      {"dof_names", kTwoJoints},
+      {"command_interface", "velocity"},
+      {"reference_and_state_interfaces", std::vector<std::string>{"velocity"}},
+      {"gains." + kTwoJoints[0] + ".p", 0.05},
+      {"gains." + kTwoJoints[1] + ".p", 0.05},
+    });
+    EXPECT_EQ(controller->init(params), controller_interface::return_type::OK);
+    EXPECT_EQ(
+      controller->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    exported_ = controller->export_state_interfaces();
+    reference_ = controller->export_reference_interfaces();
+
+    std::vector<hardware_interface::LoanedCommandInterface> commands;
+    std::vector<hardware_interface::LoanedStateInterface> states;
+    for (size_t i = 0; i < kTwoJoints.size(); ++i) {
+      two_command_itfs_[i] = std::make_shared<hardware_interface::CommandInterface>(
+        kTwoJoints[i], "velocity", &two_hw_commands_[i]);
+      commands.emplace_back(two_command_itfs_[i]);
+    }
+    for (const auto i : claimed_order) {
+      two_state_itfs_[i] = std::make_shared<hardware_interface::StateInterface>(
+        kTwoJoints[i], "velocity", &two_hw_states_[i]);
+      states.emplace_back(two_state_itfs_[i]);
+    }
+    controller->assign_interfaces(std::move(commands), std::move(states));
+
+    EXPECT_EQ(
+      controller->get_node()->activate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    EXPECT_EQ(exported_.size(), kTwoJoints.size());
+    return controller;
+  }
+
+  const std::vector<std::string> kTwoJoints = {
+    "rl_wheel_base_to_rl_wheel_joint", "rr_wheel_base_to_rr_wheel_joint"};
+  std::array<double, 2> two_hw_states_ = {0.37, -0.52};
+  std::array<double, 2> two_hw_commands_ = {0.0, 0.0};
+  std::array<hardware_interface::CommandInterface::SharedPtr, 2> two_command_itfs_;
+  std::array<hardware_interface::StateInterface::SharedPtr, 2> two_state_itfs_;
+
   double hw_state_ = 0.0;
   double hw_command_ = 0.0;
   hardware_interface::CommandInterface::SharedPtr command_itf_;
@@ -115,6 +167,25 @@ TEST_F(SeededPidControllerTest, SeededPidStillTracksTheHardwareAfterUpdates)
     pid->update(rclcpp::Time(0, 10'000'000), rclcpp::Duration::from_seconds(0.01)),
     controller_interface::return_type::OK);
   EXPECT_DOUBLE_EQ(exported_.at(0)->get_optional().value(), -0.25);
+}
+
+TEST_F(SeededPidControllerTest, SeededPidSeedsEachWheelFromItsOwnHardwareState)
+{
+  const auto pid = activate_two_wheels({0, 1});
+  for (size_t i = 0; i < kTwoJoints.size(); ++i) {
+    EXPECT_EQ(exported_.at(i)->get_prefix_name(), "pid_controller_test/" + kTwoJoints[i]);
+    EXPECT_DOUBLE_EQ(exported_.at(i)->get_optional().value(), two_hw_states_[i]);
+  }
+}
+
+TEST_F(SeededPidControllerTest, SeededPidLeavesNanRatherThanSeedingAnotherWheel)
+{
+  // Claimed interfaces in a different order than exported (what an upstream reorder would look
+  // like): seeding by index would give each wheel the other's velocity.
+  const auto pid = activate_two_wheels({1, 0});
+  for (const auto & exported : exported_) {
+    EXPECT_TRUE(std::isnan(exported->get_optional().value())) << exported->get_name();
+  }
 }
 
 }  // namespace
