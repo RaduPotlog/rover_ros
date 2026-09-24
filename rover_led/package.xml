@@ -19,6 +19,7 @@
   <exec_depend>rover_udp_driver</exec_depend>
   <depend>rover_msgs</depend>
   <depend>rover_utils</depend>
+  <depend>libboost-dev</depend>
   <depend>libpng-dev</depend>
   <depend>lifecycle_msgs</depend>
   <depend>pluginlib</depend>
