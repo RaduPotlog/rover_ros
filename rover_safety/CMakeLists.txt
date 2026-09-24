@@ -260,27 +260,6 @@ if(BUILD_TESTING)
         ${std_srvs_TARGETS}
     )
 
-    ament_add_gtest(test_call_set_bool_service test/integration/test_call_set_bool_service.cpp
-                    TIMEOUT 60)
-    target_link_libraries(test_call_set_bool_service call_set_bool_service_bt_node)
-    target_link_libraries(test_call_set_bool_service
-        ${behaviortree_cpp_TARGETS}
-        ${nav2_behavior_tree_TARGETS}
-        ${rclcpp_TARGETS}
-        ${std_srvs_TARGETS}
-    )
-
-    ament_add_gtest(test_call_set_led_animation_service
-                    test/integration/test_call_set_led_animation_service.cpp
-                    TIMEOUT 60)
-    target_link_libraries(test_call_set_led_animation_service call_set_led_animation_service_bt_node)
-    target_link_libraries(test_call_set_led_animation_service
-        ${behaviortree_cpp_TARGETS}
-        ${nav2_behavior_tree_TARGETS}
-        ${rclcpp_TARGETS}
-        ${rover_msgs_TARGETS}
-    )
-
     # Loads the plugins by name like the node does, so their build directory must be on the
     # library path; the btproj comes straight from the source tree.
     ament_add_gtest(test_shutdown_tree test/integration/test_shutdown_tree.cpp

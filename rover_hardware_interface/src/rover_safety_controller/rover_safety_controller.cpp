@@ -78,8 +78,6 @@ const std::vector<RoverControllerCoilInfo> ContactCoilHandler::coils_config_info
     // General-purpose aux IO on the PLC's programmable digital I/O (DIO00..DIO11). Outputs are
     // driven OFF by initCoils() on every start; inputs are PLC-owned and marked non-engageable so
     // the driver refuses any write to them.
-    // DIO00..11 = coils 8..19 (the PLC IDE's 1-based "Modbus Coil 9..20"), checked pin by pin on
-    // the rover on 2026-09-24.
     RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_0, CoilInfo { Coil::COIL_8,  false, true  } },
     RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_1, CoilInfo { Coil::COIL_9,  false, true  } },
     RoverControllerCoilInfo { RoverControllerGpio::GPIO_AUX_OUT_2, CoilInfo { Coil::COIL_10, false, true  } },

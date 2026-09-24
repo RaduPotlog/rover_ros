@@ -23,6 +23,9 @@ CallSetBoolService::CallSetBoolService(
     const std::string & service_name)
 : nav2_behavior_tree::BtServiceNode<std_srvs::srv::SetBool>(name, config, service_name)
 {
+    if (!getInput<std::string>("service_name", service_name_)) {
+        throw BT::RuntimeError("Missing required input [service_name]");
+    }
 }
 
 BT::PortsList CallSetBoolService::providedPorts()

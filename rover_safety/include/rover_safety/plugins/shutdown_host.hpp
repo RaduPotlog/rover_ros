@@ -22,7 +22,6 @@
 #include <iomanip>
 #include <ios>
 #include <memory>
-#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -98,7 +97,6 @@ public:
     , state_(ShutdownHostState::IDLE)
     {
         command_handler_ = std::make_shared<CommandHandler>();
-        ping_handler_ = std::make_shared<CommandHandler>();
     }
   
     ShutdownHost(
@@ -114,7 +112,6 @@ public:
     , state_(ShutdownHostState::IDLE)
     {
         command_handler_ = std::make_shared<CommandHandler>();
-        ping_handler_ = std::make_shared<CommandHandler>();
     }
 
     ~ShutdownHost() = default;
@@ -122,14 +119,8 @@ public:
     void call() override
     {
         switch (state_) {
-            case ShutdownHostState::IDLE: {
-                const auto available = pollAvailability();
-
-                if (!available) {
-                    break;
-                }
-
-                if (!*available) {
+            case ShutdownHostState::IDLE:
+                if (!isAvailable()) {
                     state_ = ShutdownHostState::SKIPPED;
                     break;
                 }
@@ -144,7 +135,6 @@ public:
                 
                 state_ = ShutdownHostState::COMMAND_EXECUTED;
                 break;
-            }
 
             case ShutdownHostState::COMMAND_EXECUTED:
                 if (commandRunning()) {
@@ -169,21 +159,18 @@ public:
                 state_ = ShutdownHostState::FAILURE;
                 break;
 
-            case ShutdownHostState::PINGING: {
-                const auto available = pollAvailability();
-
-                if (available && !*available) {
+            case ShutdownHostState::PINGING:
+                if (!isAvailable()) {
                     state_ = ShutdownHostState::SUCCESS;
                     break;
                 }
-
+            
                 if (timeoutExceeded(request_time_, timeout_ms_)) {
                     state_ = ShutdownHostState::FAILURE;
                     failure_reason_ = "Timeout waiting for host to shutdown";
                 }
-
+            
                 break;
-            }
 
             default:
                 break;
@@ -193,8 +180,6 @@ public:
     void halt() override 
     { 
         command_handler_->halt(); 
-        ping_handler_->halt();
-        ping_started_ = false;
     }
 
     std::string getIp() const override 
@@ -219,27 +204,9 @@ public:
 
 protected:
   
-    /**
-     * Whether the host answers ping, without blocking the tick: the first call starts a ping in
-     * the background and returns std::nullopt, as do calls while it runs. The call after it
-     * finishes returns the result, and the one after that starts a new ping.
-     */
-    std::optional<bool> pollAvailability()
+    bool isAvailable() const
     {
-        if (!ping_started_) {
-            ping_handler_->execute("ping -c 1 -w 1 " + ip_ + " > /dev/null", kPingTimeout);
-            ping_started_ = true;
-        }
-
-        const auto state = ping_handler_->getState();
-
-        if (state == CommandState::RUNNING) {
-            return std::nullopt;
-        }
-
-        ping_started_ = false;
-
-        return state == CommandState::SUCCESS;
+        return system(("ping -c 1 -w 1 " + ip_ + " > /dev/null").c_str()) == 0;
     }
 
     std::int64_t getTimeSinceEpoch()
@@ -310,11 +277,6 @@ private:
     std::string failure_reason_;
 
     std::shared_ptr<CommandHandler> command_handler_;
-
-    // `ping -w 1` exits within a second; the margin only covers a slow fork.
-    static constexpr std::chrono::milliseconds kPingTimeout{2000};
-    std::shared_ptr<CommandHandler> ping_handler_;
-    bool ping_started_ = false;
 };
 
 }  // namespace rover_safety

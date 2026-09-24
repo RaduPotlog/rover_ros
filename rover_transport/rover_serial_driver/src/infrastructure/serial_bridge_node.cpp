@@ -106,9 +106,6 @@ SerialBridgeNode::CallbackReturn SerialBridgeNode::on_configure(
         return CallbackReturn::FAILURE;
     }
 
-    // Reliable, depth 100: raw framed bytes from the device. A frame split across two reads
-    // is only reassembled if neither half is dropped, so no best-effort here, and the depth
-    // absorbs a burst while a subscriber is briefly slow.
     publisher_ = create_publisher<UInt8MultiArray>(kReadTopic, rclcpp::QoS{100});
 
     try {
@@ -130,9 +127,6 @@ SerialBridgeNode::CallbackReturn SerialBridgeNode::on_configure(
 
     subscriber_ = create_subscription<UInt8MultiArray>(
         kWriteTopic,
-        // Best-effort on purpose: it matches reliable and best-effort publishers alike, and a
-        // write stream is only useful fresh - a newer command supersedes a dropped one. No
-        // rover node writes here today (rover_crsf_teleop remaps serial_write away).
         rclcpp::QoS(rclcpp::KeepLast(32)).best_effort(),
         [this](const UInt8MultiArray::SharedPtr msg) {subscriberCallback(msg);});
 

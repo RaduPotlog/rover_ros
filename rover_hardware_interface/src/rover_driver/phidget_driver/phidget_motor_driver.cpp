@@ -666,11 +666,6 @@ bool PhidgetMotorDriver::isFailsafeTripped()
     return failsafe_tripped_.load(std::memory_order_relaxed);
 }
 
-std::uint32_t PhidgetMotorDriver::getDroppedCommandCount()
-{
-    return dropped_cmd_count_.load(std::memory_order_relaxed);
-}
-
 void PhidgetMotorDriver::sendCmdVel(const float cmd)
 {
     if (auto driver = driver_.lock()) {
@@ -679,12 +674,9 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
 
         // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet -
         // this command is dropped rather than queued. At the 100 Hz write() rate the next cycle's
-        // command supersedes it almost immediately, so this is intentional, not an oversight. It
-        // is counted, and the count shows up in the system status diagnostics.
-        if (set_speed_pending_) {
-            dropped_cmd_count_.fetch_add(1, std::memory_order_relaxed);
-            return;
-        }
+        // command supersedes it almost immediately, so this is intentional, not an oversight; it
+        // is not currently surfaced as an error/counter to the caller.
+        if (set_speed_pending_) return;
 
         float cmd_temp = 0.0f;
 

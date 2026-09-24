@@ -46,7 +46,6 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_wheel_geometry test/test_wheel_geometry.py)
   ament_add_pytest_test(test_response_analysis test/test_response_analysis.py)
-  ament_add_pytest_test(test_schedule test/test_schedule.py)
   ament_add_pytest_test(test_calibration_analysis test/test_calibration_analysis.py)
   ament_add_pytest_test(test_controller_launch test/test_controller_launch.py
     TIMEOUT 120

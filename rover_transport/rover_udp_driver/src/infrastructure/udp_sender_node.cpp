@@ -116,9 +116,6 @@ UdpSenderNode::CallbackReturn UdpSenderNode::on_configure(
 
     subscriber_ = create_subscription<UdpPacket>(
         kWriteTopic,
-        // Best-effort on purpose: it matches reliable and best-effort publishers alike, and
-        // what comes through here is a stream where the next packet supersedes a dropped one
-        // (rover_led's LED frames are the only writer).
         rclcpp::QoS(rclcpp::KeepLast(32)).best_effort(),
         [this](const UdpPacket::SharedPtr msg) {subscriberCallback(msg);});
 

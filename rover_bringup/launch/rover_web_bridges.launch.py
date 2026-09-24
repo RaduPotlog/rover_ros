@@ -14,12 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Web bridges (foxglove_bridge, rosbridge) under rover_-prefixed node names.
-
-Unlike the other rover launch files, this one takes no namespace or log_level argument: the
-bridges are host-global entry points for browser clients, not per-rover nodes.
-"""
+"""Web bridges (foxglove_bridge, rosbridge) under rover_-prefixed node names."""
 
 from launch import LaunchDescription
 from launch.actions import GroupAction, IncludeLaunchDescription

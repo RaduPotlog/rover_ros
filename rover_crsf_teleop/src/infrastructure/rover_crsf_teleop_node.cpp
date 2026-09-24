@@ -653,9 +653,6 @@ void RoverCrsfTeleopNode::createCalibrationInterfaces()
             const ChannelCalibration requested = fromRcCalibrationMsg(request->calibration);
             const bool supplied = requested.in_max != std::array<int, RcFrame::kChannelCount>{};
 
-            // With persist, apply() writes the calibration file synchronously on this executor
-            // thread, stalling the 20 ms control timer for the write. That's fine: it happens
-            // before the session ends, so teleop is still inhibited and nothing is driving.
             const CalibrationOutcome outcome =
                 calibration_->apply(supplied ? &requested : nullptr, request->persist);
             response->success = outcome.ok;

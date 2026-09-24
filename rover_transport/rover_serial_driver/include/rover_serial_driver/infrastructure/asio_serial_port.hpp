@@ -30,7 +30,6 @@
 #include <asio.hpp>
 
 #include "rover_io_context/domain/ports.hpp"
-#include "rover_io_context/infrastructure/async_op_guard.hpp"
 #include "rover_io_context/infrastructure/io_context.hpp"
 #include "rover_serial_driver/domain/serial_port_config.hpp"
 
@@ -78,12 +77,8 @@ private:
 
     void asyncReceiveHandler(const asio::error_code & error, std::size_t bytes_transferred);
 
-    void armReceive();
-
     const IoContext & ctx_;
     std::string device_name_;
-    // Every async operation, and close(), runs on this guard's strand; see async_op_guard.hpp.
-    AsyncOpGuard guard_;
     asio::serial_port serial_port_;
     SerialPortConfig port_config_;
     ByteReceiveCallback callback_;

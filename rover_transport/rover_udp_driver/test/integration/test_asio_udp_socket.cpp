@@ -22,15 +22,14 @@
 
 #include <gtest/gtest.h>
 
-#include <unistd.h>
-
 #include <chrono>
 #include <condition_variable>
-#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include <unistd.h>
 
 #include "rover_udp_driver/infrastructure/asio_udp_socket.hpp"
 
@@ -101,7 +100,7 @@ TEST(AsioUdpSocketTest, AsyncSendReachesAnAsyncReceiver)
         [&](const std::vector<uint8_t> & buffer, std::size_t length)
         {
             std::lock_guard<std::mutex> lock{mutex};
-            received.assign(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(length));
+            received.assign(buffer.begin(), buffer.begin() + static_cast<long>(length));
             got_it = true;
             cv.notify_one();
         });

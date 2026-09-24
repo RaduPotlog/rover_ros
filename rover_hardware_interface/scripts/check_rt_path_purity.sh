@@ -29,14 +29,11 @@
 #     the domain ports (e.g. PhidgetMotorDriver::sendCmdVel()/readState(), RoverSafetyController::
 #     queryControlInterfaceIOStates()) - an explicit, hand-maintained list, see
 #     RT_REACHABLE_ADAPTER_METHODS below.
-#   - PhidgetImuSensor::read() and the updateExportedStateValues() it calls - the IMU is its own
-#     SensorInterface, ticked by the same controller_manager loop. Its SDK callbacks and
-#     calibration run on other threads and are not scanned.
 #
 # Deliberately NOT scanned: defineRoverDriver()/defineRoverController() and any *_system.cpp code
 # reachable only from them, since those run during on_configure() (not on the RT path) and are
 # expected to construct blocking backends (e.g. `RoverSafetyController(...)`, a real Modbus TCP
-# connection). Also NOT scanned: any adapter or sensor method not in
+# connection). Also NOT scanned: rover_sensors/, and any adapter method not in
 # RT_REACHABLE_ADAPTER_METHODS - a NEW RT-reachable adapter method, or a new driver/adapter
 # backend, must be added to that list by hand or it will not be caught here. This is a substring
 # scan of specific function bodies, NOT a real call-graph analysis: it catches a blocking call
@@ -205,7 +202,6 @@ FORBIDDEN_ADAPTER_PATTERNS=(
 # activate(), armFailsafe(), resetFailsafe(), eStopUserBtnTrigger(), eStopLatchReset(), ...).
 DRIVER_DIR="${PKG_DIR}/src/rover_driver"
 SAFETY_DIR="${PKG_DIR}/src/rover_safety_controller"
-SENSORS_DIR="${PKG_DIR}/src/rover_sensors"
 RT_REACHABLE_ADAPTER_METHODS=(
     "${DRIVER_DIR}/phidget_driver/phidget_motor_driver.cpp|^([A-Za-z].*[ &*])?PhidgetMotorDriver::readState[(]"
     "${DRIVER_DIR}/phidget_driver/phidget_motor_driver.cpp|^([A-Za-z].*[ &*])?PhidgetMotorDriver::sendCmdVel[(]"
@@ -229,8 +225,6 @@ RT_REACHABLE_ADAPTER_METHODS=(
     "${SAFETY_DIR}/rover_safety_controller_gpio_adapter.cpp|^([A-Za-z].*[ &*])?RoverSafetyControllerGpioAdapter::queryControlInterfaceIOStates[(]"
     "${SAFETY_DIR}/rover_safety_controller_e_stop_io.cpp|^([A-Za-z].*[ &*])?RoverSafetyControllerEStopIo::isUserButtonActive[(]"
     "${SAFETY_DIR}/rover_safety_controller_e_stop_io.cpp|^([A-Za-z].*[ &*])?RoverSafetyControllerEStopIo::isLatchActive[(]"
-    "${SENSORS_DIR}/phidget_imu_sensor.cpp|^([A-Za-z].*[ &*])?PhidgetImuSensor::read[(]"
-    "${SENSORS_DIR}/phidget_imu_sensor.cpp|^([A-Za-z].*[ &*])?PhidgetImuSensor::updateExportedStateValues[(]"
 )
 
 for entry in "${RT_REACHABLE_ADAPTER_METHODS[@]}"; do

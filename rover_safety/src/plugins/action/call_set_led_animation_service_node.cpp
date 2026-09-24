@@ -23,51 +23,43 @@ CallSetLedAnimationService::CallSetLedAnimationService(
     const std::string & service_name)
 : nav2_behavior_tree::BtServiceNode<rover_msgs::srv::SetLedAnimation>(name, config, service_name)
 {
+    if (!getInput<std::string>("service_name", service_name_)) {
+        throw BT::RuntimeError("Missing required input [service_name]");
+    }
+
+    node_ = config.blackboard->get<nav2::LifecycleNode::SharedPtr>("node");
 }
 
 BT::PortsList CallSetLedAnimationService::providedPorts() 
 {
-    return providedBasicPorts({
+    return {
+        BT::InputPort<std::string>("service_name", "led/set_animation"),
         BT::InputPort<unsigned>("id", "Animation ID to trigger."),
         BT::InputPort<std::string>("param", "Optional animation parameter."),
         BT::InputPort<bool>("repeating", "Specifies whether the animation should repeated continuously.")
-    });
+    };
 }
 
-void CallSetLedAnimationService::on_tick()
+BT::NodeStatus CallSetLedAnimationService::tick()
 {
     unsigned animation_id;
-
+    
     if (!getInput<unsigned>("id", animation_id)) {
-        RCLCPP_ERROR(node_->get_logger(), "Missing required input [id] for %s", service_name_.c_str());
-        should_send_request_ = false;
-        return;
+        return BT::NodeStatus::FAILURE;
     }
 
     request_->animation.id = static_cast<uint16_t>(animation_id);
 
     if (!getInput<std::string>("param", request_->animation.param)) {
-        RCLCPP_ERROR(node_->get_logger(), "Missing required input [param] for %s", service_name_.c_str());
-        should_send_request_ = false;
-        return;
-    }
-
-    if (!getInput<bool>("repeating", request_->repeating)) {
-        RCLCPP_ERROR(node_->get_logger(), "Missing required input [repeating] for %s", service_name_.c_str());
-        should_send_request_ = false;
-    }
-}
-
-BT::NodeStatus CallSetLedAnimationService::on_completion(
-    std::shared_ptr<rover_msgs::srv::SetLedAnimation::Response> response)
-{
-    if (!response->success) {
-        RCLCPP_ERROR(
-            node_->get_logger(), "Service %s returned failure: %s",
-            service_name_.c_str(), response->message.c_str());
         return BT::NodeStatus::FAILURE;
     }
 
+    if (!getInput<bool>("repeating", request_->repeating)) {
+        return BT::NodeStatus::FAILURE;
+    }
+
+    service_client_->async_call(request_);
+    
     return BT::NodeStatus::SUCCESS;
 }
 

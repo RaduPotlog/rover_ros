@@ -83,7 +83,7 @@ public:
 
     void publish(const std::vector<uint8_t> & buffer, std::size_t length) override
     {
-        published_.emplace_back(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(length));
+        published_.emplace_back(buffer.begin(), buffer.begin() + static_cast<long>(length));
     }
 
     const std::vector<std::vector<uint8_t>> & published() const {return published_;}

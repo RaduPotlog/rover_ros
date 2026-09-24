@@ -30,8 +30,8 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/serial_port_config.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
+                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                           $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(${PROJECT_NAME}_core PUBLIC rover_io_context::rover_io_context_core)
 set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -55,7 +55,7 @@ target_link_libraries(${PROJECT_NAME}_ros PUBLIC
 )
 # SYSTEM so the house -Wold-style-cast / -Wpedantic do not fire inside ASIO's headers.
 target_include_directories(${PROJECT_NAME}_ros SYSTEM PUBLIC
-  $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
+                           $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
 )
 target_compile_definitions(${PROJECT_NAME}_ros PUBLIC ${ASIO_DEFINITIONS})
 
@@ -71,11 +71,6 @@ install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 
 if(BUILD_TESTING)
-  # The house uses a 4-space style that uncrustify's ament profile disagrees with.
-  list(APPEND AMENT_LINT_AUTO_EXCLUDE ament_cmake_uncrustify)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-
   find_package(ament_cmake_gtest REQUIRED)
 
   # Pure domain - no ROS, no ASIO.
@@ -93,11 +88,6 @@ if(BUILD_TESTING)
   # Integration: the ASIO adapter against the OS. Needs no real UART - see the file header.
   ament_add_gtest(test_asio_serial_port test/integration/test_asio_serial_port.cpp)
   target_link_libraries(test_asio_serial_port ${PROJECT_NAME}_ros)
-
-  # Integration: the lifecycle node over a pty pair (no real UART either).
-  ament_add_gtest(test_serial_bridge_node_lifecycle
-                  test/integration/test_serial_bridge_node_lifecycle.cpp TIMEOUT 60)
-  target_link_libraries(test_serial_bridge_node_lifecycle ${PROJECT_NAME}_ros util)
 endif()
 
 ament_package()

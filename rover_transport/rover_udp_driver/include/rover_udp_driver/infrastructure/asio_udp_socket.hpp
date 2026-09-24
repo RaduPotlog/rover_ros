@@ -30,7 +30,6 @@
 #include <asio.hpp>
 
 #include "rover_io_context/domain/ports.hpp"
-#include "rover_io_context/infrastructure/async_op_guard.hpp"
 #include "rover_io_context/infrastructure/io_context.hpp"
 #include "rover_udp_driver/domain/udp_endpoint.hpp"
 
@@ -93,8 +92,6 @@ private:
     void armReceive();
 
     const IoContext & ctx_;
-    // Every async operation, and close(), runs on this guard's strand; see async_op_guard.hpp.
-    AsyncOpGuard guard_;
     asio::ip::udp::socket udp_socket_;
     asio::ip::udp::endpoint remote_endpoint_;
     asio::ip::udp::endpoint host_endpoint_;

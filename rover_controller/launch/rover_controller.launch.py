@@ -14,12 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from rover_utils.events import ControllersActive
 from rover_utils.logging import limit_log_level_to_info
 from rover_utils.shutdown import shutdown_unless_shutting_down
 from launch import LaunchDescription
 from launch.actions import (
-    DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription, LogError,
+    DeclareLaunchArgument, IncludeLaunchDescription, LogError,
     OpaqueFunction, RegisterEventHandler, SetLaunchConfiguration, Shutdown,
 )
 from launch.conditions import UnlessCondition
@@ -128,7 +127,7 @@ def generate_launch_description():
     declare_log_level_arg = DeclareLaunchArgument(
         "log_level",
         default_value="DEBUG",
-        choices=["DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "FATAL"],
         description="Logging level",
     )
 
@@ -314,11 +313,7 @@ def generate_launch_description():
             RegisterEventHandler(
                 OnProcessExit(
                     target_action=imu_broadcaster_spawner,
-                    # The last mandatory controller: rover_bringup starts the rest of the
-                    # stack on this event.
-                    on_exit=spawner_exit_handler(
-                        'rover_imu_broadcaster', EmitEvent(event=ControllersActive())
-                    ),
+                    on_exit=spawner_exit_handler('rover_imu_broadcaster'),
                 )
             ),
             joint_state_broadcaster_spawner,

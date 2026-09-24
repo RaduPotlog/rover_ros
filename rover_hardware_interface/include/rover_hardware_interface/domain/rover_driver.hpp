@@ -68,9 +68,6 @@ public:
     virtual void resetFailsafe() = 0;
 
     virtual bool isFailsafeTripped() = 0;
-
-    // MotorDriverInterface::getDroppedCommandCount() of the named wheel driver.
-    virtual std::uint32_t getDroppedCommandCount(const DriverNames name) = 0;
 };
 
 }  // namespace rover_hardware_interface

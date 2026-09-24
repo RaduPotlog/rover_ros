@@ -24,11 +24,7 @@ namespace rover_safety
 
 BT::NodeStatus SignalShutdown::tick()
 {
-    std::string reason;
-
-    if (!this->getInput<std::string>("reason", reason)) {
-        return BT::NodeStatus::FAILURE;
-    }
+    const auto reason = this->getInput<std::string>("reason").value();
 
     std::pair<bool, std::string> signal_shutdown;
     signal_shutdown.first = true;

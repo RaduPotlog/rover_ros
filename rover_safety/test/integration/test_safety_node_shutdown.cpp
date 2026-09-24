@@ -15,7 +15,6 @@
 
 #include <gtest/gtest.h>
 
-#include <any>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -42,15 +41,6 @@ using TriggerSrv = std_srvs::srv::Trigger;
 
 namespace
 {
-
-// Exposes the blackboard builders, which only read parameters the constructor already loaded.
-class BlackboardProbeNode : public rover_safety::SafetyNode
-{
-public:
-    using rover_safety::SafetyNode::SafetyNode;
-    using rover_safety::SafetyNode::createSafetyInitialBlackboard;
-    using rover_safety::SafetyNode::createShutdownInitialBlackboard;
-};
 
 /**
  * Runs the real rover_safety_node in-process against a fake hardware interface. The power-off
@@ -95,8 +85,7 @@ protected:
         std::filesystem::remove(reason_file_);
     }
 
-    static rclcpp::NodeOptions safetyNodeOptions(
-        const std::string & power_off_command, double retry_backoff = 30.0)
+    void startSafetyNode(const std::string & power_off_command, double retry_backoff = 30.0)
     {
         rclcpp::NodeOptions options;
         options.parameter_overrides({
@@ -114,13 +103,8 @@ protected:
             {"shutdown.command_timeout", 5.0},
             {"shutdown.retry_backoff", retry_backoff},
         });
-        return options;
-    }
 
-    void startSafetyNode(const std::string & power_off_command, double retry_backoff = 30.0)
-    {
-        safety_node_ = std::make_shared<rover_safety::SafetyNode>(
-            "rover_safety_node", safetyNodeOptions(power_off_command, retry_backoff));
+        safety_node_ = std::make_shared<rover_safety::SafetyNode>("rover_safety_node", options);
         ASSERT_EQ(
             safety_node_->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
 
@@ -247,19 +231,4 @@ TEST_F(SafetyNodeShutdownTest, FatalBatteryTemperatureShutsDown)
     EXPECT_TRUE(waitFor([this]() { return readReasonFile() == "Fatal battery temperature"; }))
         << readReasonFile();
     EXPECT_EQ(e_stop_calls_.load(), 1);
-}
-
-TEST_F(SafetyNodeShutdownTest, BothTreesWaitForServicesAsLongAsConfigured)
-{
-    auto options = safetyNodeOptions("true");
-    options.parameter_overrides().emplace_back("ros_communication_timeout.availability", 0.25);
-    BlackboardProbeNode node("rover_safety_node", options);
-
-    for (const auto & blackboard :
-         {node.createSafetyInitialBlackboard(), node.createShutdownInitialBlackboard()})
-    {
-        EXPECT_EQ(
-            std::any_cast<std::chrono::milliseconds>(blackboard.at("wait_for_service_timeout")),
-            250ms);
-    }
 }

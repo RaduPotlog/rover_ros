@@ -28,11 +28,6 @@ foreach(PACKAGE IN ITEMS ${PACKAGE_DEPENDENCIES})
   find_package(${PACKAGE} REQUIRED)
 endforeach()
 
-# The image animations decode PNGs with Boost.GIL (header-only) over libpng. Both appear in the
-# domain's public headers, so they are exported below.
-find_package(Boost REQUIRED CONFIG)
-find_package(PNG REQUIRED)
-
 include_directories(include)
 
 # --- Domain: entities, animations, SK9822 encoder, ports. No ROS. ----------
@@ -56,7 +51,7 @@ target_include_directories(rover_led_domain PUBLIC
 # rover_utils is only used for its header-only YAML helpers.
 target_include_directories(rover_led_domain PUBLIC ${rover_utils_INCLUDE_DIRS})
 
-target_link_libraries(rover_led_domain PUBLIC Boost::headers PNG::PNG yaml-cpp)
+target_link_libraries(rover_led_domain png yaml-cpp)
 
 # --- Application: use cases. No ROS. ----------------------------------------
 
@@ -170,7 +165,7 @@ if(BUILD_TESTING)
   endfunction()
 
   rover_led_add_test(test_animation test/unit/domain/test_animation.cpp rover_led_domain)
-  rover_led_add_test(test_image_animation test/unit/domain/test_image_animation.cpp rover_led_domain)
+  rover_led_add_test(test_image_animation test/unit/domain/test_image_animation.cpp rover_led_domain png)
   rover_led_add_test(test_led_panel test/unit/domain/test_led_panel.cpp rover_led_domain)
   rover_led_add_test(test_led_segment test/unit/domain/test_led_segment.cpp rover_led_domain)
   rover_led_add_test(test_segment_layers test/unit/domain/test_segment_layers.cpp rover_led_domain)
@@ -221,7 +216,7 @@ install(DIRECTORY animations config launch
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
-ament_export_dependencies(${PACKAGE_DEPENDENCIES} Boost PNG)
+ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 ament_export_include_directories(include/${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 

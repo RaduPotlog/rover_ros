@@ -158,11 +158,6 @@ public:
     // because the hardware watchdog had tripped. Latched by the implementation until
     // resetFailsafe() succeeds - never auto-clears on its own.
     virtual bool isFailsafeTripped() = 0;
-
-    // Non-blocking, RT-safe: how many sendCmdVel() commands were dropped rather than sent since
-    // the driver was created (e.g. because the previous command was still in flight). Only ever
-    // grows.
-    virtual std::uint32_t getDroppedCommandCount() = 0;
 };
 
 }  // namespace rover_hardware_interface

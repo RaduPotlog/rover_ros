@@ -7,7 +7,6 @@
             <input_port name="param">optional parameter</input_port>
             <input_port name="repeating" default="false">indicates if animation should repeat</input_port>
             <input_port name="service_name">ROS service name</input_port>
-            <input_port name="server_timeout">time in ms to wait for the response</input_port>
         </Action>
         <Decorator ID="SafetyBtTickAfterTimeout" editable="true">
             <input_port name="timeout">time in s to wait before ticking child again</input_port>

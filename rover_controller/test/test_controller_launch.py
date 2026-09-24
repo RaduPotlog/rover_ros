@@ -14,7 +14,7 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_prefix, get_package_share_directory
 
-from launch import EventHandler, LaunchContext, LaunchDescription, LaunchService
+from launch import LaunchContext, LaunchDescription, LaunchService
 from launch.actions import (
     DeclareLaunchArgument, ExecuteProcess, GroupAction, OpaqueFunction,
     RegisterEventHandler, SetLaunchConfiguration,
@@ -23,8 +23,6 @@ from launch.event_handlers import OnShutdown
 from launch.utilities import normalize_to_list_of_substitutions, perform_substitutions
 
 from launch_ros.utilities import evaluate_parameters, normalize_parameters
-
-from rover_utils.events import ControllersActive
 
 import pytest
 
@@ -158,20 +156,12 @@ def test_spawner_sequence(controller_launch, monkeypatch, tmp_path, failed):
     service = LaunchService()
     service.context.launch_configurations.update(namespace='', robot_model='rover_a1')
     reasons = []
-    controllers_active = []
     controller_actions = controller_launch.generate_launch_description().entities
     description = LaunchDescription([
         GroupAction(scoped=True, actions=controller_actions),
         RegisterEventHandler(
             OnShutdown(
                 on_shutdown=lambda event, context: reasons.append(event.reason)
-            ),
-        ),
-        RegisterEventHandler(
-            EventHandler(
-                matcher=lambda event: isinstance(event, ControllersActive),
-                entities=[OpaqueFunction(
-                    function=lambda context: controllers_active.append(1) or [])],
             ),
         ),
     ])
@@ -182,8 +172,6 @@ def test_spawner_sequence(controller_launch, monkeypatch, tmp_path, failed):
     failures = [reason for reason in reasons if 'spawner failed' in reason]
     assert failures == ([] if failed is None else
                         [f'{failed} spawner failed with exit code 7'])
-    # rover_bringup starts the rest of the stack on this: only once every spawner succeeded.
-    assert len(controllers_active) == (1 if failed is None else 0)
 
 
 def test_chained_wheel_controllers(controller_launch, tmp_path):

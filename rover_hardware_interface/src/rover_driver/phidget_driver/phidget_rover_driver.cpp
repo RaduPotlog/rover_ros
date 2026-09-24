@@ -214,15 +214,6 @@ bool PhidgetRoverDriver::isFailsafeTripped()
     return false;
 }
 
-std::uint32_t PhidgetRoverDriver::getDroppedCommandCount(const DriverNames name)
-{
-    const auto driver = drivers_.find(name);
-    if (driver == drivers_.end()) {
-        return 0;
-    }
-    return driver->second->getMotorDriver(MotorNames::DEFAULT)->getDroppedCommandCount();
-}
-
 DriverDataSnapshot PhidgetRoverDriver::getData(const DriverNames name)
 {
     // `last_known_data_` mirrors `data_`'s keys 1:1 (both seeded together in initialize(), never

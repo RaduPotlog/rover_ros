@@ -16,8 +16,7 @@
 //
 // Modified 2026 by Mechatronics Academy: relayouted from udp_driver/src/udp_socket.cpp
 // (ros-drivers/transport_drivers v1.2.0). Three defects fixed while moving - see
-// asyncSend(), asyncReceiveHandler() and send()/receive(). Later: close() waits for the
-// socket's handlers (AsyncOpGuard), so the owner can destroy what the callback uses.
+// asyncSend(), asyncReceiveHandler() and send()/receive().
 
 #include "rover_udp_driver/infrastructure/asio_udp_socket.hpp"
 
@@ -53,7 +52,6 @@ AsioUdpSocket::AsioUdpSocket(
     const std::uint16_t host_port,
     SocketRole role)
 : ctx_(ctx),
-  guard_(ctx.ios()),
   udp_socket_(ctx.ios()),
   remote_endpoint_(makeEndpoint(remote_ip, remote_port)),
   host_endpoint_(makeEndpoint(host_ip, host_port)),
@@ -107,26 +105,18 @@ void AsioUdpSocket::asyncSend(const std::vector<uint8_t> & buffer)
     // subscriber callback returned, leaving the async write reading freed memory.
     auto payload = std::make_shared<std::vector<uint8_t>>(buffer);
 
-    guard_.post(
-        [this, payload]()
+    udp_socket_.async_send_to(
+        asio::buffer(*payload), remote_endpoint_,
+        [this, payload](std::error_code error, std::size_t bytes_transferred)
         {
-            if (!udp_socket_.is_open()) {
-                return;  // Closed after this send was queued.
-            }
-            udp_socket_.async_send_to(
-                asio::buffer(*payload), remote_endpoint_,
-                guard_.wrap(
-                    [this, payload](std::error_code error, std::size_t bytes_transferred)
-                    {
-                        asyncSendHandler(error, bytes_transferred);
-                    }));
+            asyncSendHandler(error, bytes_transferred);
         });
 }
 
 void AsioUdpSocket::asyncReceive(ByteReceiveCallback callback)
 {
     callback_ = std::move(callback);
-    guard_.post([this]() {armReceive();});
+    armReceive();
 }
 
 void AsioUdpSocket::armReceive()
@@ -134,11 +124,10 @@ void AsioUdpSocket::armReceive()
     udp_socket_.async_receive_from(
         asio::buffer(recv_buffer_),
         host_endpoint_,
-        guard_.wrap(
-            [this](std::error_code error, std::size_t bytes_transferred)
-            {
-                asyncReceiveHandler(error, bytes_transferred);
-            }));
+        [this](std::error_code error, std::size_t bytes_transferred)
+        {
+            asyncReceiveHandler(error, bytes_transferred);
+        });
 }
 
 void AsioUdpSocket::asyncSendHandler(
@@ -156,10 +145,8 @@ void AsioUdpSocket::asyncReceiveHandler(
     const asio::error_code & error,
     std::size_t bytes_transferred)
 {
-    if (error == asio::error::operation_aborted || !udp_socket_.is_open()) {
-        // close() cancelled the pending read, or ran after this datagram arrived but before
-        // its handler did - a normal part of shutdown/cleanup. Either way the callback's
-        // targets may be going away: don't deliver, don't re-arm.
+    if (error == asio::error::operation_aborted) {
+        // close() cancelled the pending read - a normal part of shutdown/cleanup.
         return;
     }
 
@@ -214,17 +201,11 @@ void AsioUdpSocket::open()
 
 void AsioUdpSocket::close()
 {
-    // Returns only once no handler of this socket is running or queued, so the caller may
-    // destroy the receive callback's targets (and this socket) right after.
-    guard_.closeAndDrain(
-        [this]()
-        {
-            asio::error_code error;
-            udp_socket_.close(error);
-            if (error) {
-                RCLCPP_ERROR_STREAM(rclcpp::get_logger("AsioUdpSocket::close"), error.message());
-            }
-        });
+    asio::error_code error;
+    udp_socket_.close(error);
+    if (error) {
+        RCLCPP_ERROR_STREAM(rclcpp::get_logger("AsioUdpSocket::close"), error.message());
+    }
 }
 
 bool AsioUdpSocket::isOpen() const

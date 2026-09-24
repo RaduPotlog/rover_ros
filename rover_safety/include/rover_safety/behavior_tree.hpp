@@ -40,7 +40,7 @@ class BehaviorTreeSafety
 public:
   
     BehaviorTreeSafety(
-        nav2::LifecycleNode::SharedPtr node,
+        const nav2::LifecycleNode::SharedPtr & node,
         const std::string & tree_name, 
         const std::map<std::string, std::any> & initial_blackboard,
         const unsigned groot_port = 1667)

@@ -22,7 +22,7 @@
 namespace rover_utils::ros
 {
 
-inline void verifyTimestampGap(
+void verifyTimestampGap(
     const std_msgs::msg::Header & header_1, 
     const std_msgs::msg::Header & header_2,
     std::chrono::seconds max_timestamp_gap)
@@ -44,7 +44,7 @@ inline void verifyTimestampGap(
     }
 }
 
-inline std_msgs::msg::Header mergeHeaders(
+std_msgs::msg::Header mergeHeaders(
     const std_msgs::msg::Header & header_1, 
     const std_msgs::msg::Header & header_2)
 {
@@ -65,7 +65,7 @@ inline std_msgs::msg::Header mergeHeaders(
     return merged_header;
 }
 
-inline std::string addNamespaceToFrameID(const std::string & frame_id, const std::string & node_namespace)
+std::string addNamespaceToFrameID(const std::string & frame_id, const std::string & node_namespace)
 {
     std::string tf_prefix = node_namespace;
 

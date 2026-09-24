@@ -15,7 +15,6 @@
 
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -35,8 +34,6 @@
 
 #include "rover_safety/behavior_tree_utils.hpp"
 #include "rover_safety/infrastructure/shutdown_command.hpp"
-
-#include "../unit/plugins/plugin_test_utils.hpp"
 
 using namespace std::chrono_literals;
 using TriggerSrv = std_srvs::srv::Trigger;
@@ -78,9 +75,6 @@ protected:
         reason_file_ = std::filesystem::temp_directory_path() /
                        (std::string("rover_safety_") + test_info->name() + "_reason.txt");
         std::filesystem::remove(reason_file_);
-        hosts_file_ = std::filesystem::temp_directory_path() /
-                      (std::string("rover_safety_") + test_info->name() + "_hosts.yaml");
-        std::filesystem::remove(hosts_file_);
     }
 
     void TearDown() override
@@ -88,7 +82,6 @@ protected:
         executor_.cancel();
         spin_thread_.join();
         std::filesystem::remove(reason_file_);
-        std::filesystem::remove(hosts_file_);
     }
 
     BT::Blackboard::Ptr createBlackboard(const std::string & power_off_command, const std::string & reason)
@@ -131,7 +124,6 @@ protected:
     std::atomic<int> e_stop_calls_{0};
     BT::BehaviorTreeFactory factory_;
     std::filesystem::path reason_file_;
-    std::filesystem::path hosts_file_;
 };
 
 }  // namespace
@@ -177,32 +169,4 @@ TEST_F(ShutdownTreeTest, RetryRunsTheWholeSequenceAgain)
     EXPECT_EQ(tickUntilDone(tree), BT::NodeStatus::SUCCESS);
     EXPECT_EQ(e_stop_calls_.load(), 2);
     EXPECT_EQ(readReasonFile(), "second");
-}
-
-// A remote host takes the shutdown tree through ShutdownHostsFromFile's ping. The ping to a dead
-// host lasts a full second and must run beside the tick, never inside it: rover_safety_node ticks
-// from the same executor thread that serves the E-Stop and battery callbacks.
-TEST_F(ShutdownTreeTest, SkipsUnreachableHostWithoutBlockingTheTick)
-{
-    {
-        std::ofstream hosts(hosts_file_);
-        hosts << "hosts:\n  - ip: " << rover_safety::test::kUnreachableIp << "\n    timeout: 1.0\n";
-    }
-    auto blackboard = createBlackboard(
-        "printf '%s' \"$ROVER_SHUTDOWN_REASON\" > '" + reason_file_.string() + "'", "remote");
-    blackboard->set<std::string>("SHUTDOWN_HOSTS_FILE", hosts_file_.string());
-    auto tree = factory_.createTree("RoverShutdown", blackboard);
-
-    auto status = BT::NodeStatus::RUNNING;
-    auto slowest = std::chrono::steady_clock::duration::zero();
-    for (int i = 0; i < 200 && status == BT::NodeStatus::RUNNING; ++i) {
-        const auto before = std::chrono::steady_clock::now();
-        status = tree.tickOnce();
-        slowest = std::max(slowest, std::chrono::steady_clock::now() - before);
-        tree.sleep(100ms);
-    }
-
-    EXPECT_EQ(status, BT::NodeStatus::SUCCESS);
-    EXPECT_EQ(readReasonFile(), "remote");
-    EXPECT_LT(slowest, 200ms);
 }

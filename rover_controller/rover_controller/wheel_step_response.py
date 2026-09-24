@@ -20,8 +20,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 import yaml
 
-from rover_controller.drive_session import DriveSession
-from rover_controller.schedule import build_schedule
+from rover_controller.drive_session import build_schedule, DriveSession
 from rover_controller.response_analysis import (
     analyze_step, derive_acceleration_limits, finite, Sample)
 

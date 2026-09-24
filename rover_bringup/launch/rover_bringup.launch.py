@@ -21,7 +21,6 @@ from rover_utils.messages import (
     warning_msg,
     welcome_msg,
 )
-from rover_utils.events import ControllersActive, start_once_on
 from rover_utils.version_check import check_version_compatibility
 from launch import LaunchDescription
 from launch.actions import (
@@ -29,6 +28,7 @@ from launch.actions import (
     ExecuteProcess,
     GroupAction,
     IncludeLaunchDescription,
+    TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -72,7 +72,7 @@ def generate_launch_description():
     declare_log_level_arg = DeclareLaunchArgument(
         "log_level",
         default_value="INFO",
-        choices=["DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "FATAL"],
         description="Logging level",
     )
 
@@ -92,16 +92,6 @@ def generate_launch_description():
         "use_gps",
         default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
         description="Fuse the RUTX11 GPS into localization (true/false).",
-    )
-
-    controllers_ready_timeout = LaunchConfiguration("controllers_ready_timeout")
-    declare_controllers_ready_timeout_arg = DeclareLaunchArgument(
-        "controllers_ready_timeout",
-        default_value="20.0",
-        description=(
-            "Seconds to wait for rover_controller to activate its controllers before starting "
-            "the rest of the stack anyway."
-        ),
     )
 
     rover_model_name = EnvironmentVariable(name="ROBOT_MODEL_NAME", default_value="rover_a1")
@@ -229,6 +219,18 @@ def generate_launch_description():
         }.items(),
     )
 
+    rover_bringup_common_dir = PythonExpression(
+        [
+            "'",
+            common_dir_path,
+            "/rover_bringup' if '",
+            common_dir_path,
+            "' else '",
+            FindPackageShare("rover_bringup"),
+            "'",
+        ]
+    )
+
     hw_config_correct = EnvironmentVariable(name="ROBOT_HW_CONFIG_CORRECT", default_value="true")
 
     prevent_exit_action = ExecuteProcess(
@@ -260,13 +262,9 @@ def generate_launch_description():
         condition=UnlessCondition(os_version_correct),
     )
 
-    # Started once rover_controller reports its controllers active (the last spawner
-    # succeeded). A failed spawner shuts the whole launch down, so the timeout only covers a
-    # spawner that hangs.
-    rover_delayed_actions = start_once_on(
-        ControllersActive,
-        controllers_ready_timeout,
-        [
+    rover_delayed_action = TimerAction(
+        period=10.0,
+        actions=[
             rover_battery_launch,
             rover_led_launch,
             rover_safety_launch,
@@ -274,15 +272,13 @@ def generate_launch_description():
             rover_crsf_teleop_launch,
             rover_twist_mux_launch,
         ],
-        "rover_controller did not report its controllers active within "
-        "controllers_ready_timeout; starting the rest of the stack anyway.",
     )
 
     rover_driver_actions = GroupAction(
         [
             rover_controller_launch,
             rover_system_diag_launch,
-            *rover_delayed_actions,
+            rover_delayed_action,
         ],
         condition=IfCondition(hw_config_correct),
     )
@@ -294,7 +290,6 @@ def generate_launch_description():
         declare_log_level_arg,
         declare_namespace_arg,
         declare_use_gps_arg,
-        declare_controllers_ready_timeout_arg,
         welcome_info,
         incorrect_hw_config_action,
         incorrect_os_version_action,

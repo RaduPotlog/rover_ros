@@ -194,8 +194,6 @@ std::map<std::string, std::any> SafetyNode::createSafetyInitialBlackboard()
 {
     const auto server_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::duration<double>(params_.ros_communication_timeout.response));
-    const auto wait_for_service_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::duration<double>(params_.ros_communication_timeout.availability));
 
     const std::map<std::string, std::any> safety_initial_bb = {
         {"VERDICT_NONE", unsigned(domain::SafetyVerdict::None)},
@@ -206,7 +204,7 @@ std::map<std::string, std::any> SafetyNode::createSafetyInitialBlackboard()
         // response arriving between ticks is still collected.
         {"server_timeout", server_timeout},
         {"bt_loop_duration", std::chrono::milliseconds(10)},
-        {"wait_for_service_timeout", wait_for_service_timeout},
+        {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
     };
 
     RCLCPP_INFO(this->get_logger(), "Blackboard created.");
@@ -218,8 +216,6 @@ std::map<std::string, std::any> SafetyNode::createShutdownInitialBlackboard()
 {
     const auto server_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::duration<double>(params_.ros_communication_timeout.response));
-    const auto wait_for_service_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::duration<double>(params_.ros_communication_timeout.availability));
 
     return {
         {"SHUTDOWN_HOSTS_FILE", params_.shutdown_hosts_path},
@@ -229,7 +225,7 @@ std::map<std::string, std::any> SafetyNode::createShutdownInitialBlackboard()
             infrastructure::buildShutdownCommand(shutdown_command_, "unknown")},
         {"server_timeout", server_timeout},
         {"bt_loop_duration", std::chrono::milliseconds(10)},
-        {"wait_for_service_timeout", wait_for_service_timeout},
+        {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
     };
 }
 
