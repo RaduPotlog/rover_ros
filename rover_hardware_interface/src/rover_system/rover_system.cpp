@@ -703,7 +703,9 @@ void RoverSystem::updateMotorsState(const rclcpp::Time & time)
         updateHwStates(time);
         updateMotorsStateDataTimedOut();
         control_loop_use_case_->updateMotorFailsafeTrippedStatus();
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
+        // Broad on purpose, as in RoverA1Driver::sendSpeedCmd(): the driver's data_.at() throws
+        // std::out_of_range, a sibling of std::runtime_error, and nothing may escape read().
         RCLCPP_ERROR_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while updating motors states: " << e.what());
@@ -721,7 +723,8 @@ void RoverSystem::updateDriverState()
     try {
         rover_driver_->updateDriversState();
         updateDriverStateDataTimedOut();
-    } catch (const std::runtime_error & e) {
+    } catch (const std::exception & e) {
+        // Broad for the same reason as updateMotorsState() above.
         RCLCPP_ERROR_STREAM_THROTTLE(
             logger_, steady_clock_, 5000,
             "An exception occurred while updating drivers states: " << e.what());
