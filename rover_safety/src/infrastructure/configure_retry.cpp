@@ -70,6 +70,10 @@ void ConfigureRetry::retry()
         return;
     }
 
+    // Blocks this executor thread: building the tree waits up to
+    // ros_communication_timeout.availability for each service a BT node needs. Accepted because
+    // an unconfigured node has no subscriptions or timers of its own yet, so there is nothing
+    // else on this thread to starve.
     if (node_.configure().id() != State::PRIMARY_STATE_INACTIVE) {
         return;
     }
