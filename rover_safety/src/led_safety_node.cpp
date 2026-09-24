@@ -143,6 +143,11 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
     const float low_battery_threshold_percent =
         static_cast<float>(this->params_.battery.percent.threshold.low);
 
+    const auto server_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double>(params_.ros_communication_timeout.response));
+    const auto wait_for_service_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double>(params_.ros_communication_timeout.availability));
+
     const std::string undefined_charging_anim_percent = "";
     const int undefined_anim_id = -1;
 
@@ -175,10 +180,13 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
         {"POWER_SUPPLY_STATUS_FULL", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_FULL)},
         // Battery health constants
         {"POWER_SUPPLY_HEALTH_OVERHEAT", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT)},
-        // Behaviour tree constants
-        {"default_server_timeout", std::chrono::milliseconds(5000)},
-        {"bt_loop_duration", std::chrono::milliseconds(100)},
-        {"wait_for_service_timeout", std::chrono::milliseconds(3000)},
+        // Behaviour tree constants, read by nav2_behavior_tree::BtServiceNode. server_timeout must
+        // exceed the tick period so a response arriving between ticks is still collected.
+        // bt_loop_duration bounds how long each service node spins per tick; the tree runs
+        // several of them in parallel, so it stays short.
+        {"server_timeout", server_timeout},
+        {"bt_loop_duration", std::chrono::milliseconds(10)},
+        {"wait_for_service_timeout", wait_for_service_timeout},
     };
 
     RCLCPP_INFO(this->get_logger(), "Blackboard created.");
@@ -286,4 +294,4 @@ void LedSafetyNode::diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWra
         configure_retry_->failedAttempts(), configure_retry_->lastError(), status);
 }
 
-}  // namespace husarion_ugv_manager
+}  // namespace rover_safety

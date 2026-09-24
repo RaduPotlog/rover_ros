@@ -17,8 +17,10 @@
 
 #include <openssl/hmac.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
+#include <optional>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -39,7 +41,19 @@ class ShutdownHostWrapper : public ShutdownHost
 public:
     using ShutdownHost::ShutdownHost;
     using ShutdownHost::getTimeSinceEpoch;
-    using ShutdownHost::isAvailable;
+    using ShutdownHost::pollAvailability;
+
+    /** Polls until the background ping has an answer. */
+    std::optional<bool> waitForAvailability(std::chrono::seconds deadline = std::chrono::seconds(5))
+    {
+        const auto start = std::chrono::steady_clock::now();
+        auto available = pollAvailability();
+        while (!available && std::chrono::steady_clock::now() - start < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            available = pollAvailability();
+        }
+        return available;
+    }
 };
 
 /** Calls the host until it leaves the given transient states or `deadline` passes. */
@@ -77,17 +91,36 @@ std::string hmacSha256Hex(const std::string & key, const std::string & data)
 
 TEST(ShutdownHostTest, LocalhostIsAvailable)
 {
-    const ShutdownHostWrapper host("127.0.0.1", "3003", "secret", 1.0);
-    EXPECT_TRUE(host.isAvailable());
+    ShutdownHostWrapper host("127.0.0.1", "3003", "secret", 1.0);
+    EXPECT_EQ(host.waitForAvailability(), std::optional<bool>(true));
 }
 
 TEST(ShutdownHostTest, UnreachableHostIsSkipped)
 {
     ShutdownHostWrapper host(rover_safety::test::kUnreachableIp, "3003", "secret", 1.0);
 
-    EXPECT_FALSE(host.isAvailable());
-    host.call();
+    EXPECT_EQ(host.waitForAvailability(), std::optional<bool>(false));
+    EXPECT_EQ(callUntilSettled(host), ShutdownHostState::SKIPPED);
+}
+
+// The shutdown tree ticks every host from the safety node's only executor thread, so call() must
+// return at once even while a ping to a dead host takes its full second.
+TEST(ShutdownHostTest, CallNeverBlocks)
+{
+    ShutdownHost host(rover_safety::test::kUnreachableIp, "3003", "secret", 1.0);
+
+    auto slowest = std::chrono::steady_clock::duration::zero();
+    const auto start = std::chrono::steady_clock::now();
+    while (host.getState() == ShutdownHostState::IDLE &&
+           std::chrono::steady_clock::now() - start < std::chrono::seconds(5)) {
+        const auto before = std::chrono::steady_clock::now();
+        host.call();
+        slowest = std::max(slowest, std::chrono::steady_clock::now() - before);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
     EXPECT_EQ(host.getState(), ShutdownHostState::SKIPPED);
+    EXPECT_LT(slowest, std::chrono::milliseconds(50));
 }
 
 TEST(ShutdownHostTest, TimeSinceEpochIsCurrent)
@@ -135,6 +168,7 @@ TEST(ShutdownHostTest, AcceptedRequestIsSignedThenWaitsForHostToGoDown)
     while (host.getState() == ShutdownHostState::PINGING &&
            std::chrono::steady_clock::now() - start < std::chrono::seconds(10)) {
         host.call();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     EXPECT_EQ(host.getState(), ShutdownHostState::FAILURE);
     EXPECT_EQ(host.getError(), "Timeout waiting for host to shutdown");

@@ -45,6 +45,8 @@ bool ShutdownHostsFromFile::updateHosts(std::vector<std::shared_ptr<ShutdownHost
 
     YAML::Node shutdown_hosts;
 
+    // Blocking file read, but bounded: updateHosts() runs once from onStart(), never per tick.
+
     try {
         shutdown_hosts = YAML::LoadFile(shutdown_hosts_file);
     } catch (const YAML::Exception & e) {
