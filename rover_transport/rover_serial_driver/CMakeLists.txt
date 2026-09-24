@@ -88,6 +88,11 @@ if(BUILD_TESTING)
   # Integration: the ASIO adapter against the OS. Needs no real UART - see the file header.
   ament_add_gtest(test_asio_serial_port test/integration/test_asio_serial_port.cpp)
   target_link_libraries(test_asio_serial_port ${PROJECT_NAME}_ros)
+
+  # Integration: the lifecycle node over a pty pair (no real UART either).
+  ament_add_gtest(test_serial_bridge_node_lifecycle
+                  test/integration/test_serial_bridge_node_lifecycle.cpp TIMEOUT 60)
+  target_link_libraries(test_serial_bridge_node_lifecycle ${PROJECT_NAME}_ros util)
 endif()
 
 ament_package()

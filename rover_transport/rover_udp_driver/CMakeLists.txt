@@ -92,6 +92,11 @@ if(BUILD_TESTING)
   # Integration: real loopback sockets on per-process ports.
   ament_add_gtest(test_asio_udp_socket test/integration/test_asio_udp_socket.cpp TIMEOUT 60)
   target_link_libraries(test_asio_udp_socket ${PROJECT_NAME}_ros)
+
+  # Integration: the two lifecycle nodes against localhost sockets.
+  ament_add_gtest(test_udp_nodes_lifecycle test/integration/test_udp_nodes_lifecycle.cpp
+                  TIMEOUT 60)
+  target_link_libraries(test_udp_nodes_lifecycle ${PROJECT_NAME}_ros)
 endif()
 
 ament_package()
