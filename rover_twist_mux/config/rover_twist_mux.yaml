@@ -2,23 +2,13 @@
   ros__parameters:
     use_stamped: true
     topics:
-      # ELRS RC transmitter: the operator with line of sight gets the last word, so it outranks
-      # every other input. rover_crsf_teleop publishes a centred stick's zero only once, so an
-      # idle transmitter does not hold the mux on this source.
-      cmd_elrs:
-        topic   : teleop_elrs_cmd_vel_stamped
+      # Nav 2 autonomy (orchestrator computer). Lowest, so any teleop source preempts it.
+      nav:
+        topic   : nav_cmd_vel_stamped
         timeout : 0.5
-        priority: 110
-      # Driver UI (rover_drive_interface) Manual mode. Below the RC transmitter and Foxglove,
-      # above Nav 2 so manual driving preempts autonomy.
-      #
-      # Read from rover_command_freshness_node, not from the UI's own topic
-      # (teleop_driver_interface_cmd_vel_stamped): the UI's commands cross a websocket, which holds
-      # them through a Wi-Fi stall and delivers them late in a burst, and twist_mux would replay
-      # that old motion. The node drops commands that arrive late.
-      #
-      # 0.3 s timeout, not 0.5: three periods of the UI's 10 Hz stream, so a dead browser or link
-      # stops the rover sooner. The RC keeps 0.5 s; it has its own link-loss failsafe.
+        priority: 5
+      # Driver UI, via rover_command_freshness_node, which drops commands the websocket
+      # delivered late after a Wi-Fi stall. 0.3 s = three periods of the UI's 10 Hz stream.
       driver_interface:
         topic   : teleop_driver_interface_cmd_vel_fresh_stamped
         timeout : 0.3
@@ -27,28 +17,15 @@
         topic   : teleop_foxglove_cmd_vel_stamped
         timeout : 0.5
         priority: 100
-      # Nav2 autonomy, running on the separate orchestrator computer. Lowest
-      # priority, so every teleop source preempts it deterministically rather
-      # than them racing each other on /cmd_vel. The 0.5 s timeout also makes
-      # a LAN partition a defined transition: the nav input goes stale and the
-      # mux falls through, instead of relying on the drive controller's own
-      # cmd_vel_timeout as a backstop.
-      nav:
-        topic   : nav_cmd_vel_stamped
+      # ELRS RC transmitter: line-of-sight operator has the last word.
+      cmd_elrs:
+        topic   : teleop_elrs_cmd_vel_stamped
         timeout : 0.5
-        priority: 5
+        priority: 110
 
-    # Safety lock, fed by rover_motion_lock_node from hardware_interface/safety_status
-    # and hardware_interface/safety_command_echo.
-    #
-    # twist_mux masks an input when `input priority < active lock priority` (strictly), so
-    # priority 200 outranks all the inputs above and stops the rover outright while any
-    # E-Stop condition is active. To gate autonomy ONLY and leave all teleop sources free,
-    # drop this to 7 (above nav's 5, below driver_interface's 8).
-    #
-    # The timeout is what makes this fail-safe: twist_mux treats a stale lock topic as LOCKED
-    # (isLocked() == hasExpired() || data), so if rover_motion_lock_node dies the mux closes rather
-    # than opens. rover_motion_lock_node republishes at 10 Hz to stay well inside this window.
+    # Fed by rover_motion_lock_node (10 Hz). An input is masked when its priority is below
+    # the lock's, so 200 stops everything on E-Stop; use 7 to gate only nav.
+    # A stale lock counts as locked, so if the node dies the mux closes.
     locks:
       motion_lock:
         topic   : motion_lock
