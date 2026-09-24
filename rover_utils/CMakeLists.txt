@@ -40,6 +40,10 @@ if(BUILD_TESTING)
   ament_add_gtest(test_shutdown_gate test/test_shutdown_gate.cpp)
   target_include_directories(test_shutdown_gate PRIVATE include)
   target_link_libraries(test_shutdown_gate rclcpp::rclcpp)
+
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_logging test/test_logging.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 ament_package()
