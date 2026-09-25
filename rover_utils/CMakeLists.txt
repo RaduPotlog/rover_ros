@@ -50,6 +50,12 @@ if(BUILD_TESTING)
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
   ament_add_pytest_test(test_events test/test_events.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
+  ament_add_pytest_test(test_messages test/test_messages.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
+  ament_add_pytest_test(test_shutdown test/test_shutdown.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
+  ament_add_pytest_test(test_version_check test/test_version_check.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 ament_package()

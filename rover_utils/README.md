@@ -34,7 +34,7 @@ The helpers install as the `rover_utils` Python package.
 | | `error_msg(text)`, `warning_msg(text)` | Bold red / yellow `LogInfo` actions. |
 | | `ErrorMessages` | Canned texts: `INCORRECT_HW_CONFIG`, `INCORRECT_OS_VERSION`, … |
 | `rover_utils.logging` | `limit_log_level_to_info(unit, log_level)` | `--log-level` value that caps a noisy logger (`rcl`, a controller) at `INFO` when the launch runs at `DEBUG` (used by `rover_battery`, `rover_controller`, `rover_led`, `rover_safety`). |
-| `rover_utils.version_check` | `check_version_compatibility(version, min_required)` | `True` if `X.Y.Z` `version` ≥ `min_required`. |
+| `rover_utils.version_check` | `check_version_compatibility(version, min_required)` | `True` if the first `vX.Y.Z` in `version` is ≥ the one in `min_required` (numbers, major → minor → patch). A string without `vX.Y.Z` (e.g. `1.2.3`) counts as `v0.0.0`; a suffix such as `-rc1` is ignored. |
 
 ```python
 from rover_utils.logging import limit_log_level_to_info
@@ -47,4 +47,4 @@ arguments=["--ros-args", "--log-level", log_level,
 
 - The functions in `ros_utils.hpp` are defined in the header without `inline`. Including it in
   more than one translation unit of the same target causes multiple-definition link errors.
-- There are no tests yet, although `ament_cmake_gtest` is declared as a test dependency.
+- `ros_utils.hpp`, `networking_utils.hpp` and `messages.welcome_msg` have no tests.

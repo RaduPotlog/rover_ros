@@ -50,7 +50,14 @@ def test_limit_log_level_to_info_keeps_dotted_logger_names():
 
 @pytest.mark.parametrize(
     'log_level, expected',
-    [('DEBUG', 'DEBUG'), ('INFO', 'ERROR'), ('WARN', 'ERROR'), ('FATAL', 'FATAL')],
+    [
+        ('DEBUG', 'DEBUG'),
+        ('debug', 'debug'),
+        ('INFO', 'ERROR'),
+        ('WARN', 'ERROR'),
+        ('ERROR', 'ERROR'),
+        ('FATAL', 'FATAL'),
+    ],
 )
 def test_quiet_rmw_zenoh(log_level, expected):
     level = LaunchConfiguration('log_level')
