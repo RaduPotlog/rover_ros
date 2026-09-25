@@ -16,7 +16,7 @@ panels:
 segments:
   - name: front
     channel: 1
-    led_range: 0-39
+    led_range: 39-0
   - name: rear
     channel: 2
     led_range: 0-39
@@ -35,12 +35,12 @@ led_animations:
         segments: front
         animation:
           image: $(find rover_led)/animations/rover_a1/estop_front.png
-          duration: 6
+          duration: 4
       - type: rover_led::ImageAnimation
         segments: rear
         animation:
           image: $(find rover_led)/animations/rover_a1/estop_rear.png
-          duration: 6
+          duration: 4
 
   - id: 1
     name: READY
@@ -50,12 +50,12 @@ led_animations:
         segments: front
         animation:
           image: $(find rover_led)/animations/rover_a1/ready_front.png
-          duration: 6
+          duration: 4
       - type: rover_led::ImageAnimation
         segments: rear
         animation:
           image: $(find rover_led)/animations/rover_a1/ready_rear.png
-          duration: 6
+          duration: 4
 
   - id: 2
     name: ERROR
