@@ -14,6 +14,8 @@
 
 #include "rover_modbus_driver/infrastructure/modbus_tcp_transport.hpp"
 
+#include "rover_modbus_driver/infrastructure/mb_frame_mapping.hpp"
+
 namespace rover::transport::modbus
 {
 
@@ -27,6 +29,20 @@ ModbusTcpTransport::ModbusTcpTransport(
 ModbusTcpTransport::~ModbusTcpTransport()
 {
     close();
+}
+
+DiscreteReply ModbusTcpTransport::transact(const DiscreteRequest & request)
+{
+    // Initialised from a prvalue, so no MB::ModbusResponse copy is made - its copy constructor
+    // would throw on an empty reply here, inside the transport, and drop the link.
+    const MB::ModbusResponse response = sendRequest(toMbRequest(request));
+
+    // A write's echo was never inspected beyond awaitResponse()'s own decode.
+    if (request.function == DiscreteFunction::WRITE_SINGLE_COIL) {
+        return DiscreteReply{};
+    }
+
+    return toDiscreteReply(response);
 }
 
 MB::ModbusResponse ModbusTcpTransport::sendRequest(const MB::ModbusRequest & req)

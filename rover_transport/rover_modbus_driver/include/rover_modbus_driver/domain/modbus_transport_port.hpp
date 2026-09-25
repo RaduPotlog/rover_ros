@@ -15,19 +15,22 @@
 #ifndef ROVER_MODBUS_DRIVER_DOMAIN_MODBUS_TRANSPORT_PORT_HPP_
 #define ROVER_MODBUS_DRIVER_DOMAIN_MODBUS_TRANSPORT_PORT_HPP_
 
-#include <MB/modbusException.hpp>
-#include <MB/modbusRequest.hpp>
-#include <MB/modbusResponse.hpp>
+#include "rover_modbus_driver/domain/discrete_transaction.hpp"
 
 namespace rover::transport::modbus
 {
 
-// The transport seam: one synchronous Modbus transaction. ModbusTcpTransport is the only
-// implementation today; a serial/RTU or libmodbus-backed one would be a sibling.
+// The transport seam: one synchronous discrete-IO transaction, in this package's terms
+// (domain/discrete_transaction.hpp). ModbusTcpTransport is the only implementation today; a
+// serial/RTU or libmodbus-backed sibling needs nothing from the MB:: codec to implement it.
 //
-// This was ModbusConnection in rover_hardware_interface. Note that it names MB:: types,
-// which is why this package's _core library links Modbus_Core - those are pure frame
-// codecs with no sockets behind them, so _core stays OS-free.
+// This was ModbusConnection in rover_hardware_interface.
+//
+// Contract of transact():
+//   - Failures throw. ModbusDiscreteIoClient drops the link on any exception that escapes it.
+//   - A reply that arrived is returned as-is - possibly empty, possibly non-coil cells - and
+//     judged by the client, which rejects it without dropping the link.
+//   - For WRITE_SINGLE_COIL an empty reply is returned; the device's echo is not decoded.
 class ModbusTransportPort
 {
 
@@ -45,7 +48,7 @@ public:
     ModbusTransportPort(const ModbusTransportPort &) = delete;
     ModbusTransportPort & operator=(const ModbusTransportPort &) = delete;
 
-    virtual MB::ModbusResponse sendRequest(const MB::ModbusRequest & req) = 0;
+    virtual DiscreteReply transact(const DiscreteRequest & request) = 0;
 
     virtual void close() = 0;
 };

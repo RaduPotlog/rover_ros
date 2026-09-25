@@ -22,7 +22,6 @@
 #include <thread>
 #include <vector>
 
-#include <MB/modbusCell.hpp>
 #include <MB/modbusException.hpp>
 #include <MB/modbusUtils.hpp>
 
@@ -59,6 +58,14 @@ bool connectWithAttempts(
     }
 
     return false;
+}
+
+// The function code an MB::ModbusException for this transaction carries. DiscreteFunction's
+// enumerators are defined as the wire function codes (checked by the static_asserts in
+// infrastructure/mb_frame_mapping.cpp), so this is a cast.
+MB::utils::MBFunctionCode mbFunctionCode(const DiscreteFunction function)
+{
+    return static_cast<MB::utils::MBFunctionCode>(function);
 }
 
 }  // namespace
@@ -181,38 +188,40 @@ ModbusDiscreteIoClient::~ModbusDiscreteIoClient()
     }
 }
 
-uint16_t ModbusDiscreteIoClient::firstCoilValue(const MB::ModbusResponse & response) const
+uint16_t ModbusDiscreteIoClient::firstCoilValue(const DiscreteReply & reply) const
 {
-    // Note on the two guards below: neither is reachable through the current codec, and
-    // that is worth writing down so nobody "fixes" it into a silent failure later.
+    // A reply with no values is rejected here, with the same exception
+    // MB::ModbusResponse::registerValues() used to throw for it: NumberOfValuesInvalid, slave
+    // 0xFF, no function code. That throw used to come out of registerValues() before this
+    // function could look at the vector; now toDiscreteReply() turns the same empty reply into
+    // an empty DiscreteReply one layer down, so the check and the throw happen here instead.
+    // Either way it is thrown after the transaction, so it is caught, logged and rethrown by the
+    // callers without dropping the link.
     //
-    //   - MB::ModbusResponse::registerValues() throws NumberOfValuesInvalid when the
-    //     vector is empty, so a short reply surfaces as an MB::ModbusException from the
-    //     line below rather than reaching the empty() test. That is the behaviour we
-    //     want - it is caught, logged and rethrown by the callers.
-    //   - For the discrete function codes this client uses, values are always coils:
-    //     ModbusResponse's constructor coerces every cell via ModbusCell::coil(), and
-    //     fromRaw() builds coil cells directly. So isCoil() cannot be false here.
-    //
-    // They stay as a defensive backstop, which also means kDiscreteReadUnavailable is
-    // effectively dead - as the 255U sentinel it replaced always was.
-    const auto & values = response.registerValues();
+    // The non-coil guard is a defensive backstop that is not reachable through the current
+    // codec: for the discrete function codes this client uses, ModbusResponse's constructor
+    // coerces every cell via ModbusCell::coil(), and fromRaw() builds coil cells directly. That
+    // leaves kDiscreteReadUnavailable effectively dead - as the 255U sentinel it replaced always
+    // was. Written down so nobody "fixes" it into a silent failure later.
+    if (reply.cells.empty()) {
+        throw MB::ModbusException(MB::utils::NumberOfValuesInvalid);
+    }
 
-    if (values.empty() || !values.front().isCoil()) {
+    if (!reply.cells.front().is_coil) {
         return kDiscreteReadUnavailable;
     }
 
-    // A coil read returns a whole byte's worth of bits, so the response carries 8 cells
-    // per byte regardless of how many were requested (see ModbusResponse::fromRaw). We
-    // ask for one coil starting at the target address, so bit 0 - front() - is it.
-    return values.front().coil();
+    // A coil read returns a whole byte's worth of bits, so the reply carries 8 cells per byte
+    // regardless of how many were requested (see ModbusResponse::fromRaw). We ask for one coil
+    // starting at the target address, so bit 0 - front() - is it.
+    return reply.cells.front().value;
 }
 
 uint16_t ModbusDiscreteIoClient::readDiscreteContact(const ContactInfo & contact)
 {
-    MB::ModbusRequest request(
-        kModbusDeviceId, MB::utils::ReadDiscreteInputContacts,
-        static_cast<uint16_t>(contact.contact), 1);
+    const DiscreteRequest request{
+        kModbusDeviceId, DiscreteFunction::READ_DISCRETE_INPUTS,
+        static_cast<uint16_t>(contact.contact), 1, false};
 
     try {
         return firstCoilValue(sendRequest(request));
@@ -224,9 +233,9 @@ uint16_t ModbusDiscreteIoClient::readDiscreteContact(const ContactInfo & contact
 
 uint16_t ModbusDiscreteIoClient::readDiscreteCoil(const CoilInfo & coil)
 {
-    MB::ModbusRequest request(
-        kModbusDeviceId, MB::utils::ReadDiscreteOutputCoils,
-        static_cast<uint16_t>(coil.coil), 1);
+    const DiscreteRequest request{
+        kModbusDeviceId, DiscreteFunction::READ_COILS, static_cast<uint16_t>(coil.coil), 1,
+        false};
 
     try {
         return firstCoilValue(sendRequest(request));
@@ -237,28 +246,32 @@ uint16_t ModbusDiscreteIoClient::readDiscreteCoil(const CoilInfo & coil)
 }
 
 std::vector<bool> ModbusDiscreteIoClient::readBits(
-    const MB::utils::MBFunctionCode function_code, const uint16_t first_address,
-    const uint16_t count)
+    const DiscreteFunction function, const uint16_t first_address, const uint16_t count)
 {
-    MB::ModbusRequest request(kModbusDeviceId, function_code, first_address, count);
+    const DiscreteRequest request{kModbusDeviceId, function, first_address, count, false};
 
-    const MB::ModbusResponse response = sendRequest(request);
-    const auto & values = response.registerValues();
+    const DiscreteReply reply = sendRequest(request);
+    const auto & cells = reply.cells;
 
-    if (values.size() < count) {
+    // No values at all: the exception registerValues() used to throw, without a function code.
+    if (cells.empty()) {
+        throw MB::ModbusException(MB::utils::NumberOfValuesInvalid);
+    }
+
+    if (cells.size() < count) {
         throw MB::ModbusException(
-            MB::utils::NumberOfValuesInvalid, kModbusDeviceId, function_code);
+            MB::utils::NumberOfValuesInvalid, kModbusDeviceId, mbFunctionCode(function));
     }
 
     std::vector<bool> bits(count);
 
     for (uint16_t i = 0; i < count; ++i) {
-        if (!values[i].isCoil()) {
+        if (!cells[i].is_coil) {
             throw MB::ModbusException(
-                MB::utils::NumberOfValuesInvalid, kModbusDeviceId, function_code);
+                MB::utils::NumberOfValuesInvalid, kModbusDeviceId, mbFunctionCode(function));
         }
 
-        bits[i] = values[i].coil();
+        bits[i] = cells[i].value;
     }
 
     return bits;
@@ -269,7 +282,7 @@ std::vector<bool> ModbusDiscreteIoClient::readDiscreteContacts(
 {
     try {
         return readBits(
-            MB::utils::ReadDiscreteInputContacts, static_cast<uint16_t>(first), count);
+            DiscreteFunction::READ_DISCRETE_INPUTS, static_cast<uint16_t>(first), count);
     } catch (const MB::ModbusException &) {
         logger_->error("Failed to read contacts");
         throw;
@@ -279,7 +292,7 @@ std::vector<bool> ModbusDiscreteIoClient::readDiscreteContacts(
 std::vector<bool> ModbusDiscreteIoClient::readDiscreteCoils(const Coil first, const uint16_t count)
 {
     try {
-        return readBits(MB::utils::ReadDiscreteOutputCoils, static_cast<uint16_t>(first), count);
+        return readBits(DiscreteFunction::READ_COILS, static_cast<uint16_t>(first), count);
     } catch (const MB::ModbusException &) {
         logger_->error("Failed to read coils");
         throw;
@@ -293,11 +306,9 @@ void ModbusDiscreteIoClient::writeDiscreteCoil(const CoilInfo & coil, const bool
         return;
     }
 
-    const std::vector<MB::ModbusCell> value = {MB::ModbusCell(coil_state)};
-
-    MB::ModbusRequest request(
-        kModbusDeviceId, MB::utils::WriteSingleDiscreteOutputCoil,
-        static_cast<uint16_t>(coil.coil), 1, value);
+    const DiscreteRequest request{
+        kModbusDeviceId, DiscreteFunction::WRITE_SINGLE_COIL, static_cast<uint16_t>(coil.coil),
+        1, coil_state};
 
     try {
         (void)sendRequest(request);
@@ -307,12 +318,12 @@ void ModbusDiscreteIoClient::writeDiscreteCoil(const CoilInfo & coil, const bool
     }
 }
 
-MB::ModbusResponse ModbusDiscreteIoClient::sendRequest(const MB::ModbusRequest & request)
+DiscreteReply ModbusDiscreteIoClient::sendRequest(const DiscreteRequest & request)
 {
     ensureConnected();
 
     try {
-        return transport_->sendRequest(request);
+        return transport_->transact(request);
     } catch (const MB::ModbusException & ex) {
         logger_->error(std::string("Modbus exception: ") + ex.what());
         dropTransport();

@@ -26,20 +26,32 @@ Two reasons:
 
 | Layer | Contents | Library |
 |-------|----------|---------|
-| `domain/` | `Contact`/`Coil` types, `ClientSettings`, and the `DiscreteIoPort`, `ModbusTransportPort` and `LoggerPort` seams | `rover_modbus_driver_core` |
-| `application/` | `ModbusDiscreteIoClient` - contact/coil operations to Modbus frames, plus connection retry | `rover_modbus_driver_core` |
+| `domain/` | `Contact`/`Coil` types, `ClientSettings`, the `DiscreteRequest`/`DiscreteReply` transaction values, and the `DiscreteIoPort`, `ModbusTransportPort` and `LoggerPort` seams | `rover_modbus_driver_core` |
+| `application/` | `ModbusDiscreteIoClient` - contact/coil operations to `DiscreteRequest`s and reply validation, plus connection retry | `rover_modbus_driver_core` |
+| `infrastructure/` | `toMbRequest()`/`toDiscreteReply()`: the only translation to and from `MB::` frames | `rover_modbus_driver_mb_mapping` |
 | `infrastructure/` | `ModbusTcpTransport` (sockets), `RclcppLogger`, and `makeModbusTcpDiscreteIoClient()` | `rover_modbus_driver_ros` |
 
 `_core` links only `rover_modbus::Modbus_Core`, the OS-independent frame codec - **not**
 `Modbus_Tcp`. So "no sockets in `_core`" is enforced by the linker, not by convention.
 Concretely: `_core` must never include `<MB/connection.hpp>` or `<MB/server.hpp>`.
 
-`_core` names `MB::ModbusRequest`/`MB::ModbusResponse` in its public headers. That is
-deliberate - they are pure value types over bytes, with no OS behind them. Narrowing
-`ModbusTransportPort` so it never mentions an `MB::` type (e.g.
-`readDiscreteInputs(address, count) -> std::vector<bool>`) would let a second backend exist
-without touching consumers, and is worth doing eventually; it was kept out of the
-extraction to keep that diff mechanical.
+`ModbusTransportPort` speaks `DiscreteRequest`/`DiscreteReply`
+(`domain/discrete_transaction.hpp`): unit id, FC1/FC2/FC5, address, count and coil value in;
+the reply's cells, each a coil value or "not a coil", out. So a second backend (RTU,
+libmodbus) needs no codec to implement it.
+
+`infrastructure/mb_frame_mapping` is the one translation point to and from
+`MB::ModbusRequest`/`MB::ModbusResponse`. It is its own socket-free, ROS-free library,
+shared by `ModbusTcpTransport` and the unit tests' fake transport, so every wire assertion
+in `test/unit/` runs the production mapping.
+
+`_core` still links `Modbus_Core`, for `MB::ModbusException` alone. That is
+`DiscreteIoPort`'s documented failure contract, and the client raises it itself for an
+empty or non-coil reply - after the transaction, so such a reply does not drop the link.
+The `core_purity_check` test (`scripts/check_core_purity.sh`) enforces the rest: no `MB::`
+header in `domain/` or in `application/` headers, only `<MB/modbusException.hpp>` and
+`<MB/modbusUtils.hpp>` in `application/` sources, and no `infrastructure/` or ROS include in
+either layer.
 
 ## Usage
 
@@ -89,9 +101,13 @@ the note on `kDiscreteReadUnavailable` in `domain/discrete_io_port.hpp`.
 
 | Directory | Covers |
 |-----------|--------|
-| `test/unit/` | What the client puts on the wire - slave id, function codes, addresses, the read-only-coil guard, retry semantics - against a fake transport. No socket, no ROS. |
+| `test/unit/` | What the client puts on the wire - slave id, function codes, addresses, the read-only-coil guard, retry semantics - against a fake transport that runs the production `MB::` mapping. No socket, no ROS. |
+| `test/unit/test_modbus_discrete_io_client_failures.cpp` | Every failure path the fake can inject - empty and short replies, non-coil cells, transport exceptions, the engage guard, the backoff window: the exception, the exact log lines, and whether the link is kept or dropped. |
+| `test/unit/test_mb_frame_mapping.cpp` | `toMbRequest()`/`toDiscreteReply()` alone, including byte identity with the `MB::ModbusRequest` the client used to build directly. |
 | `test/integration/` | The connection-failure path against a real, closed loopback port. |
 | `test/e2e/` | A full request/response exchange against a real `MB::TCP::Server` on a pid-derived port. |
+| `test/e2e/test_modbus_tcp_reply_handling.cpp` | The golden request frames of every operation, and the reply-handling table, against a scripted raw-socket server on a kernel-assigned port. |
+| `scripts/` | `check_core_purity.sh`, run as the `core_purity_check` test: keeps `MB::` frame types out of `domain/` and `application/`. |
 
 ```bash
 colcon test --packages-select rover_modbus_driver && colcon test-result --all

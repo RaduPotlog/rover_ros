@@ -18,7 +18,10 @@
 #include <string>
 
 #include <MB/connection.hpp>
+#include <MB/modbusRequest.hpp>
+#include <MB/modbusResponse.hpp>
 
+#include "rover_modbus_driver/domain/discrete_transaction.hpp"
 #include "rover_modbus_driver/domain/modbus_transport_port.hpp"
 
 namespace rover::transport::modbus
@@ -26,6 +29,9 @@ namespace rover::transport::modbus
 
 // ModbusTransportPort over a real TCP socket. This was ModbusTcpConnection in
 // rover_hardware_interface.
+//
+// What stays here: the socket, its response timeout, close(), and the MB:: transaction itself.
+// transact() translates through infrastructure/mb_frame_mapping on either side of it.
 class ModbusTcpTransport : public ModbusTransportPort
 {
 
@@ -36,7 +42,11 @@ public:
 
     ~ModbusTcpTransport() override;
 
-    MB::ModbusResponse sendRequest(const MB::ModbusRequest & req) override;
+    DiscreteReply transact(const DiscreteRequest & request) override;
+
+    // The raw MB:: transaction transact() is built on. Public for
+    // test/e2e/test_modbus_tcp_roundtrip.cpp; no longer an override.
+    MB::ModbusResponse sendRequest(const MB::ModbusRequest & req);
 
     void close() override;
 

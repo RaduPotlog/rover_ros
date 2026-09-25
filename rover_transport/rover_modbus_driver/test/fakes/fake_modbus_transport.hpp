@@ -23,9 +23,13 @@
 
 #include <MB/modbusCell.hpp>
 #include <MB/modbusException.hpp>
+#include <MB/modbusRequest.hpp>
+#include <MB/modbusResponse.hpp>
 #include <MB/modbusUtils.hpp>
 
+#include "rover_modbus_driver/domain/discrete_transaction.hpp"
 #include "rover_modbus_driver/domain/modbus_transport_port.hpp"
+#include "rover_modbus_driver/infrastructure/mb_frame_mapping.hpp"
 
 namespace rover::transport::modbus::test
 {
@@ -34,6 +38,10 @@ namespace rover::transport::modbus::test
 // wire encoding can be asserted without a socket. The recording lives in a shared
 // Journal rather than in the transport itself because the client owns its transport and
 // the test cannot reach inside it afterwards.
+//
+// It runs the production mapping (infrastructure/mb_frame_mapping) in both directions, exactly
+// as ModbusTcpTransport does, so every assertion on journal->requests still checks the
+// MB::ModbusRequest the TCP transport would put on the wire.
 struct Journal
 {
     std::vector<MB::ModbusRequest> requests;
@@ -45,7 +53,7 @@ struct Journal
     // the batched reads, including replies padded past or cut short of the requested count.
     std::optional<std::vector<bool>> bit_values;
 
-    // When set, sendRequest throws this instead of answering.
+    // When set, transact() throws this instead of answering.
     std::optional<MB::utils::MBErrorCode> throw_error;
 
     // Return a response with no register values, to exercise the short-reply guard.
@@ -72,12 +80,18 @@ public:
     {
     }
 
-    MB::ModbusResponse sendRequest(const MB::ModbusRequest & req) override
+    DiscreteReply transact(const DiscreteRequest & request) override
     {
+        const MB::ModbusRequest req = toMbRequest(request);
         journal_->requests.push_back(req);
 
         if (journal_->throw_error.has_value()) {
             throw MB::ModbusException(*journal_->throw_error);
+        }
+
+        // Like ModbusTcpTransport: a write's echo is not decoded.
+        if (request.function == DiscreteFunction::WRITE_SINGLE_COIL) {
+            return DiscreteReply{};
         }
 
         std::vector<MB::ModbusCell> values;
@@ -90,9 +104,11 @@ public:
             values.push_back(MB::ModbusCell(journal_->coil_value));
         }
 
-        return MB::ModbusResponse(
+        // A prvalue bound straight to toDiscreteReply()'s const reference - never a copied
+        // MB::ModbusResponse, whose copy constructor throws on an empty reply.
+        return toDiscreteReply(MB::ModbusResponse(
             req.slaveID(), req.functionCode(), req.registerAddress(), req.numberOfRegisters(),
-            values);
+            values));
     }
 
     void close() override { journal_->closed = true; }
