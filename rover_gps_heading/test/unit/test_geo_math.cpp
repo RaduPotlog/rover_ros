@@ -56,6 +56,43 @@ TEST(GeoMathTest, WrapAngle)
     EXPECT_NEAR(std::abs(wrapAngle(kPi)), kPi, 1e-12);
 }
 
+TEST(GeoMathTest, YawFromIdentityQuaternionIsZero)
+{
+    EXPECT_DOUBLE_EQ(yawFromQuaternion(0.0, 0.0, 0.0, 1.0), 0.0);
+}
+
+TEST(GeoMathTest, YawFromPureYawQuaternion)
+{
+    for (const double yaw : {0.6, -1.2, kPi / 2.0, 3.0}) {
+        EXPECT_NEAR(
+            yawFromQuaternion(0.0, 0.0, std::sin(0.5 * yaw), std::cos(0.5 * yaw)), yaw, 1e-12);
+    }
+}
+
+TEST(GeoMathTest, YawFromHalfTurnQuaternionIsPi)
+{
+    EXPECT_NEAR(std::abs(yawFromQuaternion(0.0, 0.0, 1.0, 0.0)), kPi, 1e-12);
+}
+
+TEST(GeoMathTest, YawFromQuaternionIgnoresRollAndPitch)
+{
+    const double roll = 0.2;
+    const double pitch = -0.1;
+    const double yaw = 0.7;
+    const double cr = std::cos(0.5 * roll);
+    const double sr = std::sin(0.5 * roll);
+    const double cp = std::cos(0.5 * pitch);
+    const double sp = std::sin(0.5 * pitch);
+    const double cy = std::cos(0.5 * yaw);
+    const double sy = std::sin(0.5 * yaw);
+
+    const double w = cr * cp * cy + sr * sp * sy;
+    const double x = sr * cp * cy - cr * sp * sy;
+    const double y = cr * sp * cy + sr * cp * sy;
+    const double z = cr * cp * sy - sr * sp * cy;
+    EXPECT_NEAR(yawFromQuaternion(x, y, z, w), yaw, 1e-12);
+}
+
 TEST(GeoMathTest, CircularStatsAcrossWrap)
 {
     const CircularStats stats = circularStats({kPi - 0.05, -kPi + 0.05});

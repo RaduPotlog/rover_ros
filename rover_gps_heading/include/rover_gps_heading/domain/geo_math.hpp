@@ -38,6 +38,9 @@ EnuOffset enuOffset(
 /** @brief Wraps an angle to [-pi, pi). */
 double wrapAngle(double angle_rad);
 
+/** @brief Yaw [rad] of a unit quaternion (ZYX convention), in [-pi, pi]. */
+double yawFromQuaternion(double x, double y, double z, double w);
+
 /** @brief Circular mean and circular standard deviation of a set of angles. */
 struct CircularStats
 {

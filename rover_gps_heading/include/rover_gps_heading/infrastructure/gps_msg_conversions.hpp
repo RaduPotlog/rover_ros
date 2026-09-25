@@ -39,8 +39,6 @@ domain::GnssFix toGnssFix(const NavSatFixMsg & msg, double stamp_s);
 /** @param stamp_s receive time, on the clock used for GNSS fixes too. */
 domain::OdometrySample toOdometrySample(const OdometryMsg & msg, double stamp_s);
 
-double yawFromQuaternion(double x, double y, double z, double w);
-
 /**
  * @brief Orientation-only IMU message for navsat_transform_node: roll = pitch = 0, the ENU yaw,
  *        angular velocity and linear acceleration flagged unused (covariance[0] = -1).

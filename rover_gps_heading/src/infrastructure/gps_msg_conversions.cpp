@@ -22,6 +22,8 @@
 
 #include "sensor_msgs/msg/nav_sat_status.hpp"
 
+#include "rover_gps_heading/domain/geo_math.hpp"
+
 namespace rover_gps_heading::infrastructure
 {
 
@@ -71,15 +73,10 @@ domain::OdometrySample toOdometrySample(const OdometryMsg & msg, double stamp_s)
 
     domain::OdometrySample sample;
     sample.stamp_s = stamp_s;
-    sample.yaw_rad = yawFromQuaternion(q.x, q.y, q.z, q.w);
+    sample.yaw_rad = domain::yawFromQuaternion(q.x, q.y, q.z, q.w);
     sample.vx_m_s = msg.twist.twist.linear.x;
     sample.yaw_rate_rad_s = msg.twist.twist.angular.z;
     return sample;
-}
-
-double yawFromQuaternion(double x, double y, double z, double w)
-{
-    return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
 }
 
 ImuMsg toHeadingImuMsg(

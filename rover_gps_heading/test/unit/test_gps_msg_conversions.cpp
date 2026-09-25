@@ -18,11 +18,13 @@
 
 #include "sensor_msgs/msg/nav_sat_status.hpp"
 
+#include "rover_gps_heading/domain/geo_math.hpp"
 #include "rover_gps_heading/infrastructure/gps_msg_conversions.hpp"
 
 using namespace rover_gps_heading::infrastructure;  // NOLINT
 using rover_gps_heading::domain::EnuHeading;
 using rover_gps_heading::domain::FixStatus;
+using rover_gps_heading::domain::yawFromQuaternion;
 using NavSatStatusMsg = sensor_msgs::msg::NavSatStatus;
 
 TEST(GpsMsgConversionsTest, NavSatFixToGnssFix)

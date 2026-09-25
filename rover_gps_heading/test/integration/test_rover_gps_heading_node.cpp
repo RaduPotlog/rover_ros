@@ -30,7 +30,7 @@
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
-#include "rover_gps_heading/infrastructure/gps_msg_conversions.hpp"
+#include "rover_gps_heading/domain/geo_math.hpp"
 #include "rover_gps_heading/infrastructure/rover_gps_heading_node.hpp"
 
 using namespace std::chrono_literals;
@@ -209,7 +209,7 @@ TEST_F(RoverGpsHeadingNodeTest, PublishesHeadingAfterAlignment)
 
     const ImuMsg & heading = headings_.back();
     EXPECT_EQ(heading.header.frame_id, "rover/base_link");
-    const double yaw = rover_gps_heading::infrastructure::yawFromQuaternion(
+    const double yaw = rover_gps_heading::domain::yawFromQuaternion(
         heading.orientation.x, heading.orientation.y, heading.orientation.z, heading.orientation.w);
     // Odom yaw 0 while moving north → ENU yaw +90 deg.
     EXPECT_NEAR(yaw, kPi / 2.0, 0.02);

@@ -62,7 +62,7 @@ All parameters are read-only; invalid values stop the node at startup.
 
 ```
 domain/          GnssFix/OdometrySample value types, geo math (ENU offset, angle wrap, circular
-                 stats), HeadingAlignmentEstimator, HeadingPublisherPort — no ROS
+                 stats, quaternion yaw), HeadingAlignmentEstimator, HeadingPublisherPort — no ROS
 application/     AlignHeadingUseCase (fix + odom → alignment → ENU heading)
 infrastructure/  RoverGpsHeadingNode (composition root, parameters, subscriptions, reset service),
                  Ros2HeadingPublisher, msg conversions

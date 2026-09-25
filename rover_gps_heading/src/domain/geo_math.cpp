@@ -52,6 +52,11 @@ double wrapAngle(double angle_rad)
     return wrapped - kPi;
 }
 
+double yawFromQuaternion(double x, double y, double z, double w)
+{
+    return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+}
+
 CircularStats circularStats(const std::vector<double> & angles_rad)
 {
     double sum_sin = 0.0;
