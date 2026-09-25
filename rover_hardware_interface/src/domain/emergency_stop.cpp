@@ -108,4 +108,13 @@ void EmergencyStop::resetEStopLatch()
     }
 }
 
+void EmergencyStop::releaseStartupTriggers()
+{
+    // Leaves the cached atomics alone and never consults zero_velocity_check_ - see the
+    // declaration. Lock order is this mutex, then the IO link, as in setEStop()/resetEStop().
+    std::lock_guard<std::mutex> e_stop_lck(e_stop_manipulation_mtx_);
+    io_->triggerUserButton(false);
+    io_->triggerMotorDriverFault(false);
+}
+
 }  // namespace rover_hardware_interface

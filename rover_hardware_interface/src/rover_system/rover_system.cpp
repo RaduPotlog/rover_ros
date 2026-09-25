@@ -91,6 +91,8 @@ CallbackReturn RoverSystem::on_init(const hardware_interface::HardwareComponentI
 CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
 {
     try {
+        // Keep this order: configureRoverController() releases the start-up E-Stop triggers
+        // before the motor drivers are initialised - see EmergencyStop::releaseStartupTriggers().
         configureRoverController();
         configureRoverDriver();
     } catch (const std::exception & e) {
@@ -624,14 +626,16 @@ double RoverSystem::readPositiveToleranceParam(
 void RoverSystem::configureRoverController()
 {
     // Delegates the backend-specific construction (Modbus, or whatever a future rover variant
-    // uses) to the subclass; this method only performs the generic start()/arm sequence, purely
-    // through the RoverGpioPort interface - see defineRoverController()'s declaration.
+    // uses) to the subclass; this method only starts the safety IO (RoverGpioPort) and releases
+    // the start-up E-Stop triggers (EmergencyStopInterface) - see defineRoverController()'s
+    // declaration.
     defineRoverController();
 
     rover_controller_->start();
-    // TODO(mechatronics-academy): Check if e-stop interface can be used
-    rover_controller_->eStopUserBtnTrigger(false);
-    rover_controller_->eStopMotorDriverFaultTrigger(false);
+    // start() drives both software E-Stop inputs to their asserted default; release them through
+    // the E-Stop, which owns every E-Stop coil write. Not resetEStop() - see
+    // EmergencyStop::releaseStartupTriggers().
+    e_stop_->releaseStartupTriggers();
 
     RCLCPP_INFO(logger_, "Successfully configured rover controller and SW User E-Stop.");
 }

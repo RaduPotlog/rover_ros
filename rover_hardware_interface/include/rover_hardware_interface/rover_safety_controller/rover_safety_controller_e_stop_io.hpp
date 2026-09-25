@@ -40,6 +40,8 @@ public:
 
     void triggerUserButton(const bool state) override;
 
+    void triggerMotorDriverFault(const bool state) override;
+
     void resetLatch() override;
 
 private:

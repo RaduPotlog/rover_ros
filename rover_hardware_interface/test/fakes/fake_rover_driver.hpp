@@ -94,10 +94,12 @@ public:
     void setEStop() override {}
     void resetEStop() override {}
     void resetEStopLatch() override {}
+    void releaseStartupTriggers() override { ++release_startup_triggers_calls; }
 
     bool user_e_stop_triggered = false;
     bool latch_active = false;
     bool contactor_engaged = true;
+    unsigned release_startup_triggers_calls = 0;
 };
 
 }  // namespace rover_hardware_interface

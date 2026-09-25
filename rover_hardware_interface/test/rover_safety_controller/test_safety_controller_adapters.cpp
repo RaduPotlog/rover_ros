@@ -23,10 +23,14 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
+#include <ostream>
 #include <thread>
+#include <vector>
 
+#include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller.hpp"
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_e_stop_io.hpp"
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_gpio_adapter.hpp"
@@ -37,6 +41,13 @@ namespace rover_hardware_interface
 {
 namespace test
 {
+
+// Makes a coil-sequence mismatch readable ("COIL_2=1") instead of gtest's raw byte dump. Outside
+// the anonymous namespace so argument-dependent lookup finds it next to CoilWrite.
+void PrintTo(const CoilWrite & write, std::ostream * os)
+{
+    *os << "COIL_" << static_cast<int>(write.coil) << "=" << write.state;
+}
 
 namespace
 {
@@ -140,15 +151,46 @@ TEST_F(AdapterFixture, EStopIoResetLatchPulsesTheLatchResetCoil)
     EXPECT_TRUE(modbus->hasWrite({Coil::COIL_4, false}));
 }
 
-TEST_F(AdapterFixture, GpioAdapterTriggersMapToTheirOwnCoils)
+TEST_F(AdapterFixture, EStopIoMotorDriverFaultTriggerWritesItsOwnCoil)
 {
-    RoverSafetyControllerGpioAdapter adapter(controller);
+    RoverSafetyControllerEStopIo io(controller);
+    // start()'s initCoils() already wrote COIL_3=1, so only a write after the call counts.
+    const auto writes_before = modbus->writesSnapshot().size();
 
-    adapter.eStopUserBtnTrigger(true);
-    adapter.eStopMotorDriverFaultTrigger(true);
+    io.triggerMotorDriverFault(true);
 
-    EXPECT_TRUE(modbus->hasWrite({Coil::COIL_2, true}));
-    EXPECT_TRUE(modbus->hasWrite({Coil::COIL_3, true}));
+    const auto writes = modbus->writesSnapshot();
+    const CoilWrite motor_driver_fault_set{Coil::COIL_3, true};
+    EXPECT_NE(
+        std::find(writes.begin() + writes_before, writes.end(), motor_driver_fault_set),
+        writes.end());
+}
+
+// What configure puts on the wire: start()'s initCoils() burst, then the release of both
+// software E-Stop inputs. This is the exact sequence the removed RoverGpioPort triggers produced
+// (checked against them before they went); the heartbeat (COIL_1) is filtered out because its
+// interleaving is time-dependent. The zero-velocity check refuses, which proves the release is
+// not subject to resetEStop()'s invariant.
+TEST_F(AdapterFixture, StartupTriggerReleaseLeavesTheSameCoilSequenceOnTheWire)
+{
+    EmergencyStop e(std::make_shared<RoverSafetyControllerEStopIo>(controller), [] { return false; });
+    e.releaseStartupTriggers();
+
+    std::vector<CoilWrite> writes;
+    for (const auto & write : modbus->writesSnapshot()) {
+        if (write.coil != Coil::COIL_1) {
+            writes.push_back(write);
+        }
+    }
+
+    const std::vector<CoilWrite> expected = {
+        {Coil::COIL_2, true}, {Coil::COIL_3, true}, {Coil::COIL_4, false},
+        {Coil::COIL_8, false}, {Coil::COIL_9, false}, {Coil::COIL_10, false},
+        {Coil::COIL_11, false}, {Coil::COIL_12, false}, {Coil::COIL_13, false},
+        {Coil::COIL_2, false}, {Coil::COIL_3, false},
+    };
+
+    EXPECT_EQ(writes, expected);
 }
 
 TEST_F(AdapterFixture, GpioAdapterExposesEveryMappedPin)

@@ -46,6 +46,11 @@ void RoverSafetyControllerEStopIo::triggerUserButton(const bool state)
     rover_controller_->eStopUserBtnTrigger(state);
 }
 
+void RoverSafetyControllerEStopIo::triggerMotorDriverFault(const bool state)
+{
+    rover_controller_->eStopMotorDriverFaultTrigger(state);
+}
+
 void RoverSafetyControllerEStopIo::resetLatch()
 {
     rover_controller_->eStopLatchReset();

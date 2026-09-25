@@ -141,9 +141,11 @@ protected:
     // ports here - never on a concrete backend type - so a rover variant using a different
     // safety-IO transport (e.g. CAN or direct GPIO instead of Modbus) only has to provide a new
     // implementation of this method, not modify RoverSystem. configureRoverController() (which
-    // calls this) then performs the generic start()/arm sequence common to every backend, purely
-    // through the RoverGpioPort interface. See RoverA1System::defineRoverController() for the
-    // reference (Modbus-backed) implementation.
+    // calls this) then starts the safety IO through RoverGpioPort::start() and releases the
+    // start-up E-Stop triggers through EmergencyStopInterface::releaseStartupTriggers(). So
+    // e_stop_'s IO port must drive the same safety-IO instance rover_controller_ starts;
+    // otherwise the release silently no-ops. See RoverA1System::defineRoverController() for the
+    // reference (Modbus-backed) implementation, which shares one RoverSafetyController.
     virtual void defineRoverController() = 0;
 
     void resetEStop();
@@ -212,11 +214,11 @@ protected:
 
     // Rover driver interface
     std::shared_ptr<RoverDriverInterface> rover_driver_;
-    // Rover safety controller GPIO port. read()-path GPIO polling and initial arming go through
-    // this domain port, never a concrete backend type - defineRoverController() (implemented per
-    // rover variant, e.g. RoverA1System's Modbus-backed one) constructs the concrete adapter as a
-    // scoped local and never stores it as a member, so nothing on the RT read()/write() path can
-    // reach it directly.
+    // Rover safety controller GPIO port: start, read()-path GPIO polling, link health and aux
+    // outputs go through this domain port, never a concrete backend type; E-Stop coil writes go
+    // only through e_stop_. defineRoverController() (implemented per rover variant, e.g.
+    // RoverA1System's Modbus-backed one) constructs the concrete adapter as a scoped local and
+    // never stores it as a member, so nothing on the RT read()/write() path can reach it directly.
     std::shared_ptr<RoverGpioPort> rover_controller_;
     // Rover emergency stop interface
     std::shared_ptr<EmergencyStopInterface> e_stop_;

@@ -22,7 +22,8 @@
 // on_init() without Modbus/Phidget hardware), this drives a minimal RoverSystem subclass whose
 // defineRoverDriver()/defineRoverController() extension points return in-memory fakes, so
 // on_configure() and write() run for real with no hardware. on_configure() does create a real
-// SystemROSInterface node, hence the rclcpp::init()/shutdown() suite fixture.
+// SystemROSInterface node, hence the rclcpp::init()/shutdown() suite fixture. The configure
+// section at the end checks the start-then-release order of configureRoverController().
 
 #include <gtest/gtest.h>
 
@@ -30,6 +31,8 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -51,14 +54,21 @@ namespace rover_hardware_interface
 namespace
 {
 
+// Records the configure-time calls on both safety ports, in order.
+using CallLog = std::vector<std::string>;
+
 class FakeRoverGpioPort : public RoverGpioPort
 {
 
 public:
 
-    void start() override {}
-    void eStopUserBtnTrigger(const bool /* state */) override {}
-    void eStopMotorDriverFaultTrigger(const bool /* state */) override {}
+    void start() override
+    {
+        if (call_log) {
+            call_log->push_back("gpio.start");
+        }
+    }
+
     void setAuxOutput(const unsigned /* index */, const bool /* state */) override {}
 
     const std::unordered_map<RoverControllerGpio, bool> & queryControlInterfaceIOStates() override
@@ -70,10 +80,34 @@ public:
 
     // Public so a test can present an unhealthy link without another accessor.
     SafetyLinkHealth health;
+    CallLog * call_log = nullptr;
 
 private:
 
     std::unordered_map<RoverControllerGpio, bool> io_states_;
+};
+
+// FakeEmergencyStop that also logs the release into the shared CallLog and can be told to fail it.
+class RecordingEmergencyStop : public FakeEmergencyStop
+{
+
+public:
+
+    void releaseStartupTriggers() override
+    {
+        FakeEmergencyStop::releaseStartupTriggers();
+
+        if (call_log) {
+            call_log->push_back("e_stop.releaseStartupTriggers");
+        }
+
+        if (release_throw_message) {
+            throw std::runtime_error(*release_throw_message);
+        }
+    }
+
+    CallLog * call_log = nullptr;
+    std::optional<std::string> release_throw_message;
 };
 
 // Fills RoverSystem's extension points with fakes and exposes just enough protected state to put
@@ -90,6 +124,8 @@ public:
 
     std::shared_ptr<FakeRoverDriver> fakeDriver() const { return fake_driver_; }
     std::shared_ptr<FakeRoverGpioPort> fakeGpio() const { return fake_gpio_; }
+    std::shared_ptr<RecordingEmergencyStop> fakeEStop() const { return fake_e_stop_; }
+    const CallLog & configureCalls() const { return configure_calls_; }
 
     void setLifecycle(const std::uint8_t id, const std::string & label)
     {
@@ -138,8 +174,10 @@ protected:
 
     void defineRoverController() override
     {
+        fake_gpio_->call_log = &configure_calls_;
+        fake_e_stop_->call_log = &configure_calls_;
         rover_controller_ = fake_gpio_;
-        e_stop_ = std::make_shared<FakeEmergencyStop>();
+        e_stop_ = fake_e_stop_;
     }
 
     void updateHwStates(const rclcpp::Time & /* time */) override {}
@@ -160,6 +198,8 @@ private:
 
     std::shared_ptr<FakeRoverDriver> fake_driver_ = std::make_shared<FakeRoverDriver>();
     std::shared_ptr<FakeRoverGpioPort> fake_gpio_ = std::make_shared<FakeRoverGpioPort>();
+    CallLog configure_calls_;
+    std::shared_ptr<RecordingEmergencyStop> fake_e_stop_ = std::make_shared<RecordingEmergencyStop>();
 };
 
 hardware_interface::ComponentInfo makeWheelJoint(const std::string & name)
@@ -454,6 +494,27 @@ TEST_F(RoverSystemWriteTest, SafetyLinkDiagnosticReportsStoppedThreadsAsErrorWit
     EXPECT_EQ(status.values[5].value, "never");
     EXPECT_EQ(status.values[6].key, "Last IO poll age (ms)");
     EXPECT_EQ(status.values[6].value, "never");
+}
+
+
+// --- configure: start the safety IO, then release the start-up E-Stop triggers -------------
+
+TEST_F(RoverSystemWriteTest, ConfigureStartsTheControllerThenReleasesTheStartupTriggersOnce)
+{
+    const CallLog expected = {"gpio.start", "e_stop.releaseStartupTriggers"};
+
+    EXPECT_EQ(system_.configureCalls(), expected);
+    EXPECT_EQ(system_.fakeEStop()->release_startup_triggers_calls, 1u);
+}
+
+TEST_F(RoverSystemWriteTest, ConfigureFailsWhenReleasingTheStartupTriggersThrows)
+{
+    // A fresh instance: the fixture's system_ is already configured.
+    TestableRoverSystem failing_system;
+    failing_system.fakeEStop()->release_throw_message = "boom";
+
+    ASSERT_EQ(failing_system.on_init(makeParams()), CallbackReturn::SUCCESS);
+    EXPECT_EQ(failing_system.on_configure(rclcpp_lifecycle::State()), CallbackReturn::ERROR);
 }
 
 }  // namespace rover_hardware_interface

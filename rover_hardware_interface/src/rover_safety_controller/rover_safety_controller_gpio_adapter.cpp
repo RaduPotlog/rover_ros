@@ -31,16 +31,6 @@ void RoverSafetyControllerGpioAdapter::start()
     rover_controller_->start();
 }
 
-void RoverSafetyControllerGpioAdapter::eStopUserBtnTrigger(const bool state)
-{
-    rover_controller_->eStopUserBtnTrigger(state);
-}
-
-void RoverSafetyControllerGpioAdapter::eStopMotorDriverFaultTrigger(const bool state)
-{
-    rover_controller_->eStopMotorDriverFaultTrigger(state);
-}
-
 void RoverSafetyControllerGpioAdapter::setAuxOutput(const unsigned index, const bool state)
 {
     rover_controller_->setAuxOutput(index, state);

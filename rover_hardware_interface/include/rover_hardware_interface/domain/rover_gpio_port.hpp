@@ -23,9 +23,11 @@
 namespace rover_hardware_interface
 {
 
-// Port: the GPIO/safety-controller primitives RoverSystem needs to arm the controller and poll
-// its IO state, without depending on the concrete Modbus-backed RoverSafetyController directly.
-// Implemented by RoverSafetyControllerGpioAdapter (see
+// Port: the GPIO/safety-controller primitives RoverSystem needs to start the controller, drive
+// the aux outputs, poll its IO state and report link health, without depending on the concrete
+// Modbus-backed RoverSafetyController directly. It deliberately has no E-Stop coil writes: those
+// belong to EmergencyStopIoPort, behind EmergencyStop's rules. Implemented by
+// RoverSafetyControllerGpioAdapter (see
 // rover_safety_controller/rover_safety_controller_gpio_adapter.hpp), mirroring how
 // EmergencyStopIoPort/RoverSafetyControllerEStopIo isolate EmergencyStop from the same concrete
 // type.
@@ -37,12 +39,6 @@ public:
     virtual ~RoverGpioPort() = default;
 
     virtual void start() = 0;
-
-    // SW E-STOP USER BTN - sw_e_stop_user_button
-    virtual void eStopUserBtnTrigger(const bool state) = 0;
-
-    // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault
-    virtual void eStopMotorDriverFaultTrigger(const bool state) = 0;
 
     // Drives general-purpose output GPIO_AUX_OUT_<index> (index < kAuxOutputCount). NOT RT-safe:
     // blocks for a Modbus round-trip and throws on failure, an out-of-range index, or before

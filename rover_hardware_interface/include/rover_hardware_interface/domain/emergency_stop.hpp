@@ -44,6 +44,10 @@ public:
 
     virtual void triggerUserButton(const bool state) = 0;
 
+    // SW E-STOP MOTOR DRIVER FAULT - sw_e_stop_motor_driver_fault. The relay's second software SET
+    // input; like triggerUserButton(), `true` asserts it.
+    virtual void triggerMotorDriverFault(const bool state) = 0;
+
     virtual void resetLatch() = 0;
 };
 
@@ -67,6 +71,8 @@ public:
     virtual void resetEStop() = 0;
 
     virtual void resetEStopLatch() = 0;
+
+    virtual void releaseStartupTriggers() = 0;
 };
 
 // Owns the "can't clear the E-Stop while the rover is still being commanded to move" safety
@@ -94,6 +100,20 @@ public:
     void resetEStop() override;
 
     void resetEStopLatch() override;
+
+    // Configure-time only: called once from RoverSystem::configureRoverController(), right after
+    // the safety controller's start() has asserted both software E-Stop inputs (their initCoils()
+    // defaults). Releases the user-button input, then the motor-driver-fault input.
+    //
+    // Deliberately not resetEStop() and not subject to its zero-velocity invariant: the motor
+    // drivers aren't initialised yet (configureRoverDriver() runs after), write() isn't running
+    // for this component, and the set-dominant relay latch these inputs SET holds until
+    // sw_e_stop_latch_reset. resetEStop() would also refuse on a fresh configure, because the
+    // zero-velocity check is fail-safe false until write() has run.
+    //
+    // Port exceptions propagate unwrapped (unlike setEStop()/resetEStop()), so a failed write
+    // reaches on_configure()'s log with the port's own message.
+    void releaseStartupTriggers() override;
 
 protected:
 
