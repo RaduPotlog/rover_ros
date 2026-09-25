@@ -71,6 +71,29 @@ target_include_directories(${PROJECT_NAME}_shutdown_command PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
+# Infrastructure: runs a bash command in its own process group, watched from a thread.
+add_library(${PROJECT_NAME}_command_handler STATIC
+    src/infrastructure/command_handler.cpp
+)
+target_include_directories(${PROJECT_NAME}_command_handler PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+# Linked into the BT plugin shared libraries.
+set_target_properties(${PROJECT_NAME}_command_handler PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(${PROJECT_NAME}_command_handler PRIVATE
+    ${behaviortree_cpp_TARGETS}  # behavior_tree_utils.hpp (timeoutExceeded()) includes BT.CPP
+)
+
+# Infrastructure: asks a remote host to shut down (HMAC-signed GET) and pings until it is down.
+add_library(${PROJECT_NAME}_shutdown_host STATIC
+    src/infrastructure/shutdown_host.cpp
+)
+set_target_properties(${PROJECT_NAME}_shutdown_host PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(${PROJECT_NAME}_shutdown_host
+    PUBLIC ${PROJECT_NAME}_command_handler
+    PRIVATE OpenSSL::Crypto ${behaviortree_cpp_TARGETS}
+)
+
 # ------------------------------------- Plugins -------------------------------------- #
 add_library(call_set_bool_service_bt_node SHARED
     src/plugins/action/call_set_bool_service_node.cpp)
@@ -121,6 +144,9 @@ foreach(bt_plugin ${plugin_libs})
     )
     target_include_directories(${bt_plugin} PUBLIC ${rover_utils_INCLUDE_DIRS})
 endforeach()
+
+target_link_libraries(execute_command_bt_node ${PROJECT_NAME}_command_handler)
+target_link_libraries(shutdown_hosts_from_file_bt_node ${PROJECT_NAME}_shutdown_host)
 
 add_executable(${PROJECT_NAME}_node src/safety_main.cpp
     src/safety_node.cpp
@@ -237,10 +263,10 @@ if(BUILD_TESTING)
 
     ament_add_gtest(test_shutdown_host test/unit/plugins/test_shutdown_host.cpp
                     TIMEOUT 60)
-    target_link_libraries(test_shutdown_host ${PLUGIN_TEST_LIBRARIES})
+    target_link_libraries(test_shutdown_host ${PLUGIN_TEST_LIBRARIES} ${PROJECT_NAME}_shutdown_host)
 
     ament_add_gmock(test_shutdown_hosts_node test/unit/plugins/test_shutdown_hosts_node.cpp)
-    target_link_libraries(test_shutdown_hosts_node ${PLUGIN_TEST_LIBRARIES})
+    target_link_libraries(test_shutdown_hosts_node ${PLUGIN_TEST_LIBRARIES} ${PROJECT_NAME}_shutdown_host)
 
     ament_add_gtest(test_shutdown_hosts_from_file_node
                     test/unit/plugins/test_shutdown_hosts_from_file_node.cpp

@@ -22,7 +22,7 @@
 
 #include "behaviortree_cpp/basic_types.h"
 
-#include "rover_safety/plugins/shutdown_host.hpp"
+#include "rover_safety/infrastructure/shutdown_host.hpp"
 #include "rover_safety/plugins/shutdown_hosts_node.hpp"
 
 namespace rover_safety
@@ -62,7 +62,7 @@ public:
 
 private:
 
-    bool updateHosts(std::vector<std::shared_ptr<ShutdownHostInterface>> & hosts) override;
+    bool updateHosts(std::vector<std::shared_ptr<infrastructure::ShutdownHostInterface>> & hosts) override;
 };
 
 }  // namespace rover_safety

@@ -201,7 +201,9 @@ domain/          battery_safety_policy (verdict from battery health + temperatur
                  safety_health (input freshness),
                  shutdown_sequence (shutdown state, idempotent requests, retry backoff) - no ROS dependencies
 infrastructure/  safety_diagnostics (diagnostic_updater status mapping),
-                 shutdown_command (bash command carrying the shutdown reason)
+                 shutdown_command (bash command carrying the shutdown reason),
+                 command_handler (bash command in its own process group, watched from a thread),
+                 shutdown_host (signed HTTP shutdown request, ping until down)
 safety_node / led_safety_node   lifecycle ROS adapters: subscriptions -> blackboard, tree timer
 behavior_tree.hpp               tree loading, plugin registration, Groot2 publisher
 plugins/         BT action and decorator nodes listed above

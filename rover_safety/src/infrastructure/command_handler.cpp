@@ -12,19 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROVER_SAFETY_PLUGINS_ACTION_COMMAND_HANDLER_HPP_
-#define ROVER_SAFETY_PLUGINS_ACTION_COMMAND_HANDLER_HPP_
+#include "rover_safety/infrastructure/command_handler.hpp"
 
 #include <fcntl.h>
 #include <signal.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <atomic>
 #include <chrono>
-#include <condition_variable>
-#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -32,114 +27,15 @@
 
 #include "rover_safety/behavior_tree_utils.hpp"
 
-namespace rover_safety
+namespace rover_safety::infrastructure
 {
 
-enum class CommandState {
-    IDLE = 0,
-    RUNNING,
-    SUCCESS,
-    FAILURE,
-};
-
-/**
- * Runs a bash command in a child process and watches it from a background thread, so a behavior
- * tree can poll getState() without blocking. The command runs in its own process group, so a
- * timeout or halt() kills everything it spawned. execute() may be called again to re-run.
- *
- * Each run keeps its state in an Execution shared with its watcher thread. halt() waits a bounded
- * time for the watcher; should the child survive SIGKILL (a process stuck in uninterruptible
- * sleep), the watcher is detached with its Execution instead of hanging the tree.
- */
-class CommandHandler
+CommandHandler::~CommandHandler()
 {
+    halt();
+}
 
-public:
-
-    /** How long halt() waits for the watcher to reap a killed command. */
-    static constexpr std::chrono::milliseconds kHaltTimeout{2000};
-
-    CommandHandler() = default;
-
-    CommandHandler(const CommandHandler &) = delete;
-    CommandHandler & operator=(const CommandHandler &) = delete;
-
-    ~CommandHandler()
-    {
-        halt();
-    }
-
-    void execute(const std::string & command, const std::chrono::milliseconds & timeout);
-
-    /** Kills a running command and waits, at most kHaltTimeout, for the watcher thread. */
-    void halt();
-
-    CommandState getState()
-    {
-        return execution_ ? execution_->state.load() : CommandState::IDLE;
-    }
-
-    std::string getOutput()
-    {
-        if (!execution_) {
-            return "";
-        }
-
-        std::lock_guard<std::mutex> lock(execution_->mtx);
-
-        return execution_->output;
-    }
-
-    std::string getError()
-    {
-        if (!execution_) {
-            return "";
-        }
-
-        std::lock_guard<std::mutex> lock(execution_->mtx);
-
-        return execution_->error;
-    }
-
-private:
-
-    /** One run of a command, owned jointly by the handler and the run's watcher thread. */
-    struct Execution
-    {
-        int read_fd{-1};
-        pid_t child_pid{-1};
-        std::chrono::milliseconds timeout{0};
-        std::chrono::time_point<std::chrono::steady_clock> start_time;
-
-        std::atomic<CommandState> state{CommandState::RUNNING};
-        std::atomic<bool> kill_requested{false};
-
-        // Guards output, error and done.
-        std::mutex mtx;
-        std::condition_variable done_cv;
-        std::string output;
-        std::string error;
-        bool done{false};
-
-        void setError(const std::string & message)
-        {
-            std::lock_guard<std::mutex> lock(mtx);
-            error = message;
-        }
-    };
-
-    static void watch(const std::shared_ptr<Execution> & execution);
-
-    static bool startChild(Execution & execution, const std::string & command);
-
-    /** Appends whatever the pipe holds to the output; false when nothing was read. */
-    static bool readOutput(Execution & execution);
-
-    std::shared_ptr<Execution> execution_;
-    std::thread watcher_;
-};
-
-inline void CommandHandler::execute(
+void CommandHandler::execute(
     const std::string & command,
     const std::chrono::milliseconds & timeout_ms)
 {
@@ -156,7 +52,7 @@ inline void CommandHandler::execute(
     watcher_ = std::thread(&CommandHandler::watch, execution_);
 }
 
-inline void CommandHandler::halt()
+void CommandHandler::halt()
 {
     if (!watcher_.joinable()) {
         return;
@@ -186,7 +82,29 @@ inline void CommandHandler::halt()
     execution_->state = CommandState::FAILURE;
 }
 
-inline void CommandHandler::watch(const std::shared_ptr<Execution> & execution)
+std::string CommandHandler::getOutput()
+{
+    if (!execution_) {
+        return "";
+    }
+
+    std::lock_guard<std::mutex> lock(execution_->mtx);
+
+    return execution_->output;
+}
+
+std::string CommandHandler::getError()
+{
+    if (!execution_) {
+        return "";
+    }
+
+    std::lock_guard<std::mutex> lock(execution_->mtx);
+
+    return execution_->error;
+}
+
+void CommandHandler::watch(const std::shared_ptr<Execution> & execution)
 {
     bool killed = false;
     std::string kill_reason;
@@ -241,7 +159,7 @@ inline void CommandHandler::watch(const std::shared_ptr<Execution> & execution)
     }
 }
 
-inline bool CommandHandler::startChild(Execution & execution, const std::string & command)
+bool CommandHandler::startChild(Execution & execution, const std::string & command)
 {
     int pipefd[2]{-1, -1};
 
@@ -285,7 +203,7 @@ inline bool CommandHandler::startChild(Execution & execution, const std::string 
     return true;
 }
 
-inline bool CommandHandler::readOutput(Execution & execution)
+bool CommandHandler::readOutput(Execution & execution)
 {
     char buffer[128];
 
@@ -302,6 +220,4 @@ inline bool CommandHandler::readOutput(Execution & execution)
     return false;
 }
 
-}  // namespace rover_safety
-
-#endif  // ROVER_SAFETY_PLUGINS_ACTION_COMMAND_HANDLER_HPP_
+}  // namespace rover_safety::infrastructure

@@ -32,7 +32,7 @@
 namespace rover_safety
 {
 
-bool ShutdownHostsFromFile::updateHosts(std::vector<std::shared_ptr<ShutdownHostInterface>> & hosts)
+bool ShutdownHostsFromFile::updateHosts(std::vector<std::shared_ptr<infrastructure::ShutdownHostInterface>> & hosts)
 {
     std::string shutdown_hosts_file;
 
@@ -84,7 +84,7 @@ bool ShutdownHostsFromFile::updateHosts(std::vector<std::shared_ptr<ShutdownHost
             const auto secret = rover_utils::getYAMLKeyValue<std::string>(host, "secret", "");
             const auto timeout = rover_utils::getYAMLKeyValue<float>(host, "timeout", 5.0f);
 
-            hosts.push_back(std::make_shared<ShutdownHost>(ip, port, secret, timeout));
+            hosts.push_back(std::make_shared<infrastructure::ShutdownHost>(ip, port, secret, timeout));
         }
     } catch (const std::runtime_error & e) {
         RCLCPP_ERROR_STREAM(*this->logger_, getLoggerPrefix(name()) << e.what());

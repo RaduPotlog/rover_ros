@@ -25,12 +25,12 @@
 #include <sstream>
 #include <string>
 
-#include "rover_safety/plugins/shutdown_host.hpp"
+#include "rover_safety/infrastructure/shutdown_host.hpp"
 
 #include "plugin_test_utils.hpp"
 
-using rover_safety::ShutdownHost;
-using rover_safety::ShutdownHostState;
+using rover_safety::infrastructure::ShutdownHost;
+using rover_safety::infrastructure::ShutdownHostState;
 using rover_safety::test::OneShotHttpServer;
 
 namespace

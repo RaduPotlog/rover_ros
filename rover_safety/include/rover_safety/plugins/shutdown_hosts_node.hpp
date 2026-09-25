@@ -30,7 +30,7 @@
 #include "behaviortree_cpp/tree_node.h"
 #include "rclcpp/rclcpp.hpp"
 
-#include "rover_safety/plugins/shutdown_host.hpp"
+#include "rover_safety/infrastructure/shutdown_host.hpp"
 
 #include "rover_safety/behavior_tree_utils.hpp"
 
@@ -51,7 +51,7 @@ public:
 
     virtual ~ShutdownHosts() = default;
 
-    virtual bool updateHosts(std::vector<std::shared_ptr<ShutdownHostInterface>> & hosts) = 0;
+    virtual bool updateHosts(std::vector<std::shared_ptr<infrastructure::ShutdownHostInterface>> & hosts) = 0;
 
     virtual BT::NodeStatus postProcess()
     {
@@ -115,7 +115,7 @@ protected:
         host->call();
 
         switch (host->getState()) {
-            case ShutdownHostState::RESPONSE_RECEIVED:
+            case infrastructure::ShutdownHostState::RESPONSE_RECEIVED:
                 RCLCPP_INFO_STREAM(
                     *this->logger_, getLoggerPrefix(name())
                     << "Device at: " << host->getIp() << " response:\n"
@@ -124,7 +124,7 @@ protected:
                 check_host_index_++;
                 break;
 
-            case ShutdownHostState::SUCCESS:
+            case infrastructure::ShutdownHostState::SUCCESS:
                 RCLCPP_INFO_STREAM(
                     *this->logger_, getLoggerPrefix(name())
                     << "Successfully shutdown device at: " << host->getIp());
@@ -133,7 +133,7 @@ protected:
                 
                 break;
 
-            case ShutdownHostState::FAILURE:
+            case infrastructure::ShutdownHostState::FAILURE:
                 RCLCPP_WARN_STREAM(
                     *this->logger_, getLoggerPrefix(name())
                     << "Failed to shutdown device at: " << host->getIp()
@@ -144,7 +144,7 @@ protected:
                 
                 break;
 
-            case ShutdownHostState::SKIPPED:
+            case infrastructure::ShutdownHostState::SKIPPED:
                 RCLCPP_WARN_STREAM(
                     *this->logger_, getLoggerPrefix(name())
                     << "Device at: " << host->getIp() << " not available, skipping...");
@@ -163,16 +163,17 @@ protected:
         return BT::NodeStatus::RUNNING;
     }
 
-    void removeDuplicatedHosts(std::vector<std::shared_ptr<ShutdownHostInterface>> & hosts)
+    void removeDuplicatedHosts(std::vector<std::shared_ptr<infrastructure::ShutdownHostInterface>> & hosts)
     {
         auto comp = [](
-            const std::shared_ptr<ShutdownHostInterface> & lhs,
-            const std::shared_ptr<ShutdownHostInterface> & rhs) { return *lhs < *rhs; };
+            const std::shared_ptr<infrastructure::ShutdownHostInterface> & lhs,
+            const std::shared_ptr<infrastructure::ShutdownHostInterface> & rhs) { return *lhs < *rhs; };
 
-        std::set<std::shared_ptr<ShutdownHostInterface>, decltype(comp)> seen(comp);
+        std::set<std::shared_ptr<infrastructure::ShutdownHostInterface>, decltype(comp)> seen(comp);
 
         hosts.erase(
-            std::remove_if(hosts.begin(), hosts.end(), [&](const std::shared_ptr<ShutdownHostInterface> & host) {
+            std::remove_if(hosts.begin(), hosts.end(), [&](
+                const std::shared_ptr<infrastructure::ShutdownHostInterface> & host) {
           
                 if (!seen.count(host)) {
                     seen.insert(host);
@@ -198,7 +199,7 @@ protected:
 
     std::shared_ptr<rclcpp::Logger> logger_;
     std::size_t check_host_index_ = 0;
-    std::vector<std::shared_ptr<ShutdownHostInterface>> hosts_;
+    std::vector<std::shared_ptr<infrastructure::ShutdownHostInterface>> hosts_;
     std::vector<std::size_t> hosts_to_check_;
     std::vector<std::size_t> skipped_hosts_;
     std::vector<std::size_t> succeeded_hosts_;

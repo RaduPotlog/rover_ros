@@ -22,7 +22,7 @@
 #include "rclcpp/logger.hpp"
 #include "rclcpp/logging.hpp"
 
-#include "rover_safety/plugins/command_handler.hpp"
+#include "rover_safety/infrastructure/command_handler.hpp"
 
 namespace rover_safety
 {
@@ -36,7 +36,7 @@ public:
         const BT::NodeConfiguration & conf)
     : StatefulActionNode(name, conf)
     {
-        command_handler_ = std::make_shared<CommandHandler>();
+        command_handler_ = std::make_shared<infrastructure::CommandHandler>();
         logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger(name));
     }
 
@@ -57,7 +57,7 @@ protected:
     void onHalted() override;
 
     std::shared_ptr<rclcpp::Logger> logger_;
-    std::shared_ptr<CommandHandler> command_handler_;
+    std::shared_ptr<infrastructure::CommandHandler> command_handler_;
 };
 
 }  // namespace rover_safety

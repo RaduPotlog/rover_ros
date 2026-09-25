@@ -49,11 +49,11 @@ BT::NodeStatus ExecuteCommand::onStart()
 
 BT::NodeStatus ExecuteCommand::onRunning()
 {
-    if (command_handler_->getState() == CommandState::RUNNING) {
+    if (command_handler_->getState() == infrastructure::CommandState::RUNNING) {
         return BT::NodeStatus::RUNNING;
     }
 
-    if (command_handler_->getState() == CommandState::SUCCESS) {
+    if (command_handler_->getState() == infrastructure::CommandState::SUCCESS) {
         RCLCPP_INFO_STREAM(
             *logger_, getLoggerPrefix(name()) << "Command output: " << command_handler_->getOutput());
         

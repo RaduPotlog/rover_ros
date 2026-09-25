@@ -22,8 +22,8 @@
 
 #include "rover_safety/plugins/shutdown_hosts_node.hpp"
 
-using rover_safety::ShutdownHostInterface;
-using rover_safety::ShutdownHostState;
+using rover_safety::infrastructure::ShutdownHostInterface;
+using rover_safety::infrastructure::ShutdownHostState;
 using HostList = std::vector<std::shared_ptr<ShutdownHostInterface>>;
 
 namespace
@@ -100,7 +100,7 @@ protected:
 
 TEST_F(ShutdownHostsNodeTest, RemovesDuplicatedHosts)
 {
-    using rover_safety::ShutdownHost;
+    using rover_safety::infrastructure::ShutdownHost;
     HostList hosts = {
         std::make_shared<ShutdownHost>("127.0.0.1", "3003", "password", 1.0),
         std::make_shared<ShutdownHost>("localhost", "3003", "password", 1.0),
