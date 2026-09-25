@@ -25,7 +25,7 @@ endforeach()
 # than by convention. Concretely: this library must never include <MB/connection.hpp> or
 # <MB/server.hpp>.
 add_library(${PROJECT_NAME}_core STATIC
-  src/application/logger_port.cpp
+  src/domain/logger_port.cpp
   src/application/modbus_discrete_io_client.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
