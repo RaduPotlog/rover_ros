@@ -179,3 +179,5 @@ colcon test --packages-select rover_led && colcon test-result --all --verbose
 - `test/unit/` covers the domain, the use cases, the YAML loader and the diagnostics.
 - `test/integration/test_led_driver_node.cpp` runs the driver node: its lifecycle, frame
   forwarding and dropping malformed frames.
+- `test/integration/test_led_controller_node.cpp` runs the controller node on
+  `led_controller_test_animations.yaml`: catalog, set/stop, frames, state and diagnostics.

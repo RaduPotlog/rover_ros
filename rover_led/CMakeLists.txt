@@ -199,6 +199,13 @@ if(BUILD_TESTING)
 
   rover_led_add_test(test_led_driver_node
                      test/integration/test_led_driver_node.cpp led_driver_node_component)
+
+  # pluginlib finds the animation plugins through the ament index: point it at this package's
+  # install prefix, so the test doesn't depend on a sourced workspace.
+  ament_add_gmock(test_led_controller_node test/integration/test_led_controller_node.cpp
+                  TIMEOUT 120 APPEND_ENV AMENT_PREFIX_PATH=${CMAKE_INSTALL_PREFIX})
+  target_link_libraries(test_led_controller_node led_controller_node_component)
+  target_compile_definitions(test_led_controller_node PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 install(

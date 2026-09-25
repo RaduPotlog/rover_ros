@@ -1,0 +1,49 @@
+# Layout and catalog for test_led_controller_node. Segments are as wide as flood_light.png
+# (46 px, uniform white) and animations last as many frames as it is tall (7 s x 50 Hz = 350),
+# so images are played without resampling and frames compare exactly.
+panels:
+  - channel: 1
+    number_of_leds: 46
+  - channel: 2
+    number_of_leds: 46
+    rows: 2
+segments:
+  - name: test_front
+    channel: 1
+    led_range: 0-45
+  - name: test_rear
+    channel: 2
+    led_range: 0-45
+segments_map:
+  all: [test_front, test_rear]
+  front: [test_front]
+led_animations:
+  # Out of id order on purpose: led/animations is sorted by id.
+  - id: 7
+    name: RED
+    priority: 3
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: all
+        animation:
+          image: $(find rover_led)/animations/rover_a1/flood_light.png
+          duration: 7
+          color: 16711680  # 0xFF0000
+  - id: 2
+    name: WHITE_FRONT
+    priority: 0
+    animations:
+      - type: rover_led::ImageAnimation
+        segments: front
+        animation:
+          image: $(find rover_led)/animations/rover_a1/flood_light.png
+          duration: 7
+  - id: 9
+    name: MISSING_TYPE
+    priority: 2
+    animations:
+      - type: rover_led::NoSuchAnimation
+        segments: front
+        animation:
+          image: $(find rover_led)/animations/rover_a1/flood_light.png
+          duration: 7
