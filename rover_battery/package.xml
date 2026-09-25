@@ -13,10 +13,11 @@
   <depend>diagnostic_updater</depend>
   <depend>sensor_msgs</depend>
   <depend>rover_msgs</depend>
+  <!-- parameter_utils.hpp for the node, rover_utils.logging for the launch file -->
+  <depend>rover_utils</depend>
   <depend>udp_msgs</depend>
 
   <!-- used by launch/rover_battery.launch.py -->
-  <exec_depend>rover_utils</exec_depend>
   <exec_depend>rover_udp_driver</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>

@@ -21,6 +21,7 @@
 #include <string>
 
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
+#include "rover_utils/parameter_utils.hpp"
 
 #include "rover_battery/domain/battery_classifier.hpp"
 #include "rover_battery/domain/bms_frame.hpp"
@@ -29,20 +30,8 @@
 namespace rover_battery
 {
 
+using rover_utils::ros::describe;
 using std::placeholders::_1;
-
-namespace
-{
-
-rcl_interfaces::msg::ParameterDescriptor describe(const std::string & description)
-{
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.description = description;
-    descriptor.read_only = true;
-    return descriptor;
-}
-
-}  // namespace
 
 RoverBatteryNode::RoverBatteryNode(
     const std::string & node_name,

@@ -14,10 +14,13 @@ The headers install to `include/rover_utils/`. Include them as `rover_utils/<hea
 | `ros_utils.hpp` | `rover_utils::ros` | `addNamespaceToFrameID(frame_id, ns)` | `("imu_link", "/rover")` → `"rover/imu_link"`; the root namespace leaves the frame unchanged. |
 | | | `mergeHeaders(h1, h2)` | Header with the shared `frame_id` and the older stamp; throws if the frame ids differ. |
 | | | `verifyTimestampGap(h1, h2, max_gap)` | Throws if either stamp is unset or they differ by more than `max_gap` (whole seconds). |
+| `parameter_utils.hpp` | `rover_utils::ros` | `describe(description)` | `ParameterDescriptor` with `description` and `read_only = true`. |
+| | | `describePositive(description, max_value)` | Same, plus one `floating_point_range` from `1e-6` to `max_value`. |
 | `networking_utils.hpp` | `rover_utils` | `isPortAvailable(port)` | `true` if a TCP socket can bind `port` on all interfaces. |
 
-Used by `rover_led` (`yaml_utils` for the animation config, `ros_utils` for LED frame ids) and
-`rover_safety` (`networking_utils` to pick a free Groot2 port).
+Used by `rover_led` (`yaml_utils` for the animation config, `ros_utils` for LED frame ids),
+`rover_safety` (`networking_utils` to pick a free Groot2 port), and `rover_battery` /
+`rover_gps_heading` (`parameter_utils` for their read-only parameters).
 
 ```cmake
 find_package(rover_utils REQUIRED)
@@ -45,6 +48,4 @@ arguments=["--ros-args", "--log-level", log_level,
 
 ## Known limitations
 
-- The functions in `ros_utils.hpp` are defined in the header without `inline`. Including it in
-  more than one translation unit of the same target causes multiple-definition link errors.
 - `ros_utils.hpp`, `networking_utils.hpp` and `messages.welcome_msg` have no tests.

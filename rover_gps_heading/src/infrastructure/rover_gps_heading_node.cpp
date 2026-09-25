@@ -21,6 +21,7 @@
 #include <string>
 
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
+#include "rover_utils/parameter_utils.hpp"
 
 #include "rover_gps_heading/infrastructure/ros2_heading_publisher.hpp"
 
@@ -28,31 +29,10 @@ namespace rover_gps_heading
 {
 
 using namespace std::chrono_literals;
+using rover_utils::ros::describe;
+using rover_utils::ros::describePositive;
 using std::placeholders::_1;
 using std::placeholders::_2;
-
-namespace
-{
-
-rcl_interfaces::msg::ParameterDescriptor describe(const std::string & description)
-{
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.description = description;
-    descriptor.read_only = true;
-    return descriptor;
-}
-
-rcl_interfaces::msg::ParameterDescriptor describePositive(
-    const std::string & description, double max_value)
-{
-    auto descriptor = describe(description);
-    descriptor.floating_point_range.resize(1);
-    descriptor.floating_point_range[0].from_value = 1.0e-6;
-    descriptor.floating_point_range[0].to_value = max_value;
-    return descriptor;
-}
-
-}  // namespace
 
 RoverGpsHeadingNode::RoverGpsHeadingNode(
     const std::string & node_name,

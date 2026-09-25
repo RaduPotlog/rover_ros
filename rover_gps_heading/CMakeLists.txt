@@ -15,6 +15,7 @@ set(PACKAGE_DEPENDENCIES
     diagnostic_updater
     nav_msgs
     rcl_interfaces
+    rover_utils
     sensor_msgs
     std_srvs
 )
@@ -41,6 +42,7 @@ add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/rover_gps_heading_node.cpp
 )
 target_link_libraries(${PROJECT_NAME}_ros ${PROJECT_NAME}_core)
+target_include_directories(${PROJECT_NAME}_ros PUBLIC ${rover_utils_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_ros
     ${rclcpp_TARGETS}
     ${builtin_interfaces_TARGETS}

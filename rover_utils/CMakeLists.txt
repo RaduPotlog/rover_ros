@@ -15,6 +15,7 @@ set(PACKAGE_DEPENDENCIES
     ament_cmake_python
     diagnostic_updater
     realtime_tools
+    rcl_interfaces
     rclcpp
     std_msgs
     yaml-cpp)
@@ -40,6 +41,13 @@ if(BUILD_TESTING)
   ament_add_gtest(test_shutdown_gate test/test_shutdown_gate.cpp)
   target_include_directories(test_shutdown_gate PRIVATE include)
   target_link_libraries(test_shutdown_gate rclcpp::rclcpp)
+
+  # Two translation units: a helper that lost `inline` fails to link.
+  ament_add_gtest(test_parameter_utils
+                  test/test_parameter_utils.cpp
+                  test/parameter_utils_second_tu.cpp)
+  target_include_directories(test_parameter_utils PRIVATE include)
+  target_link_libraries(test_parameter_utils ${rcl_interfaces_TARGETS})
 
   ament_add_gtest(test_yaml_utils test/test_yaml_utils.cpp)
   target_include_directories(test_yaml_utils PRIVATE include)
