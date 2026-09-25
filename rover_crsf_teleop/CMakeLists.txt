@@ -11,6 +11,7 @@ set(PACKAGE_DEPENDENCIES
     diagnostic_updater
     lifecycle_msgs
     rclcpp
+    rclcpp_components
     rclcpp_lifecycle
     std_srvs
     std_msgs
@@ -37,6 +38,7 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/rim_speed_limit.cpp
             src/domain/switch_debouncer.cpp
             src/domain/link_monitor.cpp
+            src/domain/rate_limiter.cpp
             src/domain/teleop_health.cpp
             src/application/calibration_use_case.cpp
             src/application/teleop_use_case.cpp
@@ -81,6 +83,16 @@ add_library(${PROJECT_NAME}_ros STATIC
             src/infrastructure/rover_crsf_teleop_node.cpp
 )
 target_link_libraries(${PROJECT_NAME}_ros PUBLIC ${PROJECT_NAME}_adapters)
+# Linked into the SHARED component library below.
+set_target_properties(${PROJECT_NAME}_ros PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# The same node as an rclcpp_components plugin (rover_crsf_teleop::RoverCrsfTeleopNode), which
+# the launch file loads into one container with the serial bridge. The registration source must
+# be compiled into this SHARED library itself - see the file. Plural macro: it registers without
+# generating an executable, which would clash with the hand-written main below.
+add_library(${PROJECT_NAME}_component SHARED src/infrastructure/rover_crsf_teleop_component.cpp)
+target_link_libraries(${PROJECT_NAME}_component ${PROJECT_NAME}_ros ${rclcpp_components_TARGETS})
+rclcpp_components_register_nodes(${PROJECT_NAME}_component "rover_crsf_teleop::RoverCrsfTeleopNode")
 
 add_executable(${PROJECT_NAME}_node src/rover_crsf_teleop_node_main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
@@ -90,6 +102,10 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
 # compiles downstream and then fails to link. Nothing outside this package includes them. If a
 # consumer ever appears, install and export the libraries first, then put the headers back.
 install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS ${PROJECT_NAME}_component
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
@@ -110,6 +126,7 @@ if(BUILD_TESTING)
           test_safety_io_flags
           test_calibration_use_case
           test_link_monitor
+          test_rate_limiter
           test_teleop_health
           test_teleop_use_case)
     ament_add_gtest(${TEST_NAME} test/unit/${TEST_NAME}.cpp)
@@ -140,6 +157,10 @@ if(BUILD_TESTING)
   add_test(NAME test_layer_purity
            COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                    -P ${CMAKE_CURRENT_SOURCE_DIR}/test/layer_purity.cmake)
+
+  # The launch file's composition: container, plugins, intra-process, node names.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_structure test/test_launch_structure.py)
 
   # E2E: the node started from its launch description (test/e2e/).
   add_launch_test(test/e2e/test_teleop_launch.py TIMEOUT 60)

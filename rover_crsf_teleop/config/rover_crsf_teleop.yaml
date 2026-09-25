@@ -26,9 +26,13 @@
 
     # Echo decoded frames on rc/channels (rover_msgs/RcChannels) and rc/link
     # (rover_msgs/RcLinkStatus). Nothing on the rover consumes them - teleop decodes in-process -
-    # so they exist purely for tuning and for `ros2 bag`. They publish once per DECODED frame, so
-    # `ros2 topic hz /rover/rc/channels` measures the receiver's real packet rate.
+    # so they exist purely for tuning, for `ros2 bag` and for the Cockpit RC page (which redraws
+    # at 10 Hz). They publish once per DECODED frame, capped at rc_topics_rate_hz each: the
+    # receiver decodes ~250 frames/s and every echo crosses the Zenoh router. With the cap,
+    # `ros2 topic hz /rover/rc/channels` shows the cap, not the receiver's packet rate - the
+    # "RC channels rate" diagnostic still measures that. 0 = no cap.
     publish_rc_topics: true
+    rc_topics_rate_hz: 25.0
 
 
     # Per-channel raw CRSF endpoints, index N-1 = channel N (channel 3 is the third entry).

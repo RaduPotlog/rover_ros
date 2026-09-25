@@ -13,6 +13,7 @@ set(PACKAGE_DEPENDENCIES
     rclcpp
     rclcpp_lifecycle
     lifecycle_msgs
+    rclcpp_components
     udp_msgs
     rover_io_context
 )
@@ -57,6 +58,19 @@ target_include_directories(${PROJECT_NAME}_ros SYSTEM PUBLIC
                            $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
 )
 target_compile_definitions(${PROJECT_NAME}_ros PUBLIC ${ASIO_DEFINITIONS})
+# Linked into the SHARED component library below.
+set_target_properties(${PROJECT_NAME}_ros PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# The same two nodes as rclcpp_components plugins (rover::transport::udp::UdpReceiverNode,
+# ::UdpSenderNode), for launch files that load them into the container of the node they serve.
+# The registration source must be compiled into this SHARED library itself - see the file.
+# Plural macro: it registers without generating executables, which would clash with the
+# hand-written mains below.
+add_library(${PROJECT_NAME}_components SHARED src/infrastructure/udp_components.cpp)
+target_link_libraries(${PROJECT_NAME}_components ${PROJECT_NAME}_ros ${rclcpp_components_TARGETS})
+rclcpp_components_register_nodes(${PROJECT_NAME}_components
+    "rover::transport::udp::UdpReceiverNode"
+    "rover::transport::udp::UdpSenderNode")
 
 foreach(EXE IN ITEMS
         rover_udp_receiver_node
@@ -67,6 +81,11 @@ foreach(EXE IN ITEMS
 endforeach()
 
 install(DIRECTORY include/ DESTINATION include)
+
+install(TARGETS ${PROJECT_NAME}_components
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
 
 install(TARGETS
         rover_udp_receiver_node

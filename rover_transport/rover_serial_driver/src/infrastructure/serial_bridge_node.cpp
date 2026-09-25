@@ -17,11 +17,14 @@
 
 #include "rover_serial_driver/infrastructure/serial_bridge_node.hpp"
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <lifecycle_msgs/msg/state.hpp>
 
 #include "rover_serial_driver/infrastructure/asio_serial_port.hpp"
 #include "rover_serial_driver/infrastructure/serial_msg_conversions.hpp"
@@ -44,6 +47,7 @@ SerialBridgeNode::SerialBridgeNode(const rclcpp::NodeOptions & options)
   ctx_{*owned_ctx_}
 {
     declareParameters();
+    scheduleAutostart();
 }
 
 SerialBridgeNode::SerialBridgeNode(
@@ -54,6 +58,7 @@ SerialBridgeNode::SerialBridgeNode(
   ctx_{ctx}
 {
     declareParameters();
+    scheduleAutostart();
 }
 
 SerialBridgeNode::~SerialBridgeNode()
@@ -65,11 +70,25 @@ SerialBridgeNode::~SerialBridgeNode()
 
 void SerialBridgeNode::declareParameters()
 {
+    declare_parameter<bool>("autostart", false);
     declare_parameter<std::string>("device_name", "");
     declare_parameter<int>("baud_rate", 0);
     declare_parameter<std::string>("flow_control", "");
     declare_parameter<std::string>("parity", "");
     declare_parameter<std::string>("stop_bits", "");
+}
+
+void SerialBridgeNode::scheduleAutostart()
+{
+    if (!get_parameter("autostart").as_bool()) {
+        return;
+    }
+    autostart_timer_ = create_wall_timer(std::chrono::milliseconds(0), [this]() {
+        autostart_timer_->cancel();
+        if (configure().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+            activate();
+        }
+    });
 }
 
 std::optional<SerialPortConfig> SerialBridgeNode::readConfig()

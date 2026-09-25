@@ -15,8 +15,9 @@
 // Modified 2026 by Mechatronics Academy: relayouted from
 // serial_driver/serial_bridge_node.hpp (ros-drivers/transport_drivers v1.2.0). The
 // parameter parsing moved to the domain layer, the bridging behaviour to
-// rover_io_context's application layer, and the rclcpp_components registration was dropped
-// in favour of an explicit main().
+// rover_io_context's application layer, and the node runs from an explicit main() (which
+// runs the lifecycle shutdown on Ctrl-C). It is also registered as an rclcpp_components
+// plugin again, from src/infrastructure/serial_bridge_component.cpp.
 
 #ifndef ROVER_SERIAL_DRIVER_INFRASTRUCTURE_SERIAL_BRIDGE_NODE_HPP_
 #define ROVER_SERIAL_DRIVER_INFRASTRUCTURE_SERIAL_BRIDGE_NODE_HPP_
@@ -78,6 +79,11 @@ private:
     // re-declare them.
     void declareParameters();
 
+    // With the `autostart` parameter, configures and activates the node from the executor right
+    // after construction - for component containers, where launch_ros' ComposableLifecycleNode
+    // autostart misses the namespace and never reaches the node.
+    void scheduleAutostart();
+
     // Reads the parameters into a config, or returns nullopt after logging why.
     std::optional<SerialPortConfig> readConfig();
 
@@ -97,6 +103,8 @@ private:
 
     rclcpp_lifecycle::LifecyclePublisher<UInt8MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<UInt8MultiArray>::SharedPtr subscriber_;
+
+    rclcpp::TimerBase::SharedPtr autostart_timer_;
 };
 
 }  // namespace rover::transport::serial

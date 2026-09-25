@@ -199,6 +199,10 @@ if(BUILD_TESTING)
 
   rover_led_add_test(test_led_driver_node
                      test/integration/test_led_driver_node.cpp led_driver_node_component)
+
+  # The launch file's composition: one container, driver + controller + UDP senders intra-process.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_structure test/test_launch_structure.py)
 endif()
 
 install(

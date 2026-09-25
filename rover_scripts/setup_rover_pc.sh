@@ -55,7 +55,7 @@ Writes the "rover-pc setup" block into ~/.bashrc (replacing an existing one in p
   --remove             delete the block
   -h, --help           this help
 
-The PC joins the rover's graph as a direct Zenoh client of the router in rover-a1-platform
+The PC joins the rover's graph as a direct Zenoh client of the router in rover-a1-zenoh-router
 (ZENOH_CONFIG_OVERRIDE). rover_gazebo/scripts/rover_sim.sh clears that for the local simulation.
 EOF
 }
@@ -106,7 +106,7 @@ export ROS_DOMAIN_ID=$DOMAIN_ID
 
 # ROS_LOCALHOST_ONLY (deprecated) and ROS_AUTOMATIC_DISCOVERY_RANGE are FastDDS-era leftovers
 # that confine nodes to a private graph - clear them. Then join the rover's graph directly:
-# every node is a Zenoh client of the router in rover-a1-platform. No local router is used.
+# every node is a Zenoh client of the router in rover-a1-zenoh-router. No local router is used.
 # rover_gazebo/scripts/rover_sim.sh clears this override for the local simulation (it runs its
 # own router on 127.0.0.1:7447); unset it too for off-rover tests.
 unset ROS_LOCALHOST_ONLY ROS_AUTOMATIC_DISCOVERY_RANGE

@@ -21,12 +21,14 @@ led/set_animation ──► rover_led_controller ──led/channel_<n>_frame─�
 | srv | `led/set_animation` | `rover_msgs/SetLedAnimation` |
 | srv | `led/stop_animation` | `rover_msgs/StopLedAnimation`: clears an animation (and its queued copies) from its layer on every segment; fails if it isn't playing |
 | pub | `led/channel_<n>_frame` | `sensor_msgs/Image` (`rgba8`) at `controller_frequency`: `height` = the panel's serpentine `rows` (1 for a straight strip), `data` in wire order (LED 0 first) |
+| pub | `led/channel_<n>_preview` | the same image at `preview_publish_rate`, best effort, depth 1: for UIs (the Cockpit LED page), so they don't pull the 50 Hz frame through the Zenoh router |
 | pub | `led/animations` | `rover_msgs/LedAnimationCatalog`, latched, once after loading |
 | pub | `led/state` | `rover_msgs/LedState` (what every layer of every segment plays), latched, at `state_publish_rate` |
 | pub | `diagnostics` | hardware id `Bumper Led`: `Led controller status` + render rate |
 
 Parameters (`src/led_controller_parameters.yaml`): `animations_config_path` (required),
-`controller_frequency` (50 Hz), `state_publish_rate` (5 Hz).
+`controller_frequency` (50 Hz), `state_publish_rate` (5 Hz), `preview_publish_rate` (5 Hz, 0 = no
+preview topics).
 
 ### rover_led_driver (lifecycle component `rover_led::LedDriverNode`)
 
@@ -60,7 +62,9 @@ Parameters (`src/led_driver_parameters.yaml`, values in `config/rover_a1_driver.
 
 ### rover_udp_led_channel_{1,2}_sender_node (`rover_udp_driver`)
 
-These are lifecycle `rover_udp_sender_node` instances. Each one subscribes to
+These are lifecycle `rover::transport::udp::UdpSenderNode` components, loaded into
+`rover_led_container` next to the driver with intra-process communication (hardware only), so the
+50 Hz frames never cross the Zenoh router. Each one subscribes to
 `udp_write/led_channel_<n>` and sends to the address in
 `config/rover_a1_udp_led_channel_<n>.yaml` (channel 1 → `192.168.77.202`, channel 2 → `192.168.77.201`, port `3333`).
 

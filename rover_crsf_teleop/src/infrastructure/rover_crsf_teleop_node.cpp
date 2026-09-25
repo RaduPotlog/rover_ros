@@ -68,6 +68,11 @@ constexpr auto kSerialSilenceTimeout = 1000ms;
 
 }  // namespace
 
+RoverCrsfTeleopNode::RoverCrsfTeleopNode(const rclcpp::NodeOptions & options)
+: RoverCrsfTeleopNode("rover_crsf_teleop_node", options)
+{
+}
+
 RoverCrsfTeleopNode::RoverCrsfTeleopNode(
     const std::string & node_name, const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode(node_name, options)
@@ -92,6 +97,18 @@ RoverCrsfTeleopNode::RoverCrsfTeleopNode(
     diagnostic_updater_->add("RC channels rate", this, &RoverCrsfTeleopNode::diagnoseChannelsRate);
     diagnostic_updater_->add("RC serial link", this, &RoverCrsfTeleopNode::diagnoseSerialLink);
     diagnostic_updater_->add("RC calibration", this, &RoverCrsfTeleopNode::diagnoseCalibration);
+
+    // Self-driven rather than launch_ros ComposableLifecycleNode autostart, which misses the
+    // namespace and never reaches the node (see rover_led's LedDriverNode). The launch file
+    // sets it when it loads this node into a component container.
+    if (get_parameter("autostart").as_bool()) {
+        autostart_timer_ = create_wall_timer(std::chrono::milliseconds(0), [this]() {
+            autostart_timer_->cancel();
+            if (configure().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+                activate();
+            }
+        });
+    }
 }
 
 void RoverCrsfTeleopNode::declareParameters()
@@ -100,6 +117,10 @@ void RoverCrsfTeleopNode::declareParameters()
     // on an undeclared name is a bug. Channel defaults are the raw CRSF endpoints from
     // domain/crsf/crsf_protocol.hpp, which is what the decoder actually produces.
     rejectScalarChannelParameters();
+
+    // Configure and activate right after construction, from the executor. Off for the standalone
+    // executable, which a launch-side LifecycleNode (or a lifecycle manager) drives instead.
+    declare_parameter<bool>("autostart", false);
 
     // One entry per channel, index N-1 = channel N. Declared with all 16 filled in rather than a
     // single element, so `ros2 param get` and the calibration page always see the whole picture.
@@ -175,6 +196,10 @@ void RoverCrsfTeleopNode::declareParameters()
 
     // Echo decoded frames on rc/channels and rc/link. Nothing on the rover consumes them.
     declare_parameter<bool>("publish_rc_topics", true);
+    // Upper bound on each echo's rate, in Hz; 0 echoes every decoded frame. The receiver decodes
+    // ~250 frames/s and every echo crosses the Zenoh router to the web UI, which redraws at
+    // 10 Hz. Teleop, calibration and diagnostics still see every frame.
+    declare_parameter<double>("rc_topics_rate_hz", 0.0);
 
     // Diagnostics only - read once at construction. Now measures DECODED CRSF frames, i.e. the
     // receiver's real packet rate.
@@ -531,6 +556,9 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
     publishCalibrationState();
 
     publish_rc_topics_ = get_parameter("publish_rc_topics").as_bool();
+    const double rc_topics_rate_hz = get_parameter("rc_topics_rate_hz").as_double();
+    rc_channels_limiter_ = RateLimiter(rc_topics_rate_hz);
+    rc_link_limiter_ = RateLimiter(rc_topics_rate_hz);
 
     // A cleanup -> configure cycle must not decode a half-frame left over from before.
     parser_.reset();
@@ -827,18 +855,19 @@ void RoverCrsfTeleopNode::onRcChannels(const RcFrame & frame)
     ++decoded_frames_;
     channels_rate_->tick();
 
-    if (rc_channels_publisher_) {
+    if (rc_channels_publisher_ && rc_channels_limiter_.admit(now)) {
         rc_channels_publisher_->publish(toRcChannelsMsg(frame, this->now()));
     }
 }
 
 void RoverCrsfTeleopNode::onLinkStatistics(const RcLinkStats & stats)
 {
-    use_case_->onLinkStats(stats.uplink_link_quality, std::chrono::steady_clock::now());
+    const SteadyTime now = std::chrono::steady_clock::now();
+    use_case_->onLinkStats(stats.uplink_link_quality, now);
 
     ++decoded_link_stats_;
 
-    if (rc_link_publisher_) {
+    if (rc_link_publisher_ && rc_link_limiter_.admit(now)) {
         rc_link_publisher_->publish(toRcLinkStatusMsg(stats, this->now()));
     }
 }

@@ -73,6 +73,12 @@ RoverBatteryNode::RoverBatteryNode(
         declare_parameter<std::int64_t>("watchdog_timeout_ms", 10000, timeout_descriptor));
 }
 
+RoverBatteryNode::RoverBatteryNode(const rclcpp::NodeOptions & options)
+: RoverBatteryNode("rover_battery_node", "/", options)
+{
+    init();
+}
+
 void RoverBatteryNode::init()
 {
     diagnostic_updater_->setHardwareID("RoverBattery");

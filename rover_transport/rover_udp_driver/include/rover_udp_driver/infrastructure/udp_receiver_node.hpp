@@ -60,6 +60,11 @@ private:
 
     void declareParameters();
 
+    // With the `autostart` parameter, configures and activates the node from the executor right
+    // after construction - for component containers, where launch_ros' ComposableLifecycleNode
+    // autostart misses the namespace and never reaches the node.
+    void scheduleAutostart();
+
     std::optional<UdpEndpoint> readEndpoint();
 
     void releaseResources();
@@ -72,6 +77,8 @@ private:
     std::unique_ptr<InboundByteBridge> inbound_;
 
     rclcpp_lifecycle::LifecyclePublisher<UdpPacket>::SharedPtr publisher_;
+
+    rclcpp::TimerBase::SharedPtr autostart_timer_;
 };
 
 }  // namespace rover::transport::udp

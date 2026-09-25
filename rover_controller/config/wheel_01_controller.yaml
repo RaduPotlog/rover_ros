@@ -131,8 +131,23 @@
       gains:
         fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
         
+  # Per-controller update rates. The controller_manager loop and the wheel PIDs stay at 100 Hz;
+  # everything that only publishes runs at the rate its consumers use, because each message
+  # crosses the Zenoh router to other containers. Each rate must divide 100 evenly
+  # (test/test_wheel_geometry.py), or controller_manager updates it at an uneven period.
+  #   joint_states  20 Hz - the encoders are 20 Hz; robot_state_publisher turns each message
+  #                         into /tf, which every TF listener on the rover receives.
+  #   imu/data      50 Hz - rover_ekf_node runs at 50 Hz.
+  #   odometry/wheels 50 Hz - diff_drive publishes odometry every update (it has no separate
+  #                         publish rate); the EKF runs at 50 Hz. Its wheel references still
+  #                         feed the 100 Hz PIDs, which hold the last one between updates.
+  rover_joint_state_broadcaster:
+    ros__parameters:
+      update_rate: 20
+
   rover_imu_broadcaster:
     ros__parameters:
+      update_rate: 50
       sensor_name: "<namespace>/imu"
       frame_id: "<namespace>/imu_link"
       static_covariance_orientation: [1.8e-3, 0.0, 0.0, 0.0, 1.8e-3, 0.0, 0.0, 0.0, 1.8e-3]
@@ -141,6 +156,7 @@
 
   rover_drive_controller:
     ros__parameters:
+      update_rate: 50
 
       # Chained through the wheel PIDs: "<pid controller>/<joint>" -> the PID's reference
       # (command) and state interfaces. Plain joint names here drive the wheels open loop.
@@ -159,7 +175,6 @@
       left_wheel_radius_multiplier: 1.0
       right_wheel_radius_multiplier: 1.0
 
-      publish_rate: 100.0
       odom_frame_id: odom
       base_frame_id: base_footprint
       tf_frame_prefix: "~"
@@ -173,7 +188,8 @@
       enable_odom_tf: false
 
       cmd_vel_timeout: 0.5
-      publish_limited_velocity: true
+      # Nothing consumes ~/cmd_vel_out; leave it off rather than publish it at the update rate.
+      publish_limited_velocity: false
 
       # linear.x and angular.z are limited independently, so the outer wheel rim speed can reach
       #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.5102

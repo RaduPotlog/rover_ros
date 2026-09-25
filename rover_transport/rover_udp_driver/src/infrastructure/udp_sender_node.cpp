@@ -19,10 +19,13 @@
 
 #include "rover_udp_driver/infrastructure/udp_sender_node.hpp"
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include <lifecycle_msgs/msg/state.hpp>
 
 #include "rover_udp_driver/infrastructure/asio_udp_socket.hpp"
 #include "rover_udp_driver/infrastructure/udp_packet_conversions.hpp"
@@ -44,6 +47,7 @@ UdpSenderNode::UdpSenderNode(const rclcpp::NodeOptions & options)
   ctx_{*owned_ctx_}
 {
     declareParameters();
+    scheduleAutostart();
 }
 
 UdpSenderNode::UdpSenderNode(
@@ -54,6 +58,7 @@ UdpSenderNode::UdpSenderNode(
   ctx_{ctx}
 {
     declareParameters();
+    scheduleAutostart();
 }
 
 UdpSenderNode::~UdpSenderNode()
@@ -65,8 +70,22 @@ UdpSenderNode::~UdpSenderNode()
 
 void UdpSenderNode::declareParameters()
 {
+    declare_parameter<bool>("autostart", false);
     declare_parameter<std::string>("ip", "");
     declare_parameter<int>("port", 0);
+}
+
+void UdpSenderNode::scheduleAutostart()
+{
+    if (!get_parameter("autostart").as_bool()) {
+        return;
+    }
+    autostart_timer_ = create_wall_timer(std::chrono::milliseconds(0), [this]() {
+        autostart_timer_->cancel();
+        if (configure().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+            activate();
+        }
+    });
 }
 
 std::optional<UdpEndpoint> UdpSenderNode::readEndpoint()

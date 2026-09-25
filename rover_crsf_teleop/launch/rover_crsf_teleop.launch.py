@@ -21,6 +21,17 @@ from it.
 The UART is deliberately not opened by the teleop node. rover_serial_driver's rover_serial_bridge_node already
 does it, is lifecycle-managed, and is maintained upstream; the teleop node subscribes to the raw
 bytes it publishes. That also keeps asio out of this package entirely.
+
+Both run as components of one single-threaded container, rover_crsf_container, with intra-process
+communication: the bridge publishes one rc/raw message per UART read (~250/s), and as separate
+processes each of them crossed the Zenoh router. The single thread is also what the teleop node
+was written for (see RoverCrsfTeleopNode).
+
+One trade-off: on Ctrl-C a component container exits without running the lifecycle shutdown
+transition, so the teleop node's on_shutdown() doesn't publish its final stop command. The rover
+still stops - twist_mux drops the RC input after its timeout and diff_drive's cmd_vel_timeout
+zeroes the wheels - just as it would if the process crashed. The standalone executables
+(rover_crsf_teleop_node, rover_serial_bridge_node) still run the transition.
 """
 
 from launch import LaunchDescription
@@ -32,7 +43,8 @@ from launch.substitutions import (
     PathJoinSubstitution,
     PythonExpression,
 )
-from launch_ros.actions.lifecycle_node import LifecycleNode
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 
 import yaml
@@ -79,9 +91,12 @@ def _launch_setup(context, *args, **kwargs):
     #
     # `serial_read` is remapped to rc/raw because the default name is generic and this rover has
     # other serial devices; the teleop node's `serial_topic` parameter must match.
-    serial_bridge_node = LifecycleNode(
+    #
+    # Both nodes are lifecycle nodes brought to active by their own `autostart` parameter:
+    # launch_ros' ComposableLifecycleNode autostart misses the namespace and never reaches them.
+    serial_bridge_node = ComposableNode(
         package='rover_serial_driver',
-        executable='rover_serial_bridge_node',
+        plugin='rover::transport::serial::SerialBridgeNode',
         name='rover_crsf_serial_bridge',
         namespace=namespace,
         parameters=[{
@@ -90,25 +105,34 @@ def _launch_setup(context, *args, **kwargs):
             'flow_control': 'none',
             'parity': 'none',
             'stop_bits': '1',
+            'autostart': True,
         }],
         remappings=[('serial_read', 'rc/raw'), ('serial_write', 'rc/raw_write')],
-        autostart=True,
+        extra_arguments=[{'use_intra_process_comms': True}],
         # No receiver exists in simulation, so starting a node that can only fail to open
         # /dev/ttyUSB0 is pure noise.
         condition=UnlessCondition(use_sim),
-        emulate_tty=True,
     )
 
     # Lifecycle node, brought straight to active. A supervisor can later deactivate it to take RC
     # teleop off the command path without killing the process.
-    rover_crsf_node = LifecycleNode(
+    rover_crsf_node = ComposableNode(
         package='rover_crsf_teleop',
-        executable='rover_crsf_teleop_node',
+        plugin='rover_crsf_teleop::RoverCrsfTeleopNode',
         name='rover_crsf_teleop_node',
         namespace=namespace,
-        parameters=[config_path],
+        parameters=[config_path, {'autostart': True}],
         remappings=[('/diagnostics', 'diagnostics')],
-        autostart=True,
+        extra_arguments=[{'use_intra_process_comms': True}],
+    )
+
+    # component_container, not _mt: one thread, as the teleop node requires.
+    rover_crsf_container = ComposableNodeContainer(
+        package='rclcpp_components',
+        executable='component_container',
+        name='rover_crsf_container',
+        namespace=namespace,
+        composable_node_descriptions=[serial_bridge_node, rover_crsf_node],
         arguments=[
             '--ros-args',
             '--log-level',
@@ -117,7 +141,7 @@ def _launch_setup(context, *args, **kwargs):
         emulate_tty=True,
     )
 
-    return [serial_bridge_node, rover_crsf_node]
+    return [rover_crsf_container]
 
 
 def generate_launch_description():
