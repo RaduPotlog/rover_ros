@@ -37,6 +37,7 @@
 #include "rover_msgs/srv/set_led_animation.hpp"
 
 #include "rover_led/application/led_types.hpp"
+#include "rover_led/application/validate_animation_catalog_use_case.hpp"
 #include "rover_led/domain/led_components/led_panel.hpp"
 #include "rover_led/domain/led_components/led_segment.hpp"
 #include "rover_led/infrastructure/shutdown_safe_publish.hpp"
@@ -94,7 +95,14 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
 
     const auto animations = catalog->getAll();
     diagnostics_.animations_loaded = animations.size();
-    diagnostics_.unavailable_animations = checkAnimationTypes(animations);
+
+    const auto validation = ValidateAnimationCatalogUseCase(animation_factory_).execute(animations);
+    for (const auto & unavailable : validation.unavailable_types) {
+        RCLCPP_WARN(
+            this->get_logger(), "Animation '%s' (id %zu) uses unavailable type '%s'; it can't be displayed.",
+            unavailable.name.c_str(), unavailable.id, unavailable.type.c_str());
+    }
+    diagnostics_.unavailable_animations = validation.unavailable_animations;
 
     RCLCPP_INFO(this->get_logger(), "Loaded default animations.");
 
@@ -140,32 +148,6 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     diagnostic_updater_->add(*render_rate_);
 
     RCLCPP_INFO(this->get_logger(), "Initialized successfully.");
-}
-
-std::size_t LedControllerNode::checkAnimationTypes(const std::vector<LedAnimationDescription> & animations)
-{
-    std::size_t unavailable = 0;
-
-    for (const auto & led_animation : animations) {
-        bool available = true;
-
-        for (const auto & animation : led_animation.animations) {
-            try {
-                animation_factory_->create(animation.type);
-            } catch (const std::runtime_error & e) {
-                available = false;
-                RCLCPP_WARN(
-                    this->get_logger(), "Animation '%s' (id %zu) uses unavailable type '%s'; it can't be displayed.",
-                    led_animation.name.c_str(), led_animation.id, animation.type.c_str());
-            }
-        }
-
-        if (!available) {
-            ++unavailable;
-        }
-    }
-
-    return unavailable;
 }
 
 void LedControllerNode::setLedAnimationCallback(

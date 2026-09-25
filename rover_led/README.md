@@ -165,7 +165,8 @@ ros2 topic echo /rover/led/state
 ```
 domain/          Animation (+ Image/MovingImage), LedPanel, LedSegment and its layers,
                  SegmentConverter, Sk9822FrameEncoder, AnimationCatalog/Factory ports - no ROS
-application/     SetAnimation, RenderTick, GetLedState, EncodeFrame, SetBrightness use cases
+application/     SetAnimation, StopAnimation, RenderTick, GetLedState, ValidateAnimationCatalog,
+                 EncodeFrame, SetBrightness use cases
 infrastructure/  LedControllerNode, LedDriverNode, controller diagnostics,
                  YAML config loader, pluginlib animation factory
 ```
