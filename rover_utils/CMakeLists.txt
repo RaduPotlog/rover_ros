@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(rover_utils)
 
-# Use Boost's package configuration for realtime_tools dependencies.
-if(POLICY CMP0167)
-  cmake_policy(SET CMP0167 NEW)
-endif()
-
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -13,8 +8,6 @@ endif()
 set(PACKAGE_DEPENDENCIES
     ament_cmake
     ament_cmake_python
-    diagnostic_updater
-    realtime_tools
     rcl_interfaces
     rclcpp
     std_msgs
@@ -33,9 +26,19 @@ install(PROGRAMS rover_utils/version_check.py DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
+# Consumers get this include directory and nothing else: no exported dependencies, no targets.
+# Keep it that way. ament appends every exported dependency's include path to
+# rover_utils_INCLUDE_DIRS, so exporting rclcpp here would put it on the include path of the
+# ROS-free targets that use that variable (rover_led_domain, for one). Users of the
+# rover_utils::ros headers link rclcpp, std_msgs or rcl_interfaces themselves.
 ament_export_include_directories(include/${PROJECT_NAME})
 
 if(BUILD_TESTING)
+  # Which headers may touch ROS, checked rather than trusted: see test/header_layers.cmake.
+  add_test(NAME test_header_layers
+           COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/test/header_layers.cmake)
+
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(test_shutdown_gate test/test_shutdown_gate.cpp)
