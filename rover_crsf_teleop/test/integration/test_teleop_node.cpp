@@ -205,6 +205,10 @@ public:
         gpio_state_pub_->publish(message);
     }
 
+    // Stops the 20 Hz republish, as a hardware interface that has gone away looks: the node's
+    // last sample stays where it was and only ages.
+    void stopSafetyStatus() { gpio_state_.reset(); }
+
     // Publishes an arbitrary byte chunk, so a test can split a frame across messages.
     void publishBytes(const Bytes & bytes)
     {
@@ -906,6 +910,39 @@ TEST_F(TeleopCalibrationTest, TheStateTopicReportsTheVerifiedEStop)
 
     engageEStop(false);
     EXPECT_EQ(harness_->calibration_state->e_stop, RcCalibrationState::ESTOP_RELEASED);
+}
+
+// A hardware interface that stops publishing leaves an "engaged" sample behind. Once it is older
+// than e_stop_state_timeout_s it must read "cannot verify", never what it last said - otherwise a
+// dead publisher would keep granting the permit to sweep the sticks.
+TEST_F(TeleopCalibrationTest, AnEStopSampleThatStopsArrivingAgesIntoUnverified)
+{
+    ASSERT_EQ(teleop_->deactivate().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+
+    harness_->stopSafetyStatus();
+
+    // 1 s timeout by default, re-evaluated by the watchdog twice a second.
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->e_stop == RcCalibrationState::ESTOP_UNKNOWN;
+    }, 5s)) << "a sample that stopped arriving was never aged into unverified";
+
+    const auto response = startCalibration(true);
+
+    EXPECT_FALSE(response->success);
+    EXPECT_NE(response->message.find("Cannot verify"), std::string::npos);
+}
+
+// Pin values sent while the PLC link is down are last-known-good, not current, so the node drops
+// the sample rather than trusting it.
+TEST_F(TeleopCalibrationTest, AnUnhealthySafetyLinkReportsTheEStopAsUnverified)
+{
+    harness_->publishEStopWithUnhealthyLink();
+
+    ASSERT_TRUE(spinUntil([this]() {
+        return harness_->calibration_state.has_value() &&
+               harness_->calibration_state->e_stop == RcCalibrationState::ESTOP_UNKNOWN;
+    })) << "an unhealthy safety link was still reported as a verified E-Stop";
 }
 
 // Without the harness publishing safety_status at all, which is how a bench or a sim looks.

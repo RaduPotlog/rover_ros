@@ -412,24 +412,23 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
             // the sample rather than age it: "cannot verify" is the honest answer, and it is what
             // an absent sample already produces.
             if (!msg.link_healthy) {
-                last_safety_io_.reset();
-                last_safety_io_at_.reset();
+                safety_io_monitor_.clear();
                 updateCalibrationEStop();
                 return;
             }
 
-            last_safety_io_ = toSafetyIoFlags(msg);
-            last_safety_io_at_ = std::chrono::steady_clock::now();
+            safety_io_monitor_.onSample(std::chrono::steady_clock::now(), toSafetyIoFlags(msg));
             updateCalibrationEStop();
         });
 
-    e_stop_state_timeout_ = std::chrono::milliseconds(
+    const auto e_stop_state_timeout = std::chrono::milliseconds(
         static_cast<int>(get_parameter("e_stop_state_timeout_s").as_double() * 1000.0));
+    safety_io_monitor_ = SafetyIoMonitor(e_stop_state_timeout);
 
     // Ages the last sample even when nothing is arriving and nothing is calibrating, so the page
     // shows "unverified" rather than a stale "engaged" after the hardware interface goes away.
     e_stop_watchdog_timer_ = create_wall_timer(
-        e_stop_state_timeout_ / 2, [this]() { updateCalibrationEStop(); });
+        e_stop_state_timeout / 2, [this]() { updateCalibrationEStop(); });
 
     calibration_ = std::make_unique<CalibrationUseCase>(
         config->calibration, axisChannels(*config), calibration_store_,
@@ -510,7 +509,8 @@ void RoverCrsfTeleopNode::createCalibrationInterfaces()
             std::shared_ptr<StartCalibration::Response> response) {
             const SteadyTime now = std::chrono::steady_clock::now();
             const CalibrationOutcome outcome =
-                calibration_->start(request->e_stop_confirmed, eStopState(now), now);
+                calibration_->start(
+                    request->e_stop_confirmed, safety_io_monitor_.eStopState(now), now);
             response->success = outcome.ok;
             response->message = outcome.message;
 
@@ -605,20 +605,6 @@ void RoverCrsfTeleopNode::stopCalibrationHeartbeat()
     }
 }
 
-EStopState RoverCrsfTeleopNode::eStopState(const SteadyTime now) const
-{
-    // Arrival time, not SafetyStatus.io_sample_time: the two differ by at most one poll period
-    // and arrival is what detects a publisher that has stopped. Anything older than the timeout
-    // is "cannot verify" rather than "still whatever it was".
-    if (!last_safety_io_.has_value() || !last_safety_io_at_.has_value() ||
-        (now - *last_safety_io_at_) > e_stop_state_timeout_)
-    {
-        return EStopState::kUnknown;
-    }
-
-    return isSafeToCalibrate(*last_safety_io_) ? EStopState::kEngaged : EStopState::kReleased;
-}
-
 void RoverCrsfTeleopNode::updateCalibrationEStop()
 {
     if (!calibration_) {
@@ -627,7 +613,7 @@ void RoverCrsfTeleopNode::updateCalibrationEStop()
 
     const SteadyTime now = std::chrono::steady_clock::now();
     const bool was_running = calibration_->sessionInProgress();
-    const EStopState e_stop = eStopState(now);
+    const EStopState e_stop = safety_io_monitor_.eStopState(now);
 
     calibration_->onEStop(e_stop, now);
 
@@ -821,8 +807,7 @@ void RoverCrsfTeleopNode::releaseResources()
     calibration_store_.reset();
     e_stop_watchdog_timer_.reset();
     safety_status_subscriber_.reset();
-    last_safety_io_.reset();
-    last_safety_io_at_.reset();
+    safety_io_monitor_.clear();
     calibration_state_publisher_.reset();
     calibration_start_service_.reset();
     calibration_sweep_service_.reset();
@@ -925,7 +910,7 @@ void RoverCrsfTeleopNode::diagnoseCalibration(diagnostic_updater::DiagnosticStat
     // The gate, and how old the evidence behind it is. A calibration that will not start is
     // almost always one of these two lines.
     const SteadyTime e_stop_now = std::chrono::steady_clock::now();
-    switch (eStopState(e_stop_now)) {
+    switch (safety_io_monitor_.eStopState(e_stop_now)) {
         case EStopState::kEngaged:
             status.add("E-Stop", "engaged (calibration allowed)");
             break;
@@ -937,12 +922,10 @@ void RoverCrsfTeleopNode::diagnoseCalibration(diagnostic_updater::DiagnosticStat
             break;
     }
 
+    const auto age = safety_io_monitor_.sampleAge(e_stop_now);
     status.add(
         "Safety IO age (ms)",
-        last_safety_io_at_.has_value()
-            ? std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                 e_stop_now - *last_safety_io_at_).count())
-            : std::string("never received"));
+        age.has_value() ? std::to_string(age->count()) : std::string("never received"));
     status.add("Persisted to", calibration_store_ ? calibration_store_->location() : "(disabled)");
     // All three endpoints come from the calibration in force, never from base_config_.
     // base_config_ deliberately keeps the *uncalibrated* endpoints - applyCalibration() is always

@@ -169,6 +169,7 @@ initial and need tuning on the rover (`ros2 topic hz /rover/rc/link`,
 include/rover_crsf_teleop/
 ├── domain/          stick_mapping, switch_debouncer, link_monitor, rc_frame, ports  (no ROS)
 │   │                rc_calibration - measures this transmitter's endpoints          (no ROS)
+│   │                safety_io_flags, safety_io_monitor - calibration permit, aged   (no ROS)
 │   └── crsf/        crsf_protocol, crc8, crsf_parser - the wire decoder             (no ROS)
 ├── application/     teleop_use_case - the per-tick rules above                      (no ROS)
 │                    teleop_config_validation - the rules configure enforces         (no ROS)

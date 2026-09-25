@@ -38,6 +38,7 @@
 #include "rover_crsf_teleop/application/calibration_use_case.hpp"
 #include "rover_crsf_teleop/application/teleop_use_case.hpp"
 #include "rover_crsf_teleop/domain/crsf/crsf_parser.hpp"
+#include "rover_crsf_teleop/domain/safety_io_monitor.hpp"
 #include "rover_crsf_teleop/infrastructure/rc_message_conversions.hpp"
 #include "rover_crsf_teleop/infrastructure/ros2_trigger_safety_switch.hpp"
 #include "rover_crsf_teleop/infrastructure/ros2_velocity_command_publisher.hpp"
@@ -139,11 +140,6 @@ private:
 
     void publishCalibrationState();
 
-    // What the node can currently say about the rover's E-Stop. kUnknown when nothing has
-    // arrived on safety_status or the last sample is older than e_stop_state_timeout_ - SafetyStatus
-    // carries no header, so freshness is measured from when it arrived here.
-    EStopState eStopState(SteadyTime now) const;
-
     // Feeds the current E-Stop state to the calibration session, which cancels it if the E-Stop
     // has been released for longer than its grace window.
     void updateCalibrationEStop();
@@ -216,9 +212,7 @@ private:
     // on_configure with the publisher's exact QoS (reliable + transient local, depth 1): miss any
     // of the three and nothing is delivered at all.
     rclcpp::Subscription<rover_msgs::msg::SafetyStatus>::SharedPtr safety_status_subscriber_;
-    std::optional<SafetyIoFlags> last_safety_io_;
-    std::optional<SteadyTime> last_safety_io_at_;
-    std::chrono::milliseconds e_stop_state_timeout_{1000};
+    SafetyIoMonitor safety_io_monitor_{std::chrono::milliseconds{1000}};
 
     // Last E-Stop state put on the wire, so the state topic is republished when it changes
     // rather than on every 20 Hz safety_status message.
