@@ -146,13 +146,9 @@ LedDriverNode::CallbackReturn LedDriverNode::on_activate(const rclcpp_lifecycle:
     publishBrightness();
 
     // Replies to requests of an earlier activation are stale from now on.
-    control_epoch_++;
-    led_control_pending_ = false;
-    led_control_failed_ = false;
-    control_request_attempt_ = 0;
+    led_control_.activate(this->params_.led_control_handshake);
 
     if (!this->params_.led_control_handshake) {
-        led_control_granted_ = true;
         clearLeds();
         RCLCPP_INFO(this->get_logger(), "Activated.");
         return CallbackReturn::SUCCESS;
@@ -160,7 +156,6 @@ LedDriverNode::CallbackReturn LedDriverNode::on_activate(const rclcpp_lifecycle:
 
     // The single-threaded container can't block here waiting for the reply,
     // so control is requested asynchronously and retried from a timer.
-    led_control_granted_ = false;
     control_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100), std::bind(&LedDriverNode::controlTimerCallback, this));
 
@@ -176,18 +171,13 @@ LedDriverNode::CallbackReturn LedDriverNode::on_deactivate(const rclcpp_lifecycl
         control_timer_.reset();
     }
 
-    control_epoch_++;
-    led_control_pending_ = false;
-
-    if (led_control_granted_) {
+    if (led_control_.deactivate()) {
         clearLeds();
 
         if (this->params_.led_control_handshake) {
             sendLedControlRequest(false);
         }
     }
-
-    led_control_granted_ = false;
 
     RCLCPP_INFO(this->get_logger(), "Deactivated.");
 
@@ -260,7 +250,7 @@ void LedDriverNode::releaseResources()
         control_timer_.reset();
     }
 
-    control_epoch_++;
+    led_control_.invalidate();
 
     if (enable_led_control_client_) {
         enable_led_control_client_->prune_pending_requests();
@@ -297,7 +287,7 @@ void LedDriverNode::frameCallback(const ImageMsg::UniquePtr & msg, Channel & cha
         return;
     }
 
-    if (!led_control_granted_) {
+    if (!led_control_.isGranted()) {
         throttledWarn("Waiting for LED control to be granted. Ignoring frame for " + channel.name + "!");
         return;
     }
@@ -323,34 +313,29 @@ void LedDriverNode::frameCallback(const ImageMsg::UniquePtr & msg, Channel & cha
 
 void LedDriverNode::controlTimerCallback()
 {
-    if (led_control_granted_ || led_control_failed_) {
-        control_timer_->cancel();
-        return;
-    }
+    const auto decision = led_control_.onTick(this->now().nanoseconds());
 
-    if (led_control_pending_) {
-        if (this->now() - led_control_call_time_ <= rclcpp::Duration::from_seconds(kServiceResponseTimeout)) {
-            return;
-        }
-
+    if (decision.response_timed_out) {
         RCLCPP_WARN(this->get_logger(), "LED control service response timeout.");
-        led_control_pending_ = false;
     }
 
-    if (control_request_attempt_ >= kMaxControlRequestAttempts) {
-        led_control_failed_ = true;
-        control_timer_->cancel();
-        RCLCPP_ERROR(
-            this->get_logger(), "Failed to obtain LED control after %u attempts; frames will be ignored.",
-            kMaxControlRequestAttempts);
-        return;
-    }
-
-    control_request_attempt_++;
-
-    if (sendLedControlRequest(true)) {
-        led_control_pending_ = true;
-        led_control_call_time_ = this->now();
+    switch (decision.action) {
+        case LedControlTickAction::kWait:
+            return;
+        case LedControlTickAction::kStopTimer:
+            control_timer_->cancel();
+            return;
+        case LedControlTickAction::kGiveUp:
+            control_timer_->cancel();
+            RCLCPP_ERROR(
+                this->get_logger(), "Failed to obtain LED control after %u attempts; frames will be ignored.",
+                LedControlHandshake::kMaxAttempts);
+            return;
+        case LedControlTickAction::kSendRequest:
+            if (sendLedControlRequest(true)) {
+                led_control_.onRequestSent(this->now().nanoseconds());
+            }
+            return;
     }
 }
 
@@ -366,8 +351,10 @@ bool LedDriverNode::sendLedControlRequest(const bool enable)
     auto request = std::make_shared<SetBoolSrv::Request>();
     request->data = enable;
 
+    const auto epoch = led_control_.getEpoch();
+
     enable_led_control_client_->async_send_request(
-        request, [this, epoch = control_epoch_](rclcpp::Client<SetBoolSrv>::SharedFutureWithRequest future) {
+        request, [this, epoch](rclcpp::Client<SetBoolSrv>::SharedFutureWithRequest future) {
             ledControlResponseCallback(future, epoch);
         });
 
@@ -382,32 +369,26 @@ void LedDriverNode::ledControlResponseCallback(
     const auto request = result.first;
     const auto response = result.second;
 
-    if (epoch != control_epoch_) {
-        // Reply to a request of an earlier activation: never adopt it, and
-        // hand back control that was granted too late.
-        if (request->data && response->success) {
+    switch (led_control_.onReply(epoch, request->data, response->success)) {
+        case LedControlReplyAction::kIgnore:
+            return;
+        case LedControlReplyAction::kReleaseStaleGrant:
+            // Reply to a request of an earlier activation: never adopt it, and
+            // hand back control that was granted too late.
             RCLCPP_INFO(this->get_logger(), "Releasing LED control granted to a previous activation.");
             sendLedControlRequest(false);
-        }
-
-        return;
+            return;
+        case LedControlReplyAction::kRefused:
+            RCLCPP_ERROR(this->get_logger(), "Failed to toggle LED control.");
+            return;
+        case LedControlReplyAction::kRevoked:
+            RCLCPP_INFO(this->get_logger(), "LED control revoked.");
+            return;
+        case LedControlReplyAction::kGranted:
+            clearLeds();
+            RCLCPP_INFO(this->get_logger(), "LED control granted.");
+            return;
     }
-
-    led_control_pending_ = false;
-
-    if (!response->success) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to toggle LED control.");
-        return;
-    }
-
-    if (!request->data) {
-        RCLCPP_INFO(this->get_logger(), "LED control revoked.");
-        return;
-    }
-
-    led_control_granted_ = true;
-    clearLeds();
-    RCLCPP_INFO(this->get_logger(), "LED control granted.");
 }
 
 void LedDriverNode::setBrightnessCallback(
@@ -460,11 +441,11 @@ void LedDriverNode::diagnoseLeds(diagnostic_updater::DiagnosticStatusWrapper & s
 
     if (!isActive()) {
         message = "Driver is not active!";
-    } else if (led_control_granted_) {
+    } else if (led_control_.isGranted()) {
         error_level = diagnostic_updater::DiagnosticStatusWrapper::OK;
         message = "Driver is fully functional.";
         led_control_status = "GRANTED";
-    } else if (!led_control_failed_) {
+    } else if (!led_control_.hasFailed()) {
         error_level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
         message = "Driver is not yet functional!";
         led_control_status = "PENDING";

@@ -34,6 +34,7 @@
 #include "rover_msgs/srv/set_led_brightness.hpp"
 
 #include "rover_led/application/encode_frame_use_case.hpp"
+#include "rover_led/application/led_control_handshake.hpp"
 #include "rover_led/application/set_brightness_use_case.hpp"
 #include "rover_led/domain/sk9822_frame_encoder.hpp"
 #include "rover_led/led_driver_parameters.hpp"
@@ -126,8 +127,6 @@ private:
 
     void diagnoseLeds(diagnostic_updater::DiagnosticStatusWrapper & status);
 
-    static constexpr unsigned kMaxControlRequestAttempts = 3;
-    static constexpr double kServiceResponseTimeout = 3.0;
     static constexpr std::chrono::seconds kFinalizeTimeout{1};
 
     std::shared_ptr<led_driver::ParamListener> param_listener_;
@@ -138,19 +137,9 @@ private:
 
     std::unique_ptr<SetBrightnessUseCase> set_brightness_use_case_;
 
-    bool led_control_granted_ = false;
-
-    bool led_control_pending_ = false;
-
-    bool led_control_failed_ = false;
-
-    unsigned control_request_attempt_ = 0;
-
-    // Bumped on every activation, deactivation and cleanup; LED control
-    // replies carrying an older value are stale.
-    std::uint64_t control_epoch_ = 0;
-
-    rclcpp::Time led_control_call_time_;
+    // Its epoch is bumped on every activation, deactivation and cleanup; LED
+    // control replies carrying an older value are stale.
+    LedControlHandshake led_control_;
 
     rclcpp::TimerBase::SharedPtr autostart_timer_;
 
