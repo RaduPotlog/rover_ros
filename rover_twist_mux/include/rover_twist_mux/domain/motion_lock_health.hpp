@@ -49,12 +49,25 @@ struct MotionLockHealth
 };
 
 /**
+ * @brief How long ago each of the two safety messages was received, in seconds.
+ * @details Passed apart rather than pre-combined, so the rule that combines them (the older
+ *          one counts) lives in evaluateMotionLockHealth() next to the timeout it is judged
+ *          against, where the unit tests reach it.
+ */
+struct SafetyStateAges
+{
+    double safety_status_s{0.0};
+    double safety_command_echo_s{0.0};
+};
+
+/**
  * @brief Grades the motion lock.
  * @param flags          Last received safety-IO state, or nullopt when either safety topic has
  *                       not arrived yet. Both are required: a half-populated view would silently
  *                       treat the missing half as "no stop".
- * @param gpio_age_s     Seconds since the OLDER of the two safety messages was received. Ignored
- *                       when `flags` is nullopt.
+ * @param ages           Seconds since each safety message was received. The OLDER of the two is
+ *                       judged against `gpio_timeout_s`, so neither topic going quiet on its own
+ *                       can hide behind the other still arriving. Ignored when `flags` is nullopt.
  * @param gpio_timeout_s How long `flags` stays trusted.
  * @param link_healthy   SafetyStatus.link_healthy: whether the hardware interface's link to the
  *                       safety PLC is up. False means the flags are last-known-good rather than
@@ -62,7 +75,7 @@ struct MotionLockHealth
  */
 MotionLockHealth evaluateMotionLockHealth(
     const std::optional<SafetyIoFlags> & flags,
-    double gpio_age_s,
+    const SafetyStateAges & ages,
     double gpio_timeout_s,
     const MotionLockPolicy & policy,
     bool link_healthy = true);

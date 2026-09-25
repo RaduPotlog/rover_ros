@@ -14,7 +14,6 @@
 
 #include "rover_twist_mux/infrastructure/motion_lock_node.hpp"
 
-#include <algorithm>
 #include <optional>
 
 #include <chrono>
@@ -157,18 +156,17 @@ domain::MotionLockHealth MotionLockNode::evaluateLock()
         flags = toSafetyIoFlags(*last_status_, *last_echo_);
     }
 
-    // The older of the two ages, so neither topic going quiet on its own can hide behind the
-    // other still arriving.
-    const double age_s = flags.has_value()
-        ? std::max(
-              (this->now() - last_status_stamp_).seconds(),
-              (this->now() - last_echo_stamp_).seconds())
-        : 0.0;
+    // Per-topic ages; the domain decides how they combine. Only measured once both have arrived.
+    domain::SafetyStateAges ages;
+    if (flags.has_value()) {
+        ages.safety_status_s = (this->now() - last_status_stamp_).seconds();
+        ages.safety_command_echo_s = (this->now() - last_echo_stamp_).seconds();
+    }
 
     const bool link_healthy = last_status_.has_value() && last_status_->link_healthy;
 
     return domain::evaluateMotionLockHealth(
-        flags, age_s, params.gpio_timeout, toPolicy(params), link_healthy);
+        flags, ages, params.gpio_timeout, toPolicy(params), link_healthy);
 }
 
 void MotionLockNode::timerCallback()

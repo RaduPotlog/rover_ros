@@ -15,6 +15,7 @@
 
 #include "rover_twist_mux/domain/motion_lock_health.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 
@@ -23,7 +24,7 @@ namespace rover_twist_mux::domain
 
 MotionLockHealth evaluateMotionLockHealth(
     const std::optional<SafetyIoFlags> & flags,
-    const double gpio_age_s,
+    const SafetyStateAges & ages,
     const double gpio_timeout_s,
     const MotionLockPolicy & policy,
     const bool link_healthy)
@@ -35,6 +36,10 @@ MotionLockHealth evaluateMotionLockHealth(
         health.message = "No safety state received yet: motion locked.";
         return health;
     }
+
+    // The older of the two ages, so neither topic going quiet on its own can hide behind the
+    // other still arriving.
+    const double gpio_age_s = std::max(ages.safety_status_s, ages.safety_command_echo_s);
 
     if (gpio_age_s > gpio_timeout_s) {
         char buffer[128];

@@ -210,6 +210,41 @@ TEST_F(MotionLockNodeTest, ReLocksWhenTheSafetyStateGoesStale)
         << "the lock did not re-assert after the safety state went stale";
 }
 
+// One topic going quiet while the other keeps arriving: the fresh one must not hide the stale
+// one. The unit tests pin how the two ages combine; this pins that the node really hands over
+// both, since passing the status age twice would pass every one of them.
+TEST_F(MotionLockNodeTest, ReLocksWhenOnlyTheCommandEchoGoesStale)
+{
+    const auto unlock_deadline = std::chrono::steady_clock::now() + 2s;
+    while (std::chrono::steady_clock::now() < unlock_deadline) {
+        publishAllClear();
+
+        if (spinUntil([this] { return last_lock_.has_value() && !*last_lock_; }, 60ms)) {
+            break;
+        }
+    }
+
+    ASSERT_TRUE(last_lock_.has_value());
+    ASSERT_FALSE(*last_lock_) << "precondition: the lock should have released first";
+
+    rover_msgs::msg::SafetyStatus status;
+    status.hw_e_stop_user_button = false;
+    status.latch_active = false;
+    status.motor_contactor_engaged = true;
+    status.link_healthy = true;
+
+    // Keep safety_status fresh and stop safety_command_echo. gpio_timeout is 0.3 s.
+    bool relocked = false;
+    const auto deadline = std::chrono::steady_clock::now() + 3s;
+    while (!relocked && std::chrono::steady_clock::now() < deadline) {
+        status_pub_->publish(status);
+        relocked = spinUntil([this] { return last_lock_.has_value() && *last_lock_; }, 40ms);
+    }
+
+    EXPECT_TRUE(relocked)
+        << "the lock stayed released on a fresh safety_status and a stale safety_command_echo";
+}
+
 // A link the hardware interface reports as down keeps the messages flowing, so staleness alone
 // never catches it - the values in them are simply last-known-good.
 TEST_F(MotionLockNodeTest, LocksWhenTheSafetyLinkIsReportedUnhealthy)
