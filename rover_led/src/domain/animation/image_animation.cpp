@@ -38,14 +38,25 @@ void ImageAnimation::initialize(
 {
     Animation::initialize(animation_description, num_led, controller_frequency);
 
+    image_ = rgbaImageResize(
+        readImage(animation_description), this->getNumberOfLeds(), this->getAnimationLength());
+
+    applyColorOption(animation_description);
+}
+
+gil::rgba8_image_t ImageAnimation::readImage(const YAML::Node & animation_description) const
+{
     const auto image_path = parseImagePath(
         rover_utils::getYAMLKeyValue<std::string>(animation_description, "image"));
-  
+
     gil::rgba8_image_t base_image;
     gil::read_and_convert_image(std::string(image_path), base_image, gil::png_tag());
-  
-    image_ = rgbaImageResize(base_image, this->getNumberOfLeds(), this->getAnimationLength());
 
+    return base_image;
+}
+
+void ImageAnimation::applyColorOption(const YAML::Node & animation_description)
+{
     if (animation_description["color"]) {
         rgbaImageConvertColor(image_, animation_description["color"].as<std::uint32_t>());
     }

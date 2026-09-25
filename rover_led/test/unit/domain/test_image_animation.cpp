@@ -278,3 +278,59 @@ TEST_F(MovingImageAnimationTest, OutOfRangeParamIsClamped)
 
     EXPECT_EQ(litLeds(animation.getFrame()), (std::vector<std::size_t>{7, 8, 9}));
 }
+
+TEST_F(MovingImageAnimationTest, RequiresAnExistingAbsolutePath)
+{
+    rover_led::MovingImageAnimation animation;
+
+    EXPECT_THROW(
+        animation.initialize(description("$(find rover_led)/animations/x.png", 1.0f), 10, 10.0f),
+        std::runtime_error);
+    EXPECT_THROW(animation.initialize(description("relative.png", 1.0f), 10, 10.0f), std::runtime_error);
+    EXPECT_THROW(
+        animation.initialize(description((dir_ / "missing.png").string(), 1.0f), 10, 10.0f),
+        std::runtime_error);
+}
+
+TEST_F(MovingImageAnimationTest, ColorOptionRecoloursTheObject)
+{
+    const auto image = writePng("grey_object.png", 3, 2, [](std::size_t, std::size_t) {
+        return Rgba{100, 100, 100, 255};
+    });
+
+    auto desc = description(image, 1.0f);
+    desc["object_width"] = 3;
+    desc["color"] = 0x00FF80;
+
+    rover_led::MovingImageAnimation animation;
+    animation.initialize(desc, 10, 10.0f);
+    animation.setParam("0.0");
+    animation.update();
+
+    // A uniform image is its own brightest pixel, so every LED gets the full colour.
+    const auto frame = animation.getFrame();
+    EXPECT_EQ(litLeds(frame), (std::vector<std::size_t>{0, 1, 2}));
+
+    for (std::size_t led = 0; led < 3; led++) {
+        EXPECT_EQ(pixel(frame, led), (Rgba{0, 255, 128, 255})) << "led " << led;
+    }
+}
+
+TEST_F(MovingImageAnimationTest, SplashDurationResamplesTheImageHeight)
+{
+    // 0.3 s at 10 Hz stretches the 2 row image to 3 frames.
+    auto desc = objectDescription();
+    desc["splash_duration"] = 0.3;
+
+    rover_led::MovingImageAnimation animation;
+    animation.initialize(desc, 10, 10.0f);
+    animation.setParam("0.5");
+
+    for (int update = 1; update <= 3; update++) {
+        animation.update();
+        EXPECT_FALSE(litLeds(animation.getFrame()).empty()) << "update " << update;
+    }
+
+    animation.update();
+    EXPECT_TRUE(litLeds(animation.getFrame()).empty());
+}

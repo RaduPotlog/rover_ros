@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <stdexcept>
 #include <string>
 
@@ -23,7 +22,6 @@
 
 #include "yaml-cpp/yaml.h"
 #include "boost/gil.hpp"
-#include "boost/gil/extension/io/png.hpp"
 #include "boost/gil/extension/numeric/resample.hpp"
 #include "boost/gil/extension/numeric/sampler.hpp"
 
@@ -56,8 +54,7 @@ void MovingImageAnimation::initialize(
 {
     Animation::initialize(animation_description, num_led, controller_frequency);
 
-    const auto image_path = parseImagePath(
-        rover_utils::getYAMLKeyValue<std::string>(animation_description, "image"));
+    const auto base_image = readImage(animation_description);
 
     image_center_offset_ = getOptionalKeyValue<std::int16_t>(animation_description, "center_offset", 0);
     image_object_width_ = getOptionalKeyValue<std::int16_t>(animation_description, "object_width", 0);
@@ -84,19 +81,14 @@ void MovingImageAnimation::initialize(
     } catch (const std::runtime_error & /*e*/) {
     }
 
-    gil::rgba8_image_t base_image;
-    gil::read_and_convert_image(std::string(image_path), base_image, gil::png_tag());
-  
     if (splash_duration_ > 0) {
         image_ = rgbaImageResize(base_image, base_image.width(), splash_duration_);
     } else {
         splash_duration_ = base_image.height();
         image_ = base_image;
     }
-  
-    if (animation_description["color"]) {
-        rgbaImageConvertColor(image_, animation_description["color"].as<std::uint32_t>());
-    }
+
+    applyColorOption(animation_description);
 }
 
 void MovingImageAnimation::setParam(const std::string & param)

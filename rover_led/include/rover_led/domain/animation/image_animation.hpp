@@ -54,6 +54,14 @@ protected:
     // by the infrastructure layer when the animation catalog is loaded.
     std::filesystem::path parseImagePath(const std::string & image_path) const;
 
+    // Reads the PNG named by the description's "image" (absolute path, see parseImagePath) as
+    // RGBA8, unscaled.
+    gil::rgba8_image_t readImage(const YAML::Node & animation_description) const;
+
+    // Recolours image_ with the description's optional "color" (0xRRGGBB); no-op without it.
+    // Call once image_ has its final size: recolouring normalizes to its brightest pixel.
+    void applyColorOption(const YAML::Node & animation_description);
+
     gil::rgba8_image_t rgbaImageResize(
         const gil::rgba8_image_t & image, 
         const std::size_t width, 
