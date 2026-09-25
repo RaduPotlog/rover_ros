@@ -223,7 +223,7 @@
                2.0 = up to 0.5 s from stop to full duty, a lag the ROS side can't see. Optional -
                omitting it keeps the compiled-in kDefaultMotorAcceleration (2.0). Once the wheel
                PID loop owns the speed dynamics, raise it after measuring the step response. -->
-          <param name="motor_acceleration">10.0</param>
+          <param name="motor_acceleration">5.0</param>
 
           <!-- DCC1000 motor current limit in A (device range 2-25). The motor stalls at 16 A on
                24 V, and a direction reversal can briefly reach ~2x stall as back-EMF adds to the
@@ -264,7 +264,7 @@
                reference and the measured velocity are both zero, so the PID error is zero, and a
                PI integrator holds its value at zero error instead of decaying. The command
                therefore parks at the frozen I-term - up to 0.33 rad/s - and no command-side
-               tolerance below that can ever be satisfied. 0.35 is the smallest value that clears
+               tolerance below that can ever be satisfied. 0.4 is the smallest value that clears
                the largest i_clamp with a little margin.
 
                This was previously 1.2 (~0.2 m/s at the A1's 0.1651 m wheel radius), which is
@@ -272,7 +272,7 @@
                get back to 0.01 is to reset the PID I-term when motion is inhibited, not to keep
                widening this - hence velocity_state_zero_tolerance below, which closes the real
                hazard in the meantime. -->
-          <param name="velocity_command_zero_tolerance">0.35</param>
+          <param name="velocity_command_zero_tolerance">0.4</param>
 
           <!-- Deadband (rad/s at the wheel) below which a *measured* wheel velocity counts as
                "not moving", the second half of the same invariant. Unlike the command check
