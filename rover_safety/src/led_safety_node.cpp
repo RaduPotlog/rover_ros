@@ -30,6 +30,7 @@
 #include "rover_safety/behavior_tree.hpp"
 #include "rover_safety/behavior_tree_utils.hpp"
 #include "rover_safety/led_safety_parameters.hpp"
+#include "rover_safety/infrastructure/battery_state_conversion.hpp"
 #include "rover_safety/infrastructure/safety_diagnostics.hpp"
 
 namespace rover_safety
@@ -43,8 +44,6 @@ LedSafetyNode::LedSafetyNode(
 
     this->param_listener_ =std::make_shared<led_safety::ParamListener>(this->get_node_parameters_interface());
     this->params_ = this->param_listener_->get_params();
-
-    battery_percent_ = 0.0;
 
     configure_retry_ = std::make_unique<infrastructure::ConfigureRetry>(
         *this, std::chrono::duration<double>(params_.configure_retry_period));
@@ -133,8 +132,6 @@ void LedSafetyNode::registerBehaviorTree()
 
 std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
 {
-    update_charging_anim_step_ = this->params_.battery.charging_anim_step;
-    
     const float critical_battery_threshold_percent =
         static_cast<float>(this->params_.battery.percent.threshold.critical);
     
@@ -142,6 +139,10 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
     
     const float low_battery_threshold_percent =
         static_cast<float>(this->params_.battery.percent.threshold.low);
+
+    led_thresholds_ = {
+        critical_battery_threshold_percent, low_battery_threshold_percent,
+        static_cast<float>(this->params_.battery.charging_anim_step)};
 
     const auto server_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::duration<double>(params_.ros_communication_timeout.response));
@@ -157,8 +158,20 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
         {"current_battery_anim_id", undefined_anim_id},
         {"current_error_anim_id", undefined_anim_id},
         {"drive_state", false},
-        {"CRITICAL_BATTERY_THRESHOLD_PERCENT", critical_battery_threshold_percent},
         {"LOW_BATTERY_ANIM_PERIOD", low_battery_anim_period},
+        // Verdicts of domain::evaluateLedAnimation(), which the shipped tree dispatches on.
+        {"LED_STATE_READY", unsigned(domain::LedStateVerdict::Ready)},
+        {"LED_STATE_MANUAL_ACTION", unsigned(domain::LedStateVerdict::ManualAction)},
+        {"LED_STATE_E_STOP", unsigned(domain::LedStateVerdict::EStop)},
+        {"LED_ERROR_NONE", unsigned(domain::LedErrorVerdict::None)},
+        {"LED_ERROR_CHARGING_OVERHEAT", unsigned(domain::LedErrorVerdict::ChargingOverheat)},
+        {"LED_ERROR_STATUS_UNKNOWN", unsigned(domain::LedErrorVerdict::StatusUnknown)},
+        {"LED_BATTERY_NONE", unsigned(domain::LedBatteryVerdict::None)},
+        {"LED_BATTERY_CHARGING", unsigned(domain::LedBatteryVerdict::Charging)},
+        {"LED_BATTERY_DISCHARGING", unsigned(domain::LedBatteryVerdict::Discharging)},
+        // Battery thresholds, status and health constants: no longer read by the shipped tree;
+        // kept for trees supplied through led_bt_project_path.
+        {"CRITICAL_BATTERY_THRESHOLD_PERCENT", critical_battery_threshold_percent},
         {"LOW_BATTERY_THRESHOLD_PERCENT", low_battery_threshold_percent},
         // Animation images constants
         {"E_STOP_ANIM_ID", unsigned(LedAnimationMsg::E_STOP)},
@@ -172,13 +185,13 @@ std::map<std::string, std::any> LedSafetyNode::createLedInitialBlackboard()
         {"BATTERY_CHARGED_ANIM_ID", unsigned(LedAnimationMsg::BATTERY_CHARGED)},
         {"CHARGER_INSERTED_ANIM_ID", unsigned(LedAnimationMsg::CHARGER_INSERTED)},
         {"BATTERY_NOMINAL_ANIM_ID", unsigned(LedAnimationMsg::BATTERY_NOMINAL)},
-        // Battery status constants
+        // Battery status constants (see above)
         {"POWER_SUPPLY_STATUS_UNKNOWN", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN)},
         {"POWER_SUPPLY_STATUS_CHARGING", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_CHARGING)},
         {"POWER_SUPPLY_STATUS_DISCHARGING", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_DISCHARGING)},
         {"POWER_SUPPLY_STATUS_NOT_CHARGING", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_NOT_CHARGING)},
         {"POWER_SUPPLY_STATUS_FULL", unsigned(BatteryStateMsg::POWER_SUPPLY_STATUS_FULL)},
-        // Battery health constants
+        // Battery health constants (see above)
         {"POWER_SUPPLY_HEALTH_OVERHEAT", unsigned(BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT)},
         // Behaviour tree constants, read by nav2_behavior_tree::BtServiceNode. server_timeout must
         // exceed the tick period so a response arriving between ticks is still collected.
@@ -204,12 +217,15 @@ void LedSafetyNode::batteryCallback(const BatteryStateMsg::SharedPtr battery_sta
 
     if (battery_status != BatteryStateMsg::POWER_SUPPLY_STATUS_UNKNOWN &&
         battery_health != BatteryStateMsg::POWER_SUPPLY_HEALTH_UNKNOWN) {
-        battery_percent_ = battery_state->percentage;
+        led_inputs_.battery_percent = battery_state->percentage;
     }
 
-    led_tree_->getBlackboard()->set<float>("battery_percent", battery_percent_);
-    led_tree_->getBlackboard()->set<std::string>("battery_percent_round",
-        std::to_string(round(battery_percent_ / update_charging_anim_step_) * update_charging_anim_step_));
+    led_inputs_.battery_status = infrastructure::toPowerSupplyStatus(battery_status);
+    led_inputs_.battery_health = infrastructure::toBatteryHealth(battery_health);
+    const auto decision = updateLedVerdicts();
+
+    led_tree_->getBlackboard()->set<float>("battery_percent", led_inputs_.battery_percent);
+    led_tree_->getBlackboard()->set<std::string>("battery_percent_round", decision.battery_percent_round);
 
     last_battery_stamp_ = std::chrono::steady_clock::now();
 }
@@ -217,13 +233,35 @@ void LedSafetyNode::batteryCallback(const BatteryStateMsg::SharedPtr battery_sta
 void LedSafetyNode::gpioCallback(const GpioMsg::SharedPtr gpio_state)
 {
     led_tree_->getBlackboard()->set<bool>("e_stop_state", gpio_state->hw_e_stop_user_button);
+    led_inputs_.e_stop_pressed = gpio_state->hw_e_stop_user_button;
+    updateLedVerdicts();
     last_gpio_stamp_ = std::chrono::steady_clock::now();
 }
 
 void LedSafetyNode::joyCallback(const JoyMsg::SharedPtr joy)
 {
-    led_tree_->getBlackboard()->set<bool>("drive_state", joy->buttons[kDeadManButtonIndex]);
+    const bool held = joy->buttons[kDeadManButtonIndex];
+    led_tree_->getBlackboard()->set<bool>("drive_state", held);
+    led_inputs_.dead_man_held = held;
+    updateLedVerdicts();
     last_joy_stamp_ = std::chrono::steady_clock::now();
+}
+
+domain::LedAnimationDecision LedSafetyNode::updateLedVerdicts()
+{
+    // Written next to the raw inputs, in the same callback, so every tick sees matching values.
+    const auto decision = domain::evaluateLedAnimation(led_inputs_, led_thresholds_);
+    const auto blackboard = led_tree_->getBlackboard();
+
+    blackboard->set<unsigned>("led_state_verdict", unsigned(decision.state));
+    blackboard->set<unsigned>("led_error_verdict", unsigned(decision.error));
+    blackboard->set<unsigned>("led_battery_verdict", unsigned(decision.battery));
+    blackboard->set<bool>("led_battery_full", decision.battery_full);
+    blackboard->set<bool>("led_battery_low", decision.low_battery);
+    blackboard->set<bool>("led_battery_critical", decision.critical_battery);
+    blackboard->set<bool>("led_battery_nominal", decision.nominal_battery);
+
+    return decision;
 }
 
 void LedSafetyNode::ledTreeTimerCallback()
@@ -273,7 +311,7 @@ void LedSafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper &
     status.add("joy age (s)", last_joy_stamp_ ?
         std::to_string(*infrastructure::ageSeconds(last_joy_stamp_, now)) :
         std::string("never received"));
-    status.add("Battery percent", battery_percent_);
+    status.add("Battery percent", led_inputs_.battery_percent);
 
     infrastructure::fillSafetyInputsStatus(
         configured_,

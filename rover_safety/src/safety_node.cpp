@@ -17,7 +17,6 @@
 #include <algorithm>
 #include <any>
 #include <chrono>
-#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -32,6 +31,7 @@
 
 #include "rover_safety/behavior_tree_utils.hpp"
 #include "rover_safety/domain/safety_health.hpp"
+#include "rover_safety/infrastructure/battery_state_conversion.hpp"
 #include "rover_safety/infrastructure/safety_diagnostics.hpp"
 #include "rover_safety/infrastructure/shutdown_command.hpp"
 
@@ -39,30 +39,6 @@ namespace rover_safety
 {
 
 using namespace std::chrono_literals;
-
-namespace
-{
-
-domain::BatteryHealth toBatteryHealth(std::uint8_t power_supply_health)
-{
-    using domain::BatteryHealth;
-
-    switch (power_supply_health) {
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_GOOD: return BatteryHealth::Good;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERHEAT: return BatteryHealth::Overheat;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_DEAD: return BatteryHealth::Dead;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_OVERVOLTAGE: return BatteryHealth::Overvoltage;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_UNSPEC_FAILURE: return BatteryHealth::UnspecFailure;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_COLD: return BatteryHealth::Cold;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE:
-            return BatteryHealth::WatchdogTimerExpire;
-        case BatteryStateMsg::POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE:
-            return BatteryHealth::SafetyTimerExpire;
-        default: return BatteryHealth::Unknown;
-    }
-}
-
-}  // namespace
 
 SafetyNode::SafetyNode(
     const std::string & node_name,
@@ -259,7 +235,7 @@ void SafetyNode::batteryStateSubscriberCallback(const BatteryStateMsg::SharedPtr
     safety_tree_->getBlackboard()->set<float>("bat_temp", battery_temp_);
 
     const auto decision = domain::evaluateBatterySafety(
-        toBatteryHealth(battery_health), battery_temp_, battery_thresholds_);
+        infrastructure::toBatteryHealth(battery_health), battery_temp_, battery_thresholds_);
 
     safety_tree_->getBlackboard()->set<unsigned>("battery_verdict", unsigned(decision.verdict));
     safety_tree_->getBlackboard()->set<std::string>("battery_verdict_reason", decision.reason);

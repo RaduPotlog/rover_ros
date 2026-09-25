@@ -36,6 +36,7 @@ include_directories(include)
 # Domain: plain C++, no ROS dependencies.
 add_library(${PROJECT_NAME}_core STATIC
     src/domain/battery_safety_policy.cpp
+    src/domain/led_animation_policy.cpp
     src/domain/safety_health.cpp
     src/domain/shutdown_sequence.cpp
 )
@@ -202,6 +203,7 @@ generate_parameter_library(led_safety_parameters
 
 target_link_libraries(led_safety_node ${plugin_libs}
                       led_safety_parameters
+                      ${PROJECT_NAME}_core
                       ${PROJECT_NAME}_diagnostics
                       ${PROJECT_NAME}_configure_retry
 )
@@ -232,6 +234,12 @@ if(BUILD_TESTING)
     # ---------------------------------- Unit ---------------------------------- #
     ament_add_gtest(test_battery_safety_policy test/unit/test_battery_safety_policy.cpp)
     target_link_libraries(test_battery_safety_policy ${PROJECT_NAME}_core)
+
+    ament_add_gtest(test_led_animation_policy test/unit/test_led_animation_policy.cpp)
+    target_link_libraries(test_led_animation_policy ${PROJECT_NAME}_core)
+
+    ament_add_gtest(test_battery_state_conversion test/unit/test_battery_state_conversion.cpp)
+    target_link_libraries(test_battery_state_conversion ${PROJECT_NAME}_core ${sensor_msgs_TARGETS})
 
     ament_add_gtest(test_safety_health test/unit/test_safety_health.cpp)
     target_link_libraries(test_safety_health ${PROJECT_NAME}_core)
@@ -274,6 +282,19 @@ if(BUILD_TESTING)
     target_link_libraries(test_shutdown_hosts_from_file_node
         shutdown_hosts_from_file_bt_node ${PLUGIN_TEST_LIBRARIES})
     target_include_directories(test_shutdown_hosts_from_file_node PRIVATE ${rover_utils_INCLUDE_DIRS})
+
+    # Ticks the shipped LED tree against a recording stand-in for CallSetLedAnimationService.
+    ament_add_gtest(test_led_safety_tree test/unit/test_led_safety_tree.cpp
+                    TIMEOUT 60)
+    target_compile_definitions(test_led_safety_tree PRIVATE
+        ROVER_SAFETY_LED_BT_PROJECT="${CMAKE_CURRENT_SOURCE_DIR}/behavior_trees/RoverLedSafetyBT.btproj")
+    target_link_libraries(test_led_safety_tree
+        tick_after_timeout_bt_node
+        ${PROJECT_NAME}_core
+        ${behaviortree_cpp_TARGETS}
+        ${rover_msgs_TARGETS}
+        ${sensor_msgs_TARGETS}
+    )
 
     # ------------------------------- Integration ------------------------------ #
     ament_add_gtest(test_call_trigger_service test/integration/test_call_trigger_service.cpp
@@ -372,6 +393,31 @@ if(BUILD_TESTING)
         ${rclcpp_TARGETS}
         ${sensor_msgs_TARGETS}
         led_safety_parameters
+        ${PROJECT_NAME}_core
+        ${PROJECT_NAME}_diagnostics
+        ${PROJECT_NAME}_configure_retry
+    )
+
+    # The real rover_led_safety_node, in-process, against a fake LED controller.
+    ament_add_gtest(test_led_safety_node_animations
+                    test/integration/test_led_safety_node_animations.cpp
+                    src/led_safety_node.cpp
+                    TIMEOUT 120
+                    APPEND_LIBRARY_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+    add_dependencies(test_led_safety_node_animations ${plugin_libs})
+    target_compile_definitions(test_led_safety_node_animations PRIVATE
+        ROVER_SAFETY_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(test_led_safety_node_animations PRIVATE ${rover_utils_INCLUDE_DIRS})
+    target_link_libraries(test_led_safety_node_animations
+        nav2_ros_common::nav2_ros_common
+        ${behaviortree_cpp_TARGETS}
+        ${diagnostic_msgs_TARGETS}
+        ${diagnostic_updater_TARGETS}
+        ${rover_msgs_TARGETS}
+        ${rclcpp_TARGETS}
+        ${sensor_msgs_TARGETS}
+        led_safety_parameters
+        ${PROJECT_NAME}_core
         ${PROJECT_NAME}_diagnostics
         ${PROJECT_NAME}_configure_retry
     )

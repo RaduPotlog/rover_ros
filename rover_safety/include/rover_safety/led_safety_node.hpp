@@ -35,6 +35,7 @@
 #include "rover_msgs/msg/safety_status.hpp"
 
 #include "rover_safety/behavior_tree.hpp"
+#include "rover_safety/domain/led_animation_policy.hpp"
 #include "rover_safety/infrastructure/configure_retry.hpp"
 #include "rover_safety/led_safety_parameters.hpp"
 
@@ -88,13 +89,14 @@ private:
     
     void ledTreeTimerCallback();
 
+    // Evaluates the LED animation policy on led_inputs_ and writes the led_* verdicts the tree reads.
+    domain::LedAnimationDecision updateLedVerdicts();
+
     // Diagnostics (hardware ID "Bumper Led"), on the node's single-threaded executor.
     void diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & status);
     void diagnoseBehaviorTree(diagnostic_updater::DiagnosticStatusWrapper & status);
 
     static constexpr std::size_t kDeadManButtonIndex = 4;
-
-    float update_charging_anim_step_;
 
     std::shared_ptr<led_safety::ParamListener> param_listener_;
     led_safety::Params params_;
@@ -104,8 +106,9 @@ private:
     rclcpp::Subscription<JoyMsg>::SharedPtr joy_sub_;
     rclcpp::TimerBase::SharedPtr led_tree_timer_;
 
-    double battery_percent_;
-    
+    domain::LedSafetyInputs led_inputs_;
+    domain::LedBatteryThresholds led_thresholds_{};
+
     std::unique_ptr<BT::BehaviorTreeFactory> factory_;
 
     using SteadyTime = std::chrono::steady_clock::time_point;

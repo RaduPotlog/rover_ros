@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="4">
+  <!-- led_*_verdict and led_battery_* are computed by rover_safety::domain::evaluateLedAnimation. current_*_anim_id and charging_anim_percent record what the tree last sent. -->
   <BehaviorTree ID="BatteryAnimationSubtree">
     <Sequence>
       <Parallel name="ChargingSequence"
                 failure_count="1"
                 success_count="-1"
-                _skipIf="battery_status != POWER_SUPPLY_STATUS_CHARGING &amp;&amp; battery_status != POWER_SUPPLY_STATUS_FULL">
+                _skipIf="led_battery_verdict != LED_BATTERY_CHARGING">
         <Delay delay_msec="300"
                _skipIf="current_battery_anim_id == CHARGING_BATTERY_ANIM_ID ||current_battery_anim_id == BATTERY_CHARGED_ANIM_ID">
           <CallSetLedAnimationService name="SetChargerInsertedAnimation"
@@ -15,7 +16,7 @@
                                       service_name="led/set_animation"/>
         </Delay>
         <Delay delay_msec="2500"
-               _skipIf="(battery_percent_round == charging_anim_percent  &amp;&amp; current_battery_anim_id == CHARGING_BATTERY_ANIM_ID|| battery_percent_round == 1.0)">
+               _skipIf="led_battery_full || (battery_percent_round == charging_anim_percent &amp;&amp; current_battery_anim_id == CHARGING_BATTERY_ANIM_ID)">
           <CallSetLedAnimationService name="SetChargingAnimation"
                                       id="{CHARGING_BATTERY_ANIM_ID}"
                                       param="{battery_percent_round}"
@@ -24,7 +25,7 @@
                                       _onSuccess="charging_anim_percent = battery_percent_round; current_battery_anim_id = CHARGING_BATTERY_ANIM_ID"/>
         </Delay>
         <Delay delay_msec="2500"
-               _skipIf="battery_percent_round != 1.0 || current_battery_anim_id == BATTERY_CHARGED_ANIM_ID">
+               _skipIf="(!led_battery_full) || current_battery_anim_id == BATTERY_CHARGED_ANIM_ID">
           <CallSetLedAnimationService name="SetChargedAnimation"
                                       id="{BATTERY_CHARGED_ANIM_ID}"
                                       param="{battery_percent_round}"
@@ -34,10 +35,10 @@
         </Delay>
       </Parallel>
       <Sequence name="DischargingSequence"
-                _skipIf="battery_status != POWER_SUPPLY_STATUS_DISCHARGING &amp;&amp; battery_status != POWER_SUPPLY_STATUS_NOT_CHARGING">
+                _skipIf="led_battery_verdict != LED_BATTERY_DISCHARGING">
         <Sequence name="BatteryStatusSequence">
           <SafetyBtTickAfterTimeout timeout="{LOW_BATTERY_ANIM_PERIOD}"
-                                    _skipIf="battery_percent &lt; CRITICAL_BATTERY_THRESHOLD_PERCENT || battery_percent &gt;= LOW_BATTERY_THRESHOLD_PERCENT">
+                                    _skipIf="!led_battery_low">
             <CallSetLedAnimationService name="SetLowBatteryAnimation"
                                         id="{LOW_BATTERY_ANIM_ID}"
                                         param="{battery_percent_round}"
@@ -49,14 +50,14 @@
                                       param="{battery_percent_round}"
                                       repeating="true"
                                       service_name="led/set_animation"
-                                      _skipIf="battery_percent &gt;= CRITICAL_BATTERY_THRESHOLD_PERCENT || current_battery_anim_id == CRITICAL_BATTERY_ANIM_ID"
+                                      _skipIf="(!led_battery_critical) || current_battery_anim_id == CRITICAL_BATTERY_ANIM_ID"
                                       _onSuccess="current_battery_anim_id = CRITICAL_BATTERY_ANIM_ID"/>
           <CallSetLedAnimationService name="SetNominalBatteryAnimation"
                                       id="{BATTERY_NOMINAL_ANIM_ID}"
                                       param=""
                                       repeating="false"
                                       service_name="led/set_animation"
-                                      _skipIf="battery_percent &lt; LOW_BATTERY_THRESHOLD_PERCENT  || current_battery_anim_id == BATTERY_NOMINAL_ANIM_ID"
+                                      _skipIf="(!led_battery_nominal) || current_battery_anim_id == BATTERY_NOMINAL_ANIM_ID"
                                       _onSuccess="current_battery_anim_id = BATTERY_NOMINAL_ANIM_ID"/>
         </Sequence>
       </Sequence>
@@ -71,14 +72,14 @@
                                     param=""
                                     repeating="true"
                                     service_name="led/set_animation"
-                                    _skipIf="battery_status != POWER_SUPPLY_STATUS_CHARGING || battery_health != POWER_SUPPLY_HEALTH_OVERHEAT"
+                                    _skipIf="led_error_verdict != LED_ERROR_CHARGING_OVERHEAT"
                                     _onSuccess="current_error_anim_id = ERROR_ANIM_ID"/>
         <CallSetLedAnimationService name="SetErrorAnimation"
                                     id="{ERROR_ANIM_ID}"
                                     param=""
                                     repeating="true"
                                     service_name="led/set_animation"
-                                    _skipIf="battery_status != POWER_SUPPLY_STATUS_UNKNOWN"
+                                    _skipIf="led_error_verdict != LED_ERROR_STATUS_UNKNOWN"
                                     _onSuccess="current_error_anim_id = ERROR_ANIM_ID"/>
       </Sequence>
       <Sequence _skipIf="current_error_anim_id == NO_ERROR_ANIM_ID">
@@ -87,7 +88,7 @@
                                     param=""
                                     repeating="true"
                                     service_name="led/set_animation"
-                                    _skipIf="battery_status == POWER_SUPPLY_STATUS_UNKNOWN || (battery_status == POWER_SUPPLY_STATUS_CHARGING &amp;&amp; battery_health == POWER_SUPPLY_HEALTH_OVERHEAT)"
+                                    _skipIf="led_error_verdict != LED_ERROR_NONE"
                                     _onSuccess="current_error_anim_id = NO_ERROR_ANIM_ID"/>
       </Sequence>
     </Sequence>
@@ -107,20 +108,20 @@
 
   <BehaviorTree ID="StateAnimationSubtree">
     <Sequence>
-      <Sequence _skipIf="e_stop_state">
+      <Sequence _skipIf="led_state_verdict == LED_STATE_E_STOP">
         <CallSetLedAnimationService name="SetReadyAnimation"
                                     id="{READY_ANIM_ID}"
                                     param=""
                                     repeating="true"
                                     service_name="led/set_animation"
-                                    _skipIf="drive_state || current_anim_id == READY_ANIM_ID"
+                                    _skipIf="led_state_verdict != LED_STATE_READY || current_anim_id == READY_ANIM_ID"
                                     _onSuccess="current_anim_id = READY_ANIM_ID"/>
         <CallSetLedAnimationService name="SetManualActionAnimation"
                                     id="{MANUAL_ACTION_ANIM_ID}"
                                     param=""
                                     repeating="true"
                                     service_name="led/set_animation"
-                                    _skipIf="(!drive_state) || current_anim_id == MANUAL_ACTION_ANIM_ID"
+                                    _skipIf="led_state_verdict != LED_STATE_MANUAL_ACTION || current_anim_id == MANUAL_ACTION_ANIM_ID"
                                     _onSuccess="current_anim_id = MANUAL_ACTION_ANIM_ID"/>
       </Sequence>
       <CallSetLedAnimationService name="SetEStopAnimation"
@@ -128,7 +129,7 @@
                                   param=""
                                   repeating="true"
                                   service_name="led/set_animation"
-                                  _skipIf="(!e_stop_state) || current_anim_id == E_STOP_ANIM_ID"
+                                  _skipIf="led_state_verdict != LED_STATE_E_STOP || current_anim_id == E_STOP_ANIM_ID"
                                   _onSuccess="current_anim_id = E_STOP_ANIM_ID"/>
     </Sequence>
   </BehaviorTree>

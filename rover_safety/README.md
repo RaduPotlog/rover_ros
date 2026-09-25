@@ -115,23 +115,45 @@ answer 200 and power off. Unreachable hosts are skipped. The file ships with no 
 | Direction | Name | Type |
 |-----------|------|------|
 | sub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` |
-| sub | `hardware_interface/gpio_state` | `rover_msgs/GpioState` (`gpio_pin_hw_e_stop_user_button` → `e_stop_state`) |
+| sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` (`hw_e_stop_user_button` → `e_stop_state`) |
 | sub | `joy` | `sensor_msgs/Joy` (dead-man button → `drive_state`) |
 | client | `led/set_animation` | `rover_msgs/SetLedAnimation` (called from the tree) |
 | pub | `diagnostics` | hardware id `Bumper Led`: `LED safety inputs`, `LED safety behavior tree` |
 
-The `RoverLedSafety` tree (`behavior_trees/rover_led_safety.xml`) runs three subtrees in parallel:
+The animations are decided outside the tree by the pure `domain::evaluateLedAnimation()`
+(`include/rover_safety/domain/led_animation_policy.hpp`):
 
-- `ErrorAnimationSubtree` shows `ERROR` while the battery status is unknown or it is overheating
-  while charging, and `NO_ERROR` otherwise.
-- `BatteryAnimationSubtree`:
-  - While charging, it shows `CHARGING_BATTERY`, updated every `battery.charging_anim_step`,
-    or `BATTERY_CHARGED` at 100 %.
-  - While discharging, it repeats `LOW_BATTERY` every `battery.anim_period.low` seconds below
-    `battery.percent.threshold.low`, shows `CRITICAL_BATTERY` below
-    `battery.percent.threshold.critical`, and `BATTERY_NOMINAL` otherwise.
-- `StateAnimationSubtree` shows `E_STOP` while the hardware E-Stop button is pressed, otherwise
-  `MANUAL_ACTION` while the dead-man button is held and `READY` when idle.
+| Channel | Input | Verdict | Animation |
+|---------|-------|---------|-----------|
+| state | hardware E-Stop button pressed | `LED_STATE_E_STOP` | `E_STOP` |
+| state | otherwise, dead-man button held | `LED_STATE_MANUAL_ACTION` | `MANUAL_ACTION` |
+| state | otherwise | `LED_STATE_READY` | `READY` |
+| error | battery status `UNKNOWN` | `LED_ERROR_STATUS_UNKNOWN` | `ERROR` |
+| error | status `CHARGING` and health `OVERHEAT` | `LED_ERROR_CHARGING_OVERHEAT` | `ERROR` |
+| error | anything else, including status `FULL` with health `OVERHEAT` | `LED_ERROR_NONE` | `NO_ERROR` |
+| battery | status `CHARGING` or `FULL` | `LED_BATTERY_CHARGING` | `CHARGER_INSERTED` after 0.3 s, then after 2.5 s `CHARGING_BATTERY` with the percentage rounded to `battery.charging_anim_step` |
+| battery | status `DISCHARGING` or `NOT_CHARGING` | `LED_BATTERY_DISCHARGING` | by level, below |
+| battery | any other status | `LED_BATTERY_NONE` | none |
+| level | charging, the rounded percentage reads 1.0 | `led_battery_full` | `BATTERY_CHARGED` instead of `CHARGING_BATTERY` |
+| level | discharging, percentage below `battery.percent.threshold.critical` | `led_battery_critical` | `CRITICAL_BATTERY` |
+| level | discharging, percentage from critical up to `battery.percent.threshold.low` | `led_battery_low` | `LOW_BATTERY`, repeated every `battery.anim_period.low` s |
+| level | discharging, percentage at or above low | `led_battery_nominal` | `BATTERY_NOMINAL` |
+
+The percentage is the last one reported with a known status and health, compared as a float: a NaN
+selects no level, and critical > low is accepted (`CRITICAL_BATTERY` and `BATTERY_NOMINAL` are
+then both resent every tick). The channels request independently, error first, then battery, then
+state; which animation is visible is up to `rover_led`'s animation priorities.
+
+The node writes the verdicts (`led_state_verdict`, `led_error_verdict`, `led_battery_verdict`,
+`led_battery_full`/`_low`/`_critical`/`_nominal`) to the blackboard next to the raw inputs, which
+stay there for trees supplied through `led_bt_project_path`. The `RoverLedSafety` tree
+(`behavior_trees/rover_led_safety.xml`) runs `ErrorAnimationSubtree`, `BatteryAnimationSubtree` and
+`StateAnimationSubtree` in parallel on the verdicts. It keeps the timing (the charger delays, the
+`LOW_BATTERY` repeat) and the deduplication: it records what it last sent (`current_*_anim_id`,
+`charging_anim_percent`) and requests an animation again only when that changes.
+
+Indicator only: calls nothing but `led/set_animation`; not part of the E-Stop chain
+(`rover_arch/SAFETY_CHAIN.md`).
 
 Animation ids are the `rover_msgs/LedAnimation` constants.
 
@@ -198,12 +220,14 @@ ros2 lifecycle get /rover/rover_safety_node
 
 ```
 domain/          battery_safety_policy (verdict from battery health + temperature),
+                 led_animation_policy (LED animation verdicts from battery, E-Stop and dead-man inputs),
                  safety_health (input freshness),
                  shutdown_sequence (shutdown state, idempotent requests, retry backoff) - no ROS dependencies
 infrastructure/  safety_diagnostics (diagnostic_updater status mapping),
                  shutdown_command (bash command carrying the shutdown reason),
                  command_handler (bash command in its own process group, watched from a thread),
-                 shutdown_host (signed HTTP shutdown request, ping until down)
+                 shutdown_host (signed HTTP shutdown request, ping until down),
+                 battery_state_conversion (sensor_msgs/BatteryState status and health -> domain enums)
 safety_node / led_safety_node   lifecycle ROS adapters: subscriptions -> blackboard, tree timer
 behavior_tree.hpp               tree loading, plugin registration, Groot2 publisher
 plugins/         BT action and decorator nodes listed above
@@ -216,15 +240,21 @@ scripts/         shutdown_ros_controller.sh
 colcon test --packages-select rover_safety && colcon test-result --all --verbose
 ```
 
-- `test/unit/` covers the battery safety policy, input health, shutdown sequence, shutdown command
-  quoting, diagnostics mapping, and the `ExecuteCommand`, `SignalShutdown`, `ShutdownHosts*` plugins
-  (against a local HTTP server; no root needed).
+- `test/unit/` covers the battery safety policy, the LED animation policy, the `BatteryState`
+  conversion, input health, shutdown sequence, shutdown command quoting, diagnostics mapping, and
+  the `ExecuteCommand`, `SignalShutdown`, `ShutdownHosts*` plugins (against a local HTTP server; no
+  root needed).
+- `test/unit/test_led_safety_tree.cpp` ticks the shipped `RoverLedSafety` tree with a recording
+  stand-in for `CallSetLedAnimationService`: which animations each input requests, in which order,
+  and when.
 - `test/integration/test_call_trigger_service.cpp` runs the `CallTriggerService` BT node
   against a real service.
 - `test/integration/test_shutdown_tree.cpp` loads `RoverSafetyBT.btproj` with the plugin lists of
   `config/rover_safety.yaml` and runs `RoverShutdown`, including a retry.
 - `test/integration/test_safety_node_shutdown.cpp` runs `rover_safety_node` in-process: the
   `~/shutdown` service, retry after a failed power-off, and a fatal battery temperature.
+- `test/integration/test_led_safety_node_animations.cpp` runs `rover_led_safety_node` in-process
+  against a fake LED controller: the idle animations once each, then `E_STOP`.
 - `test/integration/test_shutdown_script.sh` checks `shutdown_ros_controller.sh` against stub
   `ros2`/`curl`/`dbus-send`/`systemctl` binaries.
 
