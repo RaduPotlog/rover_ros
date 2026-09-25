@@ -37,6 +37,7 @@
 #include <hardware_interface/system_interface.hpp>
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 
+#include "rover_hardware_interface/domain/safety_link_diagnosis.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
 #include "rover_hardware_interface/utils.hpp"
@@ -754,15 +755,34 @@ void RoverSystem::updateCommunicationStatus()
     }
 }
 
+namespace
+{
+
+unsigned char toDiagnosticLevel(const SafetyLinkSeverity s)
+{
+    switch (s) {
+        case SafetyLinkSeverity::kOk:
+            return diagnostic_updater::DiagnosticStatusWrapper::OK;
+        case SafetyLinkSeverity::kWarn:
+            return diagnostic_updater::DiagnosticStatusWrapper::WARN;
+        case SafetyLinkSeverity::kError:
+            return diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+    }
+
+    // Unreachable - every SafetyLinkSeverity enumerator is handled above. Satisfies
+    // -Wreturn-type without a `default:` label, which would silently swallow a future
+    // enumerator instead of failing to compile.
+    return diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+}
+
+}  // namespace
+
 // The safety link had no diagnostic of its own: read()/write() always return OK, so a dead PLC
 // link reached nothing but a stale gpio_state topic. This reports the link and the two threads
 // that service it, plus the contactor cross-check, so "why did the rover stop?" is answerable
-// from /diagnostics alone.
+// from /diagnostics alone. The level and summary come from evaluateSafetyLinkHealth().
 void RoverSystem::diagnoseSafetyLink(diagnostic_updater::DiagnosticStatusWrapper & status)
 {
-    unsigned char level{diagnostic_updater::DiagnosticStatusWrapper::OK};
-    std::string message{"Safety PLC link healthy."};
-
     const auto health = rover_controller_->linkHealth();
 
     status.add("Watchdog thread running", health.watchdog_running);
@@ -789,33 +809,8 @@ void RoverSystem::diagnoseSafetyLink(diagnostic_updater::DiagnosticStatusWrapper
     status.add("Contactor fault latched", contactor_fault);
     status.add("Contactor failed open", contactor_failed_open);
 
-    // Ordered least to most severe so the most serious condition owns the summary.
-    if (contactor_failed_open) {
-        level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
-        message = "Motor contactor reports open while the E-Stop latch is clear - rover will not "
-                  "drive.";
-    }
-
-    if (health.watchdog_miss_count > 0) {
-        level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
-        message = "Safety PLC heartbeat is landing late - the link is too slow for the configured "
-                  "margin.";
-    }
-
-    if (!health.watchdog_running || !health.poll_running) {
-        level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
-        message = "A safety controller background thread is not running.";
-    }
-
-    if (contactor_fault) {
-        // The hazardous one: the stop was commanded and the contacts did not open.
-        level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
-        message = "E-Stop latch asserted but the motor contactor still reports engaged - suspect "
-                  "welded contacts. Motion inhibited until sw_e_stop_latch_reset and a hardware "
-                  "check.";
-    }
-
-    status.summary(level, message);
+    const auto d = evaluateSafetyLinkHealth(health, contactor_fault, contactor_failed_open);
+    status.summary(toDiagnosticLevel(d.severity), d.message);
 }
 
 void RoverSystem::updateEStopState()

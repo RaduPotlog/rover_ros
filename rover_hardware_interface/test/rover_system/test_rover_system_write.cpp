@@ -15,7 +15,8 @@
 // Tests RoverSystem::write()'s wiring around RoverControlLoopUseCase::decideWriteCommand() -
 // which command actually reaches the driver, and what happens to the controller's pending command
 // - for every lifecycle / E-Stop / failsafe-latch combination that matters. The pure decision
-// itself is covered by test/application/test_rover_control_loop_use_case.cpp.
+// itself is covered by test/application/test_rover_control_loop_use_case.cpp. The same fixture
+// also checks the "safety plc link" diagnostic callback (see the last section).
 //
 // Unlike test_rover_a1_system_on_init.cpp (which uses the real RoverA1System and so can't go past
 // on_init() without Modbus/Phidget hardware), this drives a minimal RoverSystem subclass whose
@@ -31,8 +32,10 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include <diagnostic_updater/diagnostic_status_wrapper.hpp>
 #include <hardware_interface/hardware_info.hpp>
 #include <hardware_interface/types/hardware_component_interface_params.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
@@ -86,6 +89,7 @@ public:
     }
 
     std::shared_ptr<FakeRoverDriver> fakeDriver() const { return fake_driver_; }
+    std::shared_ptr<FakeRoverGpioPort> fakeGpio() const { return fake_gpio_; }
 
     void setLifecycle(const std::uint8_t id, const std::string & label)
     {
@@ -120,6 +124,13 @@ public:
         control_loop_use_case_->updateMotorFailsafeTrippedStatus();
     }
 
+    // The "safety plc link" diagnostic task body, called directly rather than through the
+    // diagnostic_updater timer.
+    void runSafetyLinkDiagnostic(diagnostic_updater::DiagnosticStatusWrapper & s)
+    {
+        diagnoseSafetyLink(s);
+    }
+
 protected:
 
     void defineRoverDriver() override { rover_driver_ = fake_driver_; }
@@ -127,7 +138,7 @@ protected:
 
     void defineRoverController() override
     {
-        rover_controller_ = std::make_shared<FakeRoverGpioPort>();
+        rover_controller_ = fake_gpio_;
         e_stop_ = std::make_shared<FakeEmergencyStop>();
     }
 
@@ -148,6 +159,7 @@ protected:
 private:
 
     std::shared_ptr<FakeRoverDriver> fake_driver_ = std::make_shared<FakeRoverDriver>();
+    std::shared_ptr<FakeRoverGpioPort> fake_gpio_ = std::make_shared<FakeRoverGpioPort>();
 };
 
 hardware_interface::ComponentInfo makeWheelJoint(const std::string & name)
@@ -364,6 +376,84 @@ TEST_F(RoverSystemWriteTest, NonFiniteMeasuredVelocityFailsSafe)
 
     EXPECT_FALSE(system_.statesAreZeroFlag());
     EXPECT_FALSE(system_.eStopResetWouldBeAllowed());
+}
+
+
+// --- "safety plc link" diagnostic ----------------------------------------------------------
+//
+// The verdict itself is covered by test/domain/test_safety_link_diagnosis.cpp. These check the
+// callback around it: the nine key/values in their order and formatting, and the severity mapped
+// onto the DiagnosticStatus level.
+
+TEST_F(RoverSystemWriteTest, SafetyLinkDiagnosticSummarisesAHealthyLinkAsOk)
+{
+    auto & health = system_.fakeGpio()->health;
+    health.watchdog_running = true;
+    health.poll_running = true;
+    health.last_kick_age_ms = 150;
+    health.last_poll_age_ms = 40;
+
+    diagnostic_updater::DiagnosticStatusWrapper status;
+    system_.runSafetyLinkDiagnostic(status);
+
+    EXPECT_EQ(status.level, diagnostic_updater::DiagnosticStatusWrapper::OK);
+    EXPECT_EQ(status.message, "Safety PLC link healthy.");
+
+    const std::vector<std::pair<std::string, std::string>> expected = {
+        {"Watchdog thread running", "True"},
+        {"IO poll thread running", "True"},
+        {"Watchdog late kicks", "0"},
+        {"Watchdog errors", "0"},
+        {"IO poll errors", "0"},
+        {"Last heartbeat kick age (ms)", "150"},
+        {"Last IO poll age (ms)", "40"},
+        {"Contactor fault latched", "False"},
+        {"Contactor failed open", "False"},
+    };
+
+    ASSERT_EQ(status.values.size(), expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_EQ(status.values[i].key, expected[i].first) << "index " << i;
+        EXPECT_EQ(status.values[i].value, expected[i].second) << "index " << i;
+    }
+}
+
+TEST_F(RoverSystemWriteTest, SafetyLinkDiagnosticReportsALateHeartbeatAsWarn)
+{
+    auto & health = system_.fakeGpio()->health;
+    health.watchdog_running = true;
+    health.poll_running = true;
+    health.watchdog_miss_count = 2;
+
+    diagnostic_updater::DiagnosticStatusWrapper status;
+    system_.runSafetyLinkDiagnostic(status);
+
+    EXPECT_EQ(status.level, diagnostic_updater::DiagnosticStatusWrapper::WARN);
+    EXPECT_EQ(
+        status.message,
+        "Safety PLC heartbeat is landing late - the link is too slow for the configured margin.");
+
+    ASSERT_GE(status.values.size(), 3u);
+    EXPECT_EQ(status.values[2].key, "Watchdog late kicks");
+    EXPECT_EQ(status.values[2].value, "2");
+}
+
+TEST_F(RoverSystemWriteTest, SafetyLinkDiagnosticReportsStoppedThreadsAsErrorWithUnknownAges)
+{
+    // Default SafetyLinkHealth: what the link reports before start() - no thread, no success yet.
+    system_.fakeGpio()->health = SafetyLinkHealth{};
+
+    diagnostic_updater::DiagnosticStatusWrapper status;
+    system_.runSafetyLinkDiagnostic(status);
+
+    EXPECT_EQ(status.level, diagnostic_updater::DiagnosticStatusWrapper::ERROR);
+    EXPECT_EQ(status.message, "A safety controller background thread is not running.");
+
+    ASSERT_GE(status.values.size(), 7u);
+    EXPECT_EQ(status.values[5].key, "Last heartbeat kick age (ms)");
+    EXPECT_EQ(status.values[5].value, "never");
+    EXPECT_EQ(status.values[6].key, "Last IO poll age (ms)");
+    EXPECT_EQ(status.values[6].value, "never");
 }
 
 }  // namespace rover_hardware_interface

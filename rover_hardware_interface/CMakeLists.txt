@@ -69,6 +69,7 @@ add_library(
     src/domain/emergency_stop.cpp
     src/domain/velocity_command_guard.cpp
     src/domain/contactor_monitor.cpp
+    src/domain/safety_link_diagnosis.cpp
     src/application/rover_control_loop_use_case.cpp
     src/utils.cpp
 )
@@ -221,6 +222,11 @@ if(BUILD_TESTING)
   # injected, so these run instantly.
   ament_add_gtest(test_contactor_monitor test/domain/test_contactor_monitor.cpp)
   target_link_libraries(test_contactor_monitor ${PROJECT_NAME}_core)
+
+  # Severity/summary of the "safety plc link" diagnostic, extracted from
+  # RoverSystem::diagnoseSafetyLink() so its priority order is pinned without ROS.
+  ament_add_gtest(test_safety_link_diagnosis test/domain/test_safety_link_diagnosis.cpp)
+  target_link_libraries(test_safety_link_diagnosis ${PROJECT_NAME}_core)
 
   # Behavioral unit tests for the application-layer RT-loop decision logic (E-Stop state,
   # fault-flag reset, write-command gating/serialization), driven with fake domain ports the same
