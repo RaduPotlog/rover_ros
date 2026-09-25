@@ -20,12 +20,12 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <lifecycle_msgs/msg/state.hpp>
 
+#include "rover_crsf_teleop/application/teleop_config_validation.hpp"
 #include "rover_crsf_teleop/infrastructure/teleop_diagnostics_conversions.hpp"
 #include "rover_crsf_teleop/infrastructure/yaml_calibration_store.hpp"
 
@@ -246,20 +246,6 @@ std::optional<std::array<int, RcFrame::kChannelCount>> RoverCrsfTeleopNode::read
     return out;
 }
 
-std::array<bool, RcFrame::kChannelCount> RoverCrsfTeleopNode::axisChannels(
-    const TeleopConfig & config) const
-{
-    std::array<bool, RcFrame::kChannelCount> axes{};
-
-    for (const int channel : {config.linear_x_channel, config.angular_z_channel}) {
-        if (RcFrame::isValidChannel(channel)) {
-            axes[static_cast<std::size_t>(channel - 1)] = true;
-        }
-    }
-
-    return axes;
-}
-
 std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
 {
     TeleopConfig config;
@@ -302,115 +288,41 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
     config.channel_switch_threshold =
         static_cast<int>(get_parameter("channel_switch_threshold").as_int());
 
-    // Same 0-2047 wire domain the endpoint arrays are held to above. The calibrated-range check
-    // further down is a WARN and is gated on having a calibration at all, so without this a
-    // negative or out-of-wire-range threshold configured silently and pinned both switches to one
-    // position for the life of the node.
-    if (config.channel_switch_threshold < 0 || config.channel_switch_threshold > 2047) {
-        RCLCPP_ERROR(
-            get_logger(), "Parameter channel_switch_threshold = %d is outside 0-2047.",
-            config.channel_switch_threshold);
+    // Kept at the int64_t width they are read with until validateTeleopConfig() has seen them:
+    // TeleopConfig stores them narrower, and -1 settle frames or a link quality of 300 would
+    // otherwise wrap into something that passes.
+    TeleopIntegerParameters integers;
+    integers.switch_settle_frames = get_parameter("switch_settle_frames").as_int();
+    integers.channel_timeout_ms = get_parameter("channel_timeout_ms").as_int();
+    integers.link_stats_timeout_ms = get_parameter("link_stats_timeout_ms").as_int();
+    integers.link_quality_lost_below = get_parameter("link_quality_lost_below").as_int();
+    integers.link_quality_recovered_at = get_parameter("link_quality_recovered_at").as_int();
+    integers.zero_burst_duration_ms = get_parameter("zero_burst_duration_ms").as_int();
+
+    // The rules live in validateTeleopConfig(). Warnings are logged first and the first problem
+    // after them, the order configure has always reported them in.
+    const TeleopConfigCheck check = validateTeleopConfig(config, integers, calibration);
+
+    for (const std::string & warning : check.warnings) {
+        RCLCPP_WARN(get_logger(), "%s", warning.c_str());
+    }
+
+    if (!check.problems.empty()) {
+        RCLCPP_ERROR(get_logger(), "%s", check.problems.front().c_str());
         return std::nullopt;
-    }
-
-    // Fail configure on a bad channel number instead of the previous behaviour of reading it as
-    // 0 - which the stick mapping clamps to full negative deflection.
-    const std::array<std::pair<const char *, int>, 4> channel_roles{{
-        {"linear_x_channel", config.linear_x_channel},
-        {"angular_z_channel", config.angular_z_channel},
-        {"e_stop_channel", config.e_stop_channel},
-        {"e_stop_latch_reset_channel", config.e_stop_latch_reset_channel}}};
-    for (const auto & [name, channel] : channel_roles) {
-        if (!RcFrame::isValidChannel(channel)) {
-            RCLCPP_ERROR(
-                get_logger(), "Parameter %s = %d is outside 1-%zu.", name, channel,
-                RcFrame::kChannelCount);
-            return std::nullopt;
-        }
-    }
-
-    // Two roles on one channel would drive e.g. the E-Stop from a stick, so fail configure.
-    for (std::size_t i = 0; i < channel_roles.size(); ++i) {
-        for (std::size_t j = i + 1; j < channel_roles.size(); ++j) {
-            if (channel_roles[i].second == channel_roles[j].second) {
-                RCLCPP_ERROR(
-                    get_logger(), "Parameters %s and %s both use channel %d.",
-                    channel_roles[i].first, channel_roles[j].first, channel_roles[i].second);
-                return std::nullopt;
-            }
-        }
     }
 
     // The endpoints measured on this transmitter, over the output limits and inversion read
     // above. See applyCalibration() for what a calibration does and does not own.
     config = applyCalibration(config, calibration);
 
-    const std::vector<std::string> problems = calibrationProblems(calibration, axisChannels(config));
-    if (!problems.empty()) {
-        RCLCPP_ERROR(get_logger(), "Unusable stick calibration: %s", problems.front().c_str());
-        return std::nullopt;
-    }
-
-    // channel_switch_threshold stays an absolute raw value: a switch sits at the ends of its
-    // travel, so comparing raw counts is right, and re-deriving a safety-critical threshold from
-    // a measurement an operator just took is a worse failure mode than leaving it explicit. What
-    // the calibration does buy is being able to notice when the threshold has fallen outside a
-    // switch's actual range - which would leave that switch stuck reading one position forever.
-    for (const auto & [name, channel] :
-         {std::make_pair("e_stop_channel", config.e_stop_channel),
-          std::make_pair("e_stop_latch_reset_channel", config.e_stop_latch_reset_channel)})
-    {
-        const std::size_t index = static_cast<std::size_t>(channel - 1);
-        const int low = calibration.in_min[index];
-        const int high = calibration.in_max[index];
-
-        if (high > low && (config.channel_switch_threshold <= low ||
-                           config.channel_switch_threshold >= high))
-        {
-            RCLCPP_WARN(
-                get_logger(),
-                "channel_switch_threshold %d is outside channel %d's calibrated range %d-%d (%s), "
-                "so that switch will always read the same position. Re-measure the channel or "
-                "move the threshold.",
-                config.channel_switch_threshold, channel, low, high, name);
-        }
-    }
-
-    const int64_t settle_frames = get_parameter("switch_settle_frames").as_int();
-    const int64_t channel_timeout_ms = get_parameter("channel_timeout_ms").as_int();
-    const int64_t link_stats_timeout_ms = get_parameter("link_stats_timeout_ms").as_int();
-    const int64_t lq_lost_below = get_parameter("link_quality_lost_below").as_int();
-    const int64_t lq_recovered_at = get_parameter("link_quality_recovered_at").as_int();
-    const int64_t zero_burst_duration_ms = get_parameter("zero_burst_duration_ms").as_int();
-
-    if (zero_burst_duration_ms < 0) {
-        RCLCPP_ERROR(get_logger(), "zero_burst_duration_ms must be >= 0.");
-        return std::nullopt;
-    }
-    config.zero_burst_duration = std::chrono::milliseconds(zero_burst_duration_ms);
-
-    if (settle_frames < 0 || channel_timeout_ms <= 0 || link_stats_timeout_ms <= 0) {
-        RCLCPP_ERROR(
-            get_logger(),
-            "switch_settle_frames must be >= 0 and channel_timeout_ms / link_stats_timeout_ms > 0.");
-        return std::nullopt;
-    }
-
-    if (lq_lost_below < 0 || lq_recovered_at > 100 || lq_recovered_at < lq_lost_below) {
-        RCLCPP_ERROR(
-            get_logger(),
-            "Link quality thresholds must satisfy 0 <= link_quality_lost_below <= "
-            "link_quality_recovered_at <= 100 (got %ld and %ld).",
-            static_cast<long>(lq_lost_below), static_cast<long>(lq_recovered_at));
-        return std::nullopt;
-    }
-
-    config.switch_settle_frames = static_cast<unsigned int>(settle_frames);
-    config.link.channel_timeout = std::chrono::milliseconds(channel_timeout_ms);
-    config.link.link_stats_timeout = std::chrono::milliseconds(link_stats_timeout_ms);
+    config.zero_burst_duration = std::chrono::milliseconds(integers.zero_burst_duration_ms);
+    config.switch_settle_frames = static_cast<unsigned int>(integers.switch_settle_frames);
+    config.link.channel_timeout = std::chrono::milliseconds(integers.channel_timeout_ms);
+    config.link.link_stats_timeout = std::chrono::milliseconds(integers.link_stats_timeout_ms);
     config.link.require_link_stats = get_parameter("require_link_stats").as_bool();
-    config.link.lq_lost_below = static_cast<std::uint8_t>(lq_lost_below);
-    config.link.lq_recovered_at = static_cast<std::uint8_t>(lq_recovered_at);
+    config.link.lq_lost_below = static_cast<std::uint8_t>(integers.link_quality_lost_below);
+    config.link.lq_recovered_at = static_cast<std::uint8_t>(integers.link_quality_recovered_at);
 
     RCLCPP_INFO(
         get_logger(),
@@ -420,7 +332,7 @@ std::optional<TeleopConfig> RoverCrsfTeleopNode::readConfig()
         config.linear_x_mapping.in_mid, config.linear_x_mapping.deadband_counts,
         config.angular_z_channel, config.angular_z_mapping.in_min, config.angular_z_mapping.in_max,
         config.angular_z_mapping.in_mid, config.angular_z_mapping.deadband_counts,
-        static_cast<long>(channel_timeout_ms),
+        static_cast<long>(integers.channel_timeout_ms),
         config.link.require_link_stats ? " or on stale / low-quality link stats" : "");
 
     return config;

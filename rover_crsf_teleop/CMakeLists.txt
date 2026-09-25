@@ -40,6 +40,7 @@ add_library(${PROJECT_NAME}_core STATIC
             src/domain/teleop_health.cpp
             src/application/calibration_use_case.cpp
             src/application/teleop_use_case.cpp
+            src/application/teleop_config_validation.cpp
 )
 target_include_directories(${PROJECT_NAME}_core PUBLIC
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -111,7 +112,8 @@ if(BUILD_TESTING)
           test_calibration_use_case
           test_link_monitor
           test_teleop_health
-          test_teleop_use_case)
+          test_teleop_use_case
+          test_teleop_config_validation)
     ament_add_gtest(${TEST_NAME} test/unit/${TEST_NAME}.cpp)
     target_link_libraries(${TEST_NAME} ${PROJECT_NAME}_core)
   endforeach()

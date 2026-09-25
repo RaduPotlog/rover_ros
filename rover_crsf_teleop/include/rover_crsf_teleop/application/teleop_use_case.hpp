@@ -15,6 +15,7 @@
 #ifndef ROVER_CRSF_TELEOP_APPLICATION_TELEOP_USE_CASE_HPP_
 #define ROVER_CRSF_TELEOP_APPLICATION_TELEOP_USE_CASE_HPP_
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -76,6 +77,11 @@ struct TeleopConfig
 // `config` is the base to apply onto, not somewhere to accumulate: a run-time apply passes the
 // pre-calibration config, so applying twice is the same as applying once.
 TeleopConfig applyCalibration(const TeleopConfig & config, const ChannelCalibration & calibration);
+
+// Which channels the mapping drives as proportional axes. Switch channels are deliberately
+// not included: a switch rests at one end of its travel, so it fails every check meant for a
+// stick.
+std::array<bool, RcFrame::kChannelCount> axisChannels(const TeleopConfig & config);
 
 enum class TickStatus
 {

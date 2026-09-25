@@ -121,7 +121,8 @@ private:
     void declareParameters();
 
     // Reads the parameters into a TeleopConfig, or returns nullopt (after logging why) when they
-    // are inconsistent.
+    // are inconsistent. The rules for "inconsistent" are validateTeleopConfig()'s; this reads the
+    // parameters, logs what it reports and narrows the checked values into the config.
     std::optional<TeleopConfig> readConfig();
 
     // Reads one channel_in_* / channel_deadband parameter. A single-element list is expanded to
@@ -129,11 +130,6 @@ private:
     // transmitter is uniform". Any other length is a configure error.
     std::optional<std::array<int, RcFrame::kChannelCount>> readChannelArray(
         const char * name, int lower, int upper);
-
-    // Which channels the mapping drives as proportional axes. Switch channels are deliberately
-    // not included: a switch rests at one end of its travel, so it fails every check meant for a
-    // stick.
-    std::array<bool, RcFrame::kChannelCount> axisChannels(const TeleopConfig & config) const;
 
     void createCalibrationInterfaces();
 

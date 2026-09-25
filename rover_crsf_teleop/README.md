@@ -171,6 +171,7 @@ include/rover_crsf_teleop/
 │   │                rc_calibration - measures this transmitter's endpoints          (no ROS)
 │   └── crsf/        crsf_protocol, crc8, crsf_parser - the wire decoder             (no ROS)
 ├── application/     teleop_use_case - the per-tick rules above                      (no ROS)
+│                    teleop_config_validation - the rules configure enforces         (no ROS)
 │                    calibration_use_case - the session, its gate and its timeout    (no ROS)
 └── infrastructure/  ROS adapters for the ports + RoverCrsfTeleopNode (lifecycle)
                      yaml_calibration_store - the persisted calibration

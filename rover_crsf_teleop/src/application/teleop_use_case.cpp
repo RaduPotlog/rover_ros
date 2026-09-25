@@ -14,6 +14,7 @@
 
 #include "rover_crsf_teleop/application/teleop_use_case.hpp"
 
+#include <cstddef>
 #include <utility>
 
 namespace rover_crsf_teleop
@@ -34,6 +35,19 @@ TeleopConfig applyCalibration(const TeleopConfig & config, const ChannelCalibrat
         mergedMapping(config.angular_z_mapping, calibration, config.angular_z_channel);
 
     return calibrated;
+}
+
+std::array<bool, RcFrame::kChannelCount> axisChannels(const TeleopConfig & config)
+{
+    std::array<bool, RcFrame::kChannelCount> axes{};
+
+    for (const int channel : {config.linear_x_channel, config.angular_z_channel}) {
+        if (RcFrame::isValidChannel(channel)) {
+            axes[static_cast<std::size_t>(channel - 1)] = true;
+        }
+    }
+
+    return axes;
 }
 
 TeleopUseCase::TeleopUseCase(
