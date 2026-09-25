@@ -59,6 +59,19 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
     // Self-driven rather than launch_ros ComposableLifecycleNode autostart,
     // which (Jazzy) mis-builds the node name in a namespace and breaks when
     // the node's launch condition is false.
+    //
+    // One attempt and no retry, on purpose - unlike rover_safety's
+    // ConfigureRetry, which retries a configure that returned FAILURE because a
+    // service its behavior tree calls was not up yet. on_configure() has no
+    // such case: it never returns FAILURE, opens no device and waits for no
+    // service - it reads parameters already validated at construction and
+    // creates this node's own topics, services and client. The one peer the
+    // driver needs, hardware/led_control_enable, is asked for in on_activate()
+    // with its own bounded retries, so autostart reaches active without it. An
+    // exception thrown by on_configure() goes to the default on_error(), which
+    // finalizes the node, and no retry could undo that. A driver that did not
+    // come up still shows: "Led driver status" reports ERROR "Driver is not
+    // active!". Give it a retry if on_configure() ever gains a failure path.
     if (this->param_listener_->get_params().autostart) {
         autostart_timer_ = this->create_wall_timer(std::chrono::milliseconds(0), [this]() {
             autostart_timer_->cancel();
@@ -74,6 +87,8 @@ LedDriverNode::LedDriverNode(const rclcpp::NodeOptions & options)
 
 LedDriverNode::~LedDriverNode() = default;
 
+// Keep this free of failures a retry could fix (a device to open, a service to
+// wait for): autostart configures once (see the constructor).
 LedDriverNode::CallbackReturn LedDriverNode::on_configure(const rclcpp_lifecycle::State & /*previous_state*/)
 {
     RCLCPP_INFO(this->get_logger(), "Configuring.");

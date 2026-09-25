@@ -46,7 +46,11 @@ Lifecycle transitions:
   control.
 - **deactivate** clears the LEDs and releases control.
 
-With `autostart` (default) the node activates itself.
+With `autostart` (default) the node configures and activates itself once the executor spins.
+It tries once, with no retry (unlike `rover_safety`'s `ConfigureRetry`): configure depends on
+nothing outside the node, and `hardware/led_control_enable` is only asked for in activate,
+with its own retries. A driver that did not come up shows as ERROR `Driver is not active!`
+in `Led driver status`.
 
 Parameters (`src/led_driver_parameters.yaml`, values in `config/rover_a1_driver.yaml`):
 

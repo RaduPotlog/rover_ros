@@ -202,6 +202,21 @@ TEST_F(LedDriverNodeTest, AutostartConfiguresAndActivates)
     }));
 }
 
+// Autostart configures once and never retries (see LedDriverNode's constructor), which is only
+// safe while configure and activate need no peer. The handshake is on and nothing serves
+// hardware/led_control_enable (the base fixture starts no fake hardware): the node must still
+// come up.
+TEST_F(LedDriverNodeTest, AutostartActivatesWithoutTheLedControlService)
+{
+    executor_.remove_node(driver_->get_node_base_interface());
+    driver_ = makeDriver(true, true);
+    executor_.add_node(driver_->get_node_base_interface());
+
+    EXPECT_TRUE(spinUntil([this] {
+        return driver_->get_current_state().id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
+    }));
+}
+
 TEST_F(LedDriverNodeTest, ForwardsFramesOnlyWhileActive)
 {
     ASSERT_EQ(driver_->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
