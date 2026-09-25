@@ -117,6 +117,42 @@ TEST(AsyncOpGuardTest, CloseAfterTheContextStoppedRunsDirectly)
     EXPECT_TRUE(closed);
 }
 
+TEST(AsyncOpGuardTest, CloseAfterStopStillWaitsForAHandlerRunningOnAnotherThread)
+{
+    IoContext ctx(kThreads);
+    AsyncOpGuard guard(ctx.ios());
+
+    std::promise<void> started;
+    std::promise<void> release;
+    auto release_future = release.get_future().share();
+    std::atomic<bool> handler_finished{false};
+    guard.post(
+        [&]()
+        {
+            started.set_value();
+            release_future.wait();
+            handler_finished = true;
+        });
+    ASSERT_EQ(started.get_future().wait_for(kTimeout), std::future_status::ready);
+
+    // stop() without joining: the handler above keeps running on its io thread.
+    ctx.ios().stop();
+    ASSERT_TRUE(ctx.ios().stopped());
+
+    std::atomic<bool> finished_when_closing{false};
+    auto closing = std::async(
+        std::launch::async, [&]()
+        {
+            guard.closeAndDrain([&]() {finished_when_closing = handler_finished.load();});
+        });
+    EXPECT_EQ(closing.wait_for(100ms), std::future_status::timeout)
+        << "closed while a handler was still running";
+    release.set_value();
+
+    ASSERT_EQ(closing.wait_for(kTimeout), std::future_status::ready);
+    EXPECT_TRUE(finished_when_closing);
+}
+
 TEST(AsyncOpGuardTest, PostedWorkIsSerialized)
 {
     IoContext ctx(kThreads);

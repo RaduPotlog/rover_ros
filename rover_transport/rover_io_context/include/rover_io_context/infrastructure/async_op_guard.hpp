@@ -62,6 +62,7 @@ public:
             strand_,
             [this, handler = std::move(handler)](auto && ... args) mutable
             {
+                enter();
                 handler(std::forward<decltype(args)>(args)...);
                 end();
             });
@@ -75,12 +76,19 @@ public:
     }
 
     // Runs `close` on the strand, then waits until every wrapped handler has returned (a
-    // closed stream completes its pending operations with operation_aborted). Closes directly,
-    // without waiting, when called from one of the handlers or once the io_context has stopped
-    // - no handler can run then, and waiting would never end.
+    // closed stream completes its pending operations with operation_aborted). Closes directly
+    // when called from one of the handlers. Once the io_context has stopped, the queued
+    // handlers will never run and waiting for them would never end, so it closes directly too -
+    // but only after a handler still running on another io thread has returned: stop() does not
+    // wait for it.
     void closeAndDrain(const std::function<void()> & close)
     {
-        if (strand_.running_in_this_thread() || ios_.stopped()) {
+        if (strand_.running_in_this_thread()) {
+            close();
+            return;
+        }
+        if (ios_.stopped()) {
+            waitWhileAHandlerRuns();
             close();
             return;
         }
@@ -105,6 +113,7 @@ public:
             if (ios_.stopped()) {
                 // The posted close may never run now. Close here, unless it is running.
                 if (!state->claimed.exchange(true)) {
+                    waitWhileAHandlerRuns();
                     close();
                 } else {
                     done.wait();
@@ -131,12 +140,26 @@ private:
         ++outstanding_;
     }
 
+    void enter()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++running_;
+    }
+
     void end()
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (--outstanding_ == 0) {
-            drained_.notify_all();
-        }
+        --running_;
+        --outstanding_;
+        drained_.notify_all();
+    }
+
+    // Only for closing after stop(): a stopped io_context starts no new handler, but one it
+    // already started keeps running.
+    void waitWhileAHandlerRuns()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        drained_.wait(lock, [this]() {return running_ == 0;});
     }
 
     asio::io_context & ios_;
@@ -144,6 +167,7 @@ private:
     std::mutex mutex_;
     std::condition_variable drained_;
     std::size_t outstanding_{0};
+    std::size_t running_{0};
 };
 
 }  // namespace rover::transport
