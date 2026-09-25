@@ -28,6 +28,9 @@ sits lowest so every teleop source preempts autonomy deterministically, rather t
 them racing each other on `cmd_vel`. The timeout also makes a LAN partition a defined
 transition: the nav input goes stale and the mux falls through, instead of relying on
 `diff_drive_controller`'s own `cmd_vel_timeout` as a backstop.
+`test/unit/test_twist_mux_priorities.py` pins this order and the lock's priority above every
+input; a deployment that gates only Nav 2 (lock at 7) should pass its own file via
+`twist_mux_config_path` rather than change the shipped default.
 
 ## Motion lock
 

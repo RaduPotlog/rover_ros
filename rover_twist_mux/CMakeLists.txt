@@ -96,6 +96,12 @@ if(BUILD_TESTING)
   # ROS-level: that fresh commands really reach the twist_mux input and late ones do not.
   ament_add_gtest(test_command_freshness_node test/integration/test_command_freshness_node.cpp)
   target_link_libraries(test_command_freshness_node ${PROJECT_NAME}_ros ${PROJECT_NAME}_core)
+
+  # Config: the arbitration order the README promises (RC > joystick > Driver UI > Nav 2, and the
+  # E-Stop lock above all of them) exists only as the numbers twist_mux reads from
+  # config/rover_twist_mux.yaml. This pins their relative order.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_twist_mux_priorities test/unit/test_twist_mux_priorities.py)
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
