@@ -6,9 +6,9 @@ not reliable near the drive motors, so this package derives the heading from GNS
 
 This is localization logic, not a sensor driver. The GPS driver and the fix-health diagnostics
 live in the sensor payload (`rover_sensors/rover_gps`, container `rover-a1-sensors`). This
-package only consumes `gps/fix`, so any GNSS receiver that publishes a `NavSatFix` works. A
-receiver with its own true heading (dual antenna) can skip this node and feed its heading to
-`navsat_transform_node` directly.
+package only consumes `gps/fix`, so any GNSS receiver that publishes a reliable `NavSatFix`
+works; `navsat_transform_node` needs it reliable too. A receiver with its own true heading (dual
+antenna) can skip this node and feed its heading to `navsat_transform_node` directly.
 
 `rover_localization` starts `rover_gps_heading_node` in GPS mode (`ROVER_USE_GPS=true`) and
 loads its parameters from `config/rel_localization_with_gps.yaml`.
@@ -17,7 +17,7 @@ loads its parameters from `config/rel_localization_with_gps.yaml`.
 
 | Direction | Name | Type |
 |-----------|------|------|
-| sub | `gps/fix` | `sensor_msgs/NavSatFix` (sensor-data QoS, from the sensor payload) |
+| sub | `gps/fix` | `sensor_msgs/NavSatFix` (reliable, volatile, depth 10, from the sensor payload) |
 | sub | `odom` | `nav_msgs/Odometry` (local EKF output from `rover_localization`) |
 | pub | `gps/heading_imu` | `sensor_msgs/Imu`: orientation only, ENU yaw of `<namespace>/base_link`. Published only when `publish_heading` is true and the alignment has finished. Input of `rover_navsat_transform_node`. |
 | srv | `gps/reset_heading_alignment` | `std_srvs/Trigger`: discard the alignment and collect it again. |
@@ -70,5 +70,6 @@ infrastructure/  RoverGpsHeadingNode (composition root, parameters, subscription
 
 `test/unit/` covers the geo math, the estimator, the use case and the message mapping without a
 ROS graph. `test/integration/test_rover_gps_heading_node.cpp` runs the real node in-process and
-checks the alignment diagnostic, the heading output after alignment, the reset service and
-parameter validation. Run them with `colcon test --packages-select rover_gps_heading`.
+checks the alignment diagnostic, the heading output after alignment, the reset service,
+parameter validation and the reliable `gps/fix` subscription. Run them with
+`colcon test --packages-select rover_gps_heading`.

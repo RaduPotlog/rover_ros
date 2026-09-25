@@ -98,8 +98,12 @@ void RoverGpsHeadingNode::init()
             *this, diagnostic_updater_, heading_frame_id_, heading_settings_.publish_heading),
         alignment_config_, heading_settings_);
 
+    // GNSS fix is the RELIABLE exception to "sensor = best-effort": rover_gps_driver and the
+    // simulation's ros_gz_bridge both publish gps/fix reliable, volatile, depth 10, and a
+    // best-effort publisher would not match this subscription.
     fix_subscriber_ = create_subscription<infrastructure::NavSatFixMsg>(
-        "gps/fix", rclcpp::SensorDataQoS(), std::bind(&RoverGpsHeadingNode::fixCallback, this, _1));
+        "gps/fix", rclcpp::QoS(10).reliable().durability_volatile(),
+        std::bind(&RoverGpsHeadingNode::fixCallback, this, _1));
 
     odometry_subscriber_ = create_subscription<infrastructure::OdometryMsg>(
         "odom", rclcpp::QoS(10), std::bind(&RoverGpsHeadingNode::odometryCallback, this, _1));

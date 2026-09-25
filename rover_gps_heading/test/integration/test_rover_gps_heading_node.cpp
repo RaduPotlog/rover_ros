@@ -242,3 +242,34 @@ TEST_F(RoverGpsHeadingNodeTest, RejectsInvalidAlignmentConfig)
         rover_gps_heading::RoverGpsHeadingNode("rover_gps_heading_node", kNamespace, options),
         std::exception);
 }
+
+TEST_F(RoverGpsHeadingNodeTest, SubscribesGpsFixReliably)
+{
+    startNode({});
+    ASSERT_TRUE(waitForDiscovery());
+
+    // GNSS fix is the RELIABLE exception to "sensor = best-effort": rover_gps_driver and the
+    // simulation's ros_gz_bridge both publish gps/fix reliably.
+    const std::string fix_topic = std::string(kNamespace) + "/gps/fix";
+    std::vector<rclcpp::TopicEndpointInfo> node_subscriptions;
+    ASSERT_TRUE(spinUntil(
+        [&] {
+            node_subscriptions.clear();
+            for (const auto & endpoint : tester_->get_subscriptions_info_by_topic(fix_topic)) {
+                if (endpoint.node_name() == "rover_gps_heading_node" &&
+                    endpoint.node_namespace() == kNamespace) {
+                    node_subscriptions.push_back(endpoint);
+                }
+            }
+            return !node_subscriptions.empty();
+        }, 5s));
+
+    ASSERT_EQ(node_subscriptions.size(), 1u);
+    const rclcpp::QoS & qos = node_subscriptions.front().qos_profile();
+    EXPECT_EQ(qos.reliability(), rclcpp::ReliabilityPolicy::Reliable);
+    EXPECT_EQ(qos.durability(), rclcpp::DurabilityPolicy::Volatile);
+    // Depth is not asserted: this package runs under both Fast DDS and rmw_zenoh, and only
+    // reliability/durability are the policies whose compatibility this exception is actually
+    // about. The tester's reliable depth-10 publisher (like rover_gps_driver's) is matched.
+    EXPECT_EQ(fix_pub_->get_subscription_count(), 1u);
+}
