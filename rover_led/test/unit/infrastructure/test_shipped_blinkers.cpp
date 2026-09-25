@@ -52,11 +52,15 @@ constexpr float kControllerFrequency = 50.0f;
 
 using LitLeds = std::map<std::size_t, std::set<std::size_t>>;
 
-// Both panels: row 1 (LEDs 0-19) runs away from LED 0 on the robot's right,
-// row 2 (LEDs 20-39) comes back. Column 0 is the robot's right.
-std::size_t columnFromRobotRight(const std::size_t led)
+// Both panels: row 1 (LEDs 0-19) runs away from LED 0, row 2 (LEDs 20-39) comes
+// back. The rear panel has LED 0 on the robot's right; the front panel is mounted
+// the other way round, with LED 0 on the robot's left, which its reversed
+// led_range compensates for. This is the wiring, independent of the config.
+// Column 0 is the robot's right.
+std::size_t columnFromRobotRight(const std::size_t channel, const std::size_t led)
 {
-    return led < 20 ? led : 39 - led;
+    const std::size_t column_from_led_0 = led < 20 ? led : 39 - led;
+    return channel == kFrontChannel ? 19 - column_from_led_0 : column_from_led_0;
 }
 
 // The domain animations on the PNG file reader, as the plugins wire them; avoids pluginlib, which
@@ -184,7 +188,7 @@ TEST(ShippedBlinkers, LeftAndRightLightOppositeEndsOfEachBumper)
             bool second_row = false;
 
             for (const auto led : lit.at(channel)) {
-                EXPECT_EQ(columnFromRobotRight(led) < 10, on_right)
+                EXPECT_EQ(columnFromRobotRight(channel, led) < 10, on_right)
                     << "LED " << led << " on channel " << channel << " is on the wrong side for BLINKER_"
                     << (on_right ? "RIGHT" : "LEFT");
                 (led < 20 ? first_row : second_row) = true;
