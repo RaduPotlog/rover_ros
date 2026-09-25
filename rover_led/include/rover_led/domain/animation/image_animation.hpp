@@ -16,8 +16,9 @@
 #define ROVER_LED_DOMAIN_ANIMATION_IMAGE_ANIMATION_HPP_
 
 #include <cstdint>
-#include <filesystem>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "yaml-cpp/yaml.h"
@@ -26,6 +27,7 @@
 #include "boost/gil/extension/toolbox/color_spaces/gray_alpha.hpp"
 
 #include "rover_led/domain/animation/animation.hpp"
+#include "rover_led/domain/ports/image_source.hpp"
 
 namespace gil = boost::gil;
 
@@ -37,7 +39,9 @@ class ImageAnimation : public Animation
 
 public:
    
-    ImageAnimation() {}
+    // Gets its image from image_source (non-null), by the description's "image" value.
+    explicit ImageAnimation(std::shared_ptr<const IImageSource> image_source)
+    : image_source_(std::move(image_source)) {}
     
     ~ImageAnimation() {}
 
@@ -50,12 +54,9 @@ protected:
 
     std::vector<std::uint8_t> updateFrame() override;
 
-    // Expects an absolute path; "$(find <pkg>)" substitutions are resolved
-    // by the infrastructure layer when the animation catalog is loaded.
-    std::filesystem::path parseImagePath(const std::string & image_path) const;
-
-    // Reads the PNG named by the description's "image" (absolute path, see parseImagePath) as
-    // RGBA8, unscaled.
+    // Reads the description's "image" through the image source, unscaled. Throws
+    // std::runtime_error if the source can't provide it, or if the image is empty or its pixels
+    // don't match its size.
     gil::rgba8_image_t readImage(const YAML::Node & animation_description) const;
 
     // Recolours image_ with the description's optional "color" (0xRRGGBB); no-op without it.
@@ -79,6 +80,10 @@ protected:
 protected:
 
     gil::rgba8_image_t image_;
+
+private:
+
+    std::shared_ptr<const IImageSource> image_source_;
 };
 
 }  // namespace rover_led

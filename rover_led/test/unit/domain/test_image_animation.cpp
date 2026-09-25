@@ -15,23 +15,21 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <functional>
+#include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "boost/gil.hpp"
-#include "boost/gil/extension/io/png.hpp"
 #include "gtest/gtest.h"
 #include "yaml-cpp/yaml.h"
 
 #include "rover_led/domain/animation/image_animation.hpp"
 #include "rover_led/domain/animation/moving_image_animation.hpp"
+#include "rover_led/domain/ports/image_source.hpp"
 
 #include "../test_helpers.hpp"
-
-namespace gil = boost::gil;
 
 using rover_led::test::pixel;
 using rover_led::test::Rgba;
@@ -39,46 +37,56 @@ using rover_led::test::Rgba;
 namespace
 {
 
+// Serves images from memory and records the names it was asked for.
+class FakeImageSource : public rover_led::IImageSource
+{
+
+public:
+
+    rover_led::RgbaImage read(const std::string & image) const override
+    {
+        requested.push_back(image);
+
+        const auto it = images.find(image);
+
+        if (it == images.end()) {
+            throw std::runtime_error("No image '" + image + "'");
+        }
+
+        return it->second;
+    }
+
+    std::map<std::string, rover_led::RgbaImage> images;
+    mutable std::vector<std::string> requested;
+};
+
 class ImageAnimationTest : public ::testing::Test
 {
 
 protected:
 
-    void SetUp() override
-    {
-        dir_ = std::filesystem::temp_directory_path() /
-            ("rover_led_test_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + "_" +
-             ::testing::UnitTest::GetInstance()->current_test_info()->name());
-        std::filesystem::create_directories(dir_);
-    }
-
-    void TearDown() override
-    {
-        std::filesystem::remove_all(dir_);
-    }
-
-    // Writes a width x height PNG whose pixels come from `color_at(x, y)`.
-    std::string writePng(
+    // Adds a width x height image whose pixels come from `color_at(x, y)`; returns its name.
+    std::string addImage(
         const std::string & name, const std::size_t width, const std::size_t height,
         const std::function<Rgba(std::size_t, std::size_t)> & color_at)
     {
-        gil::rgba8_image_t image(width, height);
-        auto view = gil::view(image);
+        rover_led::RgbaImage image;
+        image.width = width;
+        image.height = height;
 
         for (std::size_t y = 0; y < height; y++) {
             for (std::size_t x = 0; x < width; x++) {
                 const auto c = color_at(x, y);
-                view(x, y) = gil::rgba8_pixel_t(c[0], c[1], c[2], c[3]);
+                image.pixels.insert(image.pixels.end(), c.begin(), c.end());
             }
         }
 
-        const auto path = (dir_ / name).string();
-        gil::write_view(path, gil::const_view(image), gil::png_tag());
+        images_->images[name] = image;
 
-        return path;
+        return name;
     }
 
-    std::filesystem::path dir_;
+    std::shared_ptr<FakeImageSource> images_ = std::make_shared<FakeImageSource>();
 };
 
 YAML::Node description(const std::string & image, const float duration)
@@ -109,11 +117,11 @@ std::vector<std::size_t> litLeds(const std::vector<std::uint8_t> & frame)
 TEST_F(ImageAnimationTest, PlaysImageRowsTopToBottom)
 {
     // 4 LEDs x 5 frames (0.5 s at 10 Hz): no resampling needed.
-    const auto image = writePng("rows.png", 4, 5, [](std::size_t x, std::size_t y) {
+    const auto image = addImage("rows.png", 4, 5, [](std::size_t x, std::size_t y) {
         return Rgba{std::uint8_t(10 * y), std::uint8_t(x), 7, 255};
     });
 
-    rover_led::ImageAnimation animation;
+    rover_led::ImageAnimation animation(images_);
     animation.initialize(description(image, 0.5f), 4, 10.0f);
 
     for (std::size_t row = 0; row < 5; row++) {
@@ -131,14 +139,14 @@ TEST_F(ImageAnimationTest, PlaysImageRowsTopToBottom)
 
 TEST_F(ImageAnimationTest, ColorOptionRecoloursByNormalizedBrightness)
 {
-    const auto image = writePng("grey.png", 2, 1, [](std::size_t x, std::size_t) {
+    const auto image = addImage("grey.png", 2, 1, [](std::size_t x, std::size_t) {
         return x == 0 ? Rgba{100, 100, 100, 255} : Rgba{50, 50, 50, 128};
     });
 
     auto desc = description(image, 0.1f);
     desc["color"] = 0x00FF80;
 
-    rover_led::ImageAnimation animation;
+    rover_led::ImageAnimation animation(images_);
     animation.initialize(desc, 2, 10.0f);
     animation.update();
     const auto frame = animation.getFrame();
@@ -148,17 +156,45 @@ TEST_F(ImageAnimationTest, ColorOptionRecoloursByNormalizedBrightness)
     EXPECT_EQ(pixel(frame, 1), (Rgba{0, 127, 63, 128}));
 }
 
-TEST_F(ImageAnimationTest, RequiresAnExistingAbsolutePath)
+TEST_F(ImageAnimationTest, ReadsTheImageTheDescriptionNames)
 {
-    rover_led::ImageAnimation animation;
+    const auto image = addImage("rows.png", 4, 5, [](std::size_t, std::size_t) {
+        return Rgba{1, 2, 3, 255};
+    });
 
-    EXPECT_THROW(
-        animation.initialize(description("$(find rover_led)/animations/x.png", 1.0f), 4, 10.0f),
-        std::runtime_error);
-    EXPECT_THROW(animation.initialize(description("relative.png", 1.0f), 4, 10.0f), std::runtime_error);
-    EXPECT_THROW(
-        animation.initialize(description((dir_ / "missing.png").string(), 1.0f), 4, 10.0f),
-        std::runtime_error);
+    rover_led::ImageAnimation animation(images_);
+    animation.initialize(description(image, 0.5f), 4, 10.0f);
+
+    EXPECT_EQ(images_->requested, (std::vector<std::string>{"rows.png"}));
+}
+
+TEST_F(ImageAnimationTest, FailsWhenTheImageSourceFails)
+{
+    rover_led::ImageAnimation animation(images_);
+
+    EXPECT_THROW(animation.initialize(description("unknown.png", 1.0f), 4, 10.0f), std::runtime_error);
+}
+
+TEST_F(ImageAnimationTest, RequiresAnImageKey)
+{
+    YAML::Node desc;
+    desc["duration"] = 1.0f;
+
+    rover_led::ImageAnimation animation(images_);
+
+    EXPECT_THROW(animation.initialize(desc, 4, 10.0f), std::runtime_error);
+    EXPECT_TRUE(images_->requested.empty());
+}
+
+TEST_F(ImageAnimationTest, RejectsAnImageWhosePixelsDoNotMatchItsSize)
+{
+    images_->images["short.png"] = rover_led::RgbaImage{2, 2, std::vector<std::uint8_t>(12, 255)};
+    images_->images["empty.png"] = rover_led::RgbaImage{0, 0, {}};
+
+    rover_led::ImageAnimation animation(images_);
+
+    EXPECT_THROW(animation.initialize(description("short.png", 1.0f), 4, 10.0f), std::runtime_error);
+    EXPECT_THROW(animation.initialize(description("empty.png", 1.0f), 4, 10.0f), std::runtime_error);
 }
 
 class MovingImageAnimationTest : public ImageAnimationTest
@@ -169,7 +205,7 @@ protected:
     // A 3 px wide, 2 frame tall opaque object; column x has red = 100 + x.
     YAML::Node objectDescription()
     {
-        const auto image = writePng("object.png", 3, 2, [](std::size_t x, std::size_t) {
+        const auto image = addImage("object.png", 3, 2, [](std::size_t x, std::size_t) {
             return Rgba{std::uint8_t(100 + x), 0, 0, 255};
         });
 
@@ -182,7 +218,7 @@ protected:
 
 TEST_F(MovingImageAnimationTest, ParamPlacesTheObjectAlongTheSegment)
 {
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(objectDescription(), 10, 10.0f);
 
     animation.setParam("0.0");
@@ -199,7 +235,7 @@ TEST_F(MovingImageAnimationTest, ParamPlacesTheObjectAlongTheSegment)
 
 TEST_F(MovingImageAnimationTest, ObjectIsOnlyShownForTheSplashDuration)
 {
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(objectDescription(), 10, 10.0f);
     animation.setParam("0.5");
 
@@ -217,7 +253,7 @@ TEST_F(MovingImageAnimationTest, StartOffsetDelaysTheObject)
     auto desc = objectDescription();
     desc["start_offset"] = 0.2;
 
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(desc, 10, 10.0f);
     animation.setParam("0.0");
 
@@ -235,7 +271,7 @@ TEST_F(MovingImageAnimationTest, MirroringFlipsPositionAndImage)
     desc["position_mirrored"] = true;
     desc["image_mirrored"] = true;
 
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(desc, 10, 10.0f);
     animation.setParam("0.0");
     animation.update();
@@ -252,7 +288,7 @@ TEST_F(MovingImageAnimationTest, EmptyParamUsesTheDefaultPosition)
     auto desc = objectDescription();
     desc["default_image_position"] = 1.0;
 
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(desc, 10, 10.0f);
     animation.setParam("");
     animation.update();
@@ -262,7 +298,7 @@ TEST_F(MovingImageAnimationTest, EmptyParamUsesTheDefaultPosition)
 
 TEST_F(MovingImageAnimationTest, RejectsMissingOrInvalidParam)
 {
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(objectDescription(), 10, 10.0f);
 
     EXPECT_THROW(animation.setParam(""), std::runtime_error);
@@ -271,7 +307,7 @@ TEST_F(MovingImageAnimationTest, RejectsMissingOrInvalidParam)
 
 TEST_F(MovingImageAnimationTest, OutOfRangeParamIsClamped)
 {
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(objectDescription(), 10, 10.0f);
     animation.setParam("7.5");
     animation.update();
@@ -279,22 +315,16 @@ TEST_F(MovingImageAnimationTest, OutOfRangeParamIsClamped)
     EXPECT_EQ(litLeds(animation.getFrame()), (std::vector<std::size_t>{7, 8, 9}));
 }
 
-TEST_F(MovingImageAnimationTest, RequiresAnExistingAbsolutePath)
+TEST_F(MovingImageAnimationTest, FailsWhenTheImageSourceFails)
 {
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
 
-    EXPECT_THROW(
-        animation.initialize(description("$(find rover_led)/animations/x.png", 1.0f), 10, 10.0f),
-        std::runtime_error);
-    EXPECT_THROW(animation.initialize(description("relative.png", 1.0f), 10, 10.0f), std::runtime_error);
-    EXPECT_THROW(
-        animation.initialize(description((dir_ / "missing.png").string(), 1.0f), 10, 10.0f),
-        std::runtime_error);
+    EXPECT_THROW(animation.initialize(description("unknown.png", 1.0f), 10, 10.0f), std::runtime_error);
 }
 
 TEST_F(MovingImageAnimationTest, ColorOptionRecoloursTheObject)
 {
-    const auto image = writePng("grey_object.png", 3, 2, [](std::size_t, std::size_t) {
+    const auto image = addImage("grey_object.png", 3, 2, [](std::size_t, std::size_t) {
         return Rgba{100, 100, 100, 255};
     });
 
@@ -302,7 +332,7 @@ TEST_F(MovingImageAnimationTest, ColorOptionRecoloursTheObject)
     desc["object_width"] = 3;
     desc["color"] = 0x00FF80;
 
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(desc, 10, 10.0f);
     animation.setParam("0.0");
     animation.update();
@@ -322,7 +352,7 @@ TEST_F(MovingImageAnimationTest, SplashDurationResamplesTheImageHeight)
     auto desc = objectDescription();
     desc["splash_duration"] = 0.3;
 
-    rover_led::MovingImageAnimation animation;
+    rover_led::MovingImageAnimation animation(images_);
     animation.initialize(desc, 10, 10.0f);
     animation.setParam("0.5");
 

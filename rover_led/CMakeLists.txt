@@ -30,7 +30,7 @@ endforeach()
 
 include_directories(include)
 
-# --- Domain: entities, animations, SK9822 encoder, ports. No ROS. ----------
+# --- Domain: entities, animations, SK9822 encoder, ports. No ROS, no I/O. --
 
 add_library(rover_led_domain SHARED
     src/domain/animation/image_animation.cpp
@@ -51,7 +51,7 @@ target_include_directories(rover_led_domain PUBLIC
 # rover_utils is only used for its header-only YAML helpers.
 target_include_directories(rover_led_domain PUBLIC ${rover_utils_INCLUDE_DIRS})
 
-target_link_libraries(rover_led_domain png yaml-cpp)
+target_link_libraries(rover_led_domain yaml-cpp)
 
 # --- Application: use cases. No ROS. ----------------------------------------
 
@@ -70,15 +70,22 @@ target_link_libraries(rover_led_application rover_led_domain)
 
 # --- Infrastructure: pluginlib, YAML config, ROS nodes. ----------------------
 
+# PngImageFileSource (the domain's IImageSource). An object library: built into the plugin library
+# and into the tests that read real images, so the installed plugin needs no extra shared library
+# at run time (colcon test doesn't put rover_led's own lib/ on LD_LIBRARY_PATH).
+add_library(rover_led_png_image_source OBJECT src/infrastructure/png_image_file_source.cpp)
+set_target_properties(rover_led_png_image_source PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 pluginlib_export_plugin_description_file(${PROJECT_NAME} plugins.xml)
 
-add_library(animation_plugins SHARED src/infrastructure/animation_plugins.cpp)
+add_library(animation_plugins SHARED src/infrastructure/animation_plugins.cpp
+            $<TARGET_OBJECTS:rover_led_png_image_source>)
 
 target_link_libraries(animation_plugins
     ${pluginlib_TARGETS}
 )
 
-target_link_libraries(animation_plugins rover_led_domain)
+target_link_libraries(animation_plugins rover_led_domain png)
 
 generate_parameter_library(led_driver_parameters
                            src/led_driver_parameters.yaml
@@ -167,7 +174,7 @@ if(BUILD_TESTING)
   endfunction()
 
   rover_led_add_test(test_animation test/unit/domain/test_animation.cpp rover_led_domain)
-  rover_led_add_test(test_image_animation test/unit/domain/test_image_animation.cpp rover_led_domain png)
+  rover_led_add_test(test_image_animation test/unit/domain/test_image_animation.cpp rover_led_domain)
   rover_led_add_test(test_led_panel test/unit/domain/test_led_panel.cpp rover_led_domain)
   rover_led_add_test(test_led_segment test/unit/domain/test_led_segment.cpp rover_led_domain)
   rover_led_add_test(test_segment_layers test/unit/domain/test_segment_layers.cpp rover_led_domain)
@@ -198,6 +205,13 @@ if(BUILD_TESTING)
   rover_led_add_test(test_shipped_blinkers
                      test/unit/infrastructure/test_shipped_blinkers.cpp led_controller_node_component)
   target_compile_definitions(test_shipped_blinkers PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  target_sources(test_shipped_blinkers PRIVATE $<TARGET_OBJECTS:rover_led_png_image_source>)
+  target_link_libraries(test_shipped_blinkers png)
+
+  rover_led_add_test(test_png_image_file_source
+                     test/unit/infrastructure/test_png_image_file_source.cpp rover_led_domain png)
+  target_sources(test_png_image_file_source PRIVATE $<TARGET_OBJECTS:rover_led_png_image_source>)
+  target_compile_definitions(test_png_image_file_source PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
   rover_led_add_test(test_led_controller_diagnostics
                      test/unit/infrastructure/test_led_controller_diagnostics.cpp

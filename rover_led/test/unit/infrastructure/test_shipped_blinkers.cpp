@@ -38,6 +38,7 @@
 #include "rover_led/domain/animation/image_animation.hpp"
 #include "rover_led/domain/animation/moving_image_animation.hpp"
 #include "rover_led/domain/ports/animation_factory.hpp"
+#include "rover_led/infrastructure/png_image_file_source.hpp"
 #include "rover_led/infrastructure/yaml_led_config.hpp"
 
 namespace
@@ -58,7 +59,8 @@ std::size_t columnFromRobotRight(const std::size_t led)
     return led < 20 ? led : 39 - led;
 }
 
-// Avoids pluginlib, which needs rover_led on the ament index.
+// The domain animations on the PNG file reader, as the plugins wire them; avoids pluginlib, which
+// needs rover_led on the ament index.
 class DomainAnimationFactory : public rover_led::IAnimationFactory
 {
 
@@ -67,15 +69,19 @@ public:
     std::shared_ptr<rover_led::Animation> create(const std::string & type) override
     {
         if (type == "rover_led::ImageAnimation") {
-            return std::make_shared<rover_led::ImageAnimation>();
+            return std::make_shared<rover_led::ImageAnimation>(images_);
         }
 
         if (type == "rover_led::MovingImageAnimation") {
-            return std::make_shared<rover_led::MovingImageAnimation>();
+            return std::make_shared<rover_led::MovingImageAnimation>(images_);
         }
 
         throw std::runtime_error("Unknown animation type: " + type);
     }
+
+private:
+
+    std::shared_ptr<const rover_led::IImageSource> images_ = std::make_shared<rover_led::PngImageFileSource>();
 };
 
 // The shipped config with "$(find rover_led)" pointed at the source tree.

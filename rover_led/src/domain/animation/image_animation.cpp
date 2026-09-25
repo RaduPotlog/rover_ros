@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <stdexcept>
 #include <string>
 
@@ -22,7 +22,6 @@
 
 #include "yaml-cpp/yaml.h"
 #include "boost/gil.hpp"
-#include "boost/gil/extension/io/png.hpp"
 #include "boost/gil/extension/numeric/resample.hpp"
 #include "boost/gil/extension/numeric/sampler.hpp"
 
@@ -46,11 +45,25 @@ void ImageAnimation::initialize(
 
 gil::rgba8_image_t ImageAnimation::readImage(const YAML::Node & animation_description) const
 {
-    const auto image_path = parseImagePath(
-        rover_utils::getYAMLKeyValue<std::string>(animation_description, "image"));
+    const auto name = rover_utils::getYAMLKeyValue<std::string>(animation_description, "image");
+    const auto image = image_source_->read(name);
 
-    gil::rgba8_image_t base_image;
-    gil::read_and_convert_image(std::string(image_path), base_image, gil::png_tag());
+    if (image.width == 0 || image.height == 0 ||
+        image.pixels.size() != image.width * image.height * kRGBAColorLen) {
+        throw std::runtime_error(
+            "Image '" + name + "' is not a valid RGBA image: " + std::to_string(image.width) + "x" +
+            std::to_string(image.height) + " with " + std::to_string(image.pixels.size()) + " bytes");
+    }
+
+    gil::rgba8_image_t base_image(image.width, image.height);
+    auto base_view = gil::view(base_image);
+
+    for (std::size_t y = 0; y < image.height; y++) {
+        for (std::size_t x = 0; x < image.width; x++) {
+            const auto * p = &image.pixels[(y * image.width + x) * kRGBAColorLen];
+            base_view(x, y) = gil::rgba8_pixel_t(p[0], p[1], p[2], p[3]);
+        }
+    }
 
     return base_image;
 }
@@ -75,23 +88,6 @@ std::vector<std::uint8_t> ImageAnimation::updateFrame()
     }
 
     return frame;
-}
-
-std::filesystem::path ImageAnimation::parseImagePath(const std::string & image_path) const
-{
-    const std::filesystem::path global_img_path(image_path);
-
-    if (!global_img_path.is_absolute()) {
-        throw std::runtime_error(
-            "Invalid image path '" + image_path + "': expected an absolute path "
-            "(unresolved $(find <pkg>) substitution?)");
-    }
-
-    if (!std::filesystem::exists(global_img_path)) {
-        throw std::runtime_error("File doesn't exists: " + std::string(global_img_path));
-    }
-
-    return global_img_path;
 }
 
 gil::rgba8_image_t ImageAnimation::rgbaImageResize(

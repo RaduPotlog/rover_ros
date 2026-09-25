@@ -17,8 +17,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "yaml-cpp/yaml.h"
@@ -38,7 +39,8 @@ class MovingImageAnimation : public ImageAnimation
 
 public:
   
-    MovingImageAnimation() {}
+    explicit MovingImageAnimation(std::shared_ptr<const IImageSource> image_source)
+    : ImageAnimation(std::move(image_source)) {}
     ~MovingImageAnimation() {}
 
     void initialize(

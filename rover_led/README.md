@@ -164,12 +164,14 @@ ros2 topic echo /rover/led/state
 
 ```
 domain/          Animation (+ Image/MovingImage), LedPanel, LedSegment and its layers,
-                 SegmentConverter, Sk9822FrameEncoder, AnimationCatalog/Factory ports - no ROS
+                 SegmentConverter, Sk9822FrameEncoder, AnimationCatalog/Factory/ImageSource
+                 ports - no ROS, no file I/O
 application/     SetAnimation, StopAnimation, RenderTick, GetLedState, ValidateAnimationCatalog,
                  EncodeFrame, SetBrightness use cases; LedControlHandshake (the driver's
                  LED control retries and epochs)
 infrastructure/  LedControllerNode, LedDriverNode, controller diagnostics,
-                 YAML config loader, pluginlib animation factory
+                 YAML config loader, pluginlib animation factory, animation plugins
+                 (the image animations reading PNG files through PngImageFileSource)
 ```
 
 ## Tests
@@ -178,7 +180,7 @@ infrastructure/  LedControllerNode, LedDriverNode, controller diagnostics,
 colcon test --packages-select rover_led && colcon test-result --all --verbose
 ```
 
-- `test/unit/` covers the domain, the use cases, the YAML loader and the diagnostics.
+- `test/unit/` covers the domain, the use cases, the YAML loader, the PNG reader and the diagnostics.
 - `test/integration/test_led_driver_node.cpp` runs the driver node: its lifecycle, frame
   forwarding and dropping malformed frames.
 - `test/integration/test_led_controller_node.cpp` runs the controller node on

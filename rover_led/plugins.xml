@@ -1,8 +1,10 @@
 <library path="animation_plugins">
-  <class type="rover_led::ImageAnimation" base_class_type="rover_led::Animation">
+  <!-- name is the lookup name catalogs use (API, never changes); type is the class pluginlib
+       builds: a subclass of the domain animation that passes it the PNG file reader. -->
+  <class name="rover_led::ImageAnimation" type="rover_led::ImageAnimationPlugin" base_class_type="rover_led::Animation">
     <description>Animation processed from an image</description>
   </class>
-  <class type="rover_led::MovingImageAnimation" base_class_type="rover_led::Animation">
+  <class name="rover_led::MovingImageAnimation" type="rover_led::MovingImageAnimationPlugin" base_class_type="rover_led::Animation">
     <description>Animation processed from an image with ability to change animation plcement</description>
   </class>
 </library>
