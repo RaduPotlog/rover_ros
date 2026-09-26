@@ -29,6 +29,11 @@ constexpr int kLogThrottleMs = 10000;
 
 std::string percentageText(const BatteryStateMsg & battery_state)
 {
+    // Casting a NaN to int is undefined behaviour.
+    if (!std::isfinite(battery_state.percentage)) {
+        return "unknown.";
+    }
+
     return std::to_string(static_cast<int>(std::round(battery_state.percentage * 100.0))) + "%.";
 }
 

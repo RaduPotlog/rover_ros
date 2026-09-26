@@ -246,7 +246,8 @@ TEST(StaleBatteryReport, ReportsWatchdogExpiry)
     EXPECT_TRUE(std::isnan(report.reading.charge));
     EXPECT_TRUE(std::isnan(report.reading.capacity));
     EXPECT_FLOAT_EQ(report.reading.voltage, 0.0f);
-    EXPECT_FLOAT_EQ(report.reading.percentage, 0.0f);
+    // Unmeasured, not empty: a 0.0 here reads as a flat pack downstream.
+    EXPECT_TRUE(std::isnan(report.reading.percentage));
     EXPECT_FLOAT_EQ(report.reading.design_capacity, 40.0f);
     EXPECT_EQ(report.reading.serial_number, "SN-2");
     EXPECT_EQ(report.reading.cell_voltages, std::vector<float>(16, 0.0f));
