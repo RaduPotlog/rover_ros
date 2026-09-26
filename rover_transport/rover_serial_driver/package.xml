@@ -26,6 +26,7 @@
   <depend>asio</depend>
   <depend>lifecycle_msgs</depend>
   <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>rover_io_context</depend>
   <depend>std_msgs</depend>

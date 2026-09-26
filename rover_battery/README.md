@@ -14,6 +14,12 @@ Decodes BMS telemetry received over UDP and publishes the rover's battery state.
 If no packet arrives within `watchdog_timeout_ms`, the node publishes a state with
 `present: false` and `POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE`.
 
+`launch/rover_battery.launch.py` loads the node (component `rover_battery::RoverBatteryNode`) and
+the BMS UDP endpoint (`rover_udp_driver`'s `rover::transport::udp::UdpReceiverNode`, named
+`rover_udp_battery_receiver_node`) into one container, `rover_battery_container`, with
+intra-process communication, so the packets never cross the Zenoh router. The `rover_battery_node`
+executable still runs the node on its own.
+
 ### Parameters (`rover_battery_node`, see `config/rover_battery.yaml`)
 
 | Name | Default | Description |

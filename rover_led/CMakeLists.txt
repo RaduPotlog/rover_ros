@@ -226,6 +226,12 @@ if(BUILD_TESTING)
                   TIMEOUT 120 APPEND_ENV AMENT_PREFIX_PATH=${CMAKE_INSTALL_PREFIX})
   target_link_libraries(test_led_controller_node led_controller_node_component)
   target_compile_definitions(test_led_controller_node PRIVATE ROVER_LED_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+  # The launch file's composition: one container, driver + controller + UDP senders intra-process.
+  # FindPackageShare('rover_led') needs this package's own install prefix on the ament index.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_structure test/test_launch_structure.py
+                        APPEND_ENV AMENT_PREFIX_PATH=${CMAKE_INSTALL_PREFIX})
 endif()
 
 install(

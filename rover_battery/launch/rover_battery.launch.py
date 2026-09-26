@@ -22,9 +22,9 @@ from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
 )
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
-from launch_ros.actions.lifecycle_node import LifecycleNode
 
 def generate_launch_description():
     
@@ -56,26 +56,36 @@ def generate_launch_description():
         description="Specify the path to the rover battery configuration file.",
     )
 
-    rover_udp_battery_receiver_node = LifecycleNode(
-        package='rover_udp_driver',
+    # The BMS UDP endpoint and the node that decodes its packets, in one container with
+    # intra-process communication, so the packets never cross the Zenoh router. The receiver is a
+    # lifecycle node brought to active by its own `autostart` parameter: launch_ros'
+    # ComposableLifecycleNode autostart misses the namespace and never reaches it.
+    rover_udp_battery_receiver_node = ComposableNode(
+        package="rover_udp_driver",
+        plugin="rover::transport::udp::UdpReceiverNode",
         name="rover_udp_battery_receiver_node",
         namespace=namespace,
-        executable='rover_udp_receiver_node',
-        parameters=[rover_battery_config_path],
-        remappings=[
-            ('udp_read', 'rover_battery_udp_data')
-        ],
-        autostart=True,
-        emulate_tty=True,
+        parameters=[rover_battery_config_path, {"autostart": True}],
+        remappings=[("udp_read", "rover_battery_udp_data")],
+        extra_arguments=[{"use_intra_process_comms": True}],
     )
 
-    rover_battery_node = Node(
+    rover_battery_node = ComposableNode(
         package="rover_battery",
-        executable="rover_battery_node",
+        plugin="rover_battery::RoverBatteryNode",
         name="rover_battery_node",
-        parameters=[rover_battery_config_path],
         namespace=namespace,
+        parameters=[rover_battery_config_path],
         remappings=[("/diagnostics", "diagnostics")],
+        extra_arguments=[{"use_intra_process_comms": True}],
+    )
+
+    rover_battery_container = ComposableNodeContainer(
+        package="rclcpp_components",
+        executable="component_container",
+        name="rover_battery_container",
+        namespace=namespace,
+        composable_node_descriptions=[rover_udp_battery_receiver_node, rover_battery_node],
         arguments=[
             "--ros-args",
             "--log-level",
@@ -85,13 +95,12 @@ def generate_launch_description():
         ],
         emulate_tty=True,
     )
-    
+
     actions = [
         declare_log_level_arg,
         declare_namespace_arg,
         declare_rover_battery_config_path_arg,
-        rover_udp_battery_receiver_node,
-        rover_battery_node,
+        rover_battery_container,
     ]
 
     return LaunchDescription(actions)

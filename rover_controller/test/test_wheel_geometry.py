@@ -107,3 +107,23 @@ def test_drive_limits_respect_joint_velocity_limit(wheel_type):
         assert wheel_reference + i_clamp <= limit, (
             f'{joint}: outer wheel reference {wheel_reference:.2f} rad/s + I {i_clamp} '
             f'exceeds the URDF limit {limit} rad/s')
+
+
+@pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
+def test_controller_update_rates_divide_manager_rate(wheel_type):
+    """A per-controller update_rate must divide the controller_manager rate evenly.
+
+    Otherwise controller_manager still runs it, but at an uneven period, and warns once.
+    """
+    config = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')['/**']
+    manager = config['controller_manager']['ros__parameters']
+    manager_rate = manager['update_rate']
+    controllers = [name for name, value in manager.items()
+                   if isinstance(value, dict) and 'type' in value]
+    for name in controllers:
+        rate = config.get(name, {}).get('ros__parameters', {}).get('update_rate')
+        if rate is None:
+            continue
+        assert 0 < rate <= manager_rate, f'{name}: update_rate {rate} Hz'
+        assert manager_rate % rate == 0, (
+            f'{name}: update_rate {rate} Hz does not divide {manager_rate} Hz')

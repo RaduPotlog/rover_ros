@@ -15,8 +15,8 @@
   <depend>generate_parameter_library</depend>
   <depend>udp_msgs</depend>
 
-  <!-- Runtime only: this package's launch file starts two rover_udp_driver sender
-       nodes to own the LED UDP sockets, but links none of its code. -->
+  <!-- Runtime only: this package's launch file loads two rover_udp_driver sender
+       components into its container to own the LED UDP sockets, but links none of its code. -->
   <exec_depend>rover_udp_driver</exec_depend>
   <depend>rover_msgs</depend>
   <depend>rover_utils</depend>
@@ -32,6 +32,7 @@
   <depend>yaml-cpp</depend>
 
   <test_depend>ament_cmake_gmock</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

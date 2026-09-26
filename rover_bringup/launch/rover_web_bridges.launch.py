@@ -16,6 +16,8 @@
 
 """Web bridges (foxglove_bridge, rosbridge) under rover_-prefixed node names."""
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import GroupAction, IncludeLaunchDescription
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
@@ -39,13 +41,61 @@ FOXGLOVE_ASSET_URI_ALLOWLIST = (
     r"['^package://(?:[-\w%]+/)*[-\w%.]+\." + f"(?:{_ANY_CASE})" + r"$']"
 )
 
+# Topics the web UIs actually subscribe to (rover_drive_interface through nginx's /ws, the
+# Cockpit plugin through cockpit-bridge). Every other topic stays off the bridge: upstream's
+# default ['.*'] advertises the whole graph, and anything a browser (or a stray Foxglove Studio)
+# subscribes to crosses the Zenoh router into this process at its full rate - the UIs throttle
+# only their redraws, never what the bridge sends. Names are relative to the rover namespace,
+# matched under any namespace. When a UI starts using a new topic, add it here.
+# ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']" on the platform service opens it up for debugging.
+_ABSOLUTE_UI_TOPICS = ("/tf", "/tf_static")
+_NAMESPACED_UI_TOPICS = (
+    # rover_drive_interface: map view
+    "map",
+    "global_costmap/costmap",
+    "scan",
+    "plan",
+    # rover_drive_interface: status, safety, localization and missions
+    "hardware_interface/aux_io_state",
+    "hardware_interface/safety_status",
+    "hardware_interface/safety_command_echo",
+    "motion_lock",
+    "rover_battery/battery_status",
+    "rover_battery/charging_status",
+    "localization_state",
+    "maps",
+    "places",
+    "amcl_pose",
+    "mission_state",
+    # both UIs
+    "diagnostics_agg",
+    # Cockpit: LED page (led/channel_<n>_preview, not the 50 Hz _frame the driver consumes)
+    "led/animations",
+    "led/state",
+    "led/brightness",
+    r"led/channel_\d+_preview",
+    # Cockpit: RC page
+    "rc/channels",
+    "rc/link",
+    "rc/calibration/state",
+)
+FOXGLOVE_TOPIC_WHITELIST = (
+    "["
+    + ",".join(
+        [f"'^{topic}$'" for topic in _ABSOLUTE_UI_TOPICS]
+        + [rf"'^(?:/\w+)*/{topic}$'" for topic in _NAMESPACED_UI_TOPICS]
+    )
+    + "]"
+)
+
 
 def generate_launch_description():
     # The upstream launch file keeps every foxglove_bridge parameter default except
-    # asset_uri_allowlist, overridden below. Its <node> has no name, so a global __node remap
-    # is the only node-name rule and renames it. (It would not work on a named node:
-    # launch_ros puts `-r __node:=<name>` first and rcl uses the first matching rule.)
-    # Passing a launch *argument* does not name the node, so the remap still applies.
+    # asset_uri_allowlist, topic_whitelist and sysinfo, overridden below. Its <node> has no
+    # name, so a global __node remap is the only node-name rule and renames it. (It would not
+    # work on a named node: launch_ros puts `-r __node:=<name>` first and rcl uses the first
+    # matching rule.) Passing a launch *argument* does not name the node, so the remap still
+    # applies.
     foxglove_bridge = GroupAction(
         scoped=True,
         actions=[
@@ -58,6 +108,11 @@ def generate_launch_description():
                 ),
                 launch_arguments={
                     "asset_uri_allowlist": FOXGLOVE_ASSET_URI_ALLOWLIST,
+                    # Empty counts as unset: docker-compose.yml declares the variable blank.
+                    "topic_whitelist": os.environ.get("ROVER_FOXGLOVE_TOPIC_WHITELIST")
+                    or FOXGLOVE_TOPIC_WHITELIST,
+                    # No UI reads /foxglove_bridge/sysinfo, which otherwise publishes every 500 ms.
+                    "sysinfo": "false",
                 }.items(),
             ),
         ],

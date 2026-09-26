@@ -9,7 +9,12 @@ lost.
 
 The UART is **not** opened here. `rover_serial_driver`'s `rover_serial_bridge_node` node (from `rover_transport`)
 owns the port and publishes raw bytes; this node subscribes to them and decodes CRSF in-process.
-The launch file starts both.
+The launch file loads both as components (`rover_serial_driver`'s
+`rover::transport::serial::SerialBridgeNode` and `rover_crsf_teleop::RoverCrsfTeleopNode`) into one
+single-threaded container, `rover_crsf_container`, with intra-process communication, so the ~250
+`rc/raw` messages a second never cross the Zenoh router. Inside the container, Ctrl-C does not run
+the lifecycle shutdown, so the final stop command comes from twist_mux's timeout instead; the
+standalone `rover_crsf_teleop_node` executable still sends it.
 
 ```
 ELRS receiver ──UART @460800──▶ rover_serial_bridge_node ──rc/raw (UInt8MultiArray)──▶ rover_crsf_teleop_node
@@ -44,7 +49,9 @@ be opened by `rover_serial_bridge_node` at all. Keep it at 460800.
 | client | `hardware_interface/sw_e_stop_latch_reset` | `std_srvs/Trigger` |
 
 `rc/channels` and `rc/link` are observability echoes — nothing on the rover consumes them, and
-they can be turned off with `publish_rc_topics`. They are plain (not lifecycle) publishers on
+they can be turned off with `publish_rc_topics`. Each is capped at `rc_topics_rate_hz` (25 Hz in
+the shipped config, 0 = every decoded frame), so the Cockpit RC page doesn't pull ~250 messages/s
+through the Zenoh router; the "RC channels rate" diagnostic still counts every frame. They are plain (not lifecycle) publishers on
 purpose, so they keep publishing when the node is deactivated to investigate why it was
 deactivated. Channel N is `channels[N-1]`.
 
@@ -192,7 +199,7 @@ test does not link the node.
 ## Launch
 
 ```bash
-ros2 launch rover_crsf_teleop rover_crsf_teleop.launch.py   # serial bridge + teleop
+ros2 launch rover_crsf_teleop rover_crsf_teleop.launch.py   # serial bridge + teleop, one container
 ros2 lifecycle get /rover/rover_crsf_serial_bridge
 ros2 lifecycle get /rover/rover_crsf_teleop_node
 ```

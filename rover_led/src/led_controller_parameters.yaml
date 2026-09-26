@@ -16,3 +16,9 @@ led_controller:
     default_value: 5.0
     description: Frequency in Hz at which the active animation of every layer is published on led/state.
     validation: { gt<>: 0.0 }
+
+  preview_publish_rate:
+    type: double
+    default_value: 5.0
+    description: Frequency in Hz at which each panel frame is also published on led/channel_<n>_preview for UIs (the full-rate led/channel_<n>_frame feeds the driver). 0 disables the preview topics.
+    validation: { gt_eq<>: 0.0 }

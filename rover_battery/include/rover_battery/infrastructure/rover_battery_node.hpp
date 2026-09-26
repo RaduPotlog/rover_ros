@@ -41,6 +41,10 @@ public:
         const std::string & node_name, const std::string & ns = "/",
         const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
+    // For rclcpp_components: constructs and runs init(). The container's __node / __ns remaps
+    // set the name and namespace the launch file gives it.
+    explicit RoverBatteryNode(const rclcpp::NodeOptions & options);
+
     void init();
 
 private:

@@ -11,6 +11,7 @@ endif()
 
 set(PACKAGE_DEPENDENCIES
     rclcpp
+    rclcpp_components
     diagnostic_updater
     sensor_msgs
     udp_msgs
@@ -31,6 +32,7 @@ add_library(${PROJECT_NAME}_core STATIC
 target_include_directories(${PROJECT_NAME}_core PUBLIC
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
+set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Infrastructure: ROS 2 adapters.
 add_library(${PROJECT_NAME}_ros STATIC
@@ -48,12 +50,27 @@ target_link_libraries(${PROJECT_NAME}_ros
     ${rover_msgs_TARGETS}
 )
 
+# Linked into the SHARED component library below.
+set_target_properties(${PROJECT_NAME}_ros PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# The same node as an rclcpp_components plugin (rover_battery::RoverBatteryNode), which the
+# launch file loads into one container with the BMS UDP receiver. The registration source must be
+# compiled into this SHARED library itself - see the file. Plural macro: it registers without
+# generating an executable, which would clash with rover_battery_node below.
+add_library(${PROJECT_NAME}_component SHARED src/infrastructure/rover_battery_component.cpp)
+target_link_libraries(${PROJECT_NAME}_component ${PROJECT_NAME}_ros ${rclcpp_components_TARGETS})
+rclcpp_components_register_nodes(${PROJECT_NAME}_component "rover_battery::RoverBatteryNode")
+
 add_executable(${PROJECT_NAME}_node src/rover_battery.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_ros)
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 
 install(TARGETS ${PROJECT_NAME}_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS ${PROJECT_NAME}_component
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
@@ -72,6 +89,10 @@ if(BUILD_TESTING)
   ament_add_gtest(test_rover_battery_node test/integration/test_rover_battery_node.cpp
                   TIMEOUT 60)
   target_link_libraries(test_rover_battery_node ${PROJECT_NAME}_ros)
+
+  # The launch file's composition: one container, receiver + battery node intra-process.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_structure test/test_launch_structure.py)
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})

@@ -40,7 +40,7 @@ source ~/.bashrc   # or open a new terminal
 
 ### How the PC joins the rover's graph
 
-Every ROS node on the PC is a **direct Zenoh client** of the router in `rover-a1-platform`, via
+Every ROS node on the PC is a **direct Zenoh client** of the router in `rover-a1-zenoh-router`, via
 `ZENOH_CONFIG_OVERRIDE='mode="client";connect/endpoints=["tcp/<rover-ip>:7447"]'`. No local
 router runs. This is deliberate:
 - **The simulation stays isolated.** `rover_gazebo/scripts/rover_sim.sh` clears the override and

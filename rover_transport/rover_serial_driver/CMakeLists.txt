@@ -13,6 +13,7 @@ set(PACKAGE_DEPENDENCIES
     rclcpp
     rclcpp_lifecycle
     lifecycle_msgs
+    rclcpp_components
     std_msgs
     rover_io_context
 )
@@ -58,11 +59,27 @@ target_include_directories(${PROJECT_NAME}_ros SYSTEM PUBLIC
                            $<BUILD_INTERFACE:${ASIO_INCLUDE_DIRS}>
 )
 target_compile_definitions(${PROJECT_NAME}_ros PUBLIC ${ASIO_DEFINITIONS})
+# Linked into the SHARED component library below.
+set_target_properties(${PROJECT_NAME}_ros PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# The same node as an rclcpp_components plugin (rover::transport::serial::SerialBridgeNode), for
+# launch files that load it into the container of the node it serves. The registration source
+# must be compiled into this SHARED library itself - see the file. Plural macro: it registers
+# without generating an executable, which would clash with the hand-written main below.
+add_library(${PROJECT_NAME}_components SHARED src/infrastructure/serial_bridge_component.cpp)
+target_link_libraries(${PROJECT_NAME}_components ${PROJECT_NAME}_ros ${rclcpp_components_TARGETS})
+rclcpp_components_register_nodes(${PROJECT_NAME}_components
+    "rover::transport::serial::SerialBridgeNode")
 
 add_executable(rover_serial_bridge_node src/rover_serial_bridge_node_main.cpp)
 target_link_libraries(rover_serial_bridge_node ${PROJECT_NAME}_ros)
 
 install(DIRECTORY include/ DESTINATION include)
+
+install(TARGETS ${PROJECT_NAME}_components
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
 
 install(TARGETS rover_serial_bridge_node DESTINATION lib/${PROJECT_NAME})
 

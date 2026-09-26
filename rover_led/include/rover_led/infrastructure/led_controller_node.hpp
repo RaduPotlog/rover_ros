@@ -15,6 +15,7 @@
 #ifndef ROVER_LED_INFRASTRUCTURE_LED_CONTROLLER_NODE_HPP_
 #define ROVER_LED_INFRASTRUCTURE_LED_CONTROLLER_NODE_HPP_
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -53,7 +54,8 @@ using StopLedAnimationSrv = rover_msgs::srv::StopLedAnimation;
 
 // ROS adapter of the animation side: loads the LED configuration, serves
 // led/set_animation and led/stop_animation and publishes one RGBA8 frame per panel on
-// led/channel_<n>_frame at controller_frequency. Reports the loaded
+// led/channel_<n>_frame at controller_frequency (plus a copy on led/channel_<n>_preview at
+// preview_publish_rate, for UIs). Reports the loaded
 // animations once on led/animations and what every layer plays on led/state
 // at state_publish_rate (both latched).
 class LedControllerNode : public rclcpp::Node
@@ -67,7 +69,8 @@ public:
 
 private:
 
-    void publishPanelFrame(const std::size_t channel, std::vector<std::uint8_t> frame, const std::size_t rows);
+    void publishPanelFrame(
+        const std::size_t channel, std::vector<std::uint8_t> frame, const std::size_t rows, bool preview_due);
 
     void setLedAnimationCallback(
         const SetLedAnimationSrv::Request::SharedPtr & request,
@@ -95,6 +98,10 @@ private:
     std::shared_ptr<PluginlibAnimationFactory> animation_factory_;
 
     std::unordered_map<std::size_t, rclcpp::Publisher<ImageMsg>::SharedPtr> panel_publishers_;
+    // Empty when preview_publish_rate is 0.
+    std::unordered_map<std::size_t, rclcpp::Publisher<ImageMsg>::SharedPtr> preview_publishers_;
+    std::chrono::steady_clock::duration preview_period_{};
+    std::optional<std::chrono::steady_clock::time_point> last_preview_;
 
     std::unique_ptr<SetAnimationUseCase> set_animation_use_case_;
     std::unique_ptr<StopAnimationUseCase> stop_animation_use_case_;

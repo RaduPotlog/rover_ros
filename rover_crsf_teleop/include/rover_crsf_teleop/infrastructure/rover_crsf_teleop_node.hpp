@@ -38,6 +38,7 @@
 #include "rover_crsf_teleop/application/calibration_use_case.hpp"
 #include "rover_crsf_teleop/application/teleop_use_case.hpp"
 #include "rover_crsf_teleop/domain/crsf/crsf_parser.hpp"
+#include "rover_crsf_teleop/domain/rate_limiter.hpp"
 #include "rover_crsf_teleop/domain/safety_io_monitor.hpp"
 #include "rover_crsf_teleop/infrastructure/rc_message_conversions.hpp"
 #include "rover_crsf_teleop/infrastructure/ros2_trigger_safety_switch.hpp"
@@ -93,6 +94,10 @@ public:
     explicit RoverCrsfTeleopNode(
         const std::string & node_name = "rover_crsf_teleop_node",
         const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+
+    // For rclcpp_components, which constructs a node from NodeOptions alone. The container's
+    // __node / __ns remaps set the name and namespace the launch file gives it.
+    explicit RoverCrsfTeleopNode(const rclcpp::NodeOptions & options);
 
     CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
 
@@ -177,6 +182,9 @@ private:
     rclcpp::Publisher<rover_msgs::msg::RcLinkStatus>::SharedPtr rc_link_publisher_;
 
     bool publish_rc_topics_{true};
+    // rc_topics_rate_hz, applied to each echo separately. Rebuilt on every configure.
+    RateLimiter rc_channels_limiter_{0.0};
+    RateLimiter rc_link_limiter_{0.0};
 
     // For the "RC serial link" diagnostic: how the byte stream itself is doing, as distinct from
     // whether the RC link carries a usable signal.
@@ -187,6 +195,8 @@ private:
     std::uint64_t decoded_link_stats_{0};
 
     rclcpp::TimerBase::SharedPtr control_timer_;
+    // One-shot, only with the `autostart` parameter.
+    rclcpp::TimerBase::SharedPtr autostart_timer_;
 
     // Calibration. The use case owns the session; the node owns the transport and the clock.
     std::unique_ptr<CalibrationUseCase> calibration_;

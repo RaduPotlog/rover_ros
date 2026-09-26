@@ -63,6 +63,10 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
     this->params_ = this->param_listener_->get_params();
 
     const float controller_freq = static_cast<float>(this->params_.controller_frequency);
+    if (this->params_.preview_publish_rate > 0.0) {
+        preview_period_ = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(1.0 / this->params_.preview_publish_rate));
+    }
     const YAML::Node led_config_desc = YAML::LoadFile(this->params_.animations_config_path);
 
     const auto layout = parseLedLayout(led_config_desc);
@@ -74,6 +78,14 @@ LedControllerNode::LedControllerNode(const rclcpp::NodeOptions & options)
         panel_publishers_.emplace(
             panel.channel,
             this->create_publisher<ImageMsg>("led/channel_" + std::to_string(panel.channel) + "_frame", 10));
+        if (this->params_.preview_publish_rate > 0.0) {
+            // For UIs: a web page redraws a few times a second, and the full-rate frame would
+            // cross the Zenoh router and the websocket 50 times a second per panel.
+            preview_publishers_.emplace(
+                panel.channel,
+                this->create_publisher<ImageMsg>(
+                    "led/channel_" + std::to_string(panel.channel) + "_preview", rclcpp::QoS(1).best_effort()));
+        }
 
         RCLCPP_DEBUG_STREAM(this->get_logger(), "Initialized panel with channel no. " << panel.channel << ".");
     }
@@ -207,7 +219,7 @@ void LedControllerNode::stopLedAnimationCallback(
 
 // One image row per serpentine row of the panel; data stays in wire order.
 void LedControllerNode::publishPanelFrame(
-    const std::size_t channel, std::vector<std::uint8_t> frame, const std::size_t rows)
+    const std::size_t channel, std::vector<std::uint8_t> frame, const std::size_t rows, const bool preview_due)
 {
     const auto leds_per_row = frame.size() / 4 / rows;
 
@@ -220,6 +232,14 @@ void LedControllerNode::publishPanelFrame(
     image->width = leds_per_row;
     image->step = leds_per_row * 4;
     image->data = std::move(frame);
+
+    if (preview_due) {
+        const auto preview = preview_publishers_.find(channel);
+        if (preview != preview_publishers_.end()) {
+            publishUnlessShutdown(
+                shutdown_gate_, this->get_logger(), preview->second, std::make_unique<ImageMsg>(*image));
+        }
+    }
 
     publishUnlessShutdown(shutdown_gate_, this->get_logger(), panel_publishers_.at(channel), std::move(image));
 }
@@ -241,8 +261,18 @@ void LedControllerNode::controllerTimerCallback()
 
     render_rate_->tick();
 
+    // One decision per tick, so every panel's preview shows the same render.
+    bool preview_due = false;
+    if (!preview_publishers_.empty()) {
+        const auto now = std::chrono::steady_clock::now();
+        if (!last_preview_ || now - *last_preview_ >= preview_period_) {
+            last_preview_ = now;
+            preview_due = true;
+        }
+    }
+
     for (auto & [channel, frame] : result.frames) {
-        publishPanelFrame(channel, std::move(frame), result.rows.at(channel));
+        publishPanelFrame(channel, std::move(frame), result.rows.at(channel), preview_due);
     }
 }
 
