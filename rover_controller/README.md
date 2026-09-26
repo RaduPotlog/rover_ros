@@ -39,6 +39,12 @@ launch file then spawns no PIDs (see below).
 
 The joint-state and IMU broadcasters are spawned as before.
 
+controller_manager runs at 100 Hz, and each controller at its own `update_rate`: the
+wheel PIDs at the manager's 100 Hz, `rover_drive_controller` and
+`rover_imu_broadcaster` at 50 Hz (the EKF's rate), `rover_joint_state_broadcaster` at
+20 Hz (the encoders' rate). Every rate must divide the manager's
+(`test/test_wheel_geometry.py`).
+
 ## Drive-train tuning
 
 Do these in order; each step relies on the one before. Both tools publish on the
@@ -49,7 +55,7 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
 1. **Wheel-speed loop.** Run the step-response tool with the wheels off the ground
    first, then on the ground. Tune the PID gains until overshoot stays under 10 %
    and steady-state error under 3 %. The DCC1000 encoders report at most every
-   50 ms (20 Hz), while the controllers run at 100 Hz, so each PID gets a new
+   50 ms (20 Hz), while the PIDs run at 100 Hz, so each PID gets a new
    measurement only every ~5 cycles. Keep the PID gains modest, and read measured
    dead times as accurate to about 50 ms. The driver logs each channel's actual
    encoder interval at startup.

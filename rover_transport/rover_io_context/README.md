@@ -8,13 +8,24 @@ Shared transport primitives. **Carries no ROS dependency** - the drivers that li
 |-------|----------|
 | `domain/` | `ByteStreamPort` (a UART or a UDP socket) and `BytePublisherPort` (where received bytes go). No ROS, no ASIO, no OS. |
 | `application/` | `InboundByteBridge` (bytes off the wire -> publisher) and `OutboundByteBridge` (message -> wire, **only while active**). |
-| `infrastructure/` | `IoContext` - the ASIO `io_service` and its thread pool. |
+| `infrastructure/` | `IoContext` - the ASIO `io_service` and its thread pool. `AsyncOpGuard` (header-only) - makes a stream's `close()` safe against its own handlers. |
 
 `OutboundByteBridge` is where the "do not drive the hardware from a deactivated node"
 rule lives. Upstream checked `PRIMARY_STATE_ACTIVE` inline in each of three subscriber
 callbacks, so the single most safety-relevant rule in these drivers had no test; here it
 is a plain flag driven from `on_activate` / `on_deactivate` and covered by
 `test/unit/test_byte_bridges.cpp`.
+
+`AsyncOpGuard` is why `AsioSerialPort::close()` and `AsioUdpSocket::close()` may be
+followed straight away by destroying the receive callback's targets and the stream. ASIO's
+close waits neither for a handler already running on another io thread nor for one
+completed and still queued. The guard runs every handler it wraps on one strand and counts
+it; `closeAndDrain()` runs the close on that strand and returns only once every wrapped
+handler has finished. From inside a handler it closes directly. Once the `io_context` has
+stopped - the path of a node destroyed while active, e.g. by its component container,
+since the node's destructor stops the `IoContext` it owns first - queued handlers will
+never run and are not waited for, but a handler still running on another io thread is:
+`stop()` does not wait for it. `test/unit/test_async_op_guard.cpp` covers each path.
 
 ## Targets
 

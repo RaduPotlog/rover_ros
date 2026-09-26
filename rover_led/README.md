@@ -10,6 +10,7 @@ led/set_animation ──► rover_led_controller ──led/channel_<n>_frame─�
                                                                             │ udp_write/led_channel_<n>
                                                                             ▼
                                rover_udp_led_channel_<n>_sender_node ──UDP──► LED board
+                               (rover_led_container)
 ```
 
 ## Nodes and interfaces
@@ -157,7 +158,8 @@ ros2 topic echo /rover/led/state
 
 ## Launch Files
 
-- `rover_led.launch.py` - `rover_led_container` (controller + driver) and the two UDP senders.
+- `rover_led.launch.py` - `rover_led_container`: the controller, plus the driver and the two UDP
+  senders on hardware only.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
@@ -165,7 +167,7 @@ ros2 topic echo /rover/led/state
 | `robot_model` | `$ROBOT_MODEL_NAME`, else `rover_a1` | Selects `config/<robot_model>_*.yaml`. |
 | `animations_config_path` | `config/<robot_model>_animations.yaml` | Animation catalog. |
 | `common_dir_path` | empty | If set, the default animations file is read from `<common_dir_path>/rover_led/config/`. |
-| `use_sim` | `False` | `True` skips `rover_led_driver` (the controller still publishes frames). |
+| `use_sim` | `False` | `True` skips `rover_led_driver` and the UDP senders (the controller still publishes frames). |
 | `log_level` | `INFO` | Logging level. |
 
 ## Layout
@@ -193,3 +195,5 @@ colcon test --packages-select rover_led && colcon test-result --all --verbose
   forwarding and dropping malformed frames.
 - `test/integration/test_led_controller_node.cpp` runs the controller node on
   `led_controller_test_animations.yaml`: catalog, set/stop, frames, state and diagnostics.
+- `test/test_launch_structure.py` checks the launch file's composition: one container holding all
+  four nodes intra-process, the UDP senders on hardware only.

@@ -1,8 +1,8 @@
 # rover_transport
 
-The rover'"'"'s transport layer: a hard fork of
+The rover's transport layer: a hard fork of
 [ros-drivers/transport_drivers](https://github.com/ros-drivers/transport_drivers) v1.2.0,
-relayouted into this workspace'"'"'s Clean Architecture convention.
+relayouted into this workspace's Clean Architecture convention.
 
 | Package | Role |
 |---------|------|
@@ -12,7 +12,7 @@ relayouted into this workspace'"'"'s Clean Architecture convention.
 | [`rover_udp_driver`](rover_udp_driver/) | UDP <-> `udp_read` / `udp_write`. |
 | [`rover_modbus_driver`](rover_modbus_driver/) | Synchronous Modbus TCP client. **Library only - no node, no topics.** |
 
-Each package'"'"'s README lists what changed from upstream. Several real defects were fixed
+Each package's README lists what changed from upstream. Several real defects were fixed
 along the way - two use-after-frees in the async send paths, a receiver that stopped on a
 zero-length datagram, and a `-O0` flag that leaked onto every consumer.
 

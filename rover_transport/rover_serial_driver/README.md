@@ -8,9 +8,13 @@ A lifecycle node that owns a UART and bridges it to two topics.
 | sub | `serial_write` | `std_msgs/UInt8MultiArray` (`KeepLast(32)`, best effort) |
 
 Parameters: `device_name`, `baud_rate`, `flow_control` (`none`|`hardware`|`software`),
-`parity` (`none`|`odd`|`even`), `stop_bits` (`"1"`|`"1.0"`|`"1.5"`|`"2"`|`"2.0"`).
+`parity` (`none`|`odd`|`even`), `stop_bits` (`"1"`|`"1.0"`|`"1.5"`|`"2"`|`"2.0"`),
+`autostart` (default `false`; `true` configures and activates the node as soon as the
+executor spins, one attempt, no retry - launch_ros' `ComposableLifecycleNode` autostart
+misses the namespace and never reaches a component).
 
-Executable: `rover_serial_bridge_node`.
+Executable: `rover_serial_bridge_node`. Component:
+`rover::transport::serial::SerialBridgeNode` (`rover_serial_driver_components`).
 
 ```bash
 ros2 run rover_serial_driver rover_serial_bridge_node --ros-args \
@@ -18,8 +22,9 @@ ros2 run rover_serial_driver rover_serial_bridge_node --ros-args \
   -p flow_control:=none -p parity:=none -p stop_bits:='"1"'
 ```
 
-Its only in-tree consumer is `rover_crsf_teleop`, whose launch file starts it as
-`rover_crsf_serial_bridge` with `serial_read` remapped to `rc/raw`.
+Its only in-tree consumer is `rover_crsf_teleop`, whose launch file loads it into
+`rover_crsf_container` as `rover_crsf_serial_bridge`, intra-process, with `serial_read`
+remapped to `rc/raw`.
 
 ## Layers
 
@@ -28,7 +33,7 @@ Its only in-tree consumer is `rover_crsf_teleop`, whose launch file starts it as
 | `domain/` | `SerialPortConfig` + the `FlowControl` / `Parity` / `StopBits` enums, and the parsing of the five ROS parameters into them. No ROS, no ASIO. |
 | `infrastructure/` | `AsioSerialPort` (implements `ByteStreamPort`), the ASIO option translation, the `UInt8MultiArray` conversions, `Ros2BytePublisher`, and `SerialBridgeNode`. |
 
-The bridging behaviour itself lives in `rover_io_context`'"'"'s application layer.
+The bridging behaviour itself lives in `rover_io_context`'s application layer.
 
 ## Changes from upstream beyond the relayout
 
@@ -50,8 +55,9 @@ The bridging behaviour itself lives in `rover_io_context`'"'"'s application laye
 - `toMsg` clamps to the buffer size instead of `memcpy`-ing an unchecked length.
 - `SerialDriver` (a one-member `shared_ptr` holder) was dropped for a `makeSerialPort()`
   factory; `visibility_control.hpp` was dropped as unused.
-- `rclcpp_components` registration was dropped - nothing in this workspace composes these
-  nodes - in favour of an explicit `main()`.
+- The executable has an explicit `main()`, which runs the lifecycle shutdown on Ctrl-C.
+  The `rclcpp_components` registration lives in its own SHARED library,
+  `rover_serial_driver_components`, since a static archive would drop it.
 - The port is still closed and never reopened on a read error, matching upstream.
   Auto-reconnect is the obvious follow-up the `ByteStreamPort` split unlocks, and was
   deliberately left out of the relayout.

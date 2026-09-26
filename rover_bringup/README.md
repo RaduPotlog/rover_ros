@@ -23,13 +23,18 @@ It prints the rover banner (`rover_utils.messages.welcome_msg`) and then:
 3. Starts immediately:
    - `rover_controller` (robot description, `controller_manager`, controllers)
    - `rover_diag_manager` (system diagnostics and the diagnostic aggregator)
-4. After a fixed 10 s delay (giving the hardware interface time to come up), starts:
+4. Once `rover_controller` emits `rover_utils.events.ControllersActive` (its last mandatory
+   spawner, `rover_imu_broadcaster`, succeeded), starts:
    - `rover_battery`
    - `rover_led`
    - `rover_safety` (skipped with `disable_manager:=True`)
    - `rover_localization` (with `use_ekf:=True` and `fuse_gps:=<use_gps>`)
    - `rover_crsf_teleop`
    - `rover_twist_mux`
+
+   `rover_utils.events.start_once_on` starts them exactly once: on the event, or after
+   `controllers_ready_timeout` seconds with a warning if it never comes. A failed spawner shuts
+   the whole launch down, so the timeout only covers a spawner that hangs.
 
 The GPS and lidar drivers are not started here. They are the sensor payload: the
 `rover_sensors` repo, run by the `rover-a1-sensors` container, which only publishes `gps/fix`,
@@ -46,6 +51,7 @@ Every included launch file receives `namespace`, `log_level` and, where supporte
 | `common_dir_path` | empty | Directory with per-package config overrides (`<dir>/<package>/config/...`). |
 | `disable_manager` | `False` | `True` skips `rover_safety`. |
 | `exit_on_wrong_hw` | `false` | Exit instead of idling when the hardware configuration is incorrect. |
+| `controllers_ready_timeout` | `20.0` | Seconds to wait for `ControllersActive` before starting step 4 anyway. |
 | `use_gps` | `$ROVER_USE_GPS`, else `false` | `true`: localization fuses wheels + IMU + GPS (dual EKF, `map → odom`). `false`: wheels + IMU only. |
 
 | Environment variable | Default | Effect |
@@ -63,11 +69,18 @@ launches it next to the bringup.
 
 | Node | Package | Notes |
 |------|---------|-------|
-| `rover_foxglove_bridge` | `foxglove_bridge` | Upstream `foxglove_bridge_launch.xml` defaults, websocket port 8765. Used by Foxglove, the network monitor LED page and Cockpit diagnostics. |
+| `rover_foxglove_bridge` | `foxglove_bridge` | Upstream `foxglove_bridge_launch.xml` defaults except `asset_uri_allowlist`, `topic_whitelist` and `sysinfo` (below), websocket port 8765. Used by Foxglove, the network monitor LED page and Cockpit diagnostics. |
 | `rover_rosbridge_websocket` | `rosbridge_server` | Port 9090, for ros-mcp-server. |
 | `rosapi` | `rosapi` | Kept as `/rosapi`: rosbridge clients call `/rosapi/*`. |
 
 The bridges are not namespaced, so they see the whole graph (`/rover/...` topics included).
+
+`rover_foxglove_bridge` advertises only the topics the drive UI and the Cockpit subscribe to
+(`FOXGLOVE_TOPIC_WHITELIST` in the launch file: `/tf`, `/tf_static`, and names matched under any
+namespace), because anything a browser subscribes to crosses the Zenoh router at full rate. When a
+UI starts using a new topic, add it there. `ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']"` on the
+platform service overrides it for debugging (empty counts as unset). `sysinfo:=false` turns off
+`/foxglove_bridge/sysinfo`, which no UI reads and which otherwise publishes every 500 ms.
 
 ```bash
 ros2 launch rover_bringup rover_web_bridges.launch.py

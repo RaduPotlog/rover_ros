@@ -90,7 +90,8 @@ to be single values shared by both axes, which forced one deadband wide enough f
 the two sticks — on this transmitter ch3 rests at 1004 and ch1 at 987.
 
 Measurement happens **in this node**, not in whatever is driving it: `rc/channels` is best-effort
-depth 1 at 50 Hz, so a client tracking min/max over the topic would miss the peaks. The flow is:
+depth 1 and capped at `rc_topics_rate_hz`, so a client tracking min/max over the topic would miss
+the peaks. The flow is:
 
 ```
 deactivate ──▶ start(e_stop_confirmed) ──▶ sweep ──▶ finish ──▶ apply ──▶ activate
@@ -168,7 +169,9 @@ diagnostic makes it visible; automatic recovery belongs in a supervisor, not her
 All parameters, with the reasoning behind their defaults, are documented in
 [`config/rover_crsf_teleop.yaml`](config/rover_crsf_teleop.yaml). The link failsafe values are
 initial and need tuning on the rover (`ros2 topic hz /rover/rc/link`,
-`ros2 topic echo /rover/rc/link`).
+`ros2 topic echo /rover/rc/link`). `rc/link` is capped at `rc_topics_rate_hz` (25 Hz shipped), so
+`hz` reads at most the cap, not the receiver's link-stats rate; set `rc_topics_rate_hz` to 0.0 (no
+cap, read on configure) for a true measurement.
 
 ## Layout (Clean Architecture)
 
@@ -177,12 +180,15 @@ include/rover_crsf_teleop/
 ├── domain/          stick_mapping, switch_debouncer, link_monitor, rc_frame, ports  (no ROS)
 │   │                rc_calibration - measures this transmitter's endpoints          (no ROS)
 │   │                safety_io_flags, safety_io_monitor - calibration permit, aged   (no ROS)
+│   │                rate_limiter - caps the rc/channels and rc/link echoes          (no ROS)
 │   └── crsf/        crsf_protocol, crc8, crsf_parser - the wire decoder             (no ROS)
 ├── application/     teleop_use_case - the per-tick rules above                      (no ROS)
 │                    teleop_config_validation - the rules configure enforces         (no ROS)
 │                    calibration_use_case - the session, its gate and its timeout    (no ROS)
 └── infrastructure/  ROS adapters for the ports + RoverCrsfTeleopNode (lifecycle)
                      yaml_calibration_store - the persisted calibration
+                     rover_crsf_teleop_component (.cpp only) - rclcpp_components
+                     registration, loaded into rover_crsf_container
 ```
 
 The CRSF decoder sits in `domain/` because it is pure byte math: no clock, no syscalls, no ROS

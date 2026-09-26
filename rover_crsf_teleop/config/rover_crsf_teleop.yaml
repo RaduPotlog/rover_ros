@@ -170,8 +170,9 @@
     # CRSF source is wired in that does not send them.
     #
     # INITIAL VALUES - tune on the rover: `ros2 topic hz /rover/rc/link` for the stats rate (it follows
-    # the ELRS telemetry ratio), and `ros2 topic echo /rover/rc/link` (uplink_status) while walking the
-    # transmitter out of range for the LQ thresholds.
+    # the ELRS telemetry ratio; set rc_topics_rate_hz to 0.0 first, or hz shows the cap), and
+    # `ros2 topic echo /rover/rc/link` (uplink_status) while walking the transmitter out of range for
+    # the LQ thresholds.
     channel_timeout_ms: 200
     link_stats_timeout_ms: 1000
     require_link_stats: true
@@ -183,7 +184,7 @@
     # arrive (WARN only - link loss is reported by "RC link", a dead byte stream by "RC serial
     # link"). This counts frames decoded off the byte stream, not messages on a topic, so it
     # measures the receiver's real packet rate: set it to what `ros2 topic hz /rover/rc/channels`
-    # reports. Measured 2026-09-20 on the A1: ~243 Hz, i.e. the ELRS 250 Hz packet-rate mode, not
+    # reports with rc_topics_rate_hz at 0.0 (with the cap it reports the cap). Measured 2026-09-20 on the A1: ~243 Hz, i.e. the ELRS 250 Hz packet-rate mode, not
     # the 50 Hz this was originally set to - which is what made this diagnostic read "Frequency
     # too high". Re-measure and update BOTH this and the failsafe note above if the transmitter's
     # packet rate is ever changed; the tolerance below is wide enough (200-300 Hz) that the 2.8%

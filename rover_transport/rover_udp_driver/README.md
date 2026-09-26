@@ -13,10 +13,15 @@ Lifecycle nodes bridging UDP to ROS 2.
 | pub | `udp_read` | `udp_msgs/UdpPacket` (`QoS(100)`) |
 | sub | `udp_write` | `udp_msgs/UdpPacket` (`KeepLast(32)`, best effort) |
 
-Parameters: `ip`, `port`.
+Parameters: `ip`, `port`, `autostart` (default `false`; `true` configures and activates
+the node as soon as the executor spins, one attempt, no retry - launch_ros'
+`ComposableLifecycleNode` autostart misses the namespace and never reaches a component).
 
-In-tree consumers: `rover_battery` (a receiver, `udp_read` -> `rover_battery_udp_data`)
-and `rover_led` (two senders, `udp_write` -> `udp_write/led_channel_{1,2}`).
+`rover::transport::udp::UdpReceiverNode` and `UdpSenderNode` are also registered as
+`rclcpp_components` (`rover_udp_driver_components`). The in-tree consumers load them into
+their own container, intra-process: `rover_battery` (a receiver, `udp_read` ->
+`rover_battery_udp_data`) and `rover_led` (two senders, `udp_write` ->
+`udp_write/led_channel_{1,2}`, hardware only).
 
 ## Layers
 
@@ -45,7 +50,9 @@ and `rover_led` (two senders, `udp_write` -> `udp_write/led_channel_{1,2}`).
   `visibility_control.hpp` was dropped as unused.
 - The three upstream socket tests, which all hardcoded `127.0.0.1:8000` and so could not
   run concurrently, are merged into one file using per-process ports.
-- `rclcpp_components` registration was dropped in favour of explicit `main()`s.
+- The executables have explicit `main()`s, which run the lifecycle shutdown on Ctrl-C. The
+  `rclcpp_components` registration lives in its own SHARED library,
+  `rover_udp_driver_components`, since a static archive would drop it.
 
 ## Provenance
 
