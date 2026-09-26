@@ -223,7 +223,7 @@
                2.0 = up to 0.5 s from stop to full duty, a lag the ROS side can't see. Optional -
                omitting it keeps the compiled-in kDefaultMotorAcceleration (2.0). Once the wheel
                PID loop owns the speed dynamics, raise it after measuring the step response. -->
-          <param name="motor_acceleration">5.0</param>
+          <param name="motor_acceleration">1.0</param>
 
           <!-- DCC1000 motor current limit in A (device range 2-25). The motor stalls at 16 A on
                24 V, and a direction reversal can briefly reach ~2x stall as back-EMF adds to the
