@@ -28,7 +28,11 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <functional>
+#include <future>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -76,11 +80,19 @@ public:
         return io_states_;
     }
 
-    SafetyLinkHealth linkHealth() const override { return health; }
+    SafetyLinkHealth linkHealth() const override
+    {
+        if (on_link_health) {
+            on_link_health();
+        }
+        return health;
+    }
 
     // Public so a test can present an unhealthy link without another accessor.
     SafetyLinkHealth health;
     CallLog * call_log = nullptr;
+    // Runs inside linkHealth(), on the caller's thread; lets a test hold a diagnostic mid-task.
+    std::function<void()> on_link_health;
 
 private:
 
@@ -165,6 +177,12 @@ public:
     void runSafetyLinkDiagnostic(diagnostic_updater::DiagnosticStatusWrapper & s)
     {
         diagnoseSafetyLink(s);
+    }
+
+    // Whether everything the diagnostic tasks read is still in place.
+    bool componentsInPlace() const
+    {
+        return control_loop_use_case_ && rover_controller_ && rover_driver_ && e_stop_;
     }
 
 protected:
@@ -515,6 +533,63 @@ TEST_F(RoverSystemWriteTest, ConfigureFailsWhenReleasingTheStartupTriggersThrows
 
     ASSERT_EQ(failing_system.on_init(makeParams()), CallbackReturn::SUCCESS);
     EXPECT_EQ(failing_system.on_configure(rclcpp_lifecycle::State()), CallbackReturn::ERROR);
+}
+
+// The diagnostic_updater runs the tasks on SystemROSInterface's own executor thread. Teardown
+// has to stop that executor before it releases what the tasks read; otherwise a task running at
+// that moment dereferences a released component (seen on the rover: a segfault in
+// diagnoseSafetyLink() while the launch shut down).
+TEST_F(RoverSystemWriteTest, TeardownWaitsForARunningDiagnosticBeforeReleasingComponents)
+{
+    using namespace std::chrono_literals;
+
+    std::promise<void> entered;
+    std::promise<void> release;
+    auto release_future = release.get_future().share();
+    // Never leave the diagnostics thread parked, or TearDown() would wait for it forever.
+    struct ReleaseOnExit
+    {
+        std::promise<void> & promise;
+        bool released = false;
+        void operator()()
+        {
+            if (!released) {
+                released = true;
+                promise.set_value();
+            }
+        }
+        ~ReleaseOnExit() { (*this)(); }
+    } release_on_exit{release};
+
+    std::atomic<bool> first_call{true};
+    std::atomic<bool> components_in_place_after_release{false};
+
+    // From here on only the diagnostics thread calls linkHealth(): SetUp() has already
+    // configured, and nothing in this test calls read().
+    system_.fakeGpio()->on_link_health = [&]() {
+            if (!first_call.exchange(false)) {
+                return;
+            }
+            entered.set_value();
+            release_future.wait();
+            components_in_place_after_release = system_.componentsInPlace();
+        };
+
+    ASSERT_EQ(entered.get_future().wait_for(10s), std::future_status::ready)
+        << "the safety plc link diagnostic never ran";
+
+    auto shutdown = std::async(
+        std::launch::async, [this]() {return system_.on_shutdown(rclcpp_lifecycle::State());});
+    EXPECT_EQ(shutdown.wait_for(200ms), std::future_status::timeout)
+        << "teardown finished while a diagnostic task was still running";
+
+    release_on_exit();
+    ASSERT_EQ(shutdown.wait_for(10s), std::future_status::ready);
+    EXPECT_EQ(shutdown.get(), CallbackReturn::SUCCESS);
+    EXPECT_TRUE(components_in_place_after_release)
+        << "a component was released while a diagnostic task was still reading it";
+
+    system_.fakeGpio()->on_link_health = nullptr;
 }
 
 }  // namespace rover_hardware_interface

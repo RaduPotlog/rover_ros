@@ -268,6 +268,11 @@ CallbackReturn RoverSystem::on_error(const rclcpp_lifecycle::State &)
 
 void RoverSystem::teardownRoverComponents()
 {
+    // First: its executor thread runs the diagnostic tasks and the service callbacks, which read
+    // the components below. Destroying it cancels that executor and joins the thread, waiting for
+    // a callback that is running, so nothing can call into a component once it is released.
+    system_ros_interface_.reset();
+
     control_loop_use_case_.reset();
     rover_controller_.reset();
 
@@ -277,7 +282,6 @@ void RoverSystem::teardownRoverComponents()
     }
 
     e_stop_.reset();
-    system_ros_interface_.reset();
 }
 
 std::vector<StateInterface> RoverSystem::export_state_interfaces()
