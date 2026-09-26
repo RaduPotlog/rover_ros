@@ -14,14 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from typing import List, Type
 
 from launch import Action, Event, EventHandler
 from launch.actions import (
-    GroupAction,
     OpaqueFunction,
+    PopEnvironment,
+    PopLaunchConfigurations,
+    PushEnvironment,
+    PushLaunchConfigurations,
     RegisterEventHandler,
-    SetLaunchConfiguration,
+    ReplaceEnvironmentVariables,
+    ResetLaunchConfigurations,
     TimerAction,
 )
 import launch.logging
@@ -48,14 +53,20 @@ def start_once_on(
     Whichever comes first starts them, exactly once. The timeout is a fallback for an event that
     never arrives (e.g. a hung spawner); it logs `fallback_msg` as a warning when it fires.
 
-    Like TimerAction, the actions see the launch configurations from where this was placed, not
-    whatever is current when the event arrives (e.g. after an enclosing scoped group has ended).
+    Like TimerAction, the actions see the launch configurations and environment from where this
+    was placed, not whatever is current when the event arrives (e.g. after an enclosing scoped
+    group has ended), and they are restored the same way TimerAction restores them.
     """
     started = False
     configurations = {}
+    environment = {}
 
     def snapshot(context):
-        configurations.update(context.launch_configurations)
+        # Copies of the values: launch_ros's SetParameter extends the 'global_params' list in
+        # place, so a shared list would let later changes leak in either direction.
+        configurations.update(
+            {name: copy.copy(value) for name, value in context.launch_configurations.items()})
+        environment.update(context.environment)
         return []
 
     def start(context, fallback=False):
@@ -68,8 +79,20 @@ def start_once_on(
             _logger.warning(fallback_msg)
             return actions
         timer.cancel()
-        restore = [SetLaunchConfiguration(name, value) for name, value in configurations.items()]
-        return [GroupAction(actions=[*restore, *actions], scoped=True, forwarding=False)]
+        # As TimerAction.handle() does it. Not SetLaunchConfiguration per entry: launch_ros keeps
+        # non-string configurations, such as 'global_params' (a list of (name, value) tuples),
+        # which SetLaunchConfiguration can't take; ResetLaunchConfigurations keeps them as they
+        # are.
+        return [
+            PushEnvironment(),
+            PushLaunchConfigurations(),
+            ReplaceEnvironmentVariables(environment),
+            ResetLaunchConfigurations(
+                {name: copy.copy(value) for name, value in configurations.items()}),
+            *actions,
+            PopEnvironment(),
+            PopLaunchConfigurations(),
+        ]
 
     timer = TimerAction(
         period=timeout,

@@ -20,6 +20,7 @@ from launch.actions import (
     SetLaunchConfiguration,
     TimerAction,
 )
+from launch_ros.actions import SetParameter
 import pytest
 
 from rover_utils import events
@@ -119,3 +120,48 @@ def test_actions_see_the_configurations_from_where_they_were_placed(logger, emit
     ], seen)
     assert runs == 1
     assert seen == ['rover']
+
+
+@pytest.mark.parametrize('emit_event', [True, False])
+def test_actions_see_launch_ros_global_parameters(logger, emit_event):
+    # rover_controller.launch.py sets use_sim_time with SetParameter before rover_bringup's
+    # start_once_on. launch_ros keeps that as launch configuration 'global_params', a list of
+    # (name, value) tuples rather than a string; restoring it must neither fail nor drop it.
+    seen = []
+
+    def record(context):
+        seen.append(list(context.launch_configurations.get('global_params', [])))
+        return []
+
+    timeout = 60.0 if emit_event else 0.1
+    runs = run_launch(lambda gated: [
+        GroupAction(scoped=True, actions=[
+            SetParameter(name='use_sim_time', value='False'),
+            *start_once_on(
+                ControllersActive, timeout, [gated, OpaqueFunction(function=record)], 'fallback'),
+        ]),
+        *([TimerAction(period=0.1, actions=[EmitEvent(event=ControllersActive())])]
+          if emit_event else []),
+    ])
+    assert runs == 1
+    assert seen == [[('use_sim_time', 'False')]]
+
+
+def test_global_parameters_set_by_the_actions_stay_inside_them(logger):
+    # The started launches add their own global parameters; they must not leak into the scope
+    # start_once_on was placed in.
+    outer = []
+
+    def record_outer(context):
+        outer.append(list(context.launch_configurations.get('global_params', [])))
+        return []
+
+    run_launch(lambda gated: [
+        SetParameter(name='use_sim_time', value='False'),
+        *start_once_on(
+            ControllersActive, 60.0,
+            [gated, SetParameter(name='from_the_actions', value='1')], 'fallback'),
+        EmitEvent(event=ControllersActive()),
+        TimerAction(period=0.2, actions=[OpaqueFunction(function=record_outer)]),
+    ])
+    assert outer == [[('use_sim_time', 'False')]]
