@@ -41,12 +41,15 @@ FOXGLOVE_ASSET_URI_ALLOWLIST = (
     r"['^package://(?:[-\w%]+/)*[-\w%.]+\." + f"(?:{_ANY_CASE})" + r"$']"
 )
 
-# Topics the web UIs actually subscribe to (rover_drive_interface through nginx's /ws, the
-# Cockpit plugin through cockpit-bridge). Every other topic stays off the bridge: upstream's
+# Topics the web UIs actually use (rover_drive_interface through nginx's /ws, the Cockpit
+# plugin through cockpit-bridge). Every other topic stays off the bridge: upstream's
 # default ['.*'] advertises the whole graph, and anything a browser (or a stray Foxglove Studio)
 # subscribes to crosses the Zenoh router into this process at its full rate - the UIs throttle
 # only their redraws, never what the bridge sends. Names are relative to the rover namespace,
-# matched under any namespace. When a UI starts using a new topic, add it here.
+# matched under any namespace. When a UI starts using a new topic, add it here - including
+# topics it only PUBLISHES: the UIs' foxglove client builds a publisher's message encoder from
+# the schema of the server channel with the same name, and waits for that channel forever if the
+# bridge never advertises it (manual driving silently sent nothing on 2026-09-26).
 # ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']" on the platform service opens it up for debugging.
 _ABSOLUTE_UI_TOPICS = ("/tf", "/tf_static")
 _NAMESPACED_UI_TOPICS = (
@@ -67,6 +70,9 @@ _NAMESPACED_UI_TOPICS = (
     "places",
     "amcl_pose",
     "mission_state",
+    # rover_drive_interface: published by the UI (see above for why they must be listed)
+    "teleop_driver_interface_cmd_vel_stamped",
+    "initialpose",
     # both UIs
     "diagnostics_agg",
     # Cockpit: LED page (led/channel_<n>_preview, not the 50 Hz _frame the driver consumes)

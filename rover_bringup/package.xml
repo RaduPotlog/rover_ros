@@ -33,6 +33,8 @@
   <!-- Rover zenoh dependency -->
   <exec_depend condition="$ROVER_ROS_BUILD_TYPE == hardware">rmw_zenoh_cpp</exec_depend>
   
+  <test_depend>ament_cmake_pytest</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>
