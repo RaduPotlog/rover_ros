@@ -52,12 +52,14 @@ bool spinUntil(
     const std::chrono::milliseconds timeout)
 {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
 
     while (!predicate()) {
         if (std::chrono::steady_clock::now() >= deadline) {
             return false;
         }
-        rclcpp::spin_some(node);
+        executor.spin_some();
     }
 
     return true;

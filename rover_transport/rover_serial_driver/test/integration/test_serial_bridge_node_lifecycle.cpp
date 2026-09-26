@@ -200,7 +200,10 @@ TEST_F(SerialBridgeNodeLifecycleTest, SurvivesTeardownWhileBytesArrive)
     std::thread flood([&]() {
         const std::vector<std::uint8_t> chunk(64, 0xAB);
         while (!stop) {
-            (void)write(master_fd_, chunk.data(), chunk.size());  // EAGAIN when full: fine.
+            // (void) doesn't silence warn_unused_result, so test the result instead.
+            if (write(master_fd_, chunk.data(), chunk.size()) < 0) {
+                continue;  // EAGAIN when the pty buffer is full: fine, keep flooding.
+            }
         }
     });
 
