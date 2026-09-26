@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""foxglove_bridge's topic_whitelist must cover what the web UIs use, and nothing else."""
+"""foxglove_bridge's topic and service whitelists cover what the web UIs use, and nothing else."""
 
 import importlib.util
 from pathlib import Path
@@ -23,12 +23,22 @@ import yaml
 
 
 @pytest.fixture(scope='module')
-def patterns():
+def launch_module():
     path = Path(__file__).resolve().parents[1] / 'launch' / 'rover_web_bridges.launch.py'
     spec = importlib.util.spec_from_file_location('rover_web_bridges_launch', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return yaml.safe_load(module.FOXGLOVE_TOPIC_WHITELIST)
+    return module
+
+
+@pytest.fixture(scope='module')
+def patterns(launch_module):
+    return yaml.safe_load(launch_module.FOXGLOVE_TOPIC_WHITELIST)
+
+
+@pytest.fixture(scope='module')
+def service_patterns(launch_module):
+    return yaml.safe_load(launch_module.FOXGLOVE_SERVICE_WHITELIST)
 
 
 def _allowed(patterns, topic):
@@ -70,3 +80,37 @@ def test_namespace_is_not_hard_coded(patterns):
 ])
 def test_internal_topics_stay_off_the_bridge(patterns, topic):
     assert not _allowed(patterns, topic)
+
+
+@pytest.mark.parametrize('service', [
+    '/rosapi/get_time',
+    '/rover/hardware_interface/sw_user_e_stop_set',
+    '/rover/hardware_interface/sw_user_e_stop_reset',
+    '/rover/hardware_interface/sw_e_stop_latch_reset',
+    '/rover/hardware_interface/aux_output_0/set',
+    '/rover/hardware_interface/aux_output_5/set',
+    '/rover/set_mission', '/rover/run_mission',
+    '/rover/start_mapping', '/rover/save_map', '/rover/load_map', '/rover/delete_map',
+    '/rover/save_place', '/rover/delete_place',
+    '/rover/reinitialize_global_localization', '/rover/request_nomotion_update',
+    '/rover/rc/calibration/start', '/rover/rc/calibration/apply',
+    '/rover/rover_crsf_teleop_node/change_state', '/rover/rover_crsf_teleop_node/get_state',
+    '/rover/led/set_animation', '/rover/led/stop_animation', '/rover/led/set_brightness',
+    # Unnamespaced rover.
+    '/save_map', '/led/set_brightness',
+])
+def test_services_the_uis_call_are_advertised(service_patterns, service):
+    assert _allowed(service_patterns, service)
+
+
+@pytest.mark.parametrize('service', [
+    # Node-private services sharing a leaf name with a UI service: their packages aren't in the
+    # platform image, so advertising them only made the bridge log "package not found".
+    '/rover/slam_toolbox/save_map', '/rover/map_saver/save_map',
+    '/rover/global_costmap/save_grid',
+    # Everything else on the graph.
+    '/rover/controller_server/get_parameters', '/rover/rover_led_driver/change_state',
+    '/rosapi/topics',
+])
+def test_other_services_stay_off_the_bridge(service_patterns, service):
+    assert not _allowed(service_patterns, service)
