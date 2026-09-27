@@ -42,6 +42,7 @@ rosidl_generate_interfaces(
     "msg/MapInfo.msg"
     "msg/MapList.msg"
     "msg/LocalizationState.msg"
+    "msg/DriveMode.msg"
 
     "srv/SetLedBrightness.srv"
     "srv/SetLedAnimation.srv"
@@ -55,6 +56,7 @@ rosidl_generate_interfaces(
     "srv/SaveMap.srv"
     "srv/LoadMap.srv"
     "srv/DeleteMap.srv"
+    "srv/SetDriveMode.srv"
 
     DEPENDENCIES
         builtin_interfaces

@@ -50,7 +50,7 @@ def _allowed(patterns, topic):
 # definition from the server channel with the same name, so a publish-only topic missing here
 # makes it wait forever and send nothing: manual driving was silently dead on 2026-09-26.
 @pytest.mark.parametrize('topic', [
-    '/rover/teleop_driver_interface_cmd_vel_stamped',
+    '/rover/teleop_web_cmd_vel_stamped',
     '/rover/initialpose',
 ])
 def test_topics_the_drive_ui_publishes_are_advertised(patterns, topic):
@@ -61,6 +61,7 @@ def test_topics_the_drive_ui_publishes_are_advertised(patterns, topic):
     '/tf', '/tf_static', '/rover/map', '/rover/scan', '/rover/plan',
     '/rover/global_costmap/costmap', '/rover/diagnostics_agg', '/rover/motion_lock',
     '/rover/hardware_interface/safety_status', '/rover/rover_battery/battery_status',
+    '/rover/mission_state', '/rover/drive_mode',
     '/rover/led/channel_1_preview', '/rover/rc/channels', '/rover/rc/calibration/state',
 ])
 def test_topics_the_uis_subscribe_to_are_advertised(patterns, topic):
@@ -76,6 +77,8 @@ def test_namespace_is_not_hard_coded(patterns):
     # Full-rate or internal topics a browser must not pull through the router.
     '/rover/led/channel_1_frame', '/rover/rslidar_points', '/rover/diagnostics', '/rosout',
     '/rover/cmd_vel', '/rover/teleop_driver_interface_cmd_vel_fresh_stamped',
+    # rover_drive_mode's output: a browser publishing here would bypass the driving mode.
+    '/rover/teleop_driver_interface_cmd_vel_stamped', '/rover/nav_cmd_vel_stamped',
     '/rover/odometry/wheels', '/rover/joint_states',
 ])
 def test_internal_topics_stay_off_the_bridge(patterns, topic):
@@ -89,7 +92,7 @@ def test_internal_topics_stay_off_the_bridge(patterns, topic):
     '/rover/hardware_interface/sw_e_stop_latch_reset',
     '/rover/hardware_interface/aux_output_0/set',
     '/rover/hardware_interface/aux_output_5/set',
-    '/rover/set_mission', '/rover/run_mission',
+    '/rover/set_drive_mode', '/rover/set_mission', '/rover/run_mission',
     '/rover/start_mapping', '/rover/save_map', '/rover/load_map', '/rover/delete_map',
     '/rover/save_place', '/rover/delete_place',
     '/rover/reinitialize_global_localization', '/rover/request_nomotion_update',

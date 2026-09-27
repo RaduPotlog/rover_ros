@@ -70,8 +70,12 @@ _NAMESPACED_UI_TOPICS = (
     "places",
     "amcl_pose",
     "mission_state",
-    # rover_drive_interface: published by the UI (see above for why they must be listed)
-    "teleop_driver_interface_cmd_vel_stamped",
+    "drive_mode",
+    # rover_drive_interface: published by the UI (see above for why they must be listed).
+    # The joystick goes to rover_drive_mode (rover_orchestrator), which routes it by driving mode
+    # onto teleop_driver_interface_cmd_vel_stamped. That topic stays off the bridge so a browser
+    # cannot bypass the mode (and the ASSISTED obstacle guard) by publishing on it directly.
+    "teleop_web_cmd_vel_stamped",
     "initialpose",
     # both UIs
     "diagnostics_agg",
@@ -113,6 +117,8 @@ _NAMESPACED_UI_SERVICES = (
     "hardware_interface/sw_user_e_stop_reset",
     "hardware_interface/sw_e_stop_latch_reset",
     r"hardware_interface/aux_output_\d+/set",
+    # rover_drive_interface: driving mode (rover_drive_mode)
+    "set_drive_mode",
     # rover_drive_interface: missions (rover_mission_manager)
     "set_mission",
     "run_mission",

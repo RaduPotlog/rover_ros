@@ -208,6 +208,20 @@ Five independent gates, in order from the wire inwards:
    staleness, so a navigation tree aborts rather than navigating into a closed
    mux.
 
+Outside this chain, and **not** safety functions, the driving modes of
+`rover_drive_mode` (`rover_orchestrator`) decide which *operator* commands reach
+the platform at all. They sit in front of the mux inputs, so nothing above changes:
+
+- **Mode gate.** `drive_mode_manager` is the only writer of the web-teleop input
+  (`teleop_driver_interface_cmd_vel_stamped`) and of the Nav 2 input
+  (`nav_cmd_vel_stamped`). Nav 2 is forwarded only in AUTOMATIC. If the manager
+  dies, both inputs go silent and twist_mux times them out.
+- **Lidar collision monitors** (`nav2_collision_monitor`): the teleop guard in
+  ASSISTED, and one at the end of the Nav 2 chain in AUTOMATIC. They slow down,
+  then stop, on a single scan slice, and stop on a stale scan (`source_timeout`).
+  MANUAL, the RC transmitter and the Foxglove joystick bypass them by design, so
+  the operator can always move the rover.
+
 Plus the **E-Stop reset invariant** (`EmergencyStop::resetEStop()`): the latch
 cannot be cleared while the rover is being commanded to move *or* while the
 wheels are still turning. The second half exists because the first is weak on its
@@ -231,6 +245,11 @@ inhibited, which is why the command-side deadband cannot be tightened below
 * **No end-to-end test** that an asserted `motion_lock` actually stops `cmd_vel`
   at the mux. Every stage either side of the mux is covered; the mux itself is a
   third-party node and testing it needs a launch fixture.
+* **The lidar guards are obstacle avoidance, not protection.** One 2D scan slice
+  (±0.25 m around the lidar) misses low and overhanging obstacles; MANUAL, RC and
+  Foxglove bypass them; the zone sizes are tunables without a measured stop
+  distance yet. They rely on `scan.self_filter` hiding the lidar support post,
+  or turning in place is blocked in ASSISTED.
 * **`ros2_control`'s own GPIO mechanism is not used.** No `<gpio>` tags, no
   `gpio_controllers`. This is deliberate — the safety IO is polled at 10 Hz
   behind a blocking link and hanging it off the 100 Hz resource manager buys

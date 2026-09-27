@@ -26,12 +26,12 @@
     {"name": "rover_gps_heading",        "prefix": "GPSH", "language": "C++",    "lifecycle": "plain",        "executables": "rover_gps_heading_node", "behaviour_model": ""},
     {"name": "rover_bringup",            "prefix": "BRG",  "language": "Python launch", "lifecycle": "none",  "executables": "rover_bringup.launch.py; rover_web_bridges.launch.py (foxglove_bridge, rosbridge)", "behaviour_model": ""},
     {"name": "rover_transport",          "prefix": "TRN",  "language": "C++",    "lifecycle": "lifecycle",    "executables": "rover_serial_bridge_node; UdpReceiverNode; UdpSenderNode; rover_modbus_driver (library)", "behaviour_model": ""},
-    {"name": "rover_msgs",               "prefix": "MSG",  "language": "IDL",    "lifecycle": "none",         "executables": "(interface package: 28 msg, 12 srv)", "behaviour_model": ""}
+    {"name": "rover_msgs",               "prefix": "MSG",  "language": "IDL",    "lifecycle": "none",         "executables": "(interface package: 29 msg, 13 srv)", "behaviour_model": ""}
   ],
   "actors": [
     {"name": "OperatorStation", "description": "Drive UI (rover_drive_interface) and Foxglove Studio on the operator PC, over the LAN/Wi-Fi websocket."},
     {"name": "RcTransmitter",   "description": "ExpressLRS RC transmitter + receiver on the rover UART."},
-    {"name": "Orchestrator",    "description": "rover_orchestrator container: Nav 2, mission manager."},
+    {"name": "Orchestrator",    "description": "rover_orchestrator container: driving modes (rover_drive_mode, the only writer of the web-teleop and Nav 2 mux inputs), Nav 2, mission manager."},
     {"name": "SensorPayload",   "description": "rover_sensors container: GNSS (RUTX11) and RS16 lidar."},
     {"name": "SafetyPlc",       "description": "Safety controller PLC: SR latch, contactor, HW E-stop button (Modbus TCP)."},
     {"name": "DriveMotors",     "description": "4x Phidget DCC1000 motor controllers with encoders (USB/VINT)."},
@@ -42,6 +42,7 @@
   "interfaces": [
     {"name": "TwistStamped",      "elements": [{"name": "linear_x", "units": "m/s"}, {"name": "angular_z", "units": "rad/s"}, {"name": "stamp", "units": "s"}]},
     {"name": "BoolFlag",          "elements": [{"name": "data", "units": ""}]},
+    {"name": "DriveMode",         "elements": [{"name": "mode", "units": ""}, {"name": "guard", "units": ""}, {"name": "reason", "units": ""}]},
     {"name": "Odometry",          "elements": [{"name": "x", "units": "m"}, {"name": "y", "units": "m"}, {"name": "yaw", "units": "rad"}, {"name": "vx", "units": "m/s"}, {"name": "wz", "units": "rad/s"}]},
     {"name": "Imu",               "elements": [{"name": "orientation_yaw", "units": "rad"}, {"name": "angular_velocity_z", "units": "rad/s"}, {"name": "linear_acceleration_x", "units": "m/s^2"}]},
     {"name": "NavSatFix",         "elements": [{"name": "latitude", "units": "deg"}, {"name": "longitude", "units": "deg"}, {"name": "altitude", "units": "m"}]},
@@ -66,7 +67,9 @@
     {"src": "rover_crsf_teleop", "dst": "rover_hardware_interface", "port": "e_stop_services", "interface": "TriggerService", "kind": "RosService", "topic": "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset", "msgType": "std_srvs/Trigger", "qos": "services", "rate": "on switch edge", "source": "rover_hardware_interface/src/rover_system/rover_system.cpp:130-143"},
     {"src": "OperatorStation", "dst": "rover_bringup", "port": "foxglove_ws_in", "interface": "ByteStream", "kind": "HwBus", "bus": "Websocket (LAN/Wi-Fi)", "address": "TCP 8765 (foxglove_bridge), 9090 (rosbridge)", "rate": "10 Hz UI stream", "source": "rover_bringup/launch/rover_web_bridges.launch.py:54-198"},
     {"src": "rover_bringup", "dst": "OperatorStation", "port": "foxglove_ws_out", "interface": "ByteStream", "kind": "HwBus", "bus": "Websocket (LAN/Wi-Fi)", "address": "TCP 8765 (foxglove_bridge), 9090 (rosbridge)", "rate": "per topic", "source": "rover_bringup/launch/rover_web_bridges.launch.py:54-198"},
-    {"src": "rover_bringup", "dst": "rover_twist_mux", "port": "teleop_driver_interface_cmd_vel_stamped", "interface": "TwistStamped", "kind": "RosTopic", "topic": "teleop_driver_interface_cmd_vel_stamped", "msgType": "geometry_msgs/TwistStamped", "qos": "reliable", "rate": "10 Hz", "source": "rover_twist_mux/config/rover_twist_mux.yaml:10-15"},
+    {"src": "rover_bringup", "dst": "Orchestrator", "port": "teleop_web_cmd_vel_stamped", "interface": "TwistStamped", "kind": "RosTopic", "topic": "teleop_web_cmd_vel_stamped", "msgType": "geometry_msgs/TwistStamped", "qos": "reliable", "rate": "10 Hz", "source": "rover_bringup/launch/rover_web_bridges.launch.py:74-78"},
+    {"src": "Orchestrator", "dst": "rover_twist_mux", "port": "teleop_driver_interface_cmd_vel_stamped", "interface": "TwistStamped", "kind": "RosTopic", "topic": "teleop_driver_interface_cmd_vel_stamped", "msgType": "geometry_msgs/TwistStamped", "qos": "reliable", "rate": "10 Hz", "source": "rover_twist_mux/config/rover_twist_mux.yaml:10-15"},
+    {"src": "Orchestrator", "dst": "rover_bringup", "port": "drive_mode", "interface": "DriveMode", "kind": "RosTopic", "topic": "drive_mode", "msgType": "rover_msgs/DriveMode", "qos": "reliable, transient_local", "rate": "on change", "source": "rover_msgs/msg/DriveMode.msg:1"},
     {"src": "rover_bringup", "dst": "rover_twist_mux", "port": "teleop_foxglove_cmd_vel_stamped", "interface": "TwistStamped", "kind": "RosTopic", "topic": "teleop_foxglove_cmd_vel_stamped", "msgType": "geometry_msgs/TwistStamped", "qos": "reliable", "rate": "TBD", "source": "rover_twist_mux/config/rover_twist_mux.yaml:16-19"},
     {"src": "rover_bringup", "dst": "rover_hardware_interface", "port": "ui_e_stop_services", "interface": "TriggerService", "kind": "RosService", "topic": "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset", "msgType": "std_srvs/Trigger", "qos": "services (foxglove whitelist)", "rate": "on demand", "source": "rover_bringup/launch/rover_web_bridges.launch.py:106-149"},
     {"src": "Orchestrator", "dst": "rover_twist_mux", "port": "nav_cmd_vel_stamped", "interface": "TwistStamped", "kind": "RosTopic", "topic": "nav_cmd_vel_stamped", "msgType": "geometry_msgs/TwistStamped", "qos": "reliable", "rate": "TBD (Nav 2 controller rate)", "source": "rover_twist_mux/config/rover_twist_mux.yaml:6-9"},

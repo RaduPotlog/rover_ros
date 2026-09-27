@@ -21,6 +21,7 @@ Custom messages and services of the Rover A1 stack.
 | `LedState` / `LedSegmentState` / `LedLayerState` | what every priority layer (`ERROR`/`ALERT`/`INFO`/`STATE`) of every segment plays | `rover_led` → `led/state` |
 | `LedImageAnimation` | image, duration, brightness, repeat, colour | `SetLedImageAnimation` request |
 | `LedAnimationQueue` | list of queued animation names | not used |
+| `DriveMode` | header, driving `mode` (`MANUAL`/`ASSISTED`/`AUTOMATIC`), obstacle `guard` state (`GUARD_BYPASSED`/`CLEAR`/`SLOWING`/`STOPPED`/`NO_DATA`), `reason` of the last change | `rover_drive_mode` (rover_orchestrator) → `drive_mode` (latched) |
 
 ## Services
 
@@ -30,6 +31,7 @@ Custom messages and services of the Rover A1 stack.
 | `StopLedAnimation` | `uint16 id` → `success`, `message` | `rover_led` (`led/stop_animation`) |
 | `SetLedBrightness` | `float32 data` (0–1) → `success`, `message` | `rover_led` (`led/set_brightness`) |
 | `SetLedImageAnimation` | front/rear `LedImageAnimation`, `interrupting`, `repeating` → `success`, `message` | not implemented by any node |
+| `SetDriveMode` | `uint8 mode` → `success`, `message`, `mode` in force | `rover_drive_mode` (`set_drive_mode`) |
 
 ```bash
 ros2 interface show rover_msgs/msg/SafetyStatus
