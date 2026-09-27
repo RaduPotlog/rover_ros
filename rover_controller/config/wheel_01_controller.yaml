@@ -167,10 +167,12 @@
 
       wheels_per_side: 2
       # Must match rover_description/config/wheel_01.yaml (enforced by test/test_wheel_geometry.py)
-      wheel_separation: 0.62602
+      wheel_separation: 0.615
       wheel_radius: 0.1651
 
-      wheel_separation_multiplier: 1.63
+      # Calibrated as 1.63 against the old 0.62602 separation; rescaled to the measured 0.615 so
+      # the effective track stays 0.62602 * 1.63 = 1.020 m and the odometry yaw scale is unchanged.
+      wheel_separation_multiplier: 1.659
 
       left_wheel_radius_multiplier: 1.0
       right_wheel_radius_multiplier: 1.0
