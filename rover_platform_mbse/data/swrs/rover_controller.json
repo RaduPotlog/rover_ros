@@ -1,0 +1,485 @@
+{
+  "package": "rover_controller",
+  "prefix": "CTL",
+  "document": "ROVER-A1-ROVER_CONTROLLER-SWRS-V-001",
+  "title": "rover_controller Software Requirements Specification",
+  "scope": "rover_controller is the configuration and launch composition of the Rover A1 ros2_control controllers. It starts controller_manager (ros2_control_node) on hardware, loads the robot description, and spawns rover_joint_state_broadcaster, rover_drive_controller (diff_drive_controller, skid-steer kinematics, velocity/acceleration limits, command time-out, wheel odometry) chained into four per-wheel velocity PID controllers (rover_controller/SeededPidController, a pid_controller subclass provided by this package), and rover_imu_broadcaster. It also ships drive-train tuning tools (wheel_step_response, wheel_odom_calibration).",
+  "requirements": [
+    {
+      "id": "SWR-CTL-001",
+      "category": "Performance",
+      "text": "The rover_controller shall configure controller_manager with update_rate 100 Hz and run the four wheel PID controllers at that rate.",
+      "rationale": "SYS-SR-002 requires a wheel velocity control loop of at least 50 Hz.",
+      "verification": "Test, Inspection",
+      "acceptance": "controller_manager parameter update_rate reads 100; the measured controller_manager loop rate is >= 50 Hz over 60 s (ros2 control list_controllers / controller_manager statistics).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:11-13",
+        "rover_controller/config/wheel_01_controller.yaml:134-136",
+        "rover_controller/README.md:42-46"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": "The DCC1000 encoders report at most every 50 ms (20 Hz) (README.md:57-60, yaml:63), so each PID gets a new measurement only every ~5 cycles. The loop rate meets SYS-SR-002; the feedback rate is 20 Hz."
+    },
+    {
+      "id": "SWR-CTL-002",
+      "category": "Functional",
+      "text": "The rover_controller shall chain rover_drive_controller (diff_drive_controller/DiffDriveController) into one rover_controller/SeededPidController per wheel joint (fl, fr, rl, rr), each commanding that joint's velocity interface and closing the loop on its velocity state, with rl/fl as left wheels and rr/fr as right wheels.",
+      "rationale": "SYS-SR-002/003: closed-loop wheel velocity control under skid-steer kinematics; diff_drive reads each PID's exported velocity state for odometry (open_loop false).",
+      "verification": "Test",
+      "acceptance": "Every <pid>/<joint> wheel name points at a declared SeededPidController with dof_names [joint], command_interface velocity and reference_and_state_interfaces [velocity]; 2 x wheels_per_side wheel names exist.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002",
+        "SYS-SR-003"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:22-46",
+        "rover_controller/config/wheel_01_controller.yaml:78-132",
+        "rover_controller/config/wheel_01_controller.yaml:161-168",
+        "rover_controller/config/wheel_01_controller.yaml:185-188"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py",
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-003",
+      "category": "Functional",
+      "text": "The rover_controller shall provide SeededPidController, a pid_controller::PidController whose on_activate() copies each finite claimed hardware state value into the matching exported state interface, leaving NaN where the hardware has no value yet and skipping any pair whose names do not line up.",
+      "rationale": "The stock PidController exports NaN until its first update; the chained diff_drive then reads NaN on its first cycle and controller_manager deactivates the whole drive chain on every activation on the real rover.",
+      "verification": "Test",
+      "acceptance": "After activation without an update, the exported velocity state equals the hardware velocity state of the same wheel; with a NaN hardware value the exported state stays NaN; after updates it tracks the hardware.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/src/seeded_pid_controller.cpp:15-64",
+        "rover_controller/src/seeded_pid_controller.cpp:68-69",
+        "rover_controller/include/rover_controller/seeded_pid_controller.hpp:12-30",
+        "rover_controller/rover_controller_plugins.xml:1-11"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_seeded_pid_controller.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-004",
+      "category": "Parameter",
+      "text": "The rover_controller shall configure every wheel PID with p 0.05, i 1.0, d 0.04, feedforward_gain 1.0, u_clamp +/-12.58 rad/s, back_calculation anti-windup, save_i_term false, and i_clamp +/-0.25 on fl/fr and +/-0.33 on rl/rr.",
+      "rationale": "Feed-forward carries the open-loop rad/s-scaled duty; the integral trims load/battery/slip error. save_i_term false clears the integral on each (re)activation (e.g. after an E-Stop) so no stale I-term carries into the next drive.",
+      "verification": "Test, Inspection",
+      "acceptance": "Configuration check passes for feedforward_gain 1.0 and save_i_term false on all four PIDs; wheels-lifted step response shows overshoot <= 10 % and |steady-state error| <= 3 % per README tuning targets.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:53-77",
+        "rover_controller/config/wheel_01_controller.yaml:89-90",
+        "rover_controller/config/wheel_01_controller.yaml:103-104",
+        "rover_controller/config/wheel_01_controller.yaml:117-118",
+        "rover_controller/config/wheel_01_controller.yaml:131-132",
+        "rover_controller/README.md:55-66"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py",
+        "rover_controller/test/test_response_analysis.py"
+      ],
+      "comments": "Measured on wheels lifted only (yaml:76-77 \"Re-check on the ground\"). The i_clamp_max (0.33) is what bounds the hardware E-Stop command tolerance (0.4 rad/s) in rover_hardware_interface."
+    },
+    {
+      "id": "SWR-CTL-005",
+      "category": "Parameter",
+      "text": "The rover_controller shall configure rover_drive_controller with wheel_separation 0.615 m, wheel_radius 0.1651 m, wheels_per_side 2, wheel_separation_multiplier 1.659, left/right wheel_radius_multiplier 1.0 and update_rate 50 Hz.",
+      "rationale": "SYS-SR-003 skid-steer kinematics. The separation multiplier is the empirical skid-steer correction (effective track 0.615 x 1.659 = 1.020 m), not geometry.",
+      "verification": "Test, Inspection",
+      "acceptance": "wheel_radius and wheel_separation equal rover_description/config/wheel_01.yaml; separation multiplier within [1.0, 2.5] and radius multipliers within [0.9, 1.1].",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-003"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:157-178"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": "Doc drift: rover_description/README.md:79 still cites wheel_separation_multiplier 1.5. The multiplier was rescaled from a 1.63 calibration against the old 0.62602 m separation (yaml:173-174), not re-measured."
+    },
+    {
+      "id": "SWR-CTL-006",
+      "category": "Interface",
+      "text": "The rover_controller shall make rover_drive_controller subscribe to cmd_vel and publish nav_msgs/Odometry on odometry/wheels every drive update (50 Hz) with odom_frame_id odom, base_frame_id base_footprint, twist covariance diagonal [5.4e-5, 5.4e-5, 0, 0, 0, 1.9e-4] and enable_odom_tf false.",
+      "rationale": "SYS-SR-003 requires wheel odometry; SYS-SR-021 REP-105 frames. The odom->base_footprint TF is left to the EKF, so the controller must not also publish it.",
+      "verification": "Test, Inspection",
+      "acceptance": "ros2 topic hz odometry/wheels reads 50 Hz +/- 10 %; header.frame_id is odom and child_frame_id base_footprint (with namespace prefix); no /tf odom->base_footprint transform is published by the controller.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-003",
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:42-46",
+        "rover_controller/config/wheel_01_controller.yaml:141-143",
+        "rover_controller/config/wheel_01_controller.yaml:157-159",
+        "rover_controller/config/wheel_01_controller.yaml:180-183",
+        "rover_controller/config/wheel_01_controller.yaml:190",
+        "rover_controller/README.md:136-140"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-007",
+      "category": "Performance",
+      "text": "The rover_controller shall produce wheel odometry whose travelled-distance error is <= 5 % [TBC per SYS-SR-003] when the rover drives 10 m straight at 0.5 m/s on flat ground.",
+      "rationale": "SYS-SR-003 acceptance. Accuracy depends on the calibrated radius and separation multipliers.",
+      "verification": "Test",
+      "acceptance": "10 m straight at 0.5 m/s on flat ground: |odometry distance - tape distance| <= 5 % of tape distance in 3 of 3 runs.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-003"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:173-178",
+        "rover_controller/rover_controller/wheel_odom_calibration.py:38-47",
+        "rover_controller/README.md:83-95"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "A calibration tool exists (wheel_odom_calibration, straight mode) but left/right_wheel_radius_multiplier are still 1.0 and no recorded calibration result exists in the package. 5 % is [TBC] in SYS-SR-003."
+    },
+    {
+      "id": "SWR-CTL-008",
+      "category": "Safety",
+      "text": "The rover_controller shall limit rover_drive_controller body velocity to linear.x within [-0.95, 0.95] m/s and angular.z within [-1.5, 1.5] rad/s for every command received on cmd_vel.",
+      "rationale": "SYS-SR-004 caps linear velocity at 1.0 m/s and angular velocity at 1.7 rad/s for commands from any source; all sources reach the wheels only through this controller.",
+      "verification": "Test",
+      "acceptance": "Commanding 2.0 m/s and 3.0 rad/s yields a measured speed <= 1.05 m/s and yaw rate <= 1.7 rad/s on flat hard ground.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-004"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:196-225"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": "Compliant: 0.95 m/s < 1.0 m/s and 1.5 rad/s < 1.7 rad/s. The per-wheel PID can add up to i_clamp_max (0.33 rad/s) of trim above the reference, so wheel speed can briefly exceed the kinematic value; body speed compliance still needs the SYS-SR-004 field measurement."
+    },
+    {
+      "id": "SWR-CTL-009",
+      "category": "Performance",
+      "text": "The rover_controller shall limit rover_drive_controller linear acceleration and deceleration to 2.7 m/s^2 and angular acceleration and deceleration to 3.74 rad/s^2 in both directions.",
+      "rationale": "SYS-SR-013 requires linear and angular acceleration limits.",
+      "verification": "Test",
+      "acceptance": "During a 0 -> 0.95 m/s step the commanded body acceleration never exceeds 2.7 m/s^2; during a 0 -> 1.5 rad/s step the angular acceleration never exceeds 3.74 rad/s^2; the values are <= [TBD per SYS-SR-013].",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-013",
+        "SYS-SR-014"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:205-225",
+        "rover_controller/README.md:72-81"
+      ],
+      "implementation": "Partial",
+      "verified_by": [
+        "rover_controller/test/test_response_analysis.py"
+      ],
+      "comments": "SYS-SR-013 limits are [TBD]; compliance cannot be judged until they are set. Jerk limits are NaN (disabled). test_response_analysis.py covers the tool that derives the limits, not the limits themselves."
+    },
+    {
+      "id": "SWR-CTL-010",
+      "category": "Safety",
+      "text": "The rover_controller shall configure rover_drive_controller with cmd_vel_timeout 0.5 s so that the wheel references are set to zero when no velocity command has been received for 0.5 s.",
+      "rationale": "SYS-SR-011 requires the rover to stop if no valid velocity command is received within 500 ms.",
+      "verification": "Test",
+      "acceptance": "Stopping a 1 m/s command stream: the drive controller wheel references go to zero within 0.5 s + one 20 ms update and deceleration starts within 500 ms.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:192"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No automated test of the time-out; the deceleration after time-out is still limited by the 2.7 m/s^2 ramp. rover_twist_mux applies its own per-source time-outs upstream."
+    },
+    {
+      "id": "SWR-CTL-011",
+      "category": "Safety",
+      "text": "The rover_controller shall keep the outer-wheel reference at full linear plus full angular command, plus the wheel PID i_clamp_max, at or below the URDF wheel joint velocity limit (10.958 rad/s).",
+      "rationale": "diff_drive limits linear.x and angular.z independently; the wheel PIDs add up to i_clamp_max on top of the feed-forward reference. Staying below the joint limit keeps the drive inside the modelled motor capability.",
+      "verification": "Test",
+      "acceptance": "(0.95 + 1.5 x 0.615 x 1.659 / 2) / 0.1651 + 0.33 <= 10.958 rad/s, checked by test_drive_limits_respect_joint_velocity_limit.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-004"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:196-204",
+        "rover_description/urdf/common/wheel.urdf.xacro:47"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-012",
+      "category": "Build",
+      "text": "The rover_controller shall keep wheel_radius and wheel_separation in config/wheel_01_controller.yaml equal to rover_description/config/wheel_01.yaml and fail its test suite otherwise.",
+      "rationale": "rover_description/config/wheel_01.yaml is the single source of truth for wheel geometry; drift would corrupt odometry (SYS-SR-003).",
+      "verification": "Test",
+      "acceptance": "test_drive_controller_matches_description passes; changing either file alone makes it fail.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-003"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:169-171",
+        "rover_controller/test/test_wheel_geometry.py:38-46",
+        "rover_controller/CMakeLists.txt:46-47"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-013",
+      "category": "Interface",
+      "text": "The rover_controller shall run rover_joint_state_broadcaster (joint_state_broadcaster) at update_rate 20 Hz, publishing sensor_msgs/JointState on joint_states for the four wheel joints.",
+      "rationale": "Wheel joint states feed robot_state_publisher /tf (SYS-SR-021); 20 Hz matches the encoder rate and limits Zenoh traffic.",
+      "verification": "Test, Inspection",
+      "acceptance": "ros2 topic hz joint_states reads 20 Hz +/- 10 % with 4 joint names.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:22-24",
+        "rover_controller/config/wheel_01_controller.yaml:138-139",
+        "rover_controller/config/wheel_01_controller.yaml:144-146"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py",
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-014",
+      "category": "Interface",
+      "text": "The rover_controller shall run rover_imu_broadcaster (imu_sensor_broadcaster) publishing sensor_msgs/Imu on imu/data with frame_id <namespace>/imu_link from sensor <namespace>/imu, with static diagonal covariances 1.8e-3 (orientation), 1.0e-4 (angular velocity) and 7.6e-4 (linear acceleration).",
+      "rationale": "SYS-SR-019 requires IMU orientation, angular velocity and linear acceleration with valid covariance fields.",
+      "verification": "Test, Inspection",
+      "acceptance": "ros2 topic echo imu/data shows frame_id imu_link (namespaced) and the three covariance diagonals as configured.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-019"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:48-51",
+        "rover_controller/config/wheel_01_controller.yaml:148-155"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-015",
+      "category": "Performance",
+      "text": "The rover_controller shall publish imu/data at 100 Hz or faster.",
+      "rationale": "SYS-SR-019 requires the IMU topic at >= 100 Hz. The IMU hardware samples at 125 Hz (data_interval_ms 8) and controller_manager runs at 100 Hz, but the broadcaster update_rate is 50 Hz to match the EKF rate.",
+      "verification": "Test",
+      "acceptance": "ros2 topic hz imu/data reads >= 100 Hz over 60 s.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-019"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:140",
+        "rover_controller/config/wheel_01_controller.yaml:148-150"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Setting update_rate 100 would meet SYS-SR-019 at the cost of Zenoh traffic; alternatively the SYS-SR-019 rate could be revised to 50 Hz. Decision needed."
+    },
+    {
+      "id": "SWR-CTL-016",
+      "category": "Build",
+      "text": "The rover_controller shall give every controller an update_rate that divides the controller_manager update_rate evenly and does not exceed it.",
+      "rationale": "Otherwise controller_manager runs the controller at an uneven period.",
+      "verification": "Test",
+      "acceptance": "test_controller_update_rates_divide_manager_rate passes for wheel_01_controller.yaml.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical constraint of controller_manager scheduling; no SYS-SR parent.",
+      "evidence": [
+        "rover_controller/config/wheel_01_controller.yaml:134-137",
+        "rover_controller/test/test_wheel_geometry.py:112-129"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-017",
+      "category": "Lifecycle",
+      "text": "The rover_controller shall, in rover_controller.launch.py, activate rover_joint_state_broadcaster, then rover_drive_controller together with its chained wheel PIDs in one --activate-as-group switch, then rover_imu_broadcaster, each only after the previous spawner exited with code 0, shut the launch down naming the controller and exit code when a spawner fails, and emit ControllersActive only after all three succeeded.",
+      "rationale": "Deterministic bring-up: rover_bringup starts the rest of the stack on ControllersActive (SYS-SR-024 automatic start to Idle), and a half-started drive chain must not be left running.",
+      "verification": "Test",
+      "acceptance": "With fake spawners, success runs the three in order and emits ControllersActive once; a failure of spawner k runs spawners 1..k only, reports \"<name> spawner failed with exit code 7\" and emits no ControllersActive.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/launch/rover_controller.launch.py:39-49",
+        "rover_controller/launch/rover_controller.launch.py:52-70",
+        "rover_controller/launch/rover_controller.launch.py:240-325",
+        "rover_controller/README.md:113-118"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-018",
+      "category": "Performance",
+      "text": "The rover_controller shall, in rover_controller.launch.py, start ros2_control_node with --disable-rosout-logs and a single /diagnostics -> diagnostics remap, and apply controller topic remaps only through each controller's node_options_args.",
+      "rationale": "/rosout publishes from update() stalled the 100 Hz loop for up to 4.2 s under rmw_zenoh, past the 500 ms motor watchdog; controllers ignore process-wide remaps (use_global_arguments false).",
+      "verification": "Test",
+      "acceptance": "The launch test finds exactly one ros2_control_node with --disable-rosout-logs and remappings == [(\"/diagnostics\", \"diagnostics\")], and the drive/IMU remaps in node_options_args.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/launch/rover_controller.launch.py:205-238",
+        "rover_controller/config/wheel_01_controller.yaml:15-20",
+        "rover_controller/config/wheel_01_controller.yaml:42-51"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-019",
+      "category": "Functional",
+      "text": "The rover_controller shall, in rover_controller.launch.py, select the controller configuration in the order explicit controller_config_path, then <common_dir_path>/rover_controller/config/<wheel_type>_controller.yaml, then the bundled config/<wheel_type>_controller.yaml, replace every \"<namespace>/\" placeholder with the namespace prefix, and pass the same resolved file to controller_manager, every spawner and the simulation robot description.",
+      "rationale": "One resolved configuration for all consumers avoids hardware and simulation diverging.",
+      "verification": "Test",
+      "acceptance": "For namespace in {\"\", \"rover_a1\"}, use_sim in {False, True} and each selection mode, all five consumers receive one identical path whose content equals the expected namespaced configuration.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Deployment/configuration management requirement with no SYS-SR parent.",
+      "evidence": [
+        "rover_controller/launch/rover_controller.launch.py:75-125",
+        "rover_controller/launch/rover_controller.launch.py:160-184",
+        "rover_controller/README.md:103-111"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_controller_launch.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CTL-020",
+      "category": "Safety",
+      "text": "The rover_controller shall make its tuning tools (wheel_step_response, wheel_odom_calibration) publish velocity commands on the cmd_topic parameter (default: the twist_mux input teleop_foxglove_cmd_vel_stamped) and move the rover only when the parameter enable_motion is true (default false), printing the planned schedule otherwise.",
+      "rationale": "Calibration drives are still subject to the twist_mux priority and E-Stop motion lock (SYS-SR-005) and must never move the rover by accident.",
+      "verification": "Test, Inspection",
+      "acceptance": "Running either tool without -p enable_motion:=true publishes no command and logs the dry-run warning.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_controller/rover_controller/drive_session.py:16-31",
+        "rover_controller/rover_controller/drive_session.py:51-63",
+        "rover_controller/rover_controller/wheel_step_response.py:36",
+        "rover_controller/rover_controller/wheel_odom_calibration.py:34",
+        "rover_controller/README.md:50-53"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_schedule.py"
+      ],
+      "comments": "Doc/param drift: both tools default wheel_separation 0.62602 and wheel_step_response defaults wheel_separation_multiplier 1.5 (wheel_step_response.py:44-46, wheel_odom_calibration.py:46-47), while the controller config uses 0.615 and 1.659. wheel_odom_calibration passes wheel_separation to calibrate_separation() (wheel_odom_calibration.py:127-128), so a spin calibration run with the defaults reports a multiplier relative to 0.62602 m, not 0.615 m. test_schedule.py covers the schedule, not the enable_motion gate."
+    }
+  ]
+}

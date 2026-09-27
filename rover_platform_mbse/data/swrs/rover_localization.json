@@ -1,0 +1,321 @@
+{
+  "package": "rover_localization",
+  "prefix": "LOC",
+  "document": "ROVER-A1-ROVER_LOCALIZATION-SWRS-V-001",
+  "title": "rover_localization Software Requirements Specification",
+  "scope": "rover_localization is a configuration-and-launch package (no own source code) that runs robot_localization filters for the rover. In the default mode it starts rover_ekf_node, which fuses wheel-odometry body velocities and IMU yaw rate into the continuous odom -> base_footprint estimate. With GPS fusion enabled (ROVER_USE_GPS) it also starts rover_ekf_global_node (map-frame filter adding GPS X/Y), rover_navsat_transform_node and rover_gps_heading_node (package rover_gps_heading). The GPS driver itself belongs to the sensor payload (rover_sensors, outside this boundary).",
+  "requirements": [
+    {
+      "id": "SWR-LOC-001",
+      "category": "Functional",
+      "text": "The rover_localization shall run a robot_localization EKF node named rover_ekf_node whenever the launch argument use_ekf is true.",
+      "rationale": "A fused odometry estimate is needed by navigation and control above the wheel odometry of SYS-SR-003.",
+      "verification": "Demonstration",
+      "acceptance": "`ros2 launch rover_localization rover_localization.launch.py use_ekf:=True` shows node <ns>/rover_ekf_node in `ros2 node list`; with use_ekf:=False (the default) no EKF node is started.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-003"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:76-82",
+        "rover_localization/launch/rover_localization.launch.py:140-167"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "rover_bringup and rover_gazebo pass use_ekf:=True (README.md:90)."
+    },
+    {
+      "id": "SWR-LOC-002",
+      "category": "Performance",
+      "text": "The rover_localization shall configure rover_ekf_node to run at 50.0 Hz in 2D mode (two_d_mode true) with a sensor timeout of 0.1 s.",
+      "rationale": "A 50 Hz fused estimate matches the drive control rate of SYS-SR-002 and gives local planners fresh odometry.",
+      "verification": "Test",
+      "acceptance": "`ros2 topic hz <ns>/odom` over 60 s with wheel odometry and IMU present reports >= 47.5 Hz (50 Hz -5 %); z, roll and pitch of the published pose stay 0.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-003"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization.yaml:4-6",
+        "rover_localization/config/rel_localization_with_gps.yaml:13-15"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No automated test in the package."
+    },
+    {
+      "id": "SWR-LOC-003",
+      "category": "Interface",
+      "text": "The rover_localization shall fuse only the body linear velocities vx and vy from nav_msgs/Odometry on odometry/wheels into rover_ekf_node, not the wheel-odometry pose.",
+      "rationale": "Wheel-odometry X/Y is integrated along the drive controller's own (skid-biased) yaw and would conflict with the IMU heading; vy = 0 acts as a nonholonomic constraint.",
+      "verification": "Inspection",
+      "acceptance": "odom0 = odometry/wheels and odom0_config has true only at the vx and vy positions in both shipped configs.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-003"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization.yaml:24-35",
+        "rover_localization/config/rel_localization_with_gps.yaml:33-44"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LOC-004",
+      "category": "Interface",
+      "text": "The rover_localization shall fuse only the yaw rate (vyaw) from sensor_msgs/Imu on imu/data into rover_ekf_node, not the IMU absolute orientation or linear acceleration.",
+      "rationale": "Absolute IMU orientation is magnetometer-influenced near the drive motors; the driver's linear acceleration includes gravity.",
+      "verification": "Inspection",
+      "acceptance": "imu0 = imu/data and imu0_config has true only at the vyaw position in both shipped configs.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-003", "SYS-SR-019"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization.yaml:41-51",
+        "rover_localization/config/rel_localization_with_gps.yaml:50-60"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "SYS-SR-019's orientation and acceleration outputs are therefore not used by localization."
+    },
+    {
+      "id": "SWR-LOC-005",
+      "category": "Interface",
+      "text": "The rover_localization shall publish the rover_ekf_node estimate as nav_msgs/Odometry on the relative topic odom (remapped from odometry/filtered).",
+      "rationale": "odom is the fused odometry consumed by navigation, rover_gps_heading and the UI.",
+      "verification": "Demonstration",
+      "acceptance": "With use_ekf:=True, `ros2 topic info <ns>/odom` shows publisher rover_ekf_node, type nav_msgs/msg/Odometry, frame_id odom and child_frame_id base_footprint (namespace-prefixed when a namespace is set).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-003", "SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:146-152",
+        "rover_localization/config/rel_localization.yaml:12-14"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LOC-006",
+      "category": "Interface",
+      "text": "The rover_localization shall make rover_ekf_node the only broadcaster of the odom -> base_footprint transform, using world_frame odom, odom_frame odom, map_frame map and base_link_frame base_footprint, with the namespace as tf_prefix.",
+      "rationale": "REP-105 requires a single continuous odom -> base chain; the drive controller's own odom TF is disabled so the EKF owns it.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "`ros2 run tf2_ros tf2_echo odom base_footprint` shows updates from rover_ekf_node only; the drive controller config has enable_odom_tf false.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization.yaml:11-15",
+        "rover_localization/launch/rover_localization.launch.py:144",
+        "rover_controller/config/wheel_01_controller.yaml:190"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Doc drift: README.md:9 and :32 say odom -> base_link, but the configs use base_footprint (REP-120 footprint; base_footprint -> base_link comes from the URDF, rover_description/urdf/rover_a1/base.urdf.xacro:18-23). Frame chain map/odom/base_footprint/base_link is REP-105 compatible."
+    },
+    {
+      "id": "SWR-LOC-007",
+      "category": "Interface",
+      "text": "The rover_localization shall expose the robot_localization services of rover_ekf_node as localization/set_pose, localization/enable and localization/toggle.",
+      "rationale": "Allows the operator or navigation to re-initialise and pause the filter.",
+      "verification": "Demonstration",
+      "acceptance": "`ros2 service list` shows <ns>/localization/set_pose, <ns>/localization/enable and <ns>/localization/toggle served by rover_ekf_node.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical operability interface of the filter.",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:146-150"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LOC-008",
+      "category": "Diagnostics",
+      "text": "The rover_localization shall enable print_diagnostics on every EKF and remap all localization nodes' /diagnostics to the namespaced diagnostics topic.",
+      "rationale": "With print_diagnostics false, robot_localization reports a permanent false ERROR ('No events recorded') for the odometry/filtered frequency status; namespacing lets the aggregator group them under Localization.",
+      "verification": "Demonstration",
+      "acceptance": "With use_ekf:=True and inputs present, <ns>/diagnostics carries rover_ekf_node statuses at OK level, and diagnostics_agg shows them under /Rover/Localization.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization.yaml:18-22",
+        "rover_localization/config/rel_localization_with_gps.yaml:131-135",
+        "rover_localization/launch/rover_localization.launch.py:147",
+        "rover_localization/launch/rover_localization.launch.py:185"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LOC-009",
+      "category": "Functional",
+      "text": "The rover_localization shall, when fuse_gps (default $ROVER_USE_GPS) is one of true/1/yes/on in any case and use_ekf is true, additionally start rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node and load the _with_gps configuration.",
+      "rationale": "Optional absolute positioning for outdoor operation without changing the continuous odom frame.",
+      "verification": "Demonstration",
+      "acceptance": "With ROVER_USE_GPS=true and use_ekf:=True, `ros2 node list` contains the three additional nodes; with ROVER_USE_GPS unset only rover_ekf_node runs.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:35-47",
+        "rover_localization/launch/rover_localization.launch.py:107-111",
+        "rover_localization/launch/rover_localization.launch.py:169",
+        "rover_localization/launch/rover_localization.launch.py:201",
+        "rover_localization/launch/rover_localization.launch.py:226",
+        "rover_localization/launch/rover_localization.launch.py:251"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LOC-010",
+      "category": "Functional",
+      "text": "The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with world_frame map, fusing the same wheel vx/vy and IMU yaw rate as rover_ekf_node plus X/Y only from odometry/gps, and publish its estimate on odometry/global.",
+      "rationale": "Dual-EKF scheme: GPS corrections appear only in map -> odom, keeping odom continuous for local control.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "In GPS mode `ros2 topic hz <ns>/odometry/global` reports >= 47.5 Hz and its frame_id is map; odom1_config has true only at X and Y.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization_with_gps.yaml:114-128",
+        "rover_localization/config/rel_localization_with_gps.yaml:171-184",
+        "rover_localization/launch/rover_localization.launch.py:184-190"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Until rover_gps_heading has aligned (gps/heading_imu), navsat_transform has no transform and the global filter runs on wheels + IMU only (rel_localization_with_gps.yaml:6-9)."
+    },
+    {
+      "id": "SWR-LOC-011",
+      "category": "Parameter",
+      "text": "The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_GPS_PUBLISH_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf.",
+      "rationale": "Only one node may own map -> odom; by default AMCL or SLAM owns it.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "In GPS mode with the variable unset, tf2_monitor shows no map -> odom from rover_ekf_global_node while odometry/global is still published; with ROVER_GPS_PUBLISH_MAP_TF=true it does.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:86-97",
+        "rover_localization/launch/rover_localization.launch.py:177-182",
+        "rover_localization/README.md:17-21"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Nothing prevents AMCL/SLAM and ROVER_GPS_PUBLISH_MAP_TF=true running together; README only warns."
+    },
+    {
+      "id": "SWR-LOC-012",
+      "category": "Interface",
+      "text": "The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s start delay, magnetic_declination_radians 0.0, yaw_offset 0.0 and zero_altitude true, subscribing gps/fix, gps/heading_imu and odometry/global and publishing odometry/gps and gps/filtered, with the datum service at localization/datum.",
+      "rationale": "Converts the GNSS fix into the map frame; the heading already arrives in ENU from rover_gps_heading, so no declination or IMU mounting offset applies.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "In GPS mode, once gps/heading_imu is published, <ns>/odometry/gps is published at <= 10 Hz and <ns>/localization/datum is available.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/config/rel_localization_with_gps.yaml:233-246",
+        "rover_localization/launch/rover_localization.launch.py:231-252"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Known limitation: navsat_transform computes its transform once from the first heading; after gps/reset_heading_alignment the node must be restarted (README.md:115-116)."
+    },
+    {
+      "id": "SWR-LOC-013",
+      "category": "Parameter",
+      "text": "The rover_localization shall pass to rover_gps_heading_node publish_heading true, heading_frame_id <namespace>/base_link, min_heading_std_rad 0.05 and the alignment parameters min_segment_length_m 3.0, min_speed_m_s 0.3, max_yaw_rate_rad_s 0.1, max_yaw_change_rad 0.1, max_horizontal_std_m 5.0, max_fix_gap_s 2.5, max_odometry_age_s 0.5, required_segments 3 and max_offset_std_rad 0.1.",
+      "rationale": "The alignment tuning lives with the localization config that consumes the heading.",
+      "verification": "Inspection",
+      "acceptance": "`ros2 param get <ns>/rover_gps_heading_node alignment.min_segment_length_m` returns 3.0 (and likewise for the other values) in GPS mode.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical configuration of the heading-alignment helper used by the GPS localization chain.",
+      "evidence": [
+        "rover_localization/config/rel_localization_with_gps.yaml:248-263",
+        "rover_localization/launch/rover_localization.launch.py:205-217"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "heading_frame_id is base_link while the EKFs use base_footprint; harmless for yaw but inconsistent [TBC]."
+    },
+    {
+      "id": "SWR-LOC-014",
+      "category": "Parameter",
+      "text": "The rover_localization launch file shall accept the arguments use_ekf (default False), fuse_gps, publish_global_tf, namespace (default $ROVER_NAMESPACE), localization_mode (rel|enu, default rel), localization_config_path, common_dir_path (default empty), use_sim (default False, sets use_sim_time) and log_level (default INFO).",
+      "rationale": "Single entry point used by rover_bringup and rover_gazebo.",
+      "verification": "Inspection",
+      "acceptance": "`ros2 launch rover_localization rover_localization.launch.py --show-args` lists these arguments with these defaults.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical launch interface.",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:35-138",
+        "rover_localization/launch/rover_localization.launch.py:264"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LOC-015",
+      "category": "Parameter",
+      "text": "The rover_localization shall ship a valid configuration file for every value accepted by the localization_mode argument, including enu.",
+      "rationale": "An accepted launch argument must not lead to a missing-file start failure.",
+      "verification": "Test",
+      "acceptance": "`ros2 launch rover_localization rover_localization.launch.py use_ekf:=True localization_mode:=enu` (with and without fuse_gps) starts all nodes without a parameter-file error.",
+      "priority": "Could",
+      "status": "Proposed",
+      "parents": [],
+      "derived_rationale": "Technical consistency of the launch interface; either add enu_localization[_with_gps].yaml or remove 'enu' from the choices.",
+      "evidence": [
+        "rover_localization/launch/rover_localization.launch.py:49-59",
+        "rover_localization/launch/rover_localization.launch.py:107-111",
+        "rover_localization/README.md:113-114"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "Only rel_localization.yaml and rel_localization_with_gps.yaml exist in config/; localization_mode:=enu resolves to enu_localization*.yaml, which is missing."
+    },
+    {
+      "id": "SWR-LOC-016",
+      "category": "Performance",
+      "text": "The rover_localization shall have an automated test that verifies the EKF publishes odom at >= 47.5 Hz and the odom -> base_footprint transform from recorded or simulated wheel-odometry and IMU input.",
+      "rationale": "The package currently has no tests, so frame, rate and fusion configuration regressions (SYS-SR-003, SYS-SR-021) go undetected.",
+      "verification": "Test",
+      "acceptance": "A launch_testing test in rover_localization/test passes under `colcon test --packages-select rover_localization`, checking odom rate and TF frames.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-003", "SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_localization/CMakeLists.txt:1-8"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "CMakeLists.txt only installs config and launch; no BUILD_TESTING block and no test/ directory."
+    }
+  ]
+}

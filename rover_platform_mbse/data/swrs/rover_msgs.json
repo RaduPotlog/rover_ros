@@ -1,0 +1,281 @@
+{
+  "package": "rover_msgs",
+  "prefix": "MSG",
+  "document": "ROVER-A1-ROVER_MSGS-SWRS-V-001",
+  "title": "rover_msgs Software Requirements Specification",
+  "scope": "rover_msgs defines the custom ROS 2 messages and services of the Rover A1 stack. The safety-relevant contracts are SafetyStatus (plant state of the E-Stop chain, the only message that may permit motion), SafetyCommandEcho (read-backs of software-driven safety coils, inhibit-only), AuxIoState (non-safety PLC IO), RoverDriverState and its nested DriverStateNamed / DriverState / FaultFlag / RuntimeError (motor driver health), RcLinkStatus (RC link quality), ChargingStatus and the LED animation catalogue. Safety commands are deliberately not messages: they are std_srvs/Trigger services served by rover_hardware_interface.",
+  "requirements": [
+    {
+      "id": "SWR-MSG-001",
+      "category": "Interface",
+      "text": "The rover_msgs shall define rover_msgs/SafetyStatus with fields std_msgs/Header header, builtin_interfaces/Time io_sample_time, bool hw_e_stop_user_button, bool motor_contactor_engaged, bool latch_active, uint8 latch_cause and bool link_healthy.",
+      "rationale": "SYS-SR-023 requires the HW and SW E-Stop state on a ROS topic; this is the plant-state half of the old GpioState and the only safety message consumers may gate motion on.",
+      "verification": "Inspection, Test",
+      "acceptance": "ros2 interface show rover_msgs/msg/SafetyStatus lists exactly these fields and types; publisher and subscriber tests compile and exchange the message.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SafetyStatus.msg:1-51",
+        "rover_msgs/CMakeLists.txt:23"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp",
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MSG-002",
+      "category": "Interface",
+      "text": "The rover_msgs shall document in SafetyStatus that hw_e_stop_user_button true means pressed, motor_contactor_engaged true means contacts closed (drive live), latch_active true means the E-Stop latch holds a stop, and link_healthy false means the other fields are last-known-good values that must not be trusted.",
+      "rationale": "Unambiguous field semantics (including the inverted sense of motor_contactor_engaged) prevent consumers from gating on the wrong polarity (SYS-SR-023, SYS-SR-022).",
+      "verification": "Inspection",
+      "acceptance": "Each of the four fields carries a comment stating its true/false meaning as above.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SafetyStatus.msg:18-33",
+        "rover_msgs/msg/SafetyStatus.msg:49-51"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp",
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MSG-003",
+      "category": "Interface",
+      "text": "The rover_msgs shall define SafetyStatus.io_sample_time as the time the safety PLC was polled, distinct from header.stamp (the publish time), for use by consumer staleness checks.",
+      "rationale": "Staleness must measure data age, not transport age (SYS-SR-023 latency, SYS-SR-022).",
+      "verification": "Inspection, Test",
+      "acceptance": "Field present and documented; a published sample has io_sample_time <= header.stamp.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SafetyStatus.msg:13-16",
+        "rover_msgs/msg/SafetyCommandEcho.msg:21-22",
+        "rover_msgs/msg/AuxIoState.msg:10-13"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MSG-004",
+      "category": "Interface",
+      "text": "The rover_msgs shall define the SafetyStatus latch_cause constants LATCH_CAUSE_UNKNOWN = 0, LATCH_CAUSE_SW_USER_BUTTON = 1, LATCH_CAUSE_SW_MOTOR_DRIVER_FAULT = 2, LATCH_CAUSE_CPU_WATCHDOG = 3 and LATCH_CAUSE_HW_USER_BUTTON = 4.",
+      "rationale": "Lets consumers and logs report why the rover stopped once the PLC exposes the trip source (SYS-SR-023, SYS-SR-022).",
+      "verification": "Inspection",
+      "acceptance": "ros2 interface show lists the five constants with these values.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SafetyStatus.msg:35-47"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Contract defined, but the publisher never sets the field, so it is always LATCH_CAUSE_UNKNOWN (see rover_hardware_interface SWRS, latch_cause requirement)."
+    },
+    {
+      "id": "SWR-MSG-005",
+      "category": "Safety",
+      "text": "The rover_msgs shall define rover_msgs/SafetyCommandEcho (header, io_sample_time, sw_e_stop_user_button, sw_e_stop_motor_driver_fault, sw_e_stop_latch_reset, cpu_wdg_heartbeat) and document that its fields may be used only to inhibit motion, never to permit it, and that cpu_wdg_heartbeat and sw_e_stop_latch_reset carry no stop state.",
+      "rationale": "Separating command echoes from plant state is what stops a consumer from treating \"we asked for a stop\" as evidence the hardware stopped (SAFETY_CHAIN.md §4); gating on the heartbeat once made a motion lock oscillate.",
+      "verification": "Inspection, Test",
+      "acceptance": "ros2 interface show lists the six fields; the header comment states the inhibit-only rule; the heartbeat and latch-reset comments state that neither level is a stop condition.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SafetyCommandEcho.msg:1-40",
+        "rover_msgs/CMakeLists.txt:24",
+        "rover_arch/SAFETY_CHAIN.md:166-171"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp",
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp"
+      ],
+      "comments": "Doc drift: the sw_e_stop_latch_reset comment (line 30) says the pulse is driven \"true then immediately false\"; the publisher now holds it for safety_latch_reset_pulse_ms (100 ms), so a 10 Hz poll may observe true."
+    },
+    {
+      "id": "SWR-MSG-006",
+      "category": "Interface",
+      "text": "The rover_msgs shall not define any message type that carries a safety command (E-Stop set, E-Stop reset or latch reset).",
+      "rationale": "A safety command needs an acknowledgement and must never be replayed to a late joiner, so it is a service (std_srvs/Trigger) and not a topic (SYS-SR-007, SAFETY_CHAIN.md §4).",
+      "verification": "Inspection",
+      "acceptance": "No .msg in rover_msgs/msg contains an E-Stop set/reset or latch-reset command field; there is no GpioControl message.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SafetyCommandEcho.msg:14-17",
+        "rover_msgs/CMakeLists.txt:15-63"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Design constraint verified by inspection only."
+    },
+    {
+      "id": "SWR-MSG-007",
+      "category": "Interface",
+      "text": "The rover_msgs shall define rover_msgs/AuxIoState with header, io_sample_time, bool[6] inputs (PLC DIO06..DIO11), bool[6] outputs (read-back of DIO00..DIO05) and link_healthy, documented as outside the safety chain.",
+      "rationale": "General-purpose PLC IO must be available without anyone gating motion on it.",
+      "verification": "Inspection, Test",
+      "acceptance": "ros2 interface show lists the fixed-size arrays of 6; rover_hardware_interface static_asserts the array sizes against its pin counts.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Non-safety auxiliary interface; no SYS-SR parent.",
+      "evidence": [
+        "rover_msgs/msg/AuxIoState.msg:1-24",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:306-309"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MSG-008",
+      "category": "Interface",
+      "text": "The rover_msgs shall define rover_msgs/RoverDriverState (header, DriverStateNamed[] driver_states, bool error) whose DriverState carries current, temperature, FaultFlag (emergency_stop, motor_setup_fault), RuntimeError (safety_stop_active), motor_states_data_timed_out, driver_state_data_timed_out, comm_error and heartbeat_timeout.",
+      "rationale": "Drive-motor health reporting (SYS-SR-022).",
+      "verification": "Inspection, Test",
+      "acceptance": "ros2 interface show rover_msgs/msg/RoverDriverState expands to these nested fields; the driver-state publisher test receives a populated message.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/RoverDriverState.msg:1-5",
+        "rover_msgs/msg/DriverStateNamed.msg:1-6",
+        "rover_msgs/msg/DriverState.msg:1-10",
+        "rover_msgs/msg/FaultFlag.msg:1-2",
+        "rover_msgs/msg/RuntimeError.msg:1"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp"
+      ],
+      "comments": "Doc drift: DriverStateNamed name constants are \"default\"/\"front\"/\"rear\", but the publisher uses \"front_left\"/\"front_right\"/\"rear_left\"/\"rear_right\" (rover_hardware_interface/include/rover_hardware_interface/domain/driver.hpp:50-63). heartbeat_timeout is never set by any publisher."
+    },
+    {
+      "id": "SWR-MSG-009",
+      "category": "Interface",
+      "text": "The rover_msgs shall define rover_msgs/RcLinkStatus carrying the CRSF LINK_STATISTICS uplink RSSI (both antennas), uplink_link_quality (0-100 %), uplink SNR, active antenna, rf_mode, uplink TX power and the downlink RSSI, link quality and SNR.",
+      "rationale": "Uplink link quality is what gates teleop, i.e. the observable for SYS-SR-012 loss of the operator link on the RC path.",
+      "verification": "Inspection, Test",
+      "acceptance": "ros2 interface show lists the fields; the CRSF conversion unit test fills them from a LINK_STATISTICS frame.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-012"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/RcLinkStatus.msg:1-17"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_rc_message_conversions.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MSG-010",
+      "category": "Interface",
+      "text": "The rover_msgs shall define rover_msgs/LedAnimation animation ids covering every SYS-SR-010 system state, including a Boot state.",
+      "rationale": "SYS-SR-009 requires a defined state-to-LED mapping for each SYS-SR-010 state (Boot, Idle, Teleoperation, Autonomous, Emergency Stop, Fault, Low Battery).",
+      "verification": "Inspection",
+      "acceptance": "For each SYS-SR-010 state there is a named LedAnimation constant; the mapping table is documented.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-009",
+        "SYS-SR-010"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/LedAnimation.msg:1-21"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Existing ids plausibly cover Idle (READY), Teleoperation (MANUAL_ACTION), Autonomous (AUTONOMOUS_READY / AUTONOMOUS_ACTION), Emergency Stop (E_STOP), Fault (ERROR) and Low Battery (LOW_BATTERY); there is no Boot id. The state-to-id mapping is an interpretation (TBC) and is not documented in rover_msgs. rover_safety/test/unit/test_led_animation_policy.cpp covers the current policy in rover_safety."
+    },
+    {
+      "id": "SWR-MSG-011",
+      "category": "Interface",
+      "text": "The rover_msgs shall define a system-state message whose state constants enumerate at least Boot, Idle, Teleoperation, Autonomous, Emergency Stop, Fault and Low Battery.",
+      "rationale": "SYS-SR-010 requires a defined system state machine whose transitions can be observed; no rover_msgs type carries it.",
+      "verification": "Inspection",
+      "acceptance": "ros2 interface show on the new message lists the seven state constants.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-010"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/SystemStatus.msg:1-7",
+        "rover_msgs/CMakeLists.txt:15-63"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "SystemStatus carries only CPU / RAM / disk telemetry. MissionState and LocalizationState cover sub-states of navigation only."
+    },
+    {
+      "id": "SWR-MSG-012",
+      "category": "Build",
+      "text": "The rover_msgs shall generate all messages and services with rosidl_generate_interfaces depending only on builtin_interfaces, geometry_msgs and std_msgs, and export rosidl_default_runtime.",
+      "rationale": "Keeps the interface package light so every node can depend on it (SYS-SR-020 ROS 2 based software).",
+      "verification": "Test",
+      "acceptance": "colcon build --packages-select rover_msgs succeeds and ros2 interface list | grep rover_msgs lists every .msg and .srv in the package.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-020"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/CMakeLists.txt:8-67",
+        "rover_msgs/package.xml:10-18"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "CMakeLists.txt finds builtin_interfaces twice (lines 9 and 11); harmless. No tests in rover_msgs itself."
+    }
+  ]
+}

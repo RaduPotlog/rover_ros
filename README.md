@@ -60,6 +60,9 @@ Mechatronics Academy's Rover A1 ROS2.
   namespace.
 - [`rover_scripts`](rover_scripts/README.md) - development PC helper scripts
   (`setup_rover_pc.sh`).
+- [`rover_platform_mbse`](rover_platform_mbse/README.md) - MATLAB/Simulink MBSE project for
+  the platform: System Composer architecture, per-package software requirements
+  (Requirements Toolbox), behaviour models and tests, traceability and SYS-SR compliance.
 
 ## Quick start
 

@@ -1,0 +1,737 @@
+{
+  "package": "rover_hardware_interface",
+  "prefix": "HWI",
+  "document": "ROVER-A1-ROVER_HARDWARE_INTERFACE-SWRS-V-001",
+  "title": "rover_hardware_interface Software Requirements Specification",
+  "scope": "rover_hardware_interface provides the two ros2_control hardware plugins of Rover A1: RoverA1System (hardware_interface::SystemInterface) drives the four wheel joints through four Phidget DCC1000 DC motor controllers and talks Modbus TCP to the safety PLC (E-Stop latch, CPU watchdog heartbeat, contactor feedback, general-purpose aux IO); PhidgetImuSensor (hardware_interface::SensorInterface) reads the Phidgets Spatial MOT0110 IMU through a Madgwick filter. RoverA1System also runs the rover_hardware_controller helper node inside the controller_manager process, which publishes the safety, aux IO and driver state topics, serves the software E-Stop / latch reset / aux output services and reports /diagnostics. It is responsible for gating motor commands on the E-Stop state and on latched hardware faults; the contactor opening in hardware remains the primary stop.",
+  "requirements": [
+    {
+      "id": "SWR-HWI-001",
+      "category": "Interface",
+      "text": "The rover_hardware_interface shall export the pluginlib class rover_hardware_interface/RoverA1System (hardware_interface::SystemInterface) that exposes, for each of exactly four wheel joints matched by the name sequences fl, fr, rl and rr, one velocity command interface and the state interfaces position, velocity and effort in that order, and fail on_init() with ERROR when the joint count, joint names or interface list differ.",
+      "rationale": "SYS-SR-002 requires 4 wheel drive joints in velocity mode with encoder feedback; SYS-SR-020 requires ros2_control for the drive hardware interface. Rejecting a mismatching URDF at on_init() prevents a silently mis-wired drive.",
+      "verification": "Test",
+      "acceptance": "on_init() with the rover_description URDF returns SUCCESS and exports 4 command and 12 state interfaces in the fixed joint order fl, fr, rl, rr; on_init() with 3 joints or a non-velocity command interface returns ERROR.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002",
+        "SYS-SR-020"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/rover_hardware_interfaces.xml:3-7",
+        "rover_hardware_interface/include/rover_hardware_interface/rover_system/rover_a1_system.hpp:92",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:57-89",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:287-313",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:396-478"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_a1_system_on_init.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-002",
+      "category": "Functional",
+      "text": "The rover_hardware_interface shall convert wheel velocity commands from rad/s at the wheel to a DCC1000 duty cycle using gear_ratio and max_rpm_motor_speed and clamp the result to [-1.0, 1.0], and report wheel position in rad, velocity in rad/s and effort in N·m derived from encoder_resolution, gear_ratio, motor_torque_constant and gearbox_efficiency.",
+      "rationale": "REP-103 SI units on the ros2_control interfaces (SYS-SR-021) and correct velocity-mode actuation with encoder feedback (SYS-SR-002).",
+      "verification": "Test",
+      "acceptance": "A command of max_rpm_motor_speed/gear_ratio converted to rad/s (2800/23.3 rpm with the URDF values) maps to duty 1.0; larger commands clamp to 1.0 and -1.0; one wheel revolution of encoder ticks (encoder_resolution x gear_ratio) reports 2*pi rad.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002",
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_driver/phidget_driver/phidget_data_transformer.cpp:22-32",
+        "rover_hardware_interface/include/rover_hardware_interface/rover_driver/phidget_driver/phidget_data_transformer.hpp:40-45",
+        "rover_hardware_interface/src/domain/driver_data_snapshot.cpp:99-106",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:243-254"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_driver/test_phidget_data_transformer.cpp",
+        "rover_hardware_interface/test/domain/test_driver_data_snapshot.cpp",
+        "rover_hardware_interface/test/rover_driver/test_phidget_motor_driver.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-003",
+      "category": "Parameter",
+      "text": "The rover_hardware_interface shall configure each DCC1000 with the URDF motor_acceleration (4.0 duty/s) and motor_current_limit (15.0 A) and fail on_init() when motor_acceleration is outside [0.5, 10000] duty/s, motor_current_limit outside [2, 25] A, motor_supply_voltage outside [8, 30] V or the derived current regulator gain outside [1, 100].",
+      "rationale": "The current limit protects motor, DCC1000 and gearbox; rejecting out-of-range values at on_init() avoids a late SDK failure after the drive is energised.",
+      "verification": "Test",
+      "acceptance": "on_init() succeeds with the rover_description values; on_init() returns ERROR for motor_acceleration 0.4, motor_current_limit 26 or motor_supply_voltage 31; the DCC1000 reports current limit 15.0 A after configure.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-014"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:505-553",
+        "rover_hardware_interface/src/rover_driver/phidget_driver/phidget_motor_driver.cpp:339-356",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:222-240",
+        "rover_hardware_interface/include/rover_hardware_interface/utils.hpp:28-32"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_a1_system_on_init.cpp",
+        "rover_hardware_interface/test/rover_driver/test_phidget_motor_driver.cpp"
+      ],
+      "comments": "The URDF comment says 10 A gives ~60 % of stall torque but the configured value is 15.0 A; the comment and the compiled-in default (10 A) are stale relative to the URDF value. Traced to SYS-SR-014: the DCC1000 duty ramp (motor_acceleration) bounds how fast the drives brake on a software zero command; the stopping-distance limit is still TBD."
+    },
+    {
+      "id": "SWR-HWI-004",
+      "category": "Lifecycle",
+      "text": "The rover_hardware_interface shall, in on_configure(), start the safety controller before initialising the motor drivers (up to max_rover_driver_initialization_attempts = 3), arm each DCC1000 hardware failsafe and zero all velocity commands in on_activate() (up to max_rover_driver_activation_attempts = 3), and zero all velocity commands in on_deactivate().",
+      "rationale": "No stale command may be the first thing written to the drivers after a (re)activation, and the start-up E-Stop triggers must be released before the drivers are armed.",
+      "verification": "Test",
+      "acceptance": "After configure, the safety controller start() is called once before driver initialisation; after activate, every command interface reads 0.0 and each channel failsafe is enabled; configure returns ERROR if releasing the start-up triggers throws.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008",
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:91-178",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:187-230",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:630-660",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190-192"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_system_write.cpp",
+        "rover_hardware_interface/test/test_utils.cpp"
+      ],
+      "comments": "The configure ordering and retry helper are unit-tested; on_activate()/on_deactivate() (failsafe arming, command zeroing) are not exercised by any unit test."
+    },
+    {
+      "id": "SWR-HWI-005",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall, in every write() cycle, forward the controller velocity commands to the drivers only when the component is ACTIVE, neither the software E-Stop nor the PLC latch is active and no hardware fault (motor failsafe trip or welded contactor) is latched, and otherwise discard the pending command and send zero velocity to all four drivers while ACTIVE or INACTIVE.",
+      "rationale": "Defense in depth behind the contactor (SAFETY_CHAIN.md §5 gate 3). Zeros are sent rather than nothing so that the DCC1000 failsafe keeps being fed, and a stale command is never replayed after the latch clears.",
+      "verification": "Test",
+      "acceptance": "With E-Stop active, latched failsafe or INACTIVE state, every write() sends [0, 0, 0, 0] and the command buffer reads 0 afterwards; ACTIVE with nothing inhibiting forwards the controller command unchanged; decideWriteCommand() matches the rule for all 16 input combinations.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-008",
+        "SYS-SR-014"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:349-394",
+        "rover_hardware_interface/src/application/rover_control_loop_use_case.cpp:91-136",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:824-827",
+        "rover_arch/SAFETY_CHAIN.md:199-202"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_system_write.cpp",
+        "rover_hardware_interface/test/application/test_rover_control_loop_use_case.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-006",
+      "category": "Interface",
+      "text": "The rover_hardware_interface shall provide the service hardware_interface/sw_user_e_stop_set (std_srvs/Trigger) that writes the sw_e_stop_user_button coil (COIL_2) true on the Modbus link with priority over IO polling, returning success=false with the error text when the write fails.",
+      "rationale": "SYS-SR-007 requires a software E-Stop triggerable through the ROS interface. A service (not a latched topic) gives an acknowledgement and is never replayed to a late joiner (SAFETY_CHAIN.md §4).",
+      "verification": "Test",
+      "acceptance": "Calling the service returns success=true and COIL_2 reads back true on the next IO poll; with a failing Modbus write the response is success=false with a non-empty message.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:129-131",
+        "rover_hardware_interface/src/domain/emergency_stop.cpp:68-80",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:231-237",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:101-115",
+        "rover_arch/SAFETY_CHAIN.md:173-177"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/domain/test_emergency_stop.cpp",
+        "rover_hardware_interface/test/rover_safety_controller/test_contact_coil_handler.cpp",
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp"
+      ],
+      "comments": "The set service is accepted in any lifecycle state (no ACTIVE check), unlike the two reset services. RoverSafetyController::eStopUserBtnTrigger() is a silent no-op before start() (rover_safety_controller.cpp:543-545), so the service would report success without a write; in practice the service only exists after start()."
+    },
+    {
+      "id": "SWR-HWI-007",
+      "category": "Performance",
+      "text": "The rover_hardware_interface shall command zero velocity to all four drive joints within 100 ms of a hardware_interface/sw_user_e_stop_set request being received.",
+      "rationale": "SYS-SR-007 latency budget. Today write() only inhibits once the software E-Stop is read back from the PLC through the IO poll cache, so the latency is the priority Modbus write (bounded by modbus_response_timeout_ms 150 ms plus one in-flight transaction) plus up to one safety_io_poll_period_ms (100 ms) plus a 10 ms control cycle.",
+      "verification": "Test, Analysis",
+      "acceptance": "Latency from service request to the first all-zero sendSpeedCmd() is <= 100 ms in 20 of 20 trials on the rover; worst-case analysis of the path is <= 100 ms.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller_e_stop_io.cpp:29-32",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:475-514",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:343",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:363-391",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:160",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Not verified: worst case exceeds 100 ms by analysis (in-flight Modbus transaction up to 150 ms + write + up to 100 ms poll + 10 ms). Candidate fix: latch a local \"sw E-Stop requested\" flag in EmergencyStop::setEStop() that write() honours on the next cycle, independent of the PLC read-back. The hardware contactor path (PLC latch) is not bounded by this software latency."
+    },
+    {
+      "id": "SWR-HWI-008",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall refuse hardware_interface/sw_user_e_stop_reset (success=false) unless the component is ACTIVE, every wheel velocity command is finite and within velocity_command_zero_tolerance (0.4 rad/s) of zero and every measured wheel velocity is finite and within velocity_state_zero_tolerance (0.05 rad/s) of zero.",
+      "rationale": "SYS-SR-008: releasing the stop must not resume motion by itself; the rover may not be re-energised while commanded to move or still rolling (SAFETY_CHAIN.md §5 reset invariant).",
+      "verification": "Test",
+      "acceptance": "Reset is refused with max |wheel velocity| 0.1 rad/s, refused with a command of 0.5 rad/s at standstill, refused with a NaN measured velocity, refused when not ACTIVE, and accepted with commands and wheels at rest.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:133-137",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:662-672",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:881-955",
+        "rover_hardware_interface/src/domain/emergency_stop.cpp:82-97",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:275",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:284"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_system_write.cpp",
+        "rover_hardware_interface/test/domain/test_emergency_stop.cpp",
+        "rover_hardware_interface/test/domain/test_velocity_command_guard.cpp"
+      ],
+      "comments": "Doc drift: SAFETY_CHAIN.md §6 (line 228) states the command tolerance is 0.35 rad/s; the URDF sets 0.4 rad/s. The command tolerance is bounded below by the wheel PID i_clamp_max (0.33 rad/s)."
+    },
+    {
+      "id": "SWR-HWI-009",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall provide hardware_interface/sw_e_stop_latch_reset (std_srvs/Trigger) that, only while ACTIVE, pulses the latch-reset coil (COIL_4) true for safety_latch_reset_pulse_ms (100 ms) and then false, clears the latched error-filter state and the welded-contactor fault, and re-arms the DCC1000 failsafe.",
+      "rationale": "SYS-SR-008 requires an explicit operator reset after any E-Stop. The pulse must be wide enough for the relay input filter; a single call acknowledges all latched faults, which re-latch on the next read() if still present.",
+      "verification": "Test",
+      "acceptance": "Coil 4 is written true then false with >= 100 ms between the writes; the service returns success=false when not ACTIVE; after the call a still-welded contactor re-latches the fault within one read() cycle.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:139-143",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:674-706",
+        "rover_hardware_interface/src/domain/emergency_stop.cpp:99-109",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:246-265",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:187"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_safety_controller/test_contact_coil_handler.cpp",
+        "rover_hardware_interface/test/rover_safety_controller/test_safety_controller_adapters.cpp",
+        "rover_hardware_interface/test/domain/test_emergency_stop.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-010",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall refuse hardware_interface/sw_e_stop_latch_reset (success=false) while any wheel velocity command exceeds velocity_command_zero_tolerance or any measured wheel velocity exceeds velocity_state_zero_tolerance.",
+      "rationale": "SAFETY_CHAIN.md §5 states that the latch cannot be cleared while the rover is being commanded to move or while the wheels are still turning; SYS-SR-008 requires that reset does not by itself resume motion with non-zero commands present. After a hardware E-Stop the SW user-button reset (which has the check) is not needed, so the latch reset is the only reset and has no velocity check.",
+      "verification": "Test",
+      "acceptance": "With the HW E-Stop released and a 0.5 rad/s command present, the latch reset returns success=false and the latch stays asserted; with commands and wheels at rest it succeeds.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:674-706",
+        "rover_hardware_interface/src/domain/emergency_stop.cpp:99-109",
+        "rover_arch/SAFETY_CHAIN.md:211-216"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "Deviation between code and SAFETY_CHAIN.md §5. rover_twist_mux motion_lock and diff_drive cmd_vel_timeout (0.5 s) mitigate but do not enforce the invariant at the hardware interface."
+    },
+    {
+      "id": "SWR-HWI-011",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall, on every safety-controller start, drive the heartbeat, sw_e_stop_user_button and sw_e_stop_motor_driver_fault coils to true and the latch-reset and aux output coils to false, then release only the two software E-Stop inputs, so that the PLC latch stays asserted until an explicit hardware_interface/sw_e_stop_latch_reset.",
+      "rationale": "SYS-SR-008: a (re)start of the software must never clear a stop by itself. The set-dominant latch set at start holds until the operator resets it.",
+      "verification": "Test",
+      "acceptance": "On start the coil write sequence is COIL_1=true, COIL_2=true, COIL_3=true, COIL_4=false, COIL_8..13=false, followed by COIL_2=false, COIL_3=false; read-only coils 0, 5, 14..19 are never written; resetEStop() is not invoked during configure.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008",
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:46-92",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:323-340",
+        "rover_hardware_interface/src/domain/emergency_stop.cpp:111-118",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:630-645",
+        "rover_hardware_interface/include/rover_hardware_interface/domain/emergency_stop.hpp:104-116"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_safety_controller/test_contact_coil_handler.cpp",
+        "rover_hardware_interface/test/rover_safety_controller/test_safety_controller_adapters.cpp",
+        "rover_hardware_interface/test/domain/test_emergency_stop.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-012",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall toggle the CPU watchdog heartbeat coil (COIL_1) every safety_wdg_kick_period_ms (200 ms) on a dedicated thread with absolute steady_clock deadlines and priority access to the Modbus link, counting late kicks and failed kicks without stopping the thread.",
+      "rationale": "The safety relay latches the E-Stop if the heartbeat stops changing for its ~1 s window (SAFETY_CHAIN.md §3). The heartbeat is the hardware backstop for a dead CPU / process (SYS-SR-006 stop independent of software).",
+      "verification": "Test",
+      "acceptance": "With the IO poll stalled or throwing, and with aux writes contending, the heartbeat interval stays within one kick period of 200 ms and alternates levels; a kick exception increments the error count and the next tick still runs.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:147-176",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:204-223",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:399-470",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:162-170",
+        "rover_hardware_interface/src/rover_system/rover_a1_system.cpp:109-120"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_safety_controller/test_contact_coil_handler.cpp"
+      ],
+      "comments": "The relay watchdog window (~1 s) is a measured hardware property (SAFETY_CHAIN.md:144-148), not a code value."
+    },
+    {
+      "id": "SWR-HWI-013",
+      "category": "Interface",
+      "text": "The rover_hardware_interface shall connect by Modbus TCP to the safety PLC at modbus_host:modbus_port (192.168.88.11:502) with a per-transaction response timeout of modbus_response_timeout_ms (150 ms), and refresh the cached safety and aux IO every safety_io_poll_period_ms (100 ms) using exactly four read transactions (one FC2, three FC1 blocks of at most 8 coils each within one PLC memory area).",
+      "rationale": "SYS-SR-023 needs the E-Stop state in software; the block layout works around two measured Portenta Modbus server quirks (SAFETY_CHAIN.md §2) and bounds how long the poll can hold the link.",
+      "verification": "Test, Inspection",
+      "acceptance": "One IO sweep issues 4 read transactions; a mapped coil outside every read block raises a logic_error in unit tests; on_init() fails when modbus_host is empty or safety_io_poll_period_ms / safety_wdg_kick_period_ms is 0.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:147-160",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178",
+        "rover_hardware_interface/src/rover_system/rover_a1_system.cpp:86-125",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:104-145",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:342-397",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:472-514"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_safety_controller/test_contact_coil_handler.cpp",
+        "rover_hardware_interface/test/rover_safety_controller/test_safety_controller_adapters.cpp",
+        "rover_hardware_interface/test/rover_system/test_rover_a1_system_on_init.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-014",
+      "category": "Interface",
+      "text": "The rover_hardware_interface shall publish rover_msgs/SafetyStatus on hardware_interface/safety_status and rover_msgs/SafetyCommandEcho on hardware_interface/safety_command_echo at driver_states_update_frequency (20 Hz) with QoS reliable, volatile, KeepLast(1), routing HW E-Stop button, contactor feedback and latch status to SafetyStatus and the read-backs of software-driven coils to SafetyCommandEcho.",
+      "rationale": "SYS-SR-023 requires the HW and SW E-Stop state on a ROS topic. Volatile (not transient_local) so that a late joiner cannot mistake a stale latched sample for a live publisher.",
+      "verification": "Test, Inspection",
+      "acceptance": "ros2 topic hz on each topic reads 20 Hz +/- 10 %; ros2 topic info -v shows RELIABLE/VOLATILE/depth 1; CONTACT_0, COIL_0 and COIL_5 values appear in SafetyStatus and COIL_1..4 in SafetyCommandEcho.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:164-180",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:299-304",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:314-341",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:329-341",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-015",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall set SafetyStatus.link_healthy and AuxIoState.link_healthy false unless both safety-controller threads are running and the last successful IO poll is at most 500 ms old, and stamp io_sample_time with the time of that poll.",
+      "rationale": "Without it a dead PLC link is indistinguishable from a quiet one because the messages keep flowing with last-known-good values (SAFETY_CHAIN.md §4); rover_twist_mux locks motion on link_healthy false.",
+      "verification": "Test",
+      "acceptance": "Before the first successful poll link_healthy is false and io_sample_time is 0; with a poll age of 501 ms or a stopped thread link_healthy is false; with both threads running and a fresh poll it is true.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:35-38",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:268-297",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:301-321"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp",
+        "rover_hardware_interface/test/rover_safety_controller/test_safety_controller_adapters.cpp"
+      ],
+      "comments": "read()/write() always return OK (SAFETY_CHAIN.md:238-240), so controller_manager is never told of a dead safety link; the gate is downstream (rover_twist_mux) and in write() via the cached latch."
+    },
+    {
+      "id": "SWR-HWI-016",
+      "category": "Performance",
+      "text": "The rover_hardware_interface shall publish a change of the hardware E-Stop button, software E-Stop coil or PLC latch state on hardware_interface/safety_status or hardware_interface/safety_command_echo within 100 ms of the change at the PLC.",
+      "rationale": "SYS-SR-023 latency budget. Today the path is up to one IO poll period (100 ms) plus four Modbus transactions plus up to one publish period at 20 Hz (50 ms).",
+      "verification": "Test, Analysis",
+      "acceptance": "Latency from E-Stop actuation (scope on the PLC input) to the topic update is <= 100 ms in 20 of 20 trials.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:329-341",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:475-514"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Not verified. Worst case by analysis ~150 ms plus transaction time, i.e. above 100 ms. Options: poll at 50 ms, or publish the safety topics on each fresh poll rather than on the 20 Hz driver-state tick."
+    },
+    {
+      "id": "SWR-HWI-017",
+      "category": "Diagnostics",
+      "text": "The rover_hardware_interface shall populate SafetyStatus.latch_cause with the trip source that set the PLC latch (SW user button, SW motor-driver fault, CPU watchdog or HW user button).",
+      "rationale": "Operators and SYS-SR-022 diagnostics need to know why the rover stopped; today the PLC exposes one latch bit and four SET sources (SAFETY_CHAIN.md §6).",
+      "verification": "Test",
+      "acceptance": "Tripping each of the four sources in turn yields the matching LATCH_CAUSE_* value in SafetyStatus within one publish period.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-023",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:314-341",
+        "rover_msgs/msg/SafetyStatus.msg:35-47",
+        "rover_arch/SAFETY_CHAIN.md:222-227"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "latch_cause is never assigned in rover_hardware_interface (grep finds no write), so it is always LATCH_CAUSE_UNKNOWN (0). Needs a PLC program change that latches the cause into readable coils."
+    },
+    {
+      "id": "SWR-HWI-018",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall assert the sw_e_stop_motor_driver_fault coil (COIL_3) when a motor-driver fault (latched MOTOR_FAILSAFE_TRIPPED or FAULT_FLAG error) is detected, so that the PLC latch opens the contactor.",
+      "rationale": "SAFETY_CHAIN.md §1 lists the SW motor-driver fault as one of the four SET sources of the latch; a driver fault should remove drive power through the hardware chain, not only through write() zero commands.",
+      "verification": "Test",
+      "acceptance": "Injecting a latched motor-failsafe trip writes COIL_3 = true within one read() cycle and SafetyStatus.latch_active becomes true on the next poll.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/domain/emergency_stop.cpp:111-118",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:239-244",
+        "rover_arch/SAFETY_CHAIN.md:17-21"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "triggerMotorDriverFault() is only ever called with false (start-up release); COIL_3 is never asserted at runtime. Driver faults today inhibit motion only through write() zero commands."
+    },
+    {
+      "id": "SWR-HWI-019",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall latch a welded-contactor fault and inhibit motion when the PLC latch is active and the motor contactor auxiliary contact still reports engaged for at least 500 ms, keeping the fault latched until hardware_interface/sw_e_stop_latch_reset.",
+      "rationale": "Software half of the EDM loop: detects a stop that was commanded but did not remove drive power (SYS-SR-006).",
+      "verification": "Test",
+      "acceptance": "Disagreement for 499 ms raises no fault; for 500 ms latches kWeldedSuspected, write() then sends zeros and the \"safety plc link\" diagnostic is ERROR; the fault stays latched after the latch clears and is cleared only by reset.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/domain/contactor_monitor.cpp:26-58",
+        "rover_hardware_interface/include/rover_hardware_interface/domain/contactor_monitor.hpp:24-29",
+        "rover_hardware_interface/include/rover_hardware_interface/application/rover_control_loop_use_case.hpp:86",
+        "rover_hardware_interface/src/application/rover_control_loop_use_case.cpp:72-99",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:832-849"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/domain/test_contactor_monitor.cpp",
+        "rover_hardware_interface/test/application/test_rover_control_loop_use_case.cpp",
+        "rover_hardware_interface/test/domain/test_safety_link_diagnosis.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-020",
+      "category": "Safety",
+      "text": "The rover_hardware_interface shall arm each DCC1000 hardware failsafe with motor_failsafe_timeout_ms (500 ms), keep feeding it with zero commands while motion is inhibited, and latch a MOTOR_FAILSAFE_TRIPPED error on the first trip that inhibits motion until hardware_interface/sw_e_stop_latch_reset.",
+      "rationale": "Backstop for a stalled control loop: the motors brake when commands stop reaching the drivers, independently of the software E-Stop (supports SYS-SR-011 stop on loss of commands).",
+      "verification": "Test",
+      "acceptance": "The failsafe is enabled with 500 ms on activate; a tripped return code is recognised and latches the error with no debounce; write() then sends zeros until the latch reset clears it and re-arms the failsafe.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:210-220",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:497-503",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:201-212",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:588-599",
+        "rover_hardware_interface/src/rover_driver/phidget_driver/phidget_motor_driver.cpp:402-414",
+        "rover_hardware_interface/src/application/rover_control_loop_use_case.cpp:61-70"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_driver/test_phidget_motor_driver.cpp",
+        "rover_hardware_interface/test/application/test_rover_control_loop_use_case.cpp",
+        "rover_hardware_interface/test/domain/test_rover_error_filter.cpp",
+        "rover_hardware_interface/test/rover_system/test_rover_system_write.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-021",
+      "category": "Diagnostics",
+      "text": "The rover_hardware_interface shall publish rover_msgs/RoverDriverState on hardware_interface/rover_driver_state at driver_states_update_frequency (20 Hz) with QoS reliable, volatile, KeepLast(5), reporting per driver current, temperature, fault flags, data time-outs and comm_error, where comm_error is set when no Phidget telemetry callback arrived within driver_comm_timeout_ms (300 ms).",
+      "rationale": "Drive-motor health for operators and rover_safety (SYS-SR-022).",
+      "verification": "Test",
+      "acceptance": "ros2 topic hz reads 20 Hz +/- 10 %; unplugging one DCC1000 USB sets that driver comm_error true within 300 ms plus one publish period.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:141-151",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:219-258",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:329-334",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:492-493",
+        "rover_hardware_interface/src/rover_driver/phidget_driver/phidget_motor_driver.cpp:472-485",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:189-208"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp",
+        "rover_hardware_interface/test/domain/test_driver_data_snapshot.cpp"
+      ],
+      "comments": "comm_error and read time-outs are reported but do not gate write(); only the motor failsafe and the contactor fault inhibit motion. DriverState.heartbeat_timeout is never set (system_ros_interface.cpp:235-236)."
+    },
+    {
+      "id": "SWR-HWI-022",
+      "category": "Diagnostics",
+      "text": "The rover_hardware_interface shall publish on diagnostics, with hardware id \"Rover System\", the tasks \"system errors\", \"system status\" and \"safety plc link\" at the diagnostic_updater period (default 1.0 s), reporting ERROR for any latched driver or error-filter fault, a stopped safety thread or a latched welded-contactor fault, and WARN for a late heartbeat or a contactor that is open while the latch is clear.",
+      "rationale": "SYS-SR-022 requires drive-motor and E-Stop-circuit diagnostics at >= 1 Hz with induced faults reported as ERROR.",
+      "verification": "Test",
+      "acceptance": "ros2 topic hz /<ns>/diagnostics for \"Rover System\" >= 1 Hz; stopping the watchdog thread gives ERROR with ages \"never\"; one late kick gives WARN; a latched welded fault gives ERROR.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:155-162",
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:766-822",
+        "rover_hardware_interface/src/rover_system/rover_a1_system.cpp:209-289",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:129-131",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:188",
+        "rover_hardware_interface/src/domain/safety_link_diagnosis.cpp:20-53"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/domain/test_safety_link_diagnosis.cpp",
+        "rover_hardware_interface/test/rover_system/test_rover_system_write.cpp"
+      ],
+      "comments": "The 1.0 s period is the diagnostic_updater library default; no period override is set in the package. watchdog_miss_count is cumulative, so one late kick keeps the task at WARN until restart."
+    },
+    {
+      "id": "SWR-HWI-023",
+      "category": "Diagnostics",
+      "text": "The rover_hardware_interface shall report the \"safety plc link\" diagnostic as ERROR when the last successful IO poll is older than 500 ms or when IO polls keep failing, even while both safety threads are running.",
+      "rationale": "SYS-SR-022: a dead Modbus link with live threads is a fault of the E-Stop circuit telemetry and must appear as ERROR, consistent with link_healthy on the safety_status topic.",
+      "verification": "Test",
+      "acceptance": "With the fake Modbus failing every read for 1 s, the \"safety plc link\" status is ERROR and link_healthy is false.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/domain/safety_link_diagnosis.cpp:20-53",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:288-295",
+        "rover_hardware_interface/test/domain/test_safety_link_diagnosis.cpp:159"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "evaluateSafetyLinkHealth() only escalates on thread state and contactor faults; the test ErrorCountersAndAgesNeverRaiseTheLevel pins that poll errors and ages never raise the level, so /diagnostics can read OK while SafetyStatus.link_healthy is false."
+    },
+    {
+      "id": "SWR-HWI-024",
+      "category": "Lifecycle",
+      "text": "The rover_hardware_interface shall, in on_error(), assert the software E-Stop, broadcast an ERROR status on all diagnostic tasks and tear down the safety controller, drivers and ROS helper node.",
+      "rationale": "A failed lifecycle transition must leave the rover stopped and visibly faulted (SYS-SR-008, SYS-SR-022).",
+      "verification": "Test, Inspection",
+      "acceptance": "Forcing on_error() with a fake E-Stop port records one setEStop() call and a diagnostics message with level ERROR.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:242-285"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No unit test drives on_error(); only the shared teardown ordering is covered (test_rover_system_write.cpp TeardownWaitsForARunningDiagnosticBeforeReleasingComponents)."
+    },
+    {
+      "id": "SWR-HWI-025",
+      "category": "Interface",
+      "text": "The rover_hardware_interface shall provide hardware_interface/aux_output_<0..5>/set (std_srvs/SetBool) that write PLC coils 8..13 without priority on the Modbus link, publish rover_msgs/AuxIoState on hardware_interface/aux_io_state at 20 Hz with QoS reliable, volatile, KeepLast(1), and drive all aux outputs off on every safety-controller start.",
+      "rationale": "General-purpose IO shares the safety link but must never delay the heartbeat or an E-Stop write and never gate motion (SAFETY_CHAIN.md §2).",
+      "verification": "Test",
+      "acceptance": "set(i, true) writes COIL_(8+i) and replies after the PLC acknowledges; an index of 6 throws and writes nothing; the heartbeat period holds while aux writes contend; start writes COIL_8..13 false and never writes COIL_14..19.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Aux IO is outside the safety chain and not required by any SYS-SR; it is specified so that its non-interference with the safety link is verifiable.",
+      "evidence": [
+        "rover_hardware_interface/src/rover_system/rover_system.cpp:145-153",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:267-280",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:182-186",
+        "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:343-362",
+        "rover_hardware_interface/include/rover_hardware_interface/domain/rover_gpio_types.hpp:62-63"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_safety_controller/test_contact_coil_handler.cpp",
+        "rover_hardware_interface/test/rover_safety_controller/test_rover_safety_controller.cpp",
+        "rover_hardware_interface/test/system_ros_interface/test_system_ros_interface.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-HWI-026",
+      "category": "Interface",
+      "text": "The rover_hardware_interface shall export the pluginlib class rover_hardware_interface/PhidgetImuSensor (hardware_interface::SensorInterface) that samples the Phidgets Spatial at data_interval_ms (8 ms, 125 Hz), fuses it with a Madgwick filter in the configured world_frame (enu) with use_mag false, exports 10 state interfaces (orientation x/y/z/w, angular_velocity x/y/z, linear_acceleration x/y/z) and returns ERROR from read() while the device is detached.",
+      "rationale": "SYS-SR-019 requires an IMU providing orientation, angular velocity and linear acceleration at >= 100 Hz; the sensor itself samples at 125 Hz.",
+      "verification": "Test",
+      "acceptance": "on_init() exports the 10 interfaces in declared order and fails with a wrong count or name; after activation the device data interval reads 8 ms; detaching the device makes read() return ERROR; activation fails if no valid sample arrives within 5 s.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-019"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/rover_hardware_interfaces.xml:9-13",
+        "rover_hardware_interface/src/rover_sensors/phidget_imu_sensor.cpp:128-162",
+        "rover_hardware_interface/src/rover_sensors/phidget_imu_sensor.cpp:180-200",
+        "rover_hardware_interface/src/rover_sensors/phidget_imu_sensor.cpp:236-247",
+        "rover_hardware_interface/src/rover_sensors/phidget_imu_sensor.cpp:312-331",
+        "rover_description/urdf/common/imu.urdf.xacro:98-126"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_sensors/test_phidget_imu_sensor_on_init.cpp",
+        "rover_hardware_interface/test/domain/test_imu_calibration.cpp"
+      ],
+      "comments": "The published imu/data rate is set by rover_controller (imu broadcaster 50 Hz, see the rover_controller SWRS); the hardware read() rate is the controller_manager 100 Hz. Only on_init() and the calibration gate are unit-tested; on_activate()/read() need the device."
+    },
+    {
+      "id": "SWR-HWI-027",
+      "category": "Diagnostics",
+      "text": "The rover_hardware_interface shall publish an IMU diagnostic status on diagnostics at >= 1 Hz that reports ERROR while the Phidgets Spatial is detached or delivers no valid samples.",
+      "rationale": "SYS-SR-022 requires sensor diagnostics; PhidgetImuSensor has no diagnostic_updater, so an IMU fault is visible only as a read() ERROR that deactivates the broadcaster.",
+      "verification": "Test",
+      "acceptance": "Unplugging the IMU yields an ERROR diagnostic for the IMU within 2 s.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_hardware_interface/src/rover_sensors/phidget_imu_sensor.cpp:170-200"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "No diagnostics code in phidget_imu_sensor.cpp / .hpp (grep for \"diagnos\" finds none)."
+    },
+    {
+      "id": "SWR-HWI-028",
+      "category": "Build",
+      "text": "The rover_hardware_interface shall keep domain and application code free of ROS, hardware_interface and vendor SDK includes and keep read()/write() free of blocking Modbus or Phidget SDK calls, enforced by the CTest checks domain_purity_check, application_purity_check and rt_path_purity_check.",
+      "rationale": "Clean Architecture layering and a real-time-safe control path; the safety IO is served to read() from a cache under try_lock.",
+      "verification": "Test, Inspection",
+      "acceptance": "colcon test for the package runs the three checks and all pass.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical/architecture requirement (project rules clean_architecture.md and ros2_control RT rules); a blocking call on the 100 Hz path would starve the DCC1000 failsafe feed.",
+      "evidence": [
+        "rover_hardware_interface/CMakeLists.txt:172-198",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:282-299",
+        "rover_arch/SAFETY_CHAIN.md:118-119"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/scripts/check_domain_purity.sh",
+        "rover_hardware_interface/scripts/check_application_purity.sh",
+        "rover_hardware_interface/scripts/check_rt_path_purity.sh"
+      ],
+      "comments": ""
+    }
+  ]
+}

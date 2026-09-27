@@ -1,0 +1,362 @@
+{
+  "provenance": "Values read from src/rover_ros (master 35aeb3e). 'source' is path:line relative to src/rover_ros/. Never edit a value here without re-reading its source.",
+  "parameters": [
+    {
+      "component": "rover_controller",
+      "name": "cm_update_rate",
+      "value": 100,
+      "unit": "Hz",
+      "source": "rover_controller/config/wheel_01_controller.yaml:13"
+    },
+    {
+      "component": "rover_controller",
+      "name": "diff_drive_update_rate",
+      "value": 50,
+      "unit": "Hz",
+      "source": "rover_controller/config/wheel_01_controller.yaml:159"
+    },
+    {
+      "component": "rover_controller",
+      "name": "imu_broadcaster_rate",
+      "value": 50,
+      "unit": "Hz",
+      "source": "rover_controller/config/wheel_01_controller.yaml:150"
+    },
+    {
+      "component": "rover_controller",
+      "name": "joint_state_rate",
+      "value": 20,
+      "unit": "Hz",
+      "source": "rover_controller/config/wheel_01_controller.yaml:146"
+    },
+    {
+      "component": "rover_controller",
+      "name": "wheel_separation",
+      "value": 0.615,
+      "unit": "m",
+      "source": "rover_controller/config/wheel_01_controller.yaml:170"
+    },
+    {
+      "component": "rover_controller",
+      "name": "wheel_radius",
+      "value": 0.1651,
+      "unit": "m",
+      "source": "rover_controller/config/wheel_01_controller.yaml:171"
+    },
+    {
+      "component": "rover_controller",
+      "name": "wheel_separation_multiplier",
+      "value": 1.659,
+      "unit": "1",
+      "source": "rover_controller/config/wheel_01_controller.yaml:175"
+    },
+    {
+      "component": "rover_controller",
+      "name": "cmd_vel_timeout",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_controller/config/wheel_01_controller.yaml:192"
+    },
+    {
+      "component": "rover_controller",
+      "name": "max_linear_velocity",
+      "value": 0.95,
+      "unit": "m/s",
+      "source": "rover_controller/config/wheel_01_controller.yaml:207"
+    },
+    {
+      "component": "rover_controller",
+      "name": "max_linear_acceleration",
+      "value": 2.7,
+      "unit": "m/s^2",
+      "source": "rover_controller/config/wheel_01_controller.yaml:209"
+    },
+    {
+      "component": "rover_controller",
+      "name": "max_angular_velocity",
+      "value": 1.5,
+      "unit": "rad/s",
+      "source": "rover_controller/config/wheel_01_controller.yaml:218"
+    },
+    {
+      "component": "rover_controller",
+      "name": "max_angular_acceleration",
+      "value": 3.74,
+      "unit": "rad/s^2",
+      "source": "rover_controller/config/wheel_01_controller.yaml:220"
+    },
+    {
+      "component": "rover_description",
+      "name": "wheelbase",
+      "value": 0.503,
+      "unit": "m",
+      "source": "rover_description/config/wheel_01.yaml:9"
+    },
+    {
+      "component": "rover_description",
+      "name": "wheel_width",
+      "value": 0.108,
+      "unit": "m",
+      "source": "rover_description/config/wheel_01.yaml:2"
+    },
+    {
+      "component": "rover_description",
+      "name": "wheel_mass",
+      "value": 2.5,
+      "unit": "kg",
+      "source": "rover_description/config/wheel_01.yaml:3"
+    },
+    {
+      "component": "rover_description",
+      "name": "wheel_joint_velocity_limit",
+      "value": 10.958,
+      "unit": "rad/s",
+      "source": "rover_description/urdf/common/wheel.urdf.xacro:47"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "modbus_response_timeout",
+      "value": 0.15,
+      "unit": "s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:160"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "safety_wdg_kick_period",
+      "value": 0.2,
+      "unit": "s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:170"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "safety_io_poll_period",
+      "value": 0.1,
+      "unit": "s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "safety_latch_reset_pulse",
+      "value": 0.1,
+      "unit": "s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:187"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "driver_states_update_frequency",
+      "value": 20,
+      "unit": "Hz",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "driver_comm_timeout",
+      "value": 0.3,
+      "unit": "s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:208"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "motor_failsafe_timeout",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:220"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "motor_current_limit",
+      "value": 15.0,
+      "unit": "A",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:233"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "gear_ratio",
+      "value": 23.3,
+      "unit": "1",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:245"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "velocity_command_zero_tolerance",
+      "value": 0.4,
+      "unit": "rad/s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:275"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "velocity_state_zero_tolerance",
+      "value": 0.05,
+      "unit": "rad/s",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:284"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "contactor_dropout_tolerance",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_hardware_interface/include/rover_hardware_interface/domain/contactor_monitor.hpp:29"
+    },
+    {
+      "component": "rover_hardware_interface",
+      "name": "imu_data_interval",
+      "value": 0.008,
+      "unit": "s",
+      "source": "rover_description/urdf/common/imu.urdf.xacro:104"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "prio_nav",
+      "value": 5,
+      "unit": "1",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:9"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "timeout_nav",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:8"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "prio_driver_interface",
+      "value": 8,
+      "unit": "1",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:15"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "timeout_driver_interface",
+      "value": 0.3,
+      "unit": "s",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:14"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "prio_joystick",
+      "value": 100,
+      "unit": "1",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:19"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "timeout_joystick",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:18"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "prio_elrs",
+      "value": 110,
+      "unit": "1",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:24"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "timeout_elrs",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:23"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "prio_motion_lock",
+      "value": 200,
+      "unit": "1",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:33"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "timeout_motion_lock",
+      "value": 0.5,
+      "unit": "s",
+      "source": "rover_twist_mux/config/rover_twist_mux.yaml:32"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "motion_lock_rate",
+      "value": 10,
+      "unit": "Hz",
+      "source": "rover_twist_mux/config/rover_motion_lock.yaml:3"
+    },
+    {
+      "component": "rover_twist_mux",
+      "name": "motion_lock_gpio_timeout",
+      "value": 1.0,
+      "unit": "s",
+      "source": "rover_twist_mux/config/rover_motion_lock.yaml:4"
+    },
+    {
+      "component": "rover_battery",
+      "name": "design_capacity",
+      "value": 40.0,
+      "unit": "A*h",
+      "source": "rover_battery/config/rover_battery.yaml:11"
+    },
+    {
+      "component": "rover_battery",
+      "name": "watchdog_timeout",
+      "value": 10.0,
+      "unit": "s",
+      "source": "rover_battery/config/rover_battery.yaml:13"
+    },
+    {
+      "component": "rover_safety",
+      "name": "safety_tick_rate",
+      "value": 10,
+      "unit": "Hz",
+      "source": "rover_safety/config/rover_safety.yaml:4"
+    },
+    {
+      "component": "rover_safety",
+      "name": "battery_temp_critical",
+      "value": 50.0,
+      "unit": "degC",
+      "source": "rover_safety/config/rover_safety.yaml:11"
+    },
+    {
+      "component": "rover_safety",
+      "name": "battery_temp_fatal",
+      "value": 60.0,
+      "unit": "degC",
+      "source": "rover_safety/config/rover_safety.yaml:12"
+    },
+    {
+      "component": "rover_safety",
+      "name": "led_battery_low",
+      "value": 0.4,
+      "unit": "1",
+      "source": "rover_safety/config/led_safety.yaml:13"
+    },
+    {
+      "component": "rover_safety",
+      "name": "led_battery_critical",
+      "value": 0.1,
+      "unit": "1",
+      "source": "rover_safety/config/led_safety.yaml:14"
+    },
+    {
+      "component": "rover_diag_manager",
+      "name": "system_status_rate",
+      "value": 5,
+      "unit": "Hz",
+      "source": "rover_diag_manager/config/system_diag.yaml:7"
+    },
+    {
+      "component": "rover_diag_manager",
+      "name": "diagnostics_agg_rate",
+      "value": 1.0,
+      "unit": "Hz",
+      "source": "rover_diag_manager/config/diagnostic_aggregator.yaml:15"
+    },
+    {
+      "component": "rover_localization",
+      "name": "ekf_frequency",
+      "value": 50,
+      "unit": "Hz",
+      "source": "rover_localization/config/rel_localization.yaml:4"
+    }
+  ]
+}

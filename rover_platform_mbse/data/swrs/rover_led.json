@@ -1,0 +1,495 @@
+{
+  "package": "rover_led",
+  "prefix": "LED",
+  "document": "ROVER-A1-ROVER_LED-SWRS-V-001",
+  "title": "rover_led Software Requirements Specification",
+  "scope": "rover_led drives the rover's two SK9822 LED bumper panels (front = UDP channel 1, rear = UDP channel 2). The LedControllerNode component loads an animation catalog, composites layered image animations (ERROR > ALERT > INFO > STATE) per segment and publishes one RGBA frame per panel; the lifecycle LedDriverNode component validates and encodes those frames into SK9822 packets with a global brightness and hands them to two rover_udp_driver UdpSenderNode components, all composed in rover_led_container. rover_led provides the LED display capability and the animation catalog; the choice of which animation represents the current system state is made by its client (rover_safety's rover_led_safety_node), outside this package.",
+  "requirements": [
+    {
+      "id": "SWR-LED-001",
+      "category": "Functional",
+      "text": "The rover_led shall give every LED segment four animation layers, ERROR (priority 0), ALERT (1), INFO (2) and STATE (3), and shall composite them into one frame with ERROR on top, alpha-blending each layer over the layers below it.",
+      "rationale": "Lets independent clients show a state, an informational overlay, a transient alert and an error at the same time without overwriting each other; the highest-severity layer stays visible.",
+      "verification": "Test",
+      "acceptance": "With opaque animations on the ERROR and STATE layers the published frame shows the ERROR pixels; a translucent overlay is alpha-blended as (overlay*alpha + base*(255-alpha))/255 per channel; a layer without an animation contributes nothing.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/domain/led_components/led_segment.cpp:40-43",
+        "rover_led/src/domain/led_components/led_segment.cpp:97-127",
+        "rover_led/README.md:129-134"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/domain/test_led_segment.cpp",
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-002",
+      "category": "Functional",
+      "text": "The rover_led shall play ALERT-layer animations one after another in FIFO order from a queue of at most 10 entries per segment, and shall reject (not queue) a request on a segment whose queue is full while still answering the service call with success=true and a message naming the number of segments that dropped it.",
+      "rationale": "Short alerts (blinkers, goal achieved/failed, charger inserted) must not cancel one another; a bounded queue keeps memory and latency bounded.",
+      "verification": "Test",
+      "acceptance": "Queueing 11 ALERT animations on one segment keeps 10 and reports the 11th as dropped in the response message; the queued animations play in request order and the layer is empty after the last one ends.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/include/rover_led/domain/led_components/segment_queue_layer.hpp:47",
+        "rover_led/src/domain/led_components/segment_queue_layer.cpp:38-39",
+        "rover_led/src/infrastructure/led_controller_node.cpp:176-184"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/domain/test_segment_layers.cpp",
+        "rover_led/test/unit/application/test_set_animation_use_case.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-003",
+      "category": "Interface",
+      "text": "The rover_led shall provide the service led/set_animation (rover_msgs/SetLedAnimation) that starts the catalog animation with the requested id, param and repeating flag on every segment the catalog entry names, at the entry's priority layer, and shall return success=false with a reason for an unknown id, an unknown segment, an unavailable animation type or an animation that fails to initialise, leaving the current animations unchanged in those cases.",
+      "rationale": "Single command interface for all LED clients; failed requests must not blank the panels.",
+      "verification": "Test",
+      "acceptance": "A request for a catalog id lights every covered segment on the next frame; a request for an id not in the catalog returns success=false with message 'No animation with ID: <id>' and the published frames are unchanged.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/infrastructure/led_controller_node.cpp:136-137",
+        "rover_led/src/infrastructure/led_controller_node.cpp:165-191",
+        "rover_led/src/application/set_animation_use_case.cpp:41-53",
+        "rover_led/src/application/set_animation_use_case.cpp:64-96"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_set_animation_use_case.cpp",
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-004",
+      "category": "Interface",
+      "text": "The rover_led shall provide the service led/stop_animation (rover_msgs/StopLedAnimation) that removes the animation with the requested id, including its queued ALERT copies, from its layer on every segment, and shall return success=false when that animation is not playing on any segment.",
+      "rationale": "Clients need to clear a repeating state or info animation explicitly, e.g. when a condition ends.",
+      "verification": "Test",
+      "acceptance": "After stopping a playing id the response lists the segments it was stopped on and the layer is blank (or plays the next queued ALERT animation); stopping an id that is not playing returns success=false with \"'<name>' is not playing.\".",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/infrastructure/led_controller_node.cpp:138-139",
+        "rover_led/src/infrastructure/led_controller_node.cpp:193-218",
+        "rover_led/src/domain/led_components/segment_queue_layer.cpp:80-100"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_stop_animation_use_case.cpp",
+        "rover_led/test/unit/domain/test_segment_layers.cpp",
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-005",
+      "category": "Performance",
+      "text": "The rover_led shall publish one led/channel_<n>_frame (sensor_msgs/Image, encoding rgba8, height = panel rows, width = LEDs per row, data in wire order, KEEP_LAST depth 10) per configured panel at controller_frequency, default 50.0 Hz.",
+      "rationale": "Animations are sampled at a fixed render rate; the driver forwards each frame to the LED board.",
+      "verification": "Test",
+      "acceptance": "Measured rate of led/channel_1_frame and led/channel_2_frame is 50 Hz within the 10 % tolerance used by the 'Led render rate' diagnostic, over 60 s; each frame on the rover_a1 configuration is 2 rows x 20 LEDs x 4 bytes.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/led_controller_parameters.yaml:8-12",
+        "rover_led/src/infrastructure/led_controller_node.cpp:76-80",
+        "rover_led/src/infrastructure/led_controller_node.cpp:141-143",
+        "rover_led/src/infrastructure/led_controller_node.cpp:151-155",
+        "rover_led/src/infrastructure/led_controller_node.cpp:221-234",
+        "rover_led/config/rover_a1_animations.yaml:10-16"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_render_tick_use_case.cpp",
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": "The integration test checks frame content (blank while idle, lit after set_animation), not the 50 Hz rate; the rate is only monitored at run time by the 'Led render rate' diagnostic. The render timer is a wall timer."
+    },
+    {
+      "id": "SWR-LED-006",
+      "category": "Interface",
+      "text": "The rover_led shall publish led/state (rover_msgs/LedState, reliable, transient-local, depth 1) at state_publish_rate, default 5.0 Hz, reporting for every segment and every layer whether it is active and, if so, the animation id, name, param, repeating flag, progress and number of queued animations.",
+      "rationale": "Makes the displayed LED state observable to UIs, logging and verification of the state-to-LED mapping.",
+      "verification": "Test",
+      "acceptance": "ros2 topic hz led/state reports 5 Hz; after set_animation of a STATE-layer id, the next led/state message shows that id active on the STATE layer of each covered segment; a late subscriber receives the last message immediately.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/led_controller_parameters.yaml:14-18",
+        "rover_led/src/infrastructure/led_controller_node.cpp:127-132",
+        "rover_led/src/infrastructure/led_controller_node.cpp:147-149",
+        "rover_led/src/infrastructure/led_controller_node.cpp:298-331"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_get_led_state_use_case.cpp",
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-007",
+      "category": "Interface",
+      "text": "The rover_led shall publish the loaded animation catalog once at start-up on led/animations (rover_msgs/LedAnimationCatalog, reliable, transient-local, depth 1) with the id, name and priority of every entry, sorted by id.",
+      "rationale": "UIs and clients discover the available animations without reading the YAML file.",
+      "verification": "Test",
+      "acceptance": "A subscriber that connects after start-up receives one message listing every catalog id in ascending order with its name and priority.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical requirement for UI/tool discovery of the catalog; no system requirement asks for it.",
+      "evidence": [
+        "rover_led/src/infrastructure/led_controller_node.cpp:127-134",
+        "rover_led/src/infrastructure/led_controller_node.cpp:279-296"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-008",
+      "category": "Interface",
+      "text": "The rover_led shall publish each panel frame additionally on led/channel_<n>_preview (sensor_msgs/Image, best effort, depth 1) at preview_publish_rate, default 5.0 Hz, and shall create no preview topics when preview_publish_rate is 0.",
+      "rationale": "UIs (Cockpit LED page) get a low-rate copy so the 50 Hz frames do not cross the Zenoh router.",
+      "verification": "Test",
+      "acceptance": "With the default parameter the preview topics are published at 5 Hz and carry the same image as the full-rate frame of the same tick; with preview_publish_rate=0 no led/channel_<n>_preview topic exists.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical requirement that limits network load for remote UIs; no system requirement asks for it.",
+      "evidence": [
+        "rover_led/src/led_controller_parameters.yaml:20-24",
+        "rover_led/src/infrastructure/led_controller_node.cpp:66-69",
+        "rover_led/src/infrastructure/led_controller_node.cpp:81-88",
+        "rover_led/src/infrastructure/led_controller_node.cpp:264-272"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No automated test covers the preview topics."
+    },
+    {
+      "id": "SWR-LED-009",
+      "category": "Parameter",
+      "text": "The rover_led shall load the panel layout and animation catalog from the file given by animations_config_path (mandatory, non-empty) and, for rover_a1, shall configure two panels (channel 1 front, channel 2 rear) of 40 LEDs folded into 2 rows each and a catalog containing every rover_msgs/LedAnimation id from 0 (E_STOP) to 17 (FLOOD_LIGHT).",
+      "rationale": "Every named animation id used by clients must exist in the shipped catalog, and the frame geometry must match the physical panels.",
+      "verification": "Test, Inspection",
+      "acceptance": "Parsing config/rover_a1_animations.yaml yields 2 panels, 2 segments and a catalog entry for each id 0..17; every entry uses rover_led::ImageAnimation or rover_led::MovingImageAnimation with an existing image.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/led_controller_parameters.yaml:2-6",
+        "rover_led/config/rover_a1_animations.yaml:10-28",
+        "rover_led/config/rover_a1_animations.yaml:32-325",
+        "rover_msgs/msg/LedAnimation.msg:1-18",
+        "rover_led/src/infrastructure/led_controller_node.cpp:70-72"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/infrastructure/test_yaml_led_config.cpp",
+        "rover_led/test/unit/infrastructure/test_shipped_blinkers.cpp"
+      ],
+      "comments": "README.md example shows the front segment as led_range 0-39 and E_STOP duration 6; the shipped config uses 39-0 and duration 4 (doc drift)."
+    },
+    {
+      "id": "SWR-LED-010",
+      "category": "Functional",
+      "text": "The rover_led shall provide a catalog animation for each of the SYS-SR-010 states Emergency Stop (E_STOP, id 0, STATE layer), Idle (READY, id 1, STATE), Teleoperation (MANUAL_ACTION, id 4, STATE), Autonomous (AUTONOMOUS_READY id 11 and AUTONOMOUS_ACTION id 12, STATE), Fault (ERROR, id 2, ERROR layer) and Low Battery (LOW_BATTERY id 5 and CRITICAL_BATTERY id 6, INFO layer).",
+      "rationale": "SYS-SR-009 requires a state-dependent LED indication; rover_led supplies the displayable pattern per state, its client selects it.",
+      "verification": "Inspection, Test",
+      "acceptance": "For each listed id, set_animation succeeds and led/state shows the id active on the stated layer of both segments.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009", "SYS-SR-010"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/config/rover_a1_animations.yaml:32-34",
+        "rover_led/config/rover_a1_animations.yaml:47-49",
+        "rover_led/config/rover_a1_animations.yaml:62-64",
+        "rover_led/config/rover_a1_animations.yaml:84-86",
+        "rover_led/config/rover_a1_animations.yaml:99-101",
+        "rover_led/config/rover_a1_animations.yaml:124-126",
+        "rover_led/config/rover_a1_animations.yaml:225-227",
+        "rover_led/config/rover_a1_animations.yaml:240-242"
+      ],
+      "implementation": "Partial",
+      "verified_by": [
+        "rover_led/test/unit/infrastructure/test_yaml_led_config.cpp"
+      ],
+      "comments": "Partial: no Boot animation exists (see SWR-LED-020). The mapping state -> id is an interpretation: the system has no explicit Idle state, READY is the closest. Which animation is shown is decided by rover_safety (behavior_trees/rover_led_safety.xml), whose StateAnimationSubtree only selects READY, MANUAL_ACTION and E_STOP; nothing in rover_safety requests AUTONOMOUS_READY/AUTONOMOUS_ACTION (outside this package, flagged for the rover_safety SWRS)."
+    },
+    {
+      "id": "SWR-LED-011",
+      "category": "Functional",
+      "text": "The rover_led shall encode each RGBA panel frame as an SK9822 packet: a 4-byte start frame of 0x00, one 4-byte word per LED of 0xE0 | 5-bit brightness (pixel alpha x global brightness level 0-31 / 255) followed by blue, green and red after gamma 2.2 correction scaled to 240/255/245, and a 4-byte end frame of 0xFF, each word rotated left by one byte for the UDP LED bridge.",
+      "rationale": "Wire format expected by the SK9822 LED board behind the UDP bridge; gamma and white-balance correction give perceptually correct colours.",
+      "verification": "Test",
+      "acceptance": "Known RGBA vectors encode to the expected byte sequence; a 40-LED frame produces 4 + 160 + 4 = 168 bytes; a frame whose length is not a multiple of 4 is rejected.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/include/rover_led/domain/sk9822_frame_encoder.hpp:53-56",
+        "rover_led/src/domain/sk9822_frame_encoder.cpp:26-42",
+        "rover_led/src/domain/sk9822_frame_encoder.cpp:44-67",
+        "rover_led/src/domain/sk9822_frame_encoder.cpp:69-80"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/domain/test_sk9822_frame_encoder.cpp",
+        "rover_led/test/unit/application/test_encode_frame_use_case.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-012",
+      "category": "Functional",
+      "text": "The rover_led shall drop, without sending, any received panel frame that is older than frame_timeout (default and rover_a1 value 0.1 s), older than the previously received frame, not rgba8-encoded, or whose height x width or data size does not match the channel's LED count, and shall report each dropped frame as a WARN diagnostic broadcast.",
+      "rationale": "Stale or malformed frames must never reach the LED board; out-of-order delivery must not show an old state.",
+      "verification": "Test",
+      "acceptance": "A frame stamped more than 0.1 s before receipt, a frame older than the last one, a bgr8 frame and a frame of the wrong size each produce no udp_write packet and a WARN on /diagnostics; a valid frame produces one packet.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/led_driver_parameters.yaml:2-6",
+        "rover_led/config/rover_a1_driver.yaml:1",
+        "rover_led/src/application/encode_frame_use_case.cpp:37-53",
+        "rover_led/src/application/encode_frame_use_case.cpp:60-84",
+        "rover_led/src/infrastructure/led_driver_node.cpp:317-326"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_encode_frame_use_case.cpp",
+        "rover_led/test/integration/test_led_driver_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-013",
+      "category": "Interface",
+      "text": "The rover_led shall subscribe to led/channel_1_frame and led/channel_2_frame (sensor_msgs/Image, depth 5) and publish the encoded packets on udp_write/led_channel_1 and udp_write/led_channel_2 (udp_msgs/UdpPacket, depth 5), sized by channel_1_num_led and channel_2_num_led (40 each for rover_a1).",
+      "rationale": "Decouples rendering from the transport; rover_udp_driver sends each channel's packets to its LED board.",
+      "verification": "Test",
+      "acceptance": "With the driver active, each valid 40-LED frame received on led/channel_<n>_frame yields exactly one 168-byte packet on udp_write/led_channel_<n>.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/infrastructure/led_driver_node.cpp:101-132",
+        "rover_led/config/rover_a1_driver.yaml:3-4",
+        "rover_led/src/led_driver_parameters.yaml:14-24"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/integration/test_led_driver_node.cpp"
+      ],
+      "comments": "The generated parameter default is 24 LEDs per channel; rover_a1 overrides it to 40 in config/rover_a1_driver.yaml."
+    },
+    {
+      "id": "SWR-LED-014",
+      "category": "Interface",
+      "text": "The rover_led shall provide the service led/set_brightness (rover_msgs/SetLedBrightness) accepting a global brightness in [0.0, 1.0], shall reject values outside that range with success=false and unchanged brightness, shall store an accepted value in the global_brightness parameter so it survives a reconfigure, and shall publish the brightness in effect on led/brightness (std_msgs/Float32, reliable, transient-local, depth 1) on activation and after each change.",
+      "rationale": "Operators dim the LEDs (e.g. indoors) at run time; the latched topic lets UIs show the current value.",
+      "verification": "Test",
+      "acceptance": "set_brightness 0.25 returns success=true, led/brightness reads 0.25 and parameter global_brightness is 0.25 after deactivate/cleanup/configure/activate; set_brightness 1.5 returns success=false and led/brightness is unchanged. rover_a1 starts at 0.5.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/led_driver_parameters.yaml:8-12",
+        "rover_led/config/rover_a1_driver.yaml:2",
+        "rover_led/src/infrastructure/led_driver_node.cpp:141-145",
+        "rover_led/src/infrastructure/led_driver_node.cpp:409-444"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_set_brightness_use_case.cpp",
+        "rover_led/test/integration/test_led_driver_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-LED-015",
+      "category": "Lifecycle",
+      "text": "The rover_led driver shall be a managed lifecycle node that, with autostart=true (default), configures and activates itself once when the executor first spins, forwards frames only while Active, sends an all-off frame to both panels on activation and on deactivation, and on context shutdown finalizes itself (clearing the LEDs) within 1 s.",
+      "rationale": "The LEDs must not keep showing a stale pattern when the driver stops, and must start in a known (dark) state.",
+      "verification": "Test",
+      "acceptance": "After start-up the driver reaches Active without external lifecycle calls; frames received while Inactive produce no packets; deactivation and shutdown each emit one blank packet per channel; after rclcpp::shutdown the node is Finalized.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009", "SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/led_driver_parameters.yaml:32-36",
+        "rover_led/src/infrastructure/led_driver_node.cpp:75-83",
+        "rover_led/src/infrastructure/led_driver_node.cpp:152-201",
+        "rover_led/src/infrastructure/led_driver_node.cpp:212-254",
+        "rover_led/src/infrastructure/led_driver_node.cpp:298-303",
+        "rover_led/include/rover_led/infrastructure/led_driver_node.hpp:130"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/integration/test_led_driver_node.cpp"
+      ],
+      "comments": "Autostart makes one attempt with no retry, by design (on_configure has no retryable failure path). The controller (LedControllerNode) is a plain rclcpp node, not lifecycle; it throws in its constructor if the catalog cannot be loaded, and the container exit then shuts down the launch."
+    },
+    {
+      "id": "SWR-LED-016",
+      "category": "Functional",
+      "text": "The rover_led driver shall, when led_control_handshake is true, request LED control from hardware/led_control_enable (std_srvs/SetBool) on activation, retrying from a 100 ms timer for at most 3 attempts with a 3 s response timeout each, ignore frames until control is granted, release control on deactivation, and hand back a grant that arrives for an earlier activation.",
+      "rationale": "Arbitrates the LED board with a hardware controller that may also drive the LEDs; stale grants must not leave control held by an inactive driver.",
+      "verification": "Test",
+      "acceptance": "With the handshake enabled and the service refusing, the driver sends 3 requests and then logs 'Failed to obtain LED control after 3 attempts'; frames are forwarded only after a success reply; a grant received after deactivation triggers a SetBool(false) request.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical requirement for sharing the LED hardware with another controller; no system requirement asks for it. Disabled by default.",
+      "evidence": [
+        "rover_led/src/led_driver_parameters.yaml:26-30",
+        "rover_led/include/rover_led/application/led_control_handshake.hpp:56-57",
+        "rover_led/src/infrastructure/led_driver_node.cpp:164-179",
+        "rover_led/src/infrastructure/led_driver_node.cpp:305-308",
+        "rover_led/src/infrastructure/led_driver_node.cpp:329-407"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/application/test_led_control_handshake.cpp",
+        "rover_led/test/integration/test_led_driver_node.cpp"
+      ],
+      "comments": "rover_a1 does not set led_control_handshake, so the default false applies; no provider of hardware/led_control_enable was checked in this review."
+    },
+    {
+      "id": "SWR-LED-017",
+      "category": "Diagnostics",
+      "text": "The rover_led controller shall publish on diagnostics, hardware id 'Bumper Led', a 'Led controller status' that is ERROR when rendering fails, WARN when a segment fails to update or a catalog animation uses an unavailable type, and OK otherwise (reporting animations loaded, catalog warnings, last rejected request and what each segment shows), plus a 'Led render rate' frequency status expecting controller_frequency with 10 % tolerance over a 10-sample window.",
+      "rationale": "Makes LED subsystem faults visible in the aggregated diagnostics.",
+      "verification": "Test",
+      "acceptance": "A catalog entry with an unknown animation type yields WARN 'Some animations use an unavailable type.'; a healthy controller yields OK 'Controller rendering.'; the render-rate entry is OK while frames are published at 50 Hz.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/infrastructure/led_controller_node.cpp:151-160",
+        "rover_led/src/infrastructure/led_controller_diagnostics.cpp:65-94"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/unit/infrastructure/test_led_controller_diagnostics.cpp",
+        "rover_led/test/integration/test_led_controller_node.cpp"
+      ],
+      "comments": "The diagnostic period is the diagnostic_updater default (not overridden in the package); the integration test relies on it publishing once a second (test_led_controller_node.cpp:69)."
+    },
+    {
+      "id": "SWR-LED-018",
+      "category": "Diagnostics",
+      "text": "The rover_led driver shall publish on diagnostics, hardware id 'Bumper Led', a 'Led driver status' that is ERROR 'Driver is not active!' when not Active, WARN 'Driver is not yet functional!' while LED control is pending, ERROR when obtaining control failed, and OK 'Driver is fully functional.' when control is granted, including the lifecycle state and LED control status.",
+      "rationale": "A driver that did not come up (autostart has no retry) must be visible to the operator.",
+      "verification": "Test",
+      "acceptance": "With the driver Unconfigured the status is ERROR 'Driver is not active!'; after activation without handshake it is OK with 'LED control status' = GRANTED.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/src/infrastructure/led_driver_node.cpp:56-57",
+        "rover_led/src/infrastructure/led_driver_node.cpp:451-472"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No automated test checks the driver diagnostic status."
+    },
+    {
+      "id": "SWR-LED-019",
+      "category": "Build",
+      "text": "The rover_led launch file rover_led.launch.py shall load rover_led_driver, rover_led_controller and two rover_udp_driver UdpSenderNode components (rover_udp_led_channel_1_sender_node to 192.168.77.202:3334 and rover_udp_led_channel_2_sender_node to 192.168.77.201:3333, autostart) into one container rover_led_container with intra-process communication, shall omit the driver and senders when use_sim is True, and shall shut down the launch when the container exits.",
+      "rationale": "Keeps the 50 Hz frame and packet traffic in-process instead of crossing the Zenoh router; simulation has no LED board.",
+      "verification": "Test, Inspection",
+      "acceptance": "Launch introspection finds exactly one container holding the four nodes, each with use_intra_process_comms=True; with use_sim=True only rover_led_controller is loaded.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009", "SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/launch/rover_led.launch.py:86-111",
+        "rover_led/launch/rover_led.launch.py:112-156",
+        "rover_led/config/rover_a1_udp_led_channel_1.yaml:3-4",
+        "rover_led/config/rover_a1_udp_led_channel_2.yaml:3-4"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/test_launch_structure.py"
+      ],
+      "comments": "Doc drift / TBC: README.md:74 states port 3333 for both channels, but config/rover_a1_udp_led_channel_1.yaml sets port 3334 for channel 1. Confirm the port the front (channel 1) LED board listens on."
+    },
+    {
+      "id": "SWR-LED-020",
+      "category": "Functional",
+      "text": "The rover_led shall provide a catalog animation (and a matching rover_msgs/LedAnimation constant) for the SYS-SR-010 Boot state, shown on both panels from the moment the LED driver becomes Active until a client selects another state animation.",
+      "rationale": "SYS-SR-009 requires every SYS-SR-010 state, including Boot, to have a defined LED indication; today the panels stay blank until rover_safety sends the first animation.",
+      "verification": "Test",
+      "acceptance": "Immediately after rover_led starts and before any set_animation call, led/state shows the Boot animation active on the STATE layer of both segments and the published frames are not blank.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-009", "SYS-SR-010"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_msgs/msg/LedAnimation.msg:1-18",
+        "rover_led/config/rover_a1_animations.yaml:31-325",
+        "rover_led/src/infrastructure/led_driver_node.cpp:166-168"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "No BOOT id exists in LedAnimation.msg or the catalog, and the driver clears the LEDs on activation. Colour/pattern TBD (depends on the SYS-SR-009 mapping)."
+    },
+    {
+      "id": "SWR-LED-021",
+      "category": "Functional",
+      "text": "The rover_led shall document, in the package, the state-to-LED mapping required by SYS-SR-009: for each SYS-SR-010 state the animation id, layer, colour and pattern (steady/blinking/moving, period) shown on the front and rear panels.",
+      "rationale": "SYS-SR-009 acceptance requires a specified colour/pattern per state to test against; today colour and pattern exist only implicitly in the PNG images referenced by the catalog.",
+      "verification": "Inspection",
+      "acceptance": "The package README (or a referenced spec) contains a table covering Boot, Idle, Teleoperation, Autonomous, Emergency Stop, Fault and Low Battery with id, layer, colour and pattern; each entry matches the shipped catalog and images.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-009", "SYS-SR-010"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_led/README.md:76-157",
+        "rover_led/config/rover_a1_animations.yaml:36-45"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "The README documents the layers and animation types but not the colour/pattern per state; the images (e.g. animations/rover_a1/estop_front.png) define them implicitly."
+    }
+  ]
+}

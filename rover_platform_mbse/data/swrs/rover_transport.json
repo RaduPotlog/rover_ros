@@ -1,0 +1,519 @@
+{
+  "package": "rover_transport",
+  "prefix": "TRN",
+  "document": "ROVER-A1-ROVER_TRANSPORT-SWRS-V-001",
+  "title": "rover_transport Software Requirements Specification",
+  "scope": "rover_transport is the rover's byte-transport layer, a hard fork of ros-drivers/transport_drivers v1.2.0 laid out under Clean Architecture. It covers four sub-packages. rover_io_context holds the shared ports, the inbound/outbound byte bridges and the ASIO thread pool, with no ROS dependency. rover_serial_driver provides the lifecycle SerialBridgeNode (UART <-> serial_read/serial_write), which rover_crsf_teleop uses for the ELRS/CRSF receiver at 460800 baud. rover_udp_driver provides the lifecycle UdpReceiverNode and UdpSenderNode (UDP <-> udp_read/udp_write), which rover_battery uses for the BMS bridge on UDP port 4444 and rover_led uses for the two LED panel channels on UDP ports 3334 and 3333. rover_modbus_driver is a synchronous Modbus TCP discrete-I/O client library with no node, used in-process by rover_hardware_interface's RoverSafetyController for the PLC E-stop/GPIO coils. rover_asio_cmake_module only provides find_package(ASIO). Two libraries outside the package support it. rover_modbus is a vendored, TCP-only fork of Mazurel/Modbus that supplies the Modbus_Core frame codec and the Modbus_Tcp sockets. rover_utils is not a build dependency of rover_transport; its Python launch helpers are used by the consumer launch files (for example rover_led). The package is responsible for moving raw bytes between devices and ROS 2 without interpreting them, except for Modbus framing. Protocol decoding belongs to the consumers.",
+  "requirements": [
+    {
+      "id": "SWR-TRN-001",
+      "category": "Interface",
+      "text": "The rover_transport shall, in rover_serial_driver's SerialBridgeNode, publish every non-empty chunk of bytes read from the configured UART on the topic serial_read as std_msgs/UInt8MultiArray with QoS depth 100 (reliable by default), with the byte payload unchanged.",
+      "rationale": "The CRSF/ELRS receiver bytes must reach rover_crsf_teleop, one of the velocity command sources.",
+      "verification": "Test",
+      "acceptance": "With the node active on a pseudo-terminal, bytes written to the device side show up on serial_read with identical content and order; zero-length reads publish nothing.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-005"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:38",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:128",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:141-145",
+        "rover_transport/rover_serial_driver/src/infrastructure/ros2_byte_publisher.cpp:36-47",
+        "rover_transport/rover_io_context/src/application/inbound_byte_bridge.cpp:35-43",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:97-110"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_serial_driver/test/integration/test_serial_bridge_node_lifecycle.cpp",
+        "rover_transport/rover_serial_driver/test/unit/test_serial_msg_conversions.cpp",
+        "rover_transport/rover_io_context/test/unit/test_byte_bridges.cpp"
+      ],
+      "comments": "rover_crsf_teleop remaps serial_read to rc/raw and serial_write to rc/raw_write and loads the component intra-process (rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:110-111)."
+    },
+    {
+      "id": "SWR-TRN-002",
+      "category": "Interface",
+      "text": "The rover_transport shall, in SerialBridgeNode, subscribe to serial_write (std_msgs/UInt8MultiArray, KeepLast(32), best effort) and write each message's bytes to the UART while the node is ACTIVE.",
+      "rationale": "Keeps a return path to the serial device (such as CRSF telemetry) on the same owner of the port.",
+      "verification": "Test",
+      "acceptance": "A message published on serial_write while the node is active arrives unchanged at the device side of a pseudo-terminal.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-005"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:39",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:147-150",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:213-220",
+        "rover_transport/rover_serial_driver/src/infrastructure/asio_serial_port.cpp:66-87"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_serial_driver/test/integration/test_serial_bridge_node_lifecycle.cpp"
+      ],
+      "comments": "The payload is copied for the lifetime of the async write. This fixes an upstream use-after-free (asio_serial_port.cpp:68-71)."
+    },
+    {
+      "id": "SWR-TRN-003",
+      "category": "Parameter",
+      "text": "The rover_transport shall declare the SerialBridgeNode parameters device_name (string), baud_rate (int), flow_control (none|hardware|software), parity (none|odd|even), stop_bits (\"1\"|\"1.0\"|\"1.5\"|\"2\"|\"2.0\") and autostart (bool, default false), and shall fail the configure transition with a logged error when device_name is empty, baud_rate <= 0, or any enumerated value is not in its accepted set.",
+      "rationale": "A misconfigured UART must fail visibly at configure time, not later with an opaque ASIO error.",
+      "verification": "Test",
+      "acceptance": "configure() returns to UNCONFIGURED (FAILURE) for an empty device_name, baud_rate = 0, and flow_control = 'bogus'. A valid combination such as 460800/none/none/\"1\" parses.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical robustness requirement of the transport layer. No system requirement covers parameter validation.",
+      "evidence": [
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:71-79",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:94-126",
+        "rover_transport/rover_serial_driver/src/domain/serial_port_config.cpp:29-69",
+        "rover_transport/rover_serial_driver/src/domain/serial_port_config.cpp:92-114"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_serial_driver/test/unit/test_serial_port_config.cpp",
+        "rover_transport/rover_serial_driver/test/unit/test_asio_serial_options.cpp",
+        "rover_transport/rover_serial_driver/test/integration/test_serial_bridge_node_lifecycle.cpp"
+      ],
+      "comments": "The shipped example config (rover_serial_driver/config/rover_serial_driver.yaml:10-14) uses /dev/ttyACM0 at 115200. The rover values come from rover_crsf_teleop/config/rover_crsf_teleop.yaml:19 (serial_baudrate 460800)."
+    },
+    {
+      "id": "SWR-TRN-004",
+      "category": "Lifecycle",
+      "text": "The rover_transport shall implement SerialBridgeNode, UdpReceiverNode and UdpSenderNode as ROS 2 managed lifecycle nodes. on_configure shall open the device or socket and return FAILURE if it cannot be opened. on_activate and on_deactivate shall enable and disable data transfer. on_cleanup and on_shutdown shall close the device or socket and release all publishers and subscriptions so the node can be configured again.",
+      "rationale": "The transport owns hardware resources. Per project rules, resource owners are lifecycle-managed.",
+      "verification": "Test",
+      "acceptance": "configure fails for a missing device; configure -> activate -> deactivate -> cleanup -> configure succeeds; after cleanup the UDP port can be bound again by another socket.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical requirement from the project lifecycle convention (resource owners are managed nodes). No system parent.",
+      "evidence": [
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:118-211",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_receiver_node.cpp:107-188",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:111-192"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_serial_driver/test/integration/test_serial_bridge_node_lifecycle.cpp",
+        "rover_transport/rover_udp_driver/test/integration/test_udp_nodes_lifecycle.cpp"
+      ],
+      "comments": "UdpReceiverNode starts receiving in on_configure. Datagrams that arrive while it is INACTIVE go to a deactivated lifecycle publisher and are not delivered."
+    },
+    {
+      "id": "SWR-TRN-005",
+      "category": "Lifecycle",
+      "text": "The rover_transport shall, when a transport node's autostart parameter is true, trigger configure and then activate once from the executor immediately after construction, without retrying if configure fails.",
+      "rationale": "launch_ros' ComposableLifecycleNode autostart does not reach components in a namespaced container, so the nodes bring themselves up. This is needed for unattended start-up.",
+      "verification": "Test, Inspection",
+      "acceptance": "A component loaded with autostart:=true reaches ACTIVE without an external lifecycle call; with an invalid parameter it stays UNCONFIGURED and makes no further attempt.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:81-92",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_receiver_node.cpp:74-85",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:78-89",
+        "rover_battery/launch/rover_battery.launch.py:68",
+        "rover_led/launch/rover_led.launch.py:102"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Partial because a failed configure (device not yet enumerated, PLC or BMS bridge not up) is never retried, so the node stays UNCONFIGURED until someone steps in. That conflicts with unattended start-up (SYS-SR-024). No test exercises the autostart path directly."
+    },
+    {
+      "id": "SWR-TRN-006",
+      "category": "Interface",
+      "text": "The rover_transport shall, in UdpReceiverNode, bind a UDP/IPv4 socket to the configured ip:port and publish every non-empty received datagram on udp_read as udp_msgs/UdpPacket with QoS depth 100, header.stamp set to the node clock at reception and header.frame_id set to the configured ip.",
+      "rationale": "The BMS bridge sends battery data over UDP. rover_battery decodes it into the battery state.",
+      "verification": "Test",
+      "acceptance": "With the receiver active, a datagram sent to ip:port is published once on udp_read with an identical payload and a non-zero stamp.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-016"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_receiver_node.cpp:35",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_receiver_node.cpp:112-133",
+        "rover_transport/rover_udp_driver/src/infrastructure/asio_udp_socket.cpp:210-211",
+        "rover_transport/rover_udp_driver/src/infrastructure/ros2_udp_packet_publisher.cpp:42-58",
+        "rover_battery/config/rover_battery.yaml:4-7",
+        "rover_battery/launch/rover_battery.launch.py:63-71"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_udp_driver/test/integration/test_udp_nodes_lifecycle.cpp",
+        "rover_transport/rover_udp_driver/test/integration/test_asio_udp_socket.cpp",
+        "rover_transport/rover_udp_driver/test/unit/test_udp_packet_conversions.cpp"
+      ],
+      "comments": "Rover use: rover_udp_battery_receiver_node on 192.168.1.201:4444, with udp_read remapped to rover_battery_udp_data, intra-process. Doc drift: UdpPacket.address and src_port are filled with the local bound endpoint, not the datagram's sender (ros2_udp_packet_publisher.cpp:52-55). Zero-length datagrams are not published (inbound_byte_bridge.cpp:37-39)."
+    },
+    {
+      "id": "SWR-TRN-007",
+      "category": "Functional",
+      "text": "The rover_transport shall keep the UDP receiver armed after a successful zero-length datagram, so that later datagrams are still published.",
+      "rationale": "Upstream stopped receiving for good after a legal zero-length UDP packet. That would silently freeze the battery data.",
+      "verification": "Inspection, Test",
+      "acceptance": "Sending a 0-byte datagram followed by a 4-byte datagram results in the 4-byte datagram being published on udp_read.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-016"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_udp_driver/src/infrastructure/asio_udp_socket.cpp:172-182"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No test sends a zero-length datagram. Only the bridge-level empty-read drop is tested (test_byte_bridges.cpp)."
+    },
+    {
+      "id": "SWR-TRN-008",
+      "category": "Functional",
+      "text": "The rover_transport shall recover from a receive error on a UDP or serial transport, by re-arming the receive or reopening the device, and resume publishing without operator action.",
+      "rationale": "Today one receive error permanently stops the data stream while the node stays ACTIVE. The consumer then sees stale battery data or a lost teleop link with no fault reported.",
+      "verification": "Test",
+      "acceptance": "After an injected receive error (UDP) or a USB unplug/replug (serial), data flow resumes within [TBD] s without a lifecycle transition.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-005", "SYS-SR-016", "SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_udp_driver/src/infrastructure/asio_udp_socket.cpp:166-170",
+        "rover_transport/rover_serial_driver/src/infrastructure/asio_serial_port.cpp:138-145",
+        "rover_transport/rover_serial_driver/README.md:61-63"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "On a UDP receive error (other than operation_aborted) the handler logs and returns without re-arming. On a serial read error the port is closed and never reopened, as upstream did. The README calls auto-reconnect the obvious follow-up. Recovery time is TBD because no SYS-SR sets it."
+    },
+    {
+      "id": "SWR-TRN-009",
+      "category": "Interface",
+      "text": "The rover_transport shall, in UdpSenderNode, subscribe to udp_write (udp_msgs/UdpPacket, KeepLast(32), best effort) and transmit each message's data as one UDP datagram to the configured ip:port while the node is ACTIVE.",
+      "rationale": "rover_led sends each LED panel's SK9822 frame to its LED board over UDP.",
+      "verification": "Test",
+      "acceptance": "With the sender active, a message on udp_write arrives as a datagram with identical payload at a test socket bound to ip:port.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-009"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:39",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:136-139",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:194-200",
+        "rover_led/launch/rover_led.launch.py:86-110",
+        "rover_led/config/rover_a1_udp_led_channel_1.yaml:3-4",
+        "rover_led/config/rover_a1_udp_led_channel_2.yaml:3-4"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_udp_driver/test/integration/test_udp_nodes_lifecycle.cpp",
+        "rover_transport/rover_udp_driver/test/integration/test_asio_udp_socket.cpp",
+        "rover_led/test/test_launch_structure.py"
+      ],
+      "comments": "Rover use: two senders, hardware only, with udp_write remapped to udp_write/led_channel_{1,2}. Channel 1 goes to 192.168.77.202:3334 and channel 2 to 192.168.77.201:3333. The earlier survey said both used port 3333; the channel 1 config says 3334. Send errors are only logged (asio_udp_socket.cpp:144-153)."
+    },
+    {
+      "id": "SWR-TRN-010",
+      "category": "Parameter",
+      "text": "The rover_transport shall declare the UDP node parameters ip (string), port (int) and autostart (bool, default false), and shall fail the configure transition with a logged error when port is outside 1..65535 or the socket cannot be opened or bound.",
+      "rationale": "Upstream defaulted port to 0 and never checked it.",
+      "verification": "Test",
+      "acceptance": "configure returns FAILURE for port 0, for port 65536, and for an unparsable ip; ports 1 and 65535 are accepted.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical robustness requirement of the transport layer. No system parent.",
+      "evidence": [
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_receiver_node.cpp:67-72",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_receiver_node.cpp:87-128",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:71-76",
+        "rover_transport/rover_udp_driver/src/domain/udp_endpoint.cpp:37-40"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_udp_driver/test/unit/test_udp_endpoint.cpp",
+        "rover_transport/rover_udp_driver/test/integration/test_udp_nodes_lifecycle.cpp"
+      ],
+      "comments": "An empty ip passes the endpoint validation (test_udp_endpoint.cpp AcceptsAnEmptyAddressMeaningAny)."
+    },
+    {
+      "id": "SWR-TRN-011",
+      "category": "Safety",
+      "text": "The rover_transport shall not write any byte to a serial device or UDP endpoint while the owning node is not in the ACTIVE state, and shall count the bytes it discards this way.",
+      "rationale": "A deactivated node must not drive hardware. This is the single most safety-relevant rule of the byte drivers, and it now lives in one testable place.",
+      "verification": "Test",
+      "acceptance": "Messages sent on serial_write/udp_write while the node is INACTIVE produce no bytes at the device, and bytesDropped() increases by their size. After deactivation, sending stops.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Derived from the lifecycle contract (a deactivated resource owner must not actuate). No system requirement covers it directly.",
+      "evidence": [
+        "rover_transport/rover_io_context/src/application/outbound_byte_bridge.cpp:25-44",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:157-175",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_sender_node.cpp:146-162"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_io_context/test/unit/test_byte_bridges.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-TRN-012",
+      "category": "Performance",
+      "text": "The rover_transport shall use a 2048-byte receive buffer for each serial port and UDP socket, and shall forward only the valid prefix of each read (never more bytes than were received or than the buffer holds).",
+      "rationale": "Bounds memory per transport and prevents over-reads when converting to ROS messages.",
+      "verification": "Test, Inspection",
+      "acceptance": "Conversion of a read of length L publishes exactly min(L, buffer size) bytes; a UDP datagram of up to 2048 bytes is published whole.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical sizing requirement of the transport layer. No system parent.",
+      "evidence": [
+        "rover_transport/rover_serial_driver/include/rover_serial_driver/infrastructure/asio_serial_port.hpp:90",
+        "rover_transport/rover_udp_driver/include/rover_udp_driver/infrastructure/asio_udp_socket.hpp:103",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_msg_conversions.cpp:34",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_packet_conversions.cpp:33"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_serial_driver/test/unit/test_serial_msg_conversions.cpp",
+        "rover_transport/rover_udp_driver/test/unit/test_udp_packet_conversions.cpp"
+      ],
+      "comments": "Datagrams larger than 2048 bytes would be truncated. The largest payload sizes of the BMS and LED frames were not checked against this limit (TBC)."
+    },
+    {
+      "id": "SWR-TRN-013",
+      "category": "Lifecycle",
+      "text": "The rover_transport shall make closing a serial port or UDP socket wait until no receive or send handler of that transport is running or queued, and shall drop received data without throwing once the ROS context is shut down or the publish fails.",
+      "rationale": "Nodes must be torn down safely (cleanup, container unload, Ctrl-C) while data is still arriving, with no use-after-free or uncaught exception on the ASIO thread.",
+      "verification": "Test",
+      "acceptance": "Repeated cleanup and destruction while bytes or datagrams arrive continuously completes without a crash; the AsyncOpGuard tests pass for running, cancelled, in-handler and stopped-context closes.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical robustness requirement (memory safety on teardown). No system parent.",
+      "evidence": [
+        "rover_transport/rover_io_context/include/rover_io_context/infrastructure/async_op_guard.hpp:84-95",
+        "rover_transport/rover_serial_driver/src/infrastructure/asio_serial_port.cpp:174-188",
+        "rover_transport/rover_serial_driver/src/infrastructure/ros2_byte_publisher.cpp:36-54",
+        "rover_transport/rover_udp_driver/src/infrastructure/ros2_udp_packet_publisher.cpp:42-66"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_io_context/test/unit/test_async_op_guard.cpp",
+        "rover_transport/rover_serial_driver/test/integration/test_serial_bridge_node_lifecycle.cpp",
+        "rover_transport/rover_udp_driver/test/integration/test_udp_nodes_lifecycle.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-TRN-014",
+      "category": "Interface",
+      "text": "The rover_transport shall register SerialBridgeNode, UdpReceiverNode and UdpSenderNode as rclcpp_components, and shall let several transport nodes share one externally owned IoContext thread pool.",
+      "rationale": "Consumers load the transports into their own container with intra-process communication, so high-rate byte traffic (LED frames, CRSF reads) does not cross the Zenoh router.",
+      "verification": "Inspection, Test",
+      "acceptance": "Each class loads through `ros2 component load`; the rover_udp_bridge_node executable runs a receiver and a sender on one IoContext.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Deployment/performance technical requirement. No system parent.",
+      "evidence": [
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_component.cpp:28",
+        "rover_transport/rover_udp_driver/src/infrastructure/udp_components.cpp:29-30",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:53-62",
+        "rover_transport/rover_udp_driver/src/rover_udp_bridge_node_main.cpp:41-61"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_led/test/test_launch_structure.py"
+      ],
+      "comments": "The consumers' launch-structure tests check plugin names and remappings, but not that the components actually load. Nodes that own their context use 2 threads (serial) and 1 thread (UDP) (serial_bridge_node.cpp:40, udp_receiver_node.cpp:36)."
+    },
+    {
+      "id": "SWR-TRN-015",
+      "category": "Interface",
+      "text": "The rover_transport shall provide, in rover_modbus_driver, an in-process synchronous Modbus TCP discrete-I/O client (DiscreteIoPort) that reads discrete inputs (FC2), reads coils (FC1, single or a batched range returning exactly count values) and writes a single coil (FC5), addressed to unit id 255.",
+      "rationale": "RoverSafetyController reads and writes the PLC's E-stop and GPIO coils in-process on the safety path. A topic round-trip would add latency and a new failure mode.",
+      "verification": "Test",
+      "acceptance": "Against a fake transport and a real MB::TCP::Server, each operation puts the golden request frame on the wire (unit 255, correct FC/address/value) and decodes the reply; a batched read of N coils returns N values with byte padding dropped.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-006", "SYS-SR-007", "SYS-SR-023"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_modbus_driver/include/rover_modbus_driver/application/modbus_discrete_io_client.hpp:66",
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:220-300",
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:309-311",
+        "rover_transport/rover_modbus_driver/src/infrastructure/modbus_tcp_transport.cpp:34-55",
+        "rover_hardware_interface/src/rover_safety_controller/rover_safety_controller.cpp:518"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_modbus_driver/test/unit/test_modbus_discrete_io_client.cpp",
+        "rover_transport/rover_modbus_driver/test/unit/test_mb_frame_mapping.cpp",
+        "rover_transport/rover_modbus_driver/test/e2e/test_modbus_tcp_roundtrip.cpp",
+        "rover_transport/rover_modbus_driver/test/e2e/test_modbus_tcp_reply_handling.cpp"
+      ],
+      "comments": "Built on rover_modbus (vendored TCP-only fork of Mazurel/Modbus: Modbus_Core codec + Modbus_Tcp sockets). Rover endpoint 192.168.88.11:502 from rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:148-149. README: on the Portenta PLC IDE, batched reads must stay within one memory area and at most 8 coils (rover_modbus_driver/README.md:84-91)."
+    },
+    {
+      "id": "SWR-TRN-016",
+      "category": "Safety",
+      "text": "The rover_transport shall refuse a coil write whose CoilInfo.is_coil_engage_allowed is false: no Modbus frame is sent, an error is logged, and this holds even when the link is down.",
+      "rationale": "Guards read-only safety coils against accidental writes from the controller.",
+      "verification": "Test",
+      "acceptance": "writeDiscreteCoil on a non-engageable coil sends zero requests to the transport and logs 'Coil engage is not allowed'.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-006", "SYS-SR-008"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:302-307"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_modbus_driver/test/unit/test_modbus_discrete_io_client.cpp",
+        "rover_transport/rover_modbus_driver/test/unit/test_modbus_discrete_io_client_failures.cpp"
+      ],
+      "comments": "The refusal returns silently to the caller (no exception). The caller cannot tell from the return value that the write was refused."
+    },
+    {
+      "id": "SWR-TRN-017",
+      "category": "Functional",
+      "text": "The rover_transport shall establish the initial Modbus TCP connection with up to connection_retry_count attempts (0 = retry forever), waiting connection_retry_delay_ms between them, and shall throw std::invalid_argument for an empty host and std::runtime_error once the attempts are exhausted.",
+      "rationale": "The safety controller cannot run without the PLC link. Configuration must either wait for it or fail cleanly.",
+      "verification": "Test",
+      "acceptance": "With retry count N against a closed loopback port, construction throws runtime_error after N attempts; an empty host throws invalid_argument; a factory that succeeds on attempt k yields a connected client.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-006", "SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:38-61",
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:87-109",
+        "rover_hardware_interface/src/rover_system/rover_a1_system.cpp:88-99"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_modbus_driver/test/unit/test_modbus_discrete_io_client.cpp",
+        "rover_transport/rover_modbus_driver/test/integration/test_modbus_tcp_transport.cpp"
+      ],
+      "comments": "The rover URDF sets retry count 0 and delay 1000 ms (rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:153-154), so on_configure blocks until the PLC is reachable. That affects the SYS-SR-024 start-up time."
+    },
+    {
+      "id": "SWR-TRN-018",
+      "category": "Functional",
+      "text": "The rover_transport shall, after any failed Modbus transaction, drop the TCP link, then fail operations fast with std::runtime_error inside a reconnection backoff window and re-dial lazily on the first operation after it. The window starts at connection_retry_delay_ms (minimum 1 ms) and doubles on each failure up to 30 s. The backoff resets when a re-dial succeeds.",
+      "rationale": "A post-configure link drop used to be permanent and could take the process down. Lazy, backed-off reconnection limits how long a blocking dial can stall the safety controller.",
+      "verification": "Test",
+      "acceptance": "After an injected transport failure, isConnected() is false; an operation inside the window throws without calling the factory; after the window a successful re-dial restores operations and logs 'restored'; a failed re-dial leaves the client disconnected and throwing.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-007", "SYS-SR-023"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:117-182",
+        "rover_transport/rover_modbus_driver/src/application/modbus_discrete_io_client.cpp:321-335",
+        "rover_transport/rover_modbus_driver/include/rover_modbus_driver/application/modbus_discrete_io_client.hpp:81"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_modbus_driver/test/unit/test_modbus_discrete_io_client.cpp",
+        "rover_transport/rover_modbus_driver/test/unit/test_modbus_discrete_io_client_failures.cpp",
+        "rover_transport/rover_modbus_driver/test/e2e/test_modbus_tcp_reply_handling.cpp"
+      ],
+      "comments": "A malformed but complete reply (empty or short) raises MB::ModbusException after the transaction and keeps the link. A device exception reply drops it (test_modbus_tcp_reply_handling.cpp)."
+    },
+    {
+      "id": "SWR-TRN-019",
+      "category": "Performance",
+      "text": "The rover_transport shall abort a Modbus transaction whose reply does not arrive within ClientSettings.response_timeout_ms, which defaults to 500 ms and is configurable by the caller.",
+      "rationale": "Bounds how long one stalled read or write can hold the safety link and delay the PLC watchdog heartbeat and E-stop state reporting.",
+      "verification": "Test, Analysis",
+      "acceptance": "Against a server that never replies, a transaction fails no later than response_timeout_ms + [TBD] ms margin. The analysis shows the configured timeout fits within the SYS-SR-023 100 ms E-stop state reporting budget, or documents why it does not need to.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-023"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_modbus_driver/include/rover_modbus_driver/domain/client_settings.hpp:26",
+        "rover_transport/rover_modbus_driver/include/rover_modbus_driver/domain/client_settings.hpp:42",
+        "rover_transport/rover_modbus_driver/src/infrastructure/modbus_tcp_transport.cpp:22-27",
+        "rover_hardware_interface/src/rover_system/rover_a1_system.cpp:105-106"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Partial on two counts. First, no test exercises the response timeout (the e2e tests set 5000 ms only to avoid flakiness). Second, the rover URDF sets 150 ms (rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:160), which is longer than the SYS-SR-023 100 ms budget. A single stalled transaction could therefore delay the E-stop state update past 100 ms; TBC by analysis. The hardware E-stop relay does not depend on this path."
+    },
+    {
+      "id": "SWR-TRN-020",
+      "category": "Performance",
+      "text": "The rover_transport shall bound every Modbus TCP connection attempt, initial or re-dial, by a configurable connect timeout of [TBD per SYS-SR-023] ms, so that dialling a black-holed PLC host cannot block the caller for the kernel SYN-retry period.",
+      "rationale": "MB::TCP::Connection::with() performs a blocking ::connect() with no timeout. A re-dial inside the ros2_control safety path can then stall it for many seconds.",
+      "verification": "Test",
+      "acceptance": "Dialling a non-routable address returns failure within the configured connect timeout plus [TBD] ms.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-007", "SYS-SR-023"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_modbus_driver/include/rover_modbus_driver/application/modbus_discrete_io_client.hpp:44-50",
+        "rover_transport/rover_modbus_driver/src/infrastructure/modbus_tcp_transport.cpp:24"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "The current mitigation is lazy re-dial with backoff (SWR-TRN-018), which limits dials to one per backoff window. The header argues the relay has already latched the E-stop when the link is down. The connect timeout value is TBD."
+    },
+    {
+      "id": "SWR-TRN-021",
+      "category": "Diagnostics",
+      "text": "The rover_transport shall publish diagnostic status on /diagnostics at 1 Hz or faster for each serial and UDP transport node (device or endpoint open/closed, bytes forwarded, bytes dropped while inactive, last receive error) and for the Modbus link (connected/disconnected, current backoff), reporting ERROR when a transport has closed or the link is down.",
+      "rationale": "A closed UART, a stalled UDP receiver or a dropped PLC link is currently only visible as log lines. The system requires sensor and E-stop-circuit health on /diagnostics.",
+      "verification": "Test",
+      "acceptance": "Each transport appears in /diagnostics at >= 1 Hz; closing the device, or stopping the PLC, turns its status to ERROR within 2 publication periods.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/rover_io_context/src/application/inbound_byte_bridge.cpp:45-48",
+        "rover_transport/rover_io_context/src/application/outbound_byte_bridge.cpp:46-54",
+        "rover_transport/rover_serial_driver/src/infrastructure/serial_bridge_node.cpp:118-155",
+        "rover_transport/rover_modbus_driver/include/rover_modbus_driver/application/modbus_discrete_io_client.hpp:83-85"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "No transport package depends on diagnostic_updater. The byte counters and isConnected() already exist but nothing exposes them. Modbus link diagnostics could instead be published by the consumer (rover_hardware_interface); that choice is TBD."
+    },
+    {
+      "id": "SWR-TRN-022",
+      "category": "Build",
+      "text": "The rover_transport shall build as ament_cmake packages on the rover's ROS 2 distribution (lyrical, [TBD per SYS-SR-020]), keeping rover_io_context free of any ROS dependency and keeping MB:: frame types and sockets out of rover_modbus_driver's domain and application layers, enforced by the core_purity_check test.",
+      "rationale": "Upstream transport_drivers has no lyrical release, so the rover builds its fork. The layering keeps protocol logic testable without ROS or sockets.",
+      "verification": "Inspection, Test",
+      "acceptance": "colcon build succeeds on the rover image; rover_io_context/package.xml lists no rclcpp dependency; core_purity_check passes.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-020"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_transport/README.md:36-37",
+        "rover_transport/rover_io_context/package.xml:22-27",
+        "rover_transport/rover_modbus_driver/CMakeLists.txt:35",
+        "rover_transport/rover_modbus_driver/CMakeLists.txt:114-116",
+        "rover_transport/rover_modbus_driver/package.xml:23-24"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_transport/rover_modbus_driver/scripts/check_core_purity.sh"
+      ],
+      "comments": "The exact upstream transport_drivers commit is not recorded (README provenance note). This is a hard fork, so upstream fixes must be ported by hand."
+    }
+  ]
+}

@@ -1,0 +1,377 @@
+{
+  "package": "rover_description",
+  "prefix": "DESC",
+  "document": "ROVER-A1-ROVER_DESCRIPTION-SWRS-V-001",
+  "title": "rover_description Software Requirements Specification",
+  "scope": "rover_description holds the URDF/xacro model of Rover A1: the kinematic tree and frames (REP-103/105), wheel geometry and joint limits, inertial properties, meshes, sensor mount frames, the simulation sensors and battery, and the <ros2_control> blocks that select and parameterise the hardware plugins (RoverA1System, PhidgetImuSensor) or gz_ros2_control in simulation. All hardware-interface timing and drive-train parameters are URDF <param> tags here. Its launch file generates the URDF and runs robot_state_publisher, which publishes robot_description and the static/joint TF.",
+  "requirements": [
+    {
+      "id": "SWR-DESC-001",
+      "category": "Build",
+      "text": "The rover_description shall generate the rover_a1 robot description from urdf/rover_a1.urdf.xacro with the xacro arguments use_sim, namespace, wheel_config_file, battery_config_file, controller_config_file, imu_xyz/imu_rpy, lidar_xyz/lidar_rpy and gps_xyz/gps_rpy.",
+      "rationale": "A single parameterised model serves hardware and simulation (SYS-SR-020 ros2_control based software).",
+      "verification": "Test",
+      "acceptance": "xacro urdf/rover_a1.urdf.xacro with default arguments and with use_sim:=true controller_config_file:=<file> both produce a URDF that parses; test_wheel_geometry processes the xacro without error.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-020"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1.urdf.xacro:1-29",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:4-16",
+        "rover_description/README.md:21-23",
+        "rover_description/CMakeLists.txt:6-15"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_description/test/test_wheel_geometry.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DESC-002",
+      "category": "Interface",
+      "text": "The rover_description shall define the frame tree base_footprint -> base_link -> body_link with imu_link, lidar_link, gps_link and the four <prefix>_wheel_base_link / <prefix>_wheel_link frames as children of body_link, using REP-103 axes (+x forward, +y left, +z up) and prefixing every frame with \"<namespace>/\" when a namespace is set.",
+      "rationale": "SYS-SR-021 requires REP-103 conventions and REP-105 frames; base_footprint is the ground projection the odometry filters publish odom -> base_footprint to.",
+      "verification": "Test, Inspection",
+      "acceptance": "ros2 run tf2_tools view_frames shows base_footprint as the root of the robot tree with the listed children; frame names carry the namespace prefix when ROVER_NAMESPACE is set.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/base.urdf.xacro:16-33",
+        "rover_description/urdf/rover_a1/base.urdf.xacro:62-85",
+        "rover_description/urdf/common/wheel.urdf.xacro:4-6",
+        "rover_description/urdf/common/wheel.urdf.xacro:33-45",
+        "rover_description/launch/rover_load_urdf.launch.py:191-199",
+        "rover_description/README.md:40-69"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_description/test/test_wheel_geometry.py"
+      ],
+      "comments": "map and odom (REP-105) are not defined here; they come from the localization / EKF packages."
+    },
+    {
+      "id": "SWR-DESC-003",
+      "category": "Functional",
+      "text": "The rover_description shall place base_link above base_footprint by wheel_radius minus the wheel axis height above body_link (0.033 m), with base_link coincident with body_link.",
+      "rationale": "Keeps base_footprint on the ground plane (REP-105 2D navigation, SYS-SR-021).",
+      "verification": "Test",
+      "acceptance": "footprint_to_base_joint z equals wheel_radius - 0.033 = 0.1321 m with wheel_01.yaml; base_to_body_joint origin is (0, 0, 0).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:37-38",
+        "rover_description/urdf/rover_a1/base.urdf.xacro:20-33"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_description/test/test_wheel_geometry.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DESC-004",
+      "category": "Parameter",
+      "text": "The rover_description shall take wheel geometry only from config/wheel_01.yaml (wheel_radius 0.1651 m, wheel_width 0.108 m, wheelbase 0.503 m, wheel_separation 0.615 m) and mount the fl, fr, rl and rr wheels at (+/-wheelbase/2, +/-wheel_separation/2) in their REP-103 quadrants at a common height.",
+      "rationale": "Single source of truth for kinematic geometry used by the URDF and (via its test) by the drive controller (SYS-SR-003).",
+      "verification": "Test",
+      "acceptance": "For each prefix the body_to_<prefix>_wheel_base_joint origin equals (sx*0.2515, sy*0.3075, 0.033) with the quadrant signs fl(+,+), fr(+,-), rl(-,+), rr(-,-).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-003",
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/config/wheel_01.yaml:1-10",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:32-36",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:71-101",
+        "rover_description/urdf/common/wheel.urdf.xacro:7-37"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_description/test/test_wheel_geometry.py",
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DESC-005",
+      "category": "Parameter",
+      "text": "The rover_description shall model each wheel joint as a continuous joint about +y with limit effort 64.5 and velocity 10.958 rad/s, so that a positive joint velocity drives the rover forward.",
+      "rationale": "Uniform joint sign for all four wheels (no negated axis) and a velocity limit that the drive controller limits are checked against (SYS-SR-002, SYS-SR-004).",
+      "verification": "Test, Inspection",
+      "acceptance": "All four <prefix>_wheel_base_to_<prefix>_wheel_joint elements have type continuous, axis (0 1 0) and limit velocity 10.958; rover_controller test_drive_limits_respect_joint_velocity_limit reads that limit.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002",
+        "SYS-SR-004"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/common/wheel.urdf.xacro:41-49",
+        "rover_description/README.md:61-65"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_controller/test/test_wheel_geometry.py"
+      ],
+      "comments": "The origin of 10.958 rad/s and 64.5 (N·m) is not documented in the package; 2800 rpm / 23.3 = 12.58 rad/s is the full-duty speed used by the PIDs. TBC against the motor datasheet."
+    },
+    {
+      "id": "SWR-DESC-006",
+      "category": "Interface",
+      "text": "The rover_description shall declare, with use_sim false, a <ros2_control> system component named \"<namespace>/rover_system_node\" using plugin rover_hardware_interface/RoverA1System with the four wheel joints each exposing a velocity command interface and position, velocity and effort state interfaces, and with use_sim true the plugin gz_ros2_control/GazeboSimSystem with the same joints plus the IMU state interfaces.",
+      "rationale": "SYS-SR-002 (4 joints, velocity mode, encoder feedback) and SYS-SR-020 (ros2_control hardware interface).",
+      "verification": "Test, Inspection",
+      "acceptance": "The generated URDF contains exactly one system component with 4 joints x (1 command + 3 state interfaces) and the plugin matching use_sim; RoverA1System on_init() accepts it.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002",
+        "SYS-SR-020"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:103-145",
+        "rover_description/README.md:25-38"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_a1_system_on_init.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DESC-007",
+      "category": "Parameter",
+      "text": "The rover_description shall set the RoverA1System safety-link parameters modbus_host 192.168.88.11, modbus_port 502, modbus_connection_retry_count 0, modbus_connection_retry_delay_ms 1000, modbus_response_timeout_ms 150, safety_wdg_kick_period_ms 200, safety_io_poll_period_ms 100 and safety_latch_reset_pulse_ms 100.",
+      "rationale": "These values bound the E-Stop heartbeat and state latency (SYS-SR-006, SYS-SR-023); the response timeout must stay under the kick period so one stalled transaction cannot eat a heartbeat tick.",
+      "verification": "Inspection, Test",
+      "acceptance": "The generated URDF (use_sim false) contains exactly these values; modbus_response_timeout_ms < safety_wdg_kick_period_ms.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006",
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:147-187",
+        "rover_arch/SAFETY_CHAIN.md:136-148"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No automated test asserts these URDF values; the retry count 0 blocks on_configure() until the PLC is reachable. Relay watchdog window ~1 s is a measured hardware property (SAFETY_CHAIN.md:144)."
+    },
+    {
+      "id": "SWR-DESC-008",
+      "category": "Parameter",
+      "text": "The rover_description shall set the RoverA1System drive-train parameters driver_states_update_frequency 20.0, max_rover_driver_initialization_attempts 3, max_rover_driver_activation_attempts 3, the three error-filter counts 2, driver_comm_timeout_ms 300, motor_failsafe_timeout_ms 500, motor_acceleration 4.0, motor_current_limit 15.0, motor_supply_voltage 24.0, motor_torque_constant 0.11, max_rpm_motor_speed 2800, gear_ratio 23.3, gearbox_efficiency 0.70, raw_current_to_amps_scale 0.001 and encoder_resolution 1024.",
+      "rationale": "Drive actuation and feedback scaling (SYS-SR-002) and the DCC1000 command-loss failsafe (SYS-SR-011).",
+      "verification": "Inspection, Test",
+      "acceptance": "The generated URDF contains exactly these values and RoverA1System on_init() accepts them.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-002",
+        "SYS-SR-011"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:189-254"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_system/test_rover_a1_system_on_init.cpp"
+      ],
+      "comments": "Comment drift in the URDF: motor_current_limit comment (lines 228-232) describes 10 A, value is 15.0; motor_acceleration comment (222-225) describes 2.0 duty/s, value is 4.0."
+    },
+    {
+      "id": "SWR-DESC-009",
+      "category": "Parameter",
+      "text": "The rover_description shall set the E-Stop reset tolerances velocity_command_zero_tolerance 0.4 rad/s and velocity_state_zero_tolerance 0.05 rad/s.",
+      "rationale": "SYS-SR-008: the SW E-Stop cannot be reset while commanded to move or still rolling; 0.4 rad/s is the smallest value above the wheel PID i_clamp_max (0.33 rad/s).",
+      "verification": "Inspection",
+      "acceptance": "The generated URDF contains 0.4 and 0.05; 0.4 > max i_clamp_max in rover_controller/config/wheel_01_controller.yaml.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:256-284",
+        "rover_controller/config/wheel_01_controller.yaml:90"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Doc drift: rover_arch/SAFETY_CHAIN.md:228 states 0.35 rad/s. No test ties the tolerance to i_clamp_max."
+    },
+    {
+      "id": "SWR-DESC-010",
+      "category": "Parameter",
+      "text": "The rover_description shall declare, with use_sim false, a <ros2_control> sensor component \"<namespace>/rover_imu\" using plugin rover_hardware_interface/PhidgetImuSensor with data_interval_ms 8, callback_delta_epsilon_ms 1, Madgwick gain 0.00304 and zeta 0.00151, use_mag false, stateless false, remove_gravity_vector false and world_frame enu, exporting the 10 orientation / angular_velocity / linear_acceleration state interfaces.",
+      "rationale": "SYS-SR-019 IMU at >= 100 Hz (8 ms = 125 Hz sampling). The magnetometer is disabled because it is uncalibrated near the motors.",
+      "verification": "Inspection, Test",
+      "acceptance": "The generated URDF contains the rover_imu component with these values; PhidgetImuSensor on_init() accepts it.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-019"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/common/imu.urdf.xacro:4-23",
+        "rover_description/urdf/common/imu.urdf.xacro:95-127"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_hardware_interface/test/rover_sensors/test_phidget_imu_sensor_on_init.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DESC-011",
+      "category": "Functional",
+      "text": "The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS mount poses from the ROVER_{IMU,LIDAR,GPS}_LOCALIZATION_{X,Y,Z} and _ORIENTATION_{R,P,Y} environment variables, falling back to the defaults (IMU xyz (-0.09, 0.0, 0.2), rpy (3.14159, 0.0, 0.0); lidar and GPS all 0.0) for unset or non-finite values.",
+      "rationale": "Sensor extrinsics are per-rover (balena device variables); a malformed value must not break xacro and take robot_state_publisher down (SYS-SR-021 frames).",
+      "verification": "Test",
+      "acceptance": "With ROVER_IMU_LOCALIZATION_X=abc the launch prints a warning and body_to_imu_joint x is -0.09; with a finite value the joint origin uses it.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/launch/rover_load_urdf.launch.py:38-54",
+        "rover_description/launch/rover_load_urdf.launch.py:122-143",
+        "rover_description/launch/rover_load_urdf.launch.py:145-174"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Not covered by a test. With use_sim true the macro replaces the IMU pose with (-0.09, 0.0, 0.2) / (0, 0, 0) and lifts an all-zero lidar pose to z 0.45 (rover_a1_macro.urdf.xacro:18-29). The IMU default roll of 3.14159 rad (upside-down mount) is a launch default, not a measured value (TBC)."
+    },
+    {
+      "id": "SWR-DESC-012",
+      "category": "Parameter",
+      "text": "The rover_description shall declare body_link inertial mass 33.445952 kg and each wheel link mass 2.5 kg (43.445952 kg in total).",
+      "rationale": "Inertial properties drive the simulation dynamics; SYS-SR-001 caps the platform mass at 60 kg including batteries and excluding payload.",
+      "verification": "Inspection, Analysis",
+      "acceptance": "Sum of all <mass> values in the generated URDF equals 43.445952 kg; a physical weighing of the assembled platform is <= 60.0 kg (SYS-SR-001).",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-001"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/rover_a1/base.urdf.xacro:54-59",
+        "rover_description/config/wheel_01.yaml:3",
+        "rover_description/urdf/common/wheel.urdf.xacro:70-80"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "Mass fidelity: the modelled 43.45 kg is a CAD body + nominal wheels and is not a measured value; it does not by itself verify SYS-SR-001. The survey reported a higher CAD total mass on the SYS-SR-001 source sheet (not present in the repository, TBC). Sensors and battery have no inertial links."
+    },
+    {
+      "id": "SWR-DESC-013",
+      "category": "Interface",
+      "text": "The rover_description shall start robot_state_publisher as node rover_state_publisher_node in the requested namespace with the generated robot_description, frame_prefix \"<namespace>/\" and use_sim_time equal to use_sim, when publish_robot_state is true (default).",
+      "rationale": "Publishes robot_description and the robot TF tree (SYS-SR-021).",
+      "verification": "Test, Inspection",
+      "acceptance": "ros2 node list shows <ns>/rover_state_publisher_node; ros2 param get shows frame_prefix \"<ns>/\"; with publish_robot_state false no node starts.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/launch/rover_load_urdf.launch.py:176-211",
+        "rover_description/README.md:89-102"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No test runs this launch file; rover_controller/test/test_controller_launch.py only checks the arguments passed to its include."
+    },
+    {
+      "id": "SWR-DESC-014",
+      "category": "Functional",
+      "text": "The rover_description shall, with use_sim true, provide Gazebo sensors on the IMU, lidar and GPS frames: IMU at 50 Hz on <ns>imu/data_raw with gaussian noise, a 16-ring gpu_lidar over +/-15 deg with 720 samples, 0.2-20 m range at 10 Hz on <ns>lidar, and a navsat sensor at 5 Hz on <ns>gps/fix.",
+      "rationale": "Simulation stand-ins for the RS16 lidar, RUTX11 GNSS and Phidgets IMU used by the navigation stack in Gazebo.",
+      "verification": "Inspection",
+      "acceptance": "The use_sim:=true URDF contains the three <sensor> elements with these rates and topics.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Simulation fidelity requirement; the SYS-SRs specify the physical platform only.",
+      "evidence": [
+        "rover_description/urdf/common/imu.urdf.xacro:52-93",
+        "rover_description/urdf/common/lidar.urdf.xacro:12-53",
+        "rover_description/urdf/common/gps.urdf.xacro:12-58",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:18-29"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DESC-015",
+      "category": "Performance",
+      "text": "The rover_description shall configure the simulated IMU update_rate at 100 Hz or faster.",
+      "rationale": "SYS-SR-019 requires IMU data at >= 100 Hz; the simulation should exercise the same rate as the hardware target.",
+      "verification": "Inspection",
+      "acceptance": "The use_sim:=true URDF IMU sensor <update_rate> is >= 100.",
+      "priority": "Could",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-019"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/urdf/common/imu.urdf.xacro:57"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Simulated IMU is 50 Hz today, matching the 50 Hz imu broadcaster (rover_controller)."
+    },
+    {
+      "id": "SWR-DESC-016",
+      "category": "Parameter",
+      "text": "The rover_description shall configure the simulated battery (Gazebo LinearBatteryPlugin) with capacity 40.0 Ah, initial charge 0.7 of capacity, charging_time 8.0 h, power_load 160.0 W and discharging disabled by default.",
+      "rationale": "Simulation of the BAT01 pack for SYS-SR-015 runtime estimates (~6 h at 160 W per the config comment).",
+      "verification": "Inspection",
+      "acceptance": "The use_sim:=true URDF LinearBatteryPlugin shows capacity 40.0, initial_charge 28.0 and start_draining false.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-015"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_description/config/battery.yaml:1-17",
+        "rover_description/urdf/common/battery.urdf.xacro:4-28",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:45-48",
+        "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:297-302"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "SYS-SR-015 duration and duty cycle are [TBD]. power_load is divided by 100 as a workaround for gz-sim issue 225 (battery.urdf.xacro:23-24). Simulation only; not evidence for SYS-SR-015 on hardware."
+    }
+  ]
+}

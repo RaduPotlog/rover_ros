@@ -1,0 +1,7 @@
+slprj/
+*.slxc
+*.asv
+*.autosave
+*.slx.r20*
+results/
+~$*.xlsx

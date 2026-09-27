@@ -1,0 +1,302 @@
+{
+  "package": "rover_bringup",
+  "prefix": "BRG",
+  "document": "ROVER-A1-ROVER_BRINGUP-SWRS-V-001",
+  "title": "rover_bringup Software Requirements Specification",
+  "scope": "rover_bringup holds the top-level launch files that start the Rover A1 platform software on real hardware. rover_bringup.launch.py gates start-up on the hardware-configuration flag, checks the OS build version, starts rover_controller (ros2_control) and rover_diag_manager first, and starts battery, LED, safety, localization, CRSF teleop and twist_mux once the controllers are active. rover_web_bridges.launch.py starts foxglove_bridge (with topic/service whitelists), rosbridge and rosapi for the web UIs and ros-mcp. Automatic start at power-up is done by the rover_docker container start script, outside this package boundary; the GPS and lidar drivers belong to the sensor payload (rover_sensors). Simulation uses rover_gazebo instead.",
+  "requirements": [
+    {
+      "id": "SWR-BRG-001",
+      "category": "Lifecycle",
+      "text": "The rover_bringup shall start the platform stack only when the environment variable ROBOT_HW_CONFIG_CORRECT is true (default true); otherwise it shall log INCORRECT_HW_CONFIG, start no platform node, and keep the launch process alive unless exit_on_wrong_hw is true.",
+      "rationale": "Prevents driving motors with a mismatched hardware configuration while keeping the container up for diagnosis.",
+      "verification": "Test",
+      "acceptance": "With ROBOT_HW_CONFIG_CORRECT=false, `ros2 launch rover_bringup rover_bringup.launch.py` logs the INCORRECT_HW_CONFIG error, `ros2 node list` shows no rover_* node after 30 s, and the launch is still running; with exit_on_wrong_hw:=true it exits.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:232-245",
+        "rover_bringup/launch/rover_bringup.launch.py:281-288",
+        "rover_bringup/README.md:19-21"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Keeping alive is done with `sleep infinity` (rover_bringup.launch.py:234-237). No automated test."
+    },
+    {
+      "id": "SWR-BRG-002",
+      "category": "Diagnostics",
+      "text": "The rover_bringup shall log a warning when SYSTEM_BUILD_VERSION (default v1.0.0) is lower than the minimum OS version v1.0.0, and continue the start-up.",
+      "rationale": "Makes an outdated OS image visible without blocking operation.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "With SYSTEM_BUILD_VERSION=v0.9.0 the launch prints the INCORRECT_OS_VERSION warning including 'required: v1.0.0' and the stack still starts.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical deployment check of the OS image.",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:44",
+        "rover_bringup/launch/rover_bringup.launch.py:247-261",
+        "rover_utils/rover_utils/version_check.py:24-29"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BRG-003",
+      "category": "Functional",
+      "text": "The rover_bringup shall start rover_controller (robot description, controller_manager and the ros2_control controllers) with use_sim False as the first stage of the platform stack.",
+      "rationale": "SYS-SR-020 requires ros2_control for the drive hardware interface; the drive must be up before its consumers.",
+      "verification": "Demonstration",
+      "acceptance": "After launch on hardware, `ros2 control list_controllers` shows the rover controllers active.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-020", "SYS-SR-002"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:112-127",
+        "rover_bringup/launch/rover_bringup.launch.py:281-288"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BRG-004",
+      "category": "Functional",
+      "text": "The rover_bringup shall start rover_diag_manager (system diagnostics and the diagnostic aggregator) together with rover_controller in the first stage.",
+      "rationale": "Diagnostics must be available from the start to report failures of later stages (SYS-SR-022).",
+      "verification": "Demonstration",
+      "acceptance": "rover_diag_manager_node and rover_diagnostic_aggregator appear in `ros2 node list` before the second-stage nodes.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:129-145",
+        "rover_bringup/launch/rover_bringup.launch.py:281-285"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Passes use_sim and common_dir_path to system_diag.launch.py, which does not declare them (ignored)."
+    },
+    {
+      "id": "SWR-BRG-005",
+      "category": "Lifecycle",
+      "text": "The rover_bringup shall start rover_battery, rover_led, rover_safety, rover_localization, rover_crsf_teleop and rover_twist_mux exactly once, when rover_controller emits the ControllersActive event (after the rover_imu_broadcaster spawner succeeds) or after controllers_ready_timeout seconds (default 20.0) with a warning if the event never arrives.",
+      "rationale": "Consumers of joint states, odometry and IMU must not start before the controllers are active; the timeout covers a hung spawner.",
+      "verification": "Demonstration, Inspection",
+      "acceptance": "In the launch log the second-stage nodes start after 'rover_imu_broadcaster' is spawned; with the event suppressed they start 20 s after launch and the warning 'rover_controller did not report its controllers active within controllers_ready_timeout' is printed once.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:97-105",
+        "rover_bringup/launch/rover_bringup.launch.py:266-279",
+        "rover_utils/rover_utils/events.py:38-66",
+        "rover_controller/launch/rover_controller.launch.py:314-321"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "A failed spawner shuts the whole launch down (README.md:36-37)."
+    },
+    {
+      "id": "SWR-BRG-006",
+      "category": "Safety",
+      "text": "The rover_bringup shall start rover_safety in the second stage unless the launch argument disable_manager is True (default False).",
+      "rationale": "rover_safety implements the software E-stop handling and state/LED logic (SYS-SR-007, SYS-SR-008, SYS-SR-010).",
+      "verification": "Demonstration",
+      "acceptance": "With default arguments rover_safety_node is running after start-up; with disable_manager:=True it is absent.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-007", "SYS-SR-008", "SYS-SR-010"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:163-175",
+        "rover_bringup/launch/rover_bringup.launch.py:63-69"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "disable_manager:=True silently removes the safety manager on hardware; no warning is logged. Argument description still says 'manager_bt_node' (line 67). Consider logging a warning or forbidding it on hardware [TBC]."
+    },
+    {
+      "id": "SWR-BRG-007",
+      "category": "Functional",
+      "text": "The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set from the use_gps argument (default $ROVER_USE_GPS, else false).",
+      "rationale": "The fused odometry is required on hardware; GPS fusion is selected per deployment.",
+      "verification": "Demonstration",
+      "acceptance": "With ROVER_USE_GPS unset only rover_ekf_node runs; with ROVER_USE_GPS=true rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node also run.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-003", "SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:90-95",
+        "rover_bringup/launch/rover_bringup.launch.py:147-161"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BRG-008",
+      "category": "Parameter",
+      "text": "The rover_bringup shall pass namespace (default $ROVER_NAMESPACE, else empty), log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO) and common_dir_path (default empty) to every included launch file.",
+      "rationale": "One namespace and log level for the whole platform; per-package config overrides from a common directory.",
+      "verification": "Inspection",
+      "acceptance": "Every IncludeLaunchDescription in rover_bringup.launch.py passes namespace, log_level and common_dir_path; with ROVER_NAMESPACE=rover all platform nodes are under /rover.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical launch interface enabling namespaced multi-robot deployment.",
+      "evidence": [
+        "rover_bringup/launch/rover_bringup.launch.py:56-61",
+        "rover_bringup/launch/rover_bringup.launch.py:71-84",
+        "rover_bringup/launch/rover_bringup.launch.py:121-126"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BRG-009",
+      "category": "Build",
+      "text": "The rover_bringup shall declare run dependencies on rover_controller, rover_localization, rover_diag_manager, rover_twist_mux, rover_crsf_teleop, rover_battery, rover_utils, rover_safety, rover_led, rover_udp_driver, foxglove_bridge, rosbridge_server and rmw_zenoh_cpp for the hardware build type (ROVER_ROS_BUILD_TYPE == hardware).",
+      "rationale": "rosdep must install everything the hardware launch starts, including the Zenoh RMW.",
+      "verification": "Inspection",
+      "acceptance": "`rosdep check --from-paths src/rover_ros/rover_bringup` with ROVER_ROS_BUILD_TYPE=hardware resolves all listed packages.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-020"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/package.xml:12-34"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BRG-010",
+      "category": "Build",
+      "text": "The rover_bringup shall run on the ROS 2 distribution fixed in SYS-SR-020 with rmw_zenoh_cpp as the RMW implementation.",
+      "rationale": "SYS-SR-020 leaves the distribution [TBD]; the workspace is set up for ROS 2 Lyrical and Zenoh.",
+      "verification": "Inspection",
+      "acceptance": "On the rover, ROS_DISTRO equals the SYS-SR-020 value and RMW_IMPLEMENTATION=rmw_zenoh_cpp in the platform container.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-020"],
+      "derived_rationale": "",
+      "evidence": [
+        "README.md:88",
+        "rover_scripts/setup_rover_pc.sh:104",
+        "rover_bringup/package.xml:34"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "SYS-SR-020 distribution is [TBD]; the workspace README uses ROS_DISTRO=lyrical. The RMW is set by the environment (setup script / container), not by rover_bringup itself. Update SYS-SR-020 to 'Lyrical' [TBC]."
+    },
+    {
+      "id": "SWR-BRG-011",
+      "category": "Lifecycle",
+      "text": "The rover_bringup shall be started automatically at power-up and bring the platform to the Idle state within [TBD per SYS-SR-024] s.",
+      "rationale": "SYS-SR-024 requires automatic start and a bounded time to Idle.",
+      "verification": "Test",
+      "acceptance": "Time from power-on to the Idle state being reported is <= [TBD per SYS-SR-024] s in 5 of 5 trials.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/README.md:10-11",
+        "rover_bringup/launch/rover_bringup.launch.py:266-288"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Auto-start is provided outside this boundary by the rover_docker container (rovera1-app start.sh). No 'Idle' state is defined or reported anywhere in the bringup, and no start-up time is measured; the only bound is the 20.0 s controllers_ready_timeout fallback. Needs a state-publishing node (SYS-SR-010) and a boot-time test."
+    },
+    {
+      "id": "SWR-BRG-012",
+      "category": "Interface",
+      "text": "The rover_bringup shall start foxglove_bridge as node rover_foxglove_bridge (WebSocket port 8765, upstream default) with sysinfo disabled and an asset URI allowlist accepting package:// URIs of the upstream mesh/image extensions in any letter case.",
+      "rationale": "Foxglove, the drive UI and the Cockpit diagnostics page connect through this bridge; upper-case mesh extensions must load.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "`ros2 launch rover_bringup rover_web_bridges.launch.py` creates node rover_foxglove_bridge listening on TCP 8765 and no /foxglove_bridge/sysinfo topic is published.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-025"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_web_bridges.launch.py:34-42",
+        "rover_bringup/launch/rover_web_bridges.launch.py:159-181",
+        "rover_bringup/README.md:72"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Port 8765 is the upstream foxglove_bridge default, stated in README.md:72, not set in the launch file. The web bridges are started by rover_docker start.sh next to the bringup, not by rover_bringup.launch.py."
+    },
+    {
+      "id": "SWR-BRG-013",
+      "category": "Performance",
+      "text": "The rover_bringup shall restrict foxglove_bridge to the whitelisted topics (/tf, /tf_static and the listed UI topics under any namespace) and to the whitelisted services, unless ROVER_FOXGLOVE_TOPIC_WHITELIST or ROVER_FOXGLOVE_SERVICE_WHITELIST is set non-empty.",
+      "rationale": "Anything a browser subscribes to crosses the Zenoh router at full rate; unknown services caused log floods. Topics a UI only publishes must still be listed or its client sends nothing.",
+      "verification": "Test",
+      "acceptance": "test_web_bridges_whitelist.py passes: UI-published and UI-subscribed topics and UI services are allowed under /rover, /rover_a2 and no namespace; internal topics and other services are rejected.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-025"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_web_bridges.launch.py:54-95",
+        "rover_bringup/launch/rover_web_bridges.launch.py:106-149",
+        "rover_bringup/launch/rover_web_bridges.launch.py:172-175"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_bringup/test/test_web_bridges_whitelist.py"
+      ],
+      "comments": "The whitelist includes the E-stop set/reset services (lines 112-114), so the web UI can trigger the software E-stop (SYS-SR-007) through the bridge."
+    },
+    {
+      "id": "SWR-BRG-014",
+      "category": "Interface",
+      "text": "The rover_bringup shall start rosbridge_websocket as node rover_rosbridge_websocket (port 9090, upstream default) and rosapi_node as /rosapi.",
+      "rationale": "ros-mcp-server and other rosbridge clients use port 9090 and the /rosapi/* services.",
+      "verification": "Demonstration",
+      "acceptance": "After launching rover_web_bridges.launch.py, TCP 9090 accepts a rosbridge WebSocket connection and `ros2 service list` contains /rosapi/get_time.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": ["SYS-SR-025"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/launch/rover_web_bridges.launch.py:183-198",
+        "rover_bringup/README.md:73-74"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "The bridges are not namespaced and see the whole graph (README.md:76)."
+    },
+    {
+      "id": "SWR-BRG-015",
+      "category": "Lifecycle",
+      "text": "The rover_bringup shall have an automated launch test that verifies the two-stage start order and that all platform nodes are running after start-up.",
+      "rationale": "Start-up order and completeness (SYS-SR-024) are currently checked only by hand.",
+      "verification": "Test",
+      "acceptance": "A launch_testing test under rover_bringup/test passes with mocked hardware, asserting that second-stage nodes start only after ControllersActive (or the timeout) and that all expected nodes are present.",
+      "priority": "Could",
+      "status": "Proposed",
+      "parents": ["SYS-SR-024"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_bringup/CMakeLists.txt:8-12"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "The only test is the foxglove whitelist unit test."
+    }
+  ]
+}

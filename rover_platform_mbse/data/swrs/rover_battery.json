@@ -1,0 +1,362 @@
+{
+  "package": "rover_battery",
+  "prefix": "BAT",
+  "document": "ROVER-A1-ROVER_BATTERY-SWRS-V-001",
+  "title": "rover_battery Software Requirements Specification",
+  "scope": "rover_battery decodes the Daly BMS telemetry that the ESP32 rover_led_bms_ble_controller forwards over UDP (392-byte payload, received by rover_udp_driver's UdpReceiverNode on 192.168.1.201:4444 in the same component container) and publishes the rover's battery state as sensor_msgs/BatteryState on rover_battery/battery_status and rover_msgs/ChargingStatus on rover_battery/charging_status, with a health classification from the BMS alarm bits, a data watchdog, and diagnostics. It is the battery input of rover_safety (battery E-Stop and shutdown policy, LED battery animations). State-of-charge thresholds live in the BMS configuration, not in this package.",
+  "requirements": [
+    {
+      "id": "SWR-BAT-001",
+      "category": "Interface",
+      "text": "The rover_battery shall subscribe udp_msgs/UdpPacket on rover_battery_udp_data (depth 100), fed by the rover_udp_battery_receiver_node bound to ip 192.168.1.201, port 4444.",
+      "rationale": "The ESP32 BMS bridge sends its telemetry as UDP datagrams; the receiver's udp_read is remapped to this topic.",
+      "verification": "Inspection, Test",
+      "acceptance": "The launch-structure test finds the receiver and the battery node in one container with udp_read remapped to rover_battery_udp_data; the config has a section for each node.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-016"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:84-86",
+        "rover_battery/config/rover_battery.yaml:4-7",
+        "rover_battery/launch/rover_battery.launch.py:63-71"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/test_launch_structure.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BAT-002",
+      "category": "Functional",
+      "text": "The rover_battery shall decode only payloads of exactly 392 bytes (385-byte BmsData + 7-byte BmsAlarms) and shall ignore, without publishing and without resetting the watchdog, packets of any other size and all-zero no-data payloads.",
+      "rationale": "The layout mirrors the firmware's packed structs byte for byte; the firmware sends an all-zero payload when it has no BMS data, which must not look like a live BMS.",
+      "verification": "Test",
+      "acceptance": "Integration tests: a wrong-size packet and an all-zero 392-byte packet publish nothing and do not prevent the watchdog state; a valid packet publishes one state.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-016"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/include/rover_battery/domain/bms_frame.hpp:153-162",
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:89-111",
+        "rover_battery/src/domain/battery_classifier.cpp:109-116"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/integration/test_rover_battery_node.cpp",
+        "rover_battery/test/unit/test_battery_classifier.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BAT-003",
+      "category": "Interface",
+      "text": "The rover_battery shall publish sensor_msgs/BatteryState on rover_battery/battery_status (depth 5, reliable, volatile) once for every valid BMS frame received.",
+      "rationale": "Primary battery interface of the platform, consumed by rover_safety's battery policy and LED node.",
+      "verification": "Test",
+      "acceptance": "Each valid packet injected on rover_battery_udp_data produces exactly one BatteryState message.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-016"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:83",
+        "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:91-95",
+        "rover_battery/src/application/monitor_battery_use_case.cpp:37-43"
+      ],
+      "implementation": "Partial",
+      "verified_by": [
+        "rover_battery/test/integration/test_rover_battery_node.cpp",
+        "rover_battery/test/unit/test_monitor_battery_use_case.cpp"
+      ],
+      "comments": "Publication is event-driven, so its rate equals the ESP32 packet rate, which is not specified in this package; see SWR-BAT-012 for the SYS-SR-016 >= 1 Hz requirement."
+    },
+    {
+      "id": "SWR-BAT-004",
+      "category": "Functional",
+      "text": "The rover_battery shall fill BatteryState with voltage = pack voltage [V], current = pack current [A], percentage = BMS SOC / 100, charge = residual capacity [Ah] (mAh / 1000), capacity = NaN, design_capacity = design_capacity parameter [Ah], temperature = hottest sensor [degC], cell_voltage [V] (mV / 1000) and cell_temperature for the reported (clamped) cell and sensor counts, technology LIFE, present = true and serial_number from the parameter.",
+      "rationale": "SI units per REP-103 and BatteryState conventions (NaN for unmeasured values); the hottest sensor lets rover_safety see a single hot cell.",
+      "verification": "Test",
+      "acceptance": "Unit and integration tests: a known frame produces the expected converted values; cell/sensor counts above the array size are clamped.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-016",
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/domain/battery_classifier.cpp:188-220",
+        "rover_battery/src/infrastructure/battery_msg_conversions.cpp:78-96"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/unit/test_battery_classifier.cpp",
+        "rover_battery/test/unit/test_battery_msg_conversions.cpp",
+        "rover_battery/test/integration/test_rover_battery_node.cpp"
+      ],
+      "comments": "The SYS-SR-016 accuracy criterion (within 5 % of a reference meter) depends on the BMS and is not verified; see SWR-BAT-014."
+    },
+    {
+      "id": "SWR-BAT-005",
+      "category": "Functional",
+      "text": "The rover_battery shall classify battery health from the BMS alarm bits as DEAD on a level-one pack-voltage-low, cell-voltage-low or SOC-low alarm, otherwise OVERVOLTAGE on a level-two pack-voltage-high or SOC-high alarm, and then override the result with OVERHEAT on a level-one charge/discharge temperature-high alarm or COLD on a level-one charge/discharge temperature-low alarm; GOOD when none apply.",
+      "rationale": "Maps the BMS protection state onto BatteryState health values that rover_safety acts on (DEAD/OVERVOLTAGE trip the E-Stop, OVERHEAT is graded by temperature).",
+      "verification": "Test",
+      "acceptance": "Unit tests: no alarms -> GOOD; low voltage/SOC -> DEAD; level-two high -> OVERVOLTAGE; DEAD has priority over OVERVOLTAGE; a temperature alarm overrides the voltage class.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-017",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/domain/battery_classifier.cpp:118-137"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/unit/test_battery_classifier.cpp"
+      ],
+      "comments": "Safety concern: because temperature overrides voltage, a DEAD pack with a level-one temperature alarm is reported OVERHEAT, and rover_safety then trips only if the temperature exceeds 50 degC (rover_safety/src/domain/battery_safety_policy.cpp:47-54). Review whether DEAD should outrank OVERHEAT/COLD. The SOC-low alarm threshold is configured in the BMS, not here (SYS-SR-017 thresholds [TBD])."
+    },
+    {
+      "id": "SWR-BAT-006",
+      "category": "Functional",
+      "text": "The rover_battery shall report power_supply_status NOT_CHARGING for BMS status 0, CHARGING for status 1 (FULL when SOC >= 100 %), DISCHARGING for status 2 and UNKNOWN otherwise.",
+      "rationale": "Charge state drives the LED charging animations and the charging-overheat error.",
+      "verification": "Test",
+      "acceptance": "Unit tests map each BMS status value as stated; charging at SOC 100 % is FULL.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-018"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/domain/battery_classifier.cpp:152-165",
+        "rover_battery/include/rover_battery/domain/battery_classifier.hpp:29"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/unit/test_battery_classifier.cpp",
+        "rover_battery/test/unit/test_battery_msg_conversions.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BAT-007",
+      "category": "Interface",
+      "text": "The rover_battery shall publish rover_msgs/ChargingStatus on rover_battery/charging_status (depth 5) with every battery state, with charging = (BMS status 1), current and current_battery = pack current, and charger_type WIRED while charging, UNKNOWN otherwise.",
+      "rationale": "Separate charging indication for consumers that do not parse BatteryState.",
+      "verification": "Test",
+      "acceptance": "Unit test: status 1 -> charging=true, WIRED; other status -> charging=false, UNKNOWN.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-018"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:84-85",
+        "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:97-98",
+        "rover_battery/src/domain/battery_classifier.cpp:167-176"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/unit/test_battery_classifier.cpp",
+        "rover_battery/test/unit/test_battery_msg_conversions.cpp"
+      ],
+      "comments": "SYS-SR-018 charging method is [TBD]; WIRED is hard-coded."
+    },
+    {
+      "id": "SWR-BAT-008",
+      "category": "Safety",
+      "text": "The rover_battery shall, when no valid BMS frame has been received for watchdog_timeout_ms (10000 ms), publish a BatteryState with present = false, power_supply_health WATCHDOG_TIMER_EXPIRE, power_supply_status UNKNOWN, NaN percentage, charge and capacity, zeroed cell arrays of the last known size, and the error 'Battery watchdog expired', and repeat it every watchdog_timeout_ms while data stays absent.",
+      "rationale": "A lost BMS must become an explicit, safe state: rover_safety trips the E-Stop on WATCHDOG_TIMER_EXPIRE and the LED node shows ERROR; NaN (not 0 %) prevents consumers reading a flat pack.",
+      "verification": "Test",
+      "acceptance": "Integration test: without packets, a watchdog state with present=false and WATCHDOG_TIMER_EXPIRE is published after 10000 ms (test uses a shortened timeout).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-016",
+        "SYS-SR-017",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:79-82",
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:110",
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:114-119",
+        "rover_battery/src/domain/battery_classifier.cpp:231-251",
+        "rover_battery/config/rover_battery.yaml:13"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/integration/test_rover_battery_node.cpp",
+        "rover_battery/test/unit/test_monitor_battery_use_case.cpp",
+        "rover_battery/test/unit/test_battery_classifier.cpp"
+      ],
+      "comments": "voltage, current and temperature stay at their 0.0 defaults in the watchdog state (battery_report.hpp:62-64) rather than NaN. A 10 s watchdog means battery loss is detected 10 s late; see SWR-BAT-012."
+    },
+    {
+      "id": "SWR-BAT-009",
+      "category": "Parameter",
+      "text": "The rover_battery shall declare design_capacity (default 40.0 Ah, range [0.1, 1000.0]), serial_number (default 224KA141600043) and watchdog_timeout_ms (default 10000, range [1, 600000]), and shall fail to start on an out-of-range override.",
+      "rationale": "Pack identity is not reported by the BMS; the watchdog period must be bounded.",
+      "verification": "Test",
+      "acceptance": "Integration test: constructing the node with an out-of-range design_capacity or watchdog_timeout_ms throws.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Parameterisation of SWR-BAT-004 and SWR-BAT-008.",
+      "evidence": [
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:43-62",
+        "rover_battery/config/rover_battery.yaml:9-13"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/integration/test_rover_battery_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BAT-010",
+      "category": "Diagnostics",
+      "text": "The rover_battery shall publish diagnostics under hardware ID 'RoverBattery' with 'Battery errors' (STALE before data, ERROR listing every active BMS alarm name or the watchdog error, OK otherwise) and 'Battery status' (present, charge state, health, voltage, current, SOC, charge, design capacity, temperature, cell count, min/max cell voltage and difference).",
+      "rationale": "Battery faults must reach /diagnostics as ERROR per SYS-SR-022.",
+      "verification": "Test",
+      "acceptance": "Integration test: after a valid packet the 'Battery status' task carries the published values; an active BMS alarm or watchdog expiry makes 'Battery errors' ERROR and it returns to OK on the next clean frame.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:73",
+        "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:87-88",
+        "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:134-202",
+        "rover_battery/src/domain/battery_classifier.cpp:139-150"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/integration/test_rover_battery_node.cpp",
+        "rover_battery/test/unit/test_battery_classifier.cpp"
+      ],
+      "comments": "'Battery status' always summarises OK, even with present=false. Diagnostic rate is the diagnostic_updater default period (not set in this package)."
+    },
+    {
+      "id": "SWR-BAT-011",
+      "category": "Build",
+      "text": "The rover_battery shall, in rover_battery.launch.py, load rover_battery_node and the UDP receiver as components of one component container (rover_battery_container) with intra-process communication, bringing the lifecycle-managed receiver to ACTIVE through its autostart parameter.",
+      "rationale": "BMS packets never cross the Zenoh router.",
+      "verification": "Test",
+      "acceptance": "Launch-structure test: both nodes are in one container; the receiver has autostart=true.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/launch/rover_battery.launch.py:59-86"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_battery/test/test_launch_structure.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-BAT-012",
+      "category": "Performance",
+      "text": "The rover_battery shall publish rover_battery/battery_status at 1 Hz or faster regardless of the BMS packet timing, republishing the latest reading on a fixed-rate timer, and shall enter the watchdog state (SWR-BAT-008) when the latest reading is older than [TBD] s.",
+      "rationale": "SYS-SR-016 requires >= 1 Hz; today the topic is published only per UDP packet and the only periodic output is the watchdog state every 10000 ms, so the rate is not guaranteed by this package.",
+      "verification": "Test",
+      "acceptance": "'ros2 topic hz rover_battery/battery_status' reports >= 1 Hz with the BMS bridge sending at its nominal rate and with it silent (then carrying the watchdog state).",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-016"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:79-82",
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:110-111",
+        "rover_battery/config/rover_battery.yaml:13"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "The ESP32 send period is not documented in this package; measure it before choosing the staleness limit."
+    },
+    {
+      "id": "SWR-BAT-013",
+      "category": "Interface",
+      "text": "The rover_battery shall set BatteryState.header.stamp to the time the BMS frame was received (or the watchdog fired) and header.frame_id to a battery frame name.",
+      "rationale": "The header is left empty today, so consumers cannot judge the age of a reading from the message itself and rover_safety stamps on arrival.",
+      "verification": "Test",
+      "acceptance": "Every published BatteryState has a non-zero header.stamp within the receive callback's time and a non-empty frame_id.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-016",
+        "SYS-SR-021"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/infrastructure/battery_msg_conversions.cpp:78-96"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Frame name TBD (URDF has no battery link identified in this review)."
+    },
+    {
+      "id": "SWR-BAT-014",
+      "category": "Performance",
+      "text": "The rover_battery shall report pack voltage, current and state of charge within 5 % of a reference meter.",
+      "rationale": "SYS-SR-016 acceptance criterion; the package passes BMS values through, so the accuracy is that of the BMS plus the conversions.",
+      "verification": "Test",
+      "acceptance": "Bench test against a calibrated meter: |published - reference| <= 5 % of reference for voltage, current and SOC across the operating range.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-016"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_battery/src/domain/battery_classifier.cpp:193-200"
+      ],
+      "implementation": "Partial",
+      "verified_by": [],
+      "comments": "Conversions are implemented and unit-tested; the end-to-end accuracy has never been measured. Test points TBC."
+    },
+    {
+      "id": "SWR-BAT-015",
+      "category": "Lifecycle",
+      "text": "The rover_battery shall implement rover_battery_node as a managed lifecycle node that creates its subscription, publishers and watchdog timer in configure/activate and is brought to ACTIVE by an autostart parameter.",
+      "rationale": "Project convention: nodes owning a resource are lifecycle-managed so a supervisor can restart them; rover_battery_node is a plain rclcpp::Node today (only the UDP receiver next to it is lifecycle-managed).",
+      "verification": "Inspection, Test",
+      "acceptance": "'ros2 lifecycle get /<ns>/rover_battery_node' reports active after launch; deactivate stops publication.",
+      "priority": "Could",
+      "status": "Proposed",
+      "parents": [],
+      "derived_rationale": "Architecture convention (.claude/CLAUDE.md 'Lifecycle by default for anything owning a resource'); no SYS-SR requires it.",
+      "evidence": [
+        "rover_battery/src/infrastructure/rover_battery_node.cpp:36-40",
+        "rover_battery/launch/rover_battery.launch.py:73-81"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "The launch passes autostart only to the UDP receiver (launch line 68), not to rover_battery_node."
+    }
+  ]
+}

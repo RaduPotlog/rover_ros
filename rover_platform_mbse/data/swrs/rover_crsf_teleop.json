@@ -1,0 +1,521 @@
+{
+  "package": "rover_crsf_teleop",
+  "prefix": "CRSF",
+  "document": "ROVER-A1-ROVER_CRSF_TELEOP-SWRS-V-001",
+  "title": "rover_crsf_teleop Software Requirements Specification",
+  "scope": "rover_crsf_teleop provides line-of-sight RC teleoperation over an ExpressLRS/CRSF receiver. A lifecycle component (RoverCrsfTeleopNode) decodes the raw CRSF byte stream published by rover_serial_driver's serial bridge (UART /dev/ttyUSB0 at 460800 baud, both in one single-threaded container), maps two stick channels to TwistStamped commands on the highest-priority twist_mux input (teleop_elrs_cmd_vel_stamped) at 50 Hz, maps two switch channels onto the hardware interface's software E-Stop set/reset and latch-reset services, applies an RC-link failsafe (zero burst then silence), and offers an E-Stop-interlocked per-channel stick calibration with persistence.",
+  "requirements": [
+    {
+      "id": "SWR-CRSF-001",
+      "category": "Interface",
+      "text": "The rover_crsf_teleop shall subscribe the raw CRSF byte stream as std_msgs/UInt8MultiArray on serial_topic (rc/raw) with QoS depth 100, reliable, from the moment it is configured.",
+      "rationale": "A dropped byte chunk desynchronises the parser until the next sync byte, so the transport must not drop it; decoding while inactive means link health is known the moment teleop is activated.",
+      "verification": "Inspection, Test",
+      "acceptance": "Code review shows QoS(100) (reliable) created in on_configure; the integration test drives the node with encoded CRSF bytes on rc/raw.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:490-507",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:21-25"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp",
+        "rover_crsf_teleop/test/test_launch_structure.py"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-002",
+      "category": "Functional",
+      "text": "The rover_crsf_teleop shall decode CRSF RC_CHANNELS_PACKED (0x16, 16 x 11-bit channels) and LINK_STATISTICS (0x14) frames addressed to the flight controller (0xC8), discard frames with a bad CRC8 or out-of-range length byte, and resynchronise on the next sync byte with a bounded buffer.",
+      "rationale": "Only CRC-valid frames may drive the rover; corrupted input must never be interpreted as stick positions.",
+      "verification": "Test",
+      "acceptance": "Parser unit tests pass: all-channel decode, full 11-bit range, split/merged chunks, garbage resync, bad CRC dropped with the next good frame decoded, bounded buffer, random bytes survived.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/include/rover_crsf_teleop/domain/crsf/crsf_protocol.hpp:42-46",
+        "rover_crsf_teleop/src/domain/crsf/crsf_parser.cpp:116-120",
+        "rover_crsf_teleop/src/domain/crsf/crsf_parser.cpp:142-167",
+        "rover_crsf_teleop/src/domain/crsf/crsf_parser.cpp:206-211"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_crsf_parser.cpp",
+        "rover_crsf_teleop/test/unit/test_crc8.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-003",
+      "category": "Interface",
+      "text": "The rover_crsf_teleop shall publish velocity commands as geometry_msgs/TwistStamped with header.frame_id base_link on teleop_elrs_cmd_vel_stamped through a lifecycle publisher (depth 10) that is active only while the node is ACTIVE.",
+      "rationale": "This is the cmd_elrs input of rover_twist_mux (priority 110); a lifecycle publisher guarantees an inactive node cannot command motion.",
+      "verification": "Test, Inspection",
+      "acceptance": "While ACTIVE with a deflected stick, TwistStamped messages with frame_id base_link appear on teleop_elrs_cmd_vel_stamped; while INACTIVE none appear.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:40-41",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:420-421",
+        "rover_crsf_teleop/src/infrastructure/ros2_velocity_command_publisher.cpp:26-48",
+        "rover_twist_mux/config/rover_twist_mux.yaml:21-24"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-004",
+      "category": "Performance",
+      "text": "The rover_crsf_teleop shall run its control loop every 20 ms (50 Hz) while ACTIVE and publish one command per tick while the sticks are deflected and the link is healthy.",
+      "rationale": "50 Hz keeps the cmd_elrs input far inside the 0.5 s twist_mux timeout and the 500 ms command watchdog.",
+      "verification": "Test",
+      "acceptance": "With a steady deflected stick, one command is published per 20 ms control tick ('ros2 topic hz teleop_elrs_cmd_vel_stamped' reports 50 Hz).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:44",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:788",
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:96-103"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp",
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": "The tests check one publish per tick, not the wall-clock rate; a rate tolerance is TBD."
+    },
+    {
+      "id": "SWR-CRSF-005",
+      "category": "Functional",
+      "text": "The rover_crsf_teleop shall map linear_x_channel (3) to linear.x in [-0.95, 0.95] m/s and angular_z_channel (1, inverted) to angular.z in [-1.5, 1.5] rad/s, clamping raw values to the channel's calibrated range and mapping a stick within channel_deadband (30 counts) of its midpoint to exactly 0.0.",
+      "rationale": "Output limits match the drive controller caps; an exact zero at centre is required by the hardware interface's E-Stop reset invariant and by the zero-burst logic.",
+      "verification": "Test",
+      "acceptance": "Stick at each endpoint yields exactly the configured out_min/out_max; any raw value within +/-30 counts of the midpoint yields 0.0; out-of-range raw values are clamped.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-004",
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:108-116",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:65",
+        "rover_crsf_teleop/src/domain/stick_mapping.cpp:26-31",
+        "rover_crsf_teleop/src/domain/stick_mapping.cpp:50-54"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_stick_mapping.cpp"
+      ],
+      "comments": "0.95 m/s and 1.5 rad/s are within the SYS-SR-004 limits (1.0 m/s, 1.7 rad/s)."
+    },
+    {
+      "id": "SWR-CRSF-006",
+      "category": "Functional",
+      "text": "The rover_crsf_teleop shall shape each stick axis as (1 - e) * m + e * m^3 of the normalised deflection m, with e = linear_x_expo (0.3) and angular_z_expo (0.5), clamping e to [0, 1] and keeping full deflection at the output limits.",
+      "rationale": "Finer low-speed control, matching the web joystick.",
+      "verification": "Test",
+      "acceptance": "Expo 0 equals the linear mapping; full throw still reaches out_min/out_max; half throw is softer than linear; an out-of-range expo is clamped.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Operator-handling refinement with no system-level parent.",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:123-124",
+        "rover_crsf_teleop/src/domain/stick_mapping.cpp:43-46"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_stick_mapping.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-007",
+      "category": "Performance",
+      "text": "The rover_crsf_teleop shall scale linear.x and angular.z by the same factor so that |v| + |w| * effective_track_width / 2 does not exceed max_wheel_rim_speed (1.7 m/s with effective_track_width 1.0204 m).",
+      "rationale": "Keeps the outer-wheel speed under the URDF wheel limit while preserving the commanded arc.",
+      "verification": "Test",
+      "acceptance": "Full forward plus full turn produces a command whose rim speed equals 1.7 m/s (within floating-point tolerance) with the v/w ratio unchanged; commands within budget are unchanged.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-004"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:126-133",
+        "rover_crsf_teleop/src/domain/rim_speed_limit.cpp:25-35",
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:99"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_rim_speed_limit.cpp",
+        "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp"
+      ],
+      "comments": "effective_track_width must be updated with wheel_separation_multiplier in rover_controller (config comment)."
+    },
+    {
+      "id": "SWR-CRSF-008",
+      "category": "Parameter",
+      "text": "The rover_crsf_teleop shall declare linear_x_out_min/max and angular_z_out_min/max defaults no larger in magnitude than 1.0 m/s and 1.7 rad/s and shall refuse to configure with values beyond those limits.",
+      "rationale": "The declared defaults (+/-2.0 m/s, +/-5.0 rad/s) exceed the system velocity limits, so running without the shipped YAML would command beyond SYS-SR-004; configure validation does not check the limits.",
+      "verification": "Test, Inspection",
+      "acceptance": "Starting the node without a parameter file gives |out| <= 1.0 m/s and <= 1.7 rad/s; configuring with linear_x_out_max = 1.5 fails the configure transition.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-004"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:152-158",
+        "rover_crsf_teleop/src/application/teleop_config_validation.cpp:117-139"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "Downstream diff_drive limits (rover_controller) still clip, so this is defence in depth. Other code defaults also differ from the shipped YAML (zero_burst_duration_ms 0 vs 300, rc_channels_expected_hz 50 vs 250, expo 0 vs 0.3/0.5)."
+    },
+    {
+      "id": "SWR-CRSF-009",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall, when the commanded velocity becomes zero (stick released, link lost or teleop inhibited), publish zero commands for zero_burst_duration_ms (300 ms) and then publish nothing until a non-zero command is produced.",
+      "rationale": "A burst rather than a single zero means one lost message cannot leave the last motion command standing; going silent lets twist_mux fall through to the next source.",
+      "verification": "Test",
+      "acceptance": "After a deflected stick is released, zeros are published for 300 ms (15 ticks) and then no further message until the stick is deflected again; a deflection mid-burst is published at once.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011",
+        "SYS-SR-012"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:135-139",
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:126-147"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp",
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-010",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall judge the RC link healthy only while an RC channels frame was decoded within channel_timeout_ms (200 ms) and, with require_link_stats true, a LINK_STATISTICS frame was decoded within link_stats_timeout_ms (1000 ms) and uplink link quality has not fallen below link_quality_lost_below (30 %) since it was last at or above link_quality_recovered_at (50 %); the link shall be unhealthy before any input.",
+      "rationale": "Frame freshness alone cannot detect a receiver in failsafe that keeps sending held channel values; link quality with hysteresis can, without flapping.",
+      "verification": "Test",
+      "acceptance": "Link monitor unit tests: unhealthy before input; unhealthy 200 ms after the last channels frame; unhealthy 1000 ms after the last link-stats frame; LQ 29 -> lost, 30..49 keeps the previous state, 50 -> recovered.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-012",
+        "SYS-SR-025"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:176-180",
+        "rover_crsf_teleop/src/domain/link_monitor.cpp:64-105",
+        "rover_crsf_teleop/include/rover_crsf_teleop/domain/link_monitor.hpp:109"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_link_monitor.cpp"
+      ],
+      "comments": "Config marks these as INITIAL VALUES to be tuned on the rover (rover_crsf_teleop.yaml:172-175)."
+    },
+    {
+      "id": "SWR-CRSF-011",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall, when the RC link is judged lost while ACTIVE, command zero velocity (SWR-CRSF-009 burst), stop publishing and ignore the switch channels until the link is healthy again, without triggering the E-Stop.",
+      "rationale": "Loss of the RC operator link must stop RC-commanded motion at once; twist_mux then falls through to the next source.",
+      "verification": "Test",
+      "acceptance": "Stopping the byte stream while driving: a zero is published within channel_timeout_ms (200 ms) + one control period (20 ms) of the last frame, followed by silence; switch changes during the loss call no service; no E-Stop service is called by the loss itself.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-012"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:91-94",
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:101",
+        "rover_crsf_teleop/README.md:72-77"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp",
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": "SYS-SR-012 timeout is [TBD per SYS-SR-012]. Worst-case detection is 200 ms for lost frames but up to 1000 ms when only link statistics stop. Link loss does not stop the rover if a lower-priority source is still commanding (by design of SYS-SR-005 arbitration)."
+    },
+    {
+      "id": "SWR-CRSF-012",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall, on a change of the e_stop_channel (5) switch position, call hardware_interface/sw_user_e_stop_set (std_srvs/Trigger) when it goes low and hardware_interface/sw_user_e_stop_reset when it goes high, and shall call hardware_interface/sw_e_stop_latch_reset when e_stop_latch_reset_channel (4) goes low, evaluated within one 20 ms control tick of the decoded frame.",
+      "rationale": "Gives the RC operator a software E-Stop and an explicit, deliberate reset action; only changes fire, never a resting position.",
+      "verification": "Test",
+      "acceptance": "Toggling channel 5 low/high produces exactly one set/reset request per edge; channel 4 low produces one latch-reset request; no request fires while the switches rest.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:141-145",
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:176-193",
+        "rover_crsf_teleop/src/infrastructure/ros2_trigger_safety_switch.cpp:40-44"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp",
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": "The 100 ms SYS-SR-007 budget ends at the hardware interface; this package contributes one tick plus the async service round trip. Switches are only evaluated while the node is ACTIVE and the link is healthy."
+    },
+    {
+      "id": "SWR-CRSF-013",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall ignore switch positions for switch_settle_frames (100 ticks = 2 s) after start-up and after a calibration inhibit is released, learning the resting position without firing a service call, and shall classify a raw value below channel_switch_threshold (500) as low.",
+      "rationale": "Prevents a spurious E-Stop set/reset from the switch's resting position or from switches moved during a calibration sweep.",
+      "verification": "Test",
+      "acceptance": "No safety service call during the first 100 ticks regardless of switch position; after re-arm the first frame is not treated as an edge; a value equal to the threshold counts as high.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:152-155",
+        "rover_crsf_teleop/include/rover_crsf_teleop/domain/switch_debouncer.hpp:23",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:685-690"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_switch_debouncer.cpp",
+        "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp"
+      ],
+      "comments": "An E-Stop switch already low at boot is learned as the resting position and does not set the E-Stop (edge-only semantics)."
+    },
+    {
+      "id": "SWR-CRSF-014",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall keep requesting hardware_interface/sw_user_e_stop_set while the e_stop_channel switch is low and the request has not been acknowledged with success (service unavailable, pending or refused), instead of dropping the request.",
+      "rationale": "Today an E-Stop set request is dropped with a warning if the service is not ready and is never retried, because requests fire only on a switch change; an operator's E-Stop could therefore be silently lost.",
+      "verification": "Test",
+      "acceptance": "With the set service absent when the switch goes low and started afterwards while the switch stays low, the service receives a set request within one control tick (20 ms) of becoming available.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/ros2_trigger_safety_switch.cpp:87-94",
+        "rover_crsf_teleop/src/application/teleop_use_case.cpp:178-185"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Outcome (unavailable/refused) is visible on the 'E-Stop requests' diagnostic as WARN today. Must not retry the reset/latch-reset requests the same way (a reset must stay a deliberate edge per SYS-SR-008)."
+    },
+    {
+      "id": "SWR-CRSF-015",
+      "category": "Lifecycle",
+      "text": "The rover_crsf_teleop shall be a managed lifecycle node that validates parameters and subscribes its inputs in configure, starts the 20 ms control loop in activate, publishes one zero command before its publisher is deactivated in deactivate and in shutdown, and self-transitions to ACTIVE when autostart is true.",
+      "rationale": "A supervisor can take RC teleop off the command path without killing the process; leaving the command path always ends with a stop.",
+      "verification": "Test",
+      "acceptance": "Launch test: the node reaches ACTIVE and publishes nothing without RC input; integration test: deactivate publishes exactly one zero.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:366-372",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:773-822",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:123",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:119-127"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/e2e/test_teleop_launch.py",
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": "Inside the component container Ctrl-C does not run the shutdown transition, so the final stop comes from the twist_mux timeout instead (launch docstring lines 30-34)."
+    },
+    {
+      "id": "SWR-CRSF-016",
+      "category": "Build",
+      "text": "The rover_crsf_teleop shall, in rover_crsf_teleop.launch.py, load the serial bridge (device serial_device /dev/ttyUSB0, serial_baudrate 460800, read from the teleop config) and the teleop node into one single-threaded component container with intra-process communication, and shall not start the serial bridge when use_sim is true.",
+      "rationale": "Keeps the ~250 rc/raw messages per second off the Zenoh router and preserves the node's single-threaded invariant; there is no receiver in simulation.",
+      "verification": "Test, Inspection",
+      "acceptance": "Launch-structure test: both components share one component_container (not _mt) and the bridge publishes where the teleop node subscribes.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Deployment/performance constraint of the RC input chain; no system-level parent.",
+      "evidence": [
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:53-77",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:97-142",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:18-19"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/test_launch_structure.py"
+      ],
+      "comments": "Known limitation (README.md:153-167): the serial bridge never reopens the port after a read error; recovery needs a manual lifecycle cycle."
+    },
+    {
+      "id": "SWR-CRSF-017",
+      "category": "Parameter",
+      "text": "The rover_crsf_teleop shall fail the configure transition when a channel role is outside 1-16, two roles share a channel, channel_switch_threshold is outside the 0-2047 wire range, zero_burst_duration_ms is negative, channel_timeout_ms or link_stats_timeout_ms is not positive, or the link-quality thresholds are inconsistent.",
+      "rationale": "A mis-set channel would otherwise drive the E-Stop from a stick or read a stick as full negative deflection.",
+      "verification": "Test",
+      "acceptance": "Each listed invalid configuration makes configure return FAILURE (integration and unit tests).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Configuration robustness of a safety-relevant input; no system-level parent.",
+      "evidence": [
+        "rover_crsf_teleop/src/application/teleop_config_validation.cpp:59-85",
+        "rover_crsf_teleop/src/application/teleop_config_validation.cpp:117-133"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_teleop_config_validation.cpp",
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-018",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall start an RC calibration session only while the node is not ACTIVE, the operator confirms the E-Stop, and a fresh (within e_stop_state_timeout_s = 1.0 s, link healthy) hardware_interface/safety_status shows the physical E-Stop pressed AND the latch active AND the motor contactor open; it shall refuse activation during a session, inhibit teleop for its duration, cancel it after the E-Stop is released for e_stop_grace_s (1.0 s) and after calibration_timeout_s (300 s).",
+      "rationale": "The sweep drives the sticks to full throw, so motion must be physically impossible and verified, not assumed.",
+      "verification": "Test",
+      "acceptance": "Integration tests: start refused while active, without confirmation, with the E-Stop released, on a software-only E-Stop, when safety_status was never published or is stale/unhealthy; releasing the E-Stop cancels the session; nothing is commanded while it runs.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/domain/safety_io_flags.cpp:20-25",
+        "rover_crsf_teleop/src/application/calibration_use_case.cpp:102-128",
+        "rover_crsf_teleop/src/application/calibration_use_case.cpp:155-158",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:433-441",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:773-783",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:80",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:98-103"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp",
+        "rover_crsf_teleop/test/unit/test_calibration_use_case.cpp",
+        "rover_crsf_teleop/test/unit/test_safety_io_flags.cpp"
+      ],
+      "comments": "Doc drift: rover_crsf_teleop.yaml:85-97 still says the gate reads hardware_interface/gpio_state and that 'any' stop (incl. software button) counts; the code reads safety_status and requires HW button AND latch AND contactor open (README.md:104-110 is correct)."
+    },
+    {
+      "id": "SWR-CRSF-019",
+      "category": "Interface",
+      "text": "The rover_crsf_teleop shall provide the calibration services rc/calibration/start (rover_msgs/StartRcCalibration), rc/calibration/sweep, finish and cancel (std_srvs/Trigger) and rc/calibration/apply (rover_msgs/SetRcCalibration), publish rc/calibration/state (rover_msgs/RcCalibrationState, reliable, transient-local, depth 1) at calibration_state_rate_hz (5.0 Hz) during a session and on every change, and persist an applied calibration to calibration_file.",
+      "rationale": "A client joining mid-session must immediately learn that teleop is held off; persisted endpoints describe the transmitter actually in use.",
+      "verification": "Test",
+      "acceptance": "The state topic is received by a late-joining subscriber; an applied calibration changes the mapping without restart and survives a node restart when persisted.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Maintenance function of the RC input; no system-level parent.",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:47-52",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:523-528",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:693-727",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:75-83"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp",
+        "rover_crsf_teleop/test/unit/test_yaml_calibration_store.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-020",
+      "category": "Interface",
+      "text": "The rover_crsf_teleop shall, when publish_rc_topics is true, echo decoded frames on rc/channels (rover_msgs/RcChannels) and rc/link (rover_msgs/RcLinkStatus) with QoS best-effort, volatile, depth 1, each capped at rc_topics_rate_hz (25 Hz; 0 = uncapped).",
+      "rationale": "Observability for tuning and the Cockpit RC page without pulling ~250 messages/s through the Zenoh router; nothing on the rover consumes them.",
+      "verification": "Inspection, Test",
+      "acceptance": "'ros2 topic hz rc/channels' reads <= 25 Hz with the receiver at its full packet rate; the publishers are best-effort.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Observability output only; no system-level parent.",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:27-35",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:482-488",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:756-758"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/unit/test_rate_limiter.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-CRSF-021",
+      "category": "Diagnostics",
+      "text": "The rover_crsf_teleop shall publish diagnostics under hardware ID 'RC Receiver' with the tasks 'RC link', 'E-Stop requests', 'RC channels rate', 'RC serial link' and 'RC calibration', reporting at most WARN (never ERROR); 'RC channels rate' shall warn when the decoded frame rate deviates by more than rc_channels_rate_tolerance (0.2) from rc_channels_expected_hz (250.0 Hz).",
+      "rationale": "RC teleop is optional, so its faults are warnings; separate tasks distinguish a dead byte stream from an out-of-range transmitter or a refused E-Stop request.",
+      "verification": "Test",
+      "acceptance": "With no frames the 'RC channels rate' task is WARN; the 'RC link' task follows link loss; a refused or unavailable E-Stop request makes 'E-Stop requests' WARN; no task ever reports ERROR.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:94-99",
+        "rover_crsf_teleop/src/infrastructure/teleop_diagnostics_conversions.cpp:57-59",
+        "rover_crsf_teleop/src/infrastructure/teleop_diagnostics_conversions.cpp:101-119",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:182-193"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/integration/test_teleop_node.cpp",
+        "rover_crsf_teleop/test/unit/test_teleop_diagnostics_conversions.cpp"
+      ],
+      "comments": "SYS-SR-022 asks for induced faults to be ERROR; the RC receiver is not in the SYS-SR-022 component list, so WARN-only is a deliberate design choice."
+    }
+  ]
+}

@@ -1,0 +1,317 @@
+{
+  "package": "rover_diag_manager",
+  "prefix": "DIAG",
+  "document": "ROVER-A1-ROVER_DIAG_MANAGER-SWRS-V-001",
+  "title": "rover_diag_manager Software Requirements Specification",
+  "scope": "rover_diag_manager provides the platform's computer-health monitor (rover_diag_manager_node: CPU usage, CPU temperature, RAM and root-disk usage, published as rover_msgs/SystemStatus and as an 'OS status' diagnostic) and the configuration/launch of the diagnostic_aggregator node that groups every rover node's /diagnostics statuses into the diagnostics_agg tree shown by the Cockpit diagnostics page. It does not itself produce the drive, battery, E-stop or sensor diagnostics; those come from the owning packages and are only grouped here.",
+  "requirements": [
+    {
+      "id": "SWR-DIAG-001",
+      "category": "Interface",
+      "text": "The rover_diag_manager shall publish a rover_msgs/SystemStatus message on the relative topic system_status (queue depth 10) containing per-core CPU usage, mean CPU load, CPU temperature, RAM usage and disk usage.",
+      "rationale": "Gives the operator UI and logging a numeric view of on-board computer health.",
+      "verification": "Test",
+      "acceptance": "A subscriber on system_status receives a message whose avg_load_percent, cpu_temp, ram_usage_percent and disc_usage_percent equal the values reported by the metrics source (50, 60, 70, 80 with the test fake).",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical requirement for computer-health monitoring; no SYS-SR covers the on-board computer, but it supports SYS-SR-022 sensor/platform health reporting.",
+      "evidence": [
+        "rover_diag_manager/src/infrastructure/ros2_system_status_publisher.cpp:29",
+        "rover_diag_manager/src/infrastructure/system_status_msg_conversions.cpp:35-48"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/integration/test_system_diag_node.cpp",
+        "rover_diag_manager/test/unit/test_system_status_msg_conversions.cpp"
+      ],
+      "comments": "Field name disc_usage_percent is a typo that is part of the published interface (system_status_msg_conversions.cpp:45); renaming needs a rover_msgs version bump."
+    },
+    {
+      "id": "SWR-DIAG-002",
+      "category": "Performance",
+      "text": "The rover_diag_manager shall sample the system metrics and publish system_status at the rate set by the publish_frequency parameter, 5.0 Hz in the shipped configuration.",
+      "rationale": "A fixed sampling rate keeps the health view current without loading the CPU.",
+      "verification": "Test",
+      "acceptance": "With the shipped system_diag.yaml, `ros2 topic hz system_status` over 30 s reports 5.0 Hz +/- 10 %; with publish_frequency=10.0 the first message arrives within 5 s (integration test).",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical rate for the computer-health monitor; no SYS-SR sets it.",
+      "evidence": [
+        "rover_diag_manager/config/system_diag.yaml:7",
+        "rover_diag_manager/src/infrastructure/system_diag_node.cpp:52-55",
+        "rover_diag_manager/src/application/monitor_system_use_case.cpp:40-45"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/integration/test_system_diag_node.cpp",
+        "rover_diag_manager/test/unit/test_monitor_system_use_case.cpp"
+      ],
+      "comments": "Uses a wall timer (create_wall_timer), so the rate does not follow sim time. The integration test checks message arrival, not the measured rate."
+    },
+    {
+      "id": "SWR-DIAG-003",
+      "category": "Parameter",
+      "text": "The rover_diag_manager shall declare the parameters cpu_usage_warn_threshold (default 95.0 %, bounds 0-100), cpu_temperature_warn_threshold (default 80.0 degC, bounds 0-120), ram_usage_warn_threshold (default 90.0 %, bounds 0-100), disk_usage_warn_threshold (default 90.0 %, bounds 0-100) and publish_frequency (default 5.0 Hz, bounds 0.1-10.0) through generate_parameter_library.",
+      "rationale": "Declared, bounded parameters prevent silent misconfiguration.",
+      "verification": "Test, Inspection",
+      "acceptance": "`ros2 param list` shows the five parameters with these defaults; starting the node with publish_frequency=0.0 or cpu_usage_warn_threshold=-1.0 throws InvalidParameterValueException.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical parameter contract of the computer-health monitor.",
+      "evidence": [
+        "rover_diag_manager/src/system_diag_params.yaml:1-26",
+        "rover_diag_manager/config/system_diag.yaml:1-7",
+        "rover_diag_manager/include/rover_diag_manager/domain/thresholds.hpp:22-28"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/integration/test_system_diag_node.cpp"
+      ],
+      "comments": "README warns that a YAML key not matching the node name fails silently; the shipped file uses the /**/rover_diag_manager_node wildcard (README.md:22-27)."
+    },
+    {
+      "id": "SWR-DIAG-004",
+      "category": "Functional",
+      "text": "The rover_diag_manager shall re-read the warning thresholds on every sampling tick so that a threshold changed with `ros2 param set` takes effect at the next tick without restarting the node.",
+      "rationale": "Lets operators tune thresholds on a running rover.",
+      "verification": "Test",
+      "acceptance": "After changing a threshold at runtime, the next graded report uses the new value (unit test DoesNotCacheThresholdsAcrossTicks passes).",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical operability requirement.",
+      "evidence": [
+        "rover_diag_manager/src/infrastructure/system_diag_node.cpp:60-64"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/unit/test_monitor_system_use_case.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DIAG-005",
+      "category": "Diagnostics",
+      "text": "The rover_diag_manager shall publish an 'OS status' diagnostic (hardware ID 'Rover PC') on /diagnostics with one key/value per metric (CPU usage, CPU temperature, RAM usage, disk usage) at the diagnostic_updater period.",
+      "rationale": "Brings computer health into the common /diagnostics stream (SYS-SR-022).",
+      "verification": "Test",
+      "acceptance": "An 'OS status' entry with 4 key/value pairs appears on /diagnostics within 5 s of node start and then at >= 1 Hz.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/src/infrastructure/system_diag_node.cpp:45-46",
+        "rover_diag_manager/src/infrastructure/ros2_system_status_publisher.cpp:31",
+        "rover_diag_manager/src/infrastructure/system_status_msg_conversions.cpp:66-74"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/integration/test_system_diag_node.cpp",
+        "rover_diag_manager/test/unit/test_system_status_msg_conversions.cpp"
+      ],
+      "comments": "The updater period is not configured, so it relies on the diagnostic_updater default (the test comment says ~1 Hz, test_system_diag_node.cpp:142). TBC: set diagnostic_updater.period explicitly to make >= 1 Hz a stated value."
+    },
+    {
+      "id": "SWR-DIAG-006",
+      "category": "Diagnostics",
+      "text": "The rover_diag_manager shall grade the 'OS status' diagnostic WARN when any metric is strictly above its warning threshold, ERROR when any metric cannot be read, and OK otherwise, using the most severe finding as the overall level.",
+      "rationale": "Makes overload and sensor-read failures of the computer visible to the operator.",
+      "verification": "Test",
+      "acceptance": "Unit tests: all metrics below thresholds -> OK; CPU or temperature above -> WARN; a value exactly at the threshold -> OK; an unknown metric -> ERROR. Integration test: thresholds 1.0 with fake values 50-80 -> WARN on /diagnostics within 5 s.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/src/domain/system_health_evaluator.cpp:28-39",
+        "rover_diag_manager/src/domain/system_health_evaluator.cpp:56-73",
+        "rover_diag_manager/src/infrastructure/system_status_msg_conversions.cpp:51-64"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/unit/test_system_health_evaluator.cpp",
+        "rover_diag_manager/test/integration/test_system_diag_node.cpp"
+      ],
+      "comments": "An over-threshold value never escalates to ERROR (no second, higher threshold)."
+    },
+    {
+      "id": "SWR-DIAG-007",
+      "category": "Diagnostics",
+      "text": "The rover_diag_manager shall report the 'OS status' diagnostic as STALE with the message 'No system sample yet.' until the first metrics sample has been taken.",
+      "rationale": "Avoids reporting OK before any data exists.",
+      "verification": "Inspection",
+      "acceptance": "Code review: diagnoseSystem() returns STALE when no report has been stored.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/src/infrastructure/ros2_system_status_publisher.cpp:42-51"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DIAG-008",
+      "category": "Functional",
+      "text": "The rover_diag_manager shall read CPU temperature from /sys/class/thermal/thermal_zone0/temp (millidegrees, converted to degC with 2 decimals), RAM usage as (total - available)/total from /proc/meminfo, and disk usage as (capacity - available)/capacity of the root filesystem '/', and shall report a metric as unknown (NaN on system_status) when it cannot be read or its total is not positive.",
+      "rationale": "Defines what each reported metric means so values can be checked against a reference.",
+      "verification": "Test",
+      "acceptance": "Unit tests: '45123' millidegrees -> 45.12 degC; missing temperature file -> nullopt; zero disk capacity -> nullopt; unknown metrics map to NaN in the message.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical definition of the computer-health metrics.",
+      "evidence": [
+        "rover_diag_manager/include/rover_diag_manager/infrastructure/linux_system_metrics_source.hpp:40-41",
+        "rover_diag_manager/src/infrastructure/linux_system_metrics_source.cpp:69-130",
+        "rover_diag_manager/include/rover_diag_manager/domain/percentage.hpp:27-37"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/unit/test_linux_system_metrics_source.cpp",
+        "rover_diag_manager/test/unit/test_percentage.cpp",
+        "rover_diag_manager/test/unit/test_system_status_msg_conversions.cpp"
+      ],
+      "comments": "Read errors are logged with a 10 000 ms throttle (linux_system_metrics_source.cpp:33). thermal_zone0 is assumed to be the CPU zone on the target computer [TBC]."
+    },
+    {
+      "id": "SWR-DIAG-009",
+      "category": "Interface",
+      "text": "The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover_diagnostic_aggregator that subscribes to the namespaced diagnostics topic and publishes diagnostics_agg and diagnostics_toplevel_state inside the launch namespace (ROVER_NAMESPACE).",
+      "rationale": "The Cockpit diagnostics page consumes diagnostics_agg; relative remaps keep multi-robot namespaces isolated.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "After `ros2 launch rover_diag_manager system_diag.launch.py`, `ros2 topic list` shows <ns>/diagnostics_agg and <ns>/diagnostics_toplevel_state published by rover_diagnostic_aggregator.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/launch/system_diag.launch.py:38-43",
+        "rover_diag_manager/launch/system_diag.launch.py:88-109"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "No launch test exists for system_diag.launch.py."
+    },
+    {
+      "id": "SWR-DIAG-010",
+      "category": "Performance",
+      "text": "The rover_diag_manager shall configure the diagnostic aggregator to publish diagnostics_agg at 1.0 Hz under the root path 'Rover'.",
+      "rationale": "SYS-SR-022 requires diagnostic status at 1 Hz or faster.",
+      "verification": "Test",
+      "acceptance": "`ros2 topic hz diagnostics_agg` over 30 s reports >= 1.0 Hz (tolerance -5 %).",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/config/diagnostic_aggregator.yaml:12-15"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "1.0 Hz is exactly at the SYS-SR-022 floor; measured jitter may dip below 1 Hz. Consider 2.0 Hz for margin."
+    },
+    {
+      "id": "SWR-DIAG-011",
+      "category": "Diagnostics",
+      "text": "The rover_diag_manager shall group diagnostic statuses by node-name prefix into the aggregator paths Computer (rover_diag_manager_node), Drive (rover_hardware_controller, controller_manager), Battery (rover_battery_node), Localization (rover_ekf_node, rover_ekf_global_node, rover_navsat_transform_node), GPS (rover_gps_node, rover_gps_heading_node), Lidar (rover_rs16_lidar_node), Lighting (rover_led_driver, rover_led_controller), Teleop (rover_crsf_teleop_node), Motion (rover_motion_lock_node, rover_twist_mux_node) and Safety (rover_safety_node, rover_led_safety_node).",
+      "rationale": "SYS-SR-022 lists drive motors, battery, E-stop circuit and sensors; grouping gives the operator one place per subsystem.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "With the full bringup running, diagnostics_agg contains the 10 groups /Rover/Computer ... /Rover/Safety and each listed node's statuses appear under its group, not under /Rover/Other.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/config/diagnostic_aggregator.yaml:16-57"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Doc drift: README.md:29 lists 9 groups and omits Lidar, which is present in the YAML (lines 38-41). IMU diagnostics are expected under Drive via rover_hardware_controller [TBC]."
+    },
+    {
+      "id": "SWR-DIAG-012",
+      "category": "Diagnostics",
+      "text": "The rover_diag_manager shall configure the diagnostic aggregator so that the drive, battery, E-stop (safety) and sensor (GPS, lidar, IMU) groups report ERROR or STALE when an expected component's diagnostics are missing, rather than silently omitting them.",
+      "rationale": "SYS-SR-022 acceptance requires every listed component to appear at >= 1 Hz; a GenericAnalyzer with only find_and_remove_prefix shows nothing when a node never starts.",
+      "verification": "Test",
+      "acceptance": "Killing rover_safety_node (or rover_battery_node) makes its aggregator group non-OK (STALE or ERROR) in diagnostics_agg within [TBD per SYS-SR-022] s.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_diag_manager/config/diagnostic_aggregator.yaml:20-57"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "No 'expected' / 'contains' entries or timeout are configured in any analyzer, so a missing node's group simply disappears. Proposed fix: add expected status names per group."
+    },
+    {
+      "id": "SWR-DIAG-013",
+      "category": "Parameter",
+      "text": "The rover_diag_manager launch file shall accept the arguments log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO), namespace (default $ROVER_NAMESPACE or empty), system_diag_config_path (default config/system_diag.yaml) and diagnostic_aggregator_config_path (default config/diagnostic_aggregator.yaml).",
+      "rationale": "Allows per-deployment override of configuration without rebuilding.",
+      "verification": "Inspection",
+      "acceptance": "`ros2 launch rover_diag_manager system_diag.launch.py --show-args` lists the four arguments with these defaults.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical deployment interface of the launch file.",
+      "evidence": [
+        "rover_diag_manager/launch/system_diag.launch.py:30-56",
+        "rover_diag_manager/launch/system_diag.launch.py:75-86"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DIAG-014",
+      "category": "Lifecycle",
+      "text": "The rover_diag_manager shall run rover_diag_manager_node as a plain (non-lifecycle) node that starts sampling on construction, exits with code 1 and a FATAL log if construction fails (for example on an out-of-range parameter), and stops its timer on context shutdown.",
+      "rationale": "The node owns no hardware resource; fail-fast on bad configuration makes misconfiguration visible.",
+      "verification": "Test, Inspection",
+      "acceptance": "Starting with publish_frequency=0.0 terminates the process with exit code 1 and a FATAL 'Caught exception' log.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical lifecycle choice documented in the README (plain node owning no resource).",
+      "evidence": [
+        "rover_diag_manager/README.md:18",
+        "rover_diag_manager/src/rover_diag_manager.cpp:31-52",
+        "rover_diag_manager/src/infrastructure/system_diag_node.cpp:34-38"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_diag_manager/test/integration/test_system_diag_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-DIAG-015",
+      "category": "Build",
+      "text": "The rover_diag_manager shall keep its domain and application layers in a separate static library (rover_diag_manager_core) with no ROS or cppuprofile dependency.",
+      "rationale": "Clean Architecture rule: domain has no ROS dependencies; enables fast pure unit tests.",
+      "verification": "Inspection",
+      "acceptance": "rover_diag_manager_core sources include no rclcpp, *_msgs or cppuprofile header and the target links no ROS library.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Project Clean Architecture convention (rules/clean_architecture.md).",
+      "evidence": [
+        "rover_diag_manager/CMakeLists.txt:35-43",
+        "rover_diag_manager/README.md:9-11"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "cppuprofile must be installed system-wide before building (CMakeLists.txt:27-29)."
+    }
+  ]
+}

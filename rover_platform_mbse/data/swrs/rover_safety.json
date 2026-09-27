@@ -1,0 +1,522 @@
+{
+  "package": "rover_safety",
+  "prefix": "SAF",
+  "document": "ROVER-A1-ROVER_SAFETY-SWRS-V-001",
+  "title": "rover_safety Software Requirements Specification",
+  "scope": "rover_safety provides behavior-tree driven safety supervision in two nav2::LifecycleNodes that configure and activate themselves. rover_safety_node evaluates the battery (health + temperature) with a pure domain policy and, through the RoverSafety tree, trips the software E-Stop or starts a controlled shutdown of the ROS controller (trip E-Stop, shut down remote hosts, power off), also on request via ~/shutdown. rover_led_safety_node selects LED animations (E-Stop, manual action, ready, error, battery level/charging) and requests them from rover_led. The package is outside the hard E-Stop chain (rover_arch/SAFETY_CHAIN.md). It does not implement a platform state machine today; this SWRS assigns the SYS-SR-010 mode manager, its Low Battery thresholds and the SYS-SR-009 state-to-LED mapping to this package as Proposed requirements.",
+  "requirements": [
+    {
+      "id": "SWR-SAF-001",
+      "category": "Interface",
+      "text": "The rover_safety shall, in rover_safety_node, subscribe rover_battery/battery_status (sensor_msgs/BatteryState, KeepLast(1), reliable), hardware_interface/safety_command_echo (rover_msgs/SafetyCommandEcho, KeepLast(1), reliable, volatile), system_status (rover_msgs/SystemStatus, KeepLast(1), reliable) and hardware_interface/rover_driver_state (rover_msgs/RoverDriverState, depth 10), and act as a client of hardware_interface/sw_user_e_stop_set (std_srvs/Trigger).",
+      "rationale": "Only the latest reading matters for the safety decision; QoS must be compatible with the volatile publishers.",
+      "verification": "Inspection",
+      "acceptance": "'ros2 node info rover_safety_node' lists exactly these subscriptions and the service client; QoS matches with their publishers (no incompatible-QoS events).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-016"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:122-138",
+        "rover_safety/behavior_trees/rover_safety.xml:8-9"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Doc drift: README.md:19 lists hardware_interface/gpio_state (rover_msgs/GpioState); the code subscribes hardware_interface/safety_command_echo. rover_driver_state is received but unused (TODO at safety_node.cpp:256)."
+    },
+    {
+      "id": "SWR-SAF-002",
+      "category": "Safety",
+      "text": "The rover_safety shall, in rover_safety_node, classify a battery reading with health WATCHDOG_TIMER_EXPIRE, DEAD or OVERVOLTAGE as verdict TRIP_E_STOP.",
+      "rationale": "A pack that is flat, overcharged or silent must not keep driving.",
+      "verification": "Test",
+      "acceptance": "Unit test: each of the three health values yields TRIP_E_STOP with a non-empty reason; GOOD and other health values yield no action.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-017",
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/domain/battery_safety_policy.cpp:37-45",
+        "rover_safety/src/safety_node.cpp:237-241"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_battery_safety_policy.cpp"
+      ],
+      "comments": "DEAD is raised by rover_battery on the BMS level-one low pack/cell voltage or low SOC alarm, so the SOC safe-stop threshold lives in the BMS configuration, not in software (see SWR-SAF-020). rover_battery lets OVERHEAT/COLD override DEAD (battery_classifier.cpp:130-134), which can mask a DEAD verdict here."
+    },
+    {
+      "id": "SWR-SAF-003",
+      "category": "Safety",
+      "text": "The rover_safety shall, in rover_safety_node, for a battery reading with health OVERHEAT, return verdict SHUTDOWN above battery.temp.fatal (60.0 degC) and TRIP_E_STOP above battery.temp.critical (50.0 degC), and no action otherwise; a high temperature without OVERHEAT health shall not trigger an action.",
+      "rationale": "Escalating thermal protection of the pack; the temperature is only acted on when the BMS itself flags overheat.",
+      "verification": "Test",
+      "acceptance": "Unit test: OVERHEAT above 60.0 degC -> SHUTDOWN; OVERHEAT above 50.0 and at most 60.0 degC -> TRIP_E_STOP; OVERHEAT at or below 50.0 degC -> none; GOOD health at any temperature -> none.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Battery thermal protection derived from the pack's safe operating area; no SYS-SR states battery temperature limits (SYS-SR-029 covers ambient only).",
+      "evidence": [
+        "rover_safety/src/domain/battery_safety_policy.cpp:47-54",
+        "rover_safety/config/rover_safety.yaml:9-12"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_battery_safety_policy.cpp",
+        "rover_safety/test/integration/test_safety_node_shutdown.cpp"
+      ],
+      "comments": "The temperature used is the last value received with known status and health (safety_node.cpp:230-233), i.e. the watchdog-expired state keeps the last real temperature."
+    },
+    {
+      "id": "SWR-SAF-004",
+      "category": "Parameter",
+      "text": "The rover_safety shall, in rover_safety_node, reject battery.temp.critical and battery.temp.fatal outside [-20.0, 100.0] degC and shall fail construction unless critical < fatal.",
+      "rationale": "An inverted threshold pair would skip the E-Stop stage and go straight to shutdown (or never shut down).",
+      "verification": "Test",
+      "acceptance": "Constructing BatteryThresholds with critical >= fatal throws std::invalid_argument; out-of-range parameters fail validation.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Parameter validation for SWR-SAF-003.",
+      "evidence": [
+        "rover_safety/src/domain/battery_safety_policy.cpp:23-31",
+        "rover_safety/src/safety_parameters.yaml:2-16"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_battery_safety_policy.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-SAF-005",
+      "category": "Functional",
+      "text": "The rover_safety shall, in rover_safety_node, tick the RoverSafety behavior tree at timer_frequency (10.0 Hz), calling hardware_interface/sw_user_e_stop_set when the battery verdict is TRIP_E_STOP and the software E-Stop is not already set, and raising SignalShutdown with the verdict reason when the verdict is SHUTDOWN.",
+      "rationale": "Turns the battery verdict into an action within one tick; the E-Stop is not re-requested while already set.",
+      "verification": "Test",
+      "acceptance": "With a TRIP_E_STOP verdict and sw_e_stop_state=false, the set service is called within 100 ms (one tick); with SHUTDOWN, a shutdown is started.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-017"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:140-144",
+        "rover_safety/src/safety_node.cpp:290-317",
+        "rover_safety/behavior_trees/rover_safety.xml:4-16",
+        "rover_safety/config/rover_safety.yaml:4"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/integration/test_safety_node_shutdown.cpp",
+        "rover_safety/test/integration/test_call_trigger_service.cpp"
+      ],
+      "comments": "No node-level test covers the TRIP_E_STOP branch of the tree (only SHUTDOWN via FatalBatteryTemperatureShutsDown and the CallTriggerService plugin in isolation). The tick timer is created in configure, not gated on ACTIVE."
+    },
+    {
+      "id": "SWR-SAF-006",
+      "category": "Safety",
+      "text": "The rover_safety shall, in rover_safety_node, evaluate and act on the battery verdict as soon as a battery reading and the software E-Stop state are available, independently of whether system_status (CPU temperature) has been received.",
+      "rationale": "Today the safety tree is not ticked until battery_status, cpu_temp (from rover_diag_manager's system_status) and sw_e_stop_state are all on the blackboard, so a missing or late rover_diag_manager silently disables the battery E-Stop and shutdown reactions.",
+      "verification": "Test",
+      "acceptance": "With system_status never published, a DEAD battery reading causes a sw_user_e_stop_set call within 100 ms (one tick at 10 Hz).",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-017"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:274-288",
+        "rover_safety/src/safety_node.cpp:304-308"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "cpu_temp is only read into diagnostics; no tree node uses it. The 'Safety behavior tree' diagnostic does show the not-ready condition."
+    },
+    {
+      "id": "SWR-SAF-007",
+      "category": "Functional",
+      "text": "The rover_safety shall, in rover_safety_node, once a shutdown is started (SignalShutdown or ~/shutdown), halt the safety tree and tick the RoverShutdown tree at timer_frequency, which trips the software E-Stop (best effort), asks every host in shutdown_hosts_path to shut down (best effort, unreachable hosts skipped), and runs shutdown.command (default: the installed shutdown_ros_controller.sh --no-e-stop with the reason exported) within shutdown.command_timeout (15.0 s).",
+      "rationale": "Controlled power-down of the ROS controller on a fatal battery condition or on request, with the rover stopped first.",
+      "verification": "Test",
+      "acceptance": "Integration test: a ~/shutdown request calls sw_user_e_stop_set, then runs the power-off command exactly once; an unreachable host does not block the tick; a command exceeding 15.0 s is killed and the tree fails.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Platform power management for fatal battery conditions (derived from SWR-SAF-003); no SYS-SR requires an automatic ROS-controller shutdown.",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:337-383",
+        "rover_safety/behavior_trees/rover_shutdown.xml:5-19",
+        "rover_safety/src/safety_node.cpp:208-220",
+        "rover_safety/config/rover_safety.yaml:27-33"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/integration/test_shutdown_tree.cpp",
+        "rover_safety/test/integration/test_safety_node_shutdown.cpp",
+        "rover_safety/test/integration/test_shutdown_script.sh",
+        "rover_safety/test/unit/plugins/test_execute_command_node.cpp",
+        "rover_safety/test/unit/plugins/test_shutdown_hosts_from_file_node.cpp"
+      ],
+      "comments": "config/shutdown_hosts.yaml ships with no hosts."
+    },
+    {
+      "id": "SWR-SAF-008",
+      "category": "Interface",
+      "text": "The rover_safety shall, in rover_safety_node, provide ~/shutdown (std_srvs/Trigger) when shutdown.service_enabled is true (shipped: true), replying immediately with success only when a new shutdown was started, refusing while one is in progress or has succeeded, and refusing retries for shutdown.retry_backoff (30.0 s) after a failed attempt.",
+      "rationale": "Idempotent, non-blocking shutdown requests; a failed power-off must not be hammered.",
+      "verification": "Test",
+      "acceptance": "First call -> success=true 'Shutdown started.'; call during the run -> success=false 'Shutdown already in progress.'; after a failure, a call within 30 s is refused and one after 30 s starts a new attempt.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Operator/maintenance interface of SWR-SAF-007.",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:146-149",
+        "rover_safety/src/safety_node.cpp:385-394",
+        "rover_safety/src/domain/shutdown_sequence.cpp:34-49",
+        "rover_safety/src/safety_parameters.yaml:131-140"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_shutdown_sequence.cpp",
+        "rover_safety/test/integration/test_safety_node_shutdown.cpp"
+      ],
+      "comments": "Security: anyone on the ROS graph can call ~/shutdown (README.md:270)."
+    },
+    {
+      "id": "SWR-SAF-009",
+      "category": "Diagnostics",
+      "text": "The rover_safety shall, in rover_safety_node, publish diagnostics under hardware ID 'Rover Safety' with the tasks 'Safety inputs' (ERROR when an input is older than input_timeout = 5.0 s, WARN when one was never received), 'Battery safety verdict' (ERROR for any verdict other than none, STALE before the first reading), 'Safety behavior tree' and 'Shutdown' (ERROR after a failed power-off).",
+      "rationale": "Makes the battery reaction, input freshness and shutdown state observable.",
+      "verification": "Test",
+      "acceptance": "Stopping battery_status for more than 5.0 s turns 'Safety inputs' ERROR; a TRIP_E_STOP verdict turns 'Battery safety verdict' ERROR.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:57-62",
+        "rover_safety/src/safety_node.cpp:396-452",
+        "rover_safety/src/domain/safety_health.cpp:38-66",
+        "rover_safety/config/rover_safety.yaml:6"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_safety_health.cpp",
+        "rover_safety/test/unit/test_safety_diagnostics.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-SAF-010",
+      "category": "Lifecycle",
+      "text": "The rover_safety shall run rover_safety_node and rover_led_safety_node as nav2::LifecycleNodes that configure and activate themselves when autostart_node is true, and that retry a failed configure every configure_retry_period (5.0 s) until it succeeds.",
+      "rationale": "Tree construction fails while a required service (sw_user_e_stop_set, led/set_animation) is not yet up; the nodes must recover without manual intervention.",
+      "verification": "Test",
+      "acceptance": "Starting rover_led_safety_node before its LED service exists: the node reaches ACTIVE within one retry period after the service appears.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:52-53",
+        "rover_safety/src/safety_node.cpp:67-89",
+        "rover_safety/src/infrastructure/configure_retry.cpp:31-80",
+        "rover_safety/config/rover_safety.yaml:7-8",
+        "rover_safety/config/led_safety.yaml:7-8"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/integration/test_led_safety_configure_retry.cpp"
+      ],
+      "comments": "Doc drift: README.md:266-269 says a failed configure is not retried automatically; ConfigureRetry does retry. The retry is only tested for the LED node (same ConfigureRetry class). wait_for_service_timeout is hard-coded to 3000 ms in rover_safety_node (safety_node.cpp:183) instead of ros_communication_timeout.availability."
+    },
+    {
+      "id": "SWR-SAF-011",
+      "category": "Build",
+      "text": "The rover_safety shall, in rover_safety.launch.py, start rover_led_safety_node always and rover_safety_node only when use_sim is false.",
+      "rationale": "The battery supervision and the shutdown need the real hardware interface and BMS; LED selection also runs in simulation.",
+      "verification": "Inspection",
+      "acceptance": "Launching with use_sim:=True starts only rover_led_safety_node; with use_sim:=False both nodes start.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Deployment configuration.",
+      "evidence": [
+        "rover_safety/launch/rover_safety.launch.py:102-113",
+        "rover_safety/launch/rover_safety.launch.py:124-145"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-SAF-012",
+      "category": "Safety",
+      "text": "The rover_safety shall, in rover_safety_node, evaluate motor-driver temperature from hardware_interface/rover_driver_state and trip the software E-Stop above a driver temperature limit of [TBD] degC.",
+      "rationale": "The driver-state subscription exists but its callback is a TODO; driver overheating is currently not supervised by software.",
+      "verification": "Test",
+      "acceptance": "A RoverDriverState with a driver temperature above the limit causes a sw_user_e_stop_set call within one tick.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:247-257",
+        "rover_safety/README.md:263-265"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Declared but unused parameters: cpu.temp.*, driver.temp.* (fan_on/fan_off/window_len), battery.temp.window_len, fan_turn_off_timeout (safety_parameters.yaml:18-79). No fan hardware control exists; remove the fan parameters or implement fan control. The limit value has no source yet (TBD)."
+    },
+    {
+      "id": "SWR-SAF-013",
+      "category": "Interface",
+      "text": "The rover_safety shall, in rover_led_safety_node, subscribe rover_battery/battery_status (depth 10), hardware_interface/safety_status (KeepLast(1), reliable, volatile) and joy (sensor_msgs/Joy, depth 10), tick the RoverLedSafety tree at timer_frequency (10.0 Hz) once e_stop_state and battery_status have been received, and request animations via led/set_animation (rover_msgs/SetLedAnimation) only when the selected animation changes.",
+      "rationale": "LED state follows the safety inputs; deduplication avoids flooding rover_led.",
+      "verification": "Test",
+      "acceptance": "Integration test with a fake LED controller: each idle animation is requested once, then E_STOP once when the button is pressed.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-009"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/led_safety_node.cpp:101-117",
+        "rover_safety/src/led_safety_node.cpp:267-294",
+        "rover_safety/config/led_safety.yaml:4"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/integration/test_led_safety_node_animations.cpp",
+        "rover_safety/test/unit/test_led_safety_tree.cpp"
+      ],
+      "comments": "Nothing in the workspace publishes joy (README.md:271-272). joyCallback indexes buttons[4] without a size check (led_safety_node.cpp:243)."
+    },
+    {
+      "id": "SWR-SAF-014",
+      "category": "Functional",
+      "text": "The rover_safety shall, in rover_led_safety_node, select the state animation E_STOP while SafetyStatus.hw_e_stop_user_button is true, otherwise MANUAL_ACTION while joy button 4 (dead-man) is held, otherwise READY.",
+      "rationale": "Visible indication that the physical E-Stop is pressed.",
+      "verification": "Test",
+      "acceptance": "Unit test: button pressed -> E_STOP regardless of dead-man; released with dead-man held -> MANUAL_ACTION; else READY.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-009"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/domain/led_animation_policy.cpp:29-35",
+        "rover_safety/src/led_safety_node.cpp:233-248",
+        "rover_safety/include/rover_safety/led_safety_node.hpp:99"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [
+        "rover_safety/test/unit/test_led_animation_policy.cpp",
+        "rover_safety/test/integration/test_led_safety_node_animations.cpp"
+      ],
+      "comments": "Deviation from SYS-SR-009/SYS-SR-010: only the hardware button shows E_STOP. A software E-Stop, a motor-driver-fault stop or a held latch after the button was released shows READY although the rover cannot move. Superseded by SWR-SAF-022."
+    },
+    {
+      "id": "SWR-SAF-015",
+      "category": "Functional",
+      "text": "The rover_safety shall, in rover_led_safety_node, while discharging, request CRITICAL_BATTERY below battery.percent.threshold.critical (0.1), LOW_BATTERY from 0.1 up to battery.percent.threshold.low (0.4) repeated every battery.anim_period.low (30.0 s), and BATTERY_NOMINAL at or above 0.4; while charging or full it shall request CHARGER_INSERTED then CHARGING_BATTERY with the percentage rounded to charging_anim_step (0.05), or BATTERY_CHARGED when that rounds to 1.0.",
+      "rationale": "Battery level indication on the LED panels.",
+      "verification": "Test",
+      "acceptance": "Unit tests at the threshold boundaries: just below 0.1 -> critical, exactly 0.1 -> low, just below 0.4 -> low, exactly 0.4 -> nominal; a NaN percentage selects no level.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-009"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/domain/led_animation_policy.cpp:49-63",
+        "rover_safety/src/domain/led_animation_policy.cpp:78-100",
+        "rover_safety/config/led_safety.yaml:9-17"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_led_animation_policy.cpp",
+        "rover_safety/test/unit/test_led_safety_tree.cpp"
+      ],
+      "comments": "These LED thresholds (0.4 / 0.1) are indicator levels only; they are not the SYS-SR-017 Low Battery / safe-stop thresholds, which are [TBD] and not implemented (SWR-SAF-020)."
+    },
+    {
+      "id": "SWR-SAF-016",
+      "category": "Functional",
+      "text": "The rover_safety shall, in rover_led_safety_node, request the ERROR animation while the battery status is UNKNOWN (including the BMS watchdog-expired state) or while charging with health OVERHEAT, and NO_ERROR otherwise.",
+      "rationale": "Visible indication of a lost BMS or a charging over-temperature.",
+      "verification": "Test",
+      "acceptance": "Unit test: status UNKNOWN -> ERROR; CHARGING + OVERHEAT -> ERROR; FULL + OVERHEAT -> NO_ERROR.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-009"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/domain/led_animation_policy.cpp:37-47"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_led_animation_policy.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-SAF-017",
+      "category": "Diagnostics",
+      "text": "The rover_safety shall, in rover_led_safety_node, publish diagnostics under hardware ID 'Bumper Led' with the tasks 'LED safety inputs' (battery_status and safety_status graded against input_timeout = 5.0 s; joy reported but not graded) and 'LED safety behavior tree'.",
+      "rationale": "A dead hardware interface or BMS must be visible as stale LED inputs.",
+      "verification": "Test",
+      "acceptance": "Stopping safety_status for more than 5.0 s makes 'LED safety inputs' ERROR.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/led_safety_node.cpp:51-54",
+        "rover_safety/src/led_safety_node.cpp:296-333",
+        "rover_safety/config/led_safety.yaml:6"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_safety/test/unit/test_safety_diagnostics.cpp",
+        "rover_safety/test/unit/test_safety_health.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-SAF-018",
+      "category": "Functional",
+      "text": "The rover_safety shall provide a platform mode manager that maintains exactly one current system state out of Boot, Idle, Teleoperation, Autonomous, Emergency Stop, Fault and Low Battery, and publishes it on a ROS topic with reliable, transient-local QoS (depth 1) on every change.",
+      "rationale": "SYS-SR-010 requires a defined system state machine; no package implements one (rover_safety only runs the battery tree and three LED state verdicts).",
+      "verification": "Test, Inspection",
+      "acceptance": "The state machine is documented; the state topic always carries one of the seven states, a late-joining subscriber receives the current state immediately, and each state can be reached in a test.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-010"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:290-317",
+        "rover_safety/src/domain/led_animation_policy.cpp:29-35"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Allocation to rover_safety is a proposal (it already aggregates battery and safety inputs and drives the LEDs). QoS follows .claude/rules/ros2_communication.md (state = reliable, transient-local, depth 1). Message type to be defined in rover_msgs."
+    },
+    {
+      "id": "SWR-SAF-019",
+      "category": "Functional",
+      "text": "The rover_safety shall, in its platform mode manager, implement these transitions: Boot -> Idle once all platform nodes are active and the first fresh SafetyStatus has been received; Idle <-> Teleoperation / Autonomous according to the twist_mux input currently selected (teleop inputs vs nav); any state -> Emergency Stop while any stop condition of SafetyStatus/SafetyCommandEcho is active (HW button, SW button, motor-driver fault, latch); Emergency Stop -> Idle only after the latch has been reset; Boot -> Idle within [TBD per SYS-SR-024] s of power-up.",
+      "rationale": "Every SYS-SR-010 transition must be triggerable and observable; Emergency Stop must be left only by an explicit reset (SYS-SR-008).",
+      "verification": "Test",
+      "acceptance": "Each transition is triggered by injecting the corresponding input and observed on the state topic within one tick; releasing the E-Stop without a latch reset keeps the state at Emergency Stop.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-010",
+        "SYS-SR-008",
+        "SYS-SR-024"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:259-263",
+        "rover_safety/src/led_safety_node.cpp:233-239"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Needs the selected-input topic proposed in SWR-MUX-020. Stop conditions and latch semantics as in rover_twist_mux motion_lock_policy.cpp:39-54 and rover_arch/SAFETY_CHAIN.md:17-35."
+    },
+    {
+      "id": "SWR-SAF-020",
+      "category": "Safety",
+      "text": "The rover_safety shall, in its platform mode manager, enter Low Battery when the battery state of charge falls below [TBD per SYS-SR-017] % and shall perform a safe stop (trip the software E-Stop) when it falls below [TBD per SYS-SR-017] %, with both thresholds as validated parameters.",
+      "rationale": "No software SOC threshold exists today: the battery policy acts only on BMS health flags and temperature, and the 0.4/0.1 LED levels do not change behaviour.",
+      "verification": "Test",
+      "acceptance": "A simulated BatteryState whose percentage crosses each threshold produces the Low Battery state and, at the lower threshold, a sw_user_e_stop_set call, within one tick.",
+      "priority": "Must",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-017",
+        "SYS-SR-010"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/domain/battery_safety_policy.cpp:34-59",
+        "rover_safety/config/led_safety.yaml:12-14"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Partially covered in hardware: the BMS level-one SOC-too-low alarm maps to DEAD in rover_battery and trips the E-Stop (SWR-SAF-002), but at a threshold configured in the BMS, not traceable in software. A NaN percentage (BMS watchdog) must not be read as 0 %."
+    },
+    {
+      "id": "SWR-SAF-021",
+      "category": "Safety",
+      "text": "The rover_safety shall, in its platform mode manager, enter Fault when the battery verdict is not none, when a safety input is older than input_timeout (5.0 s), or when SafetyStatus.link_healthy is false, and shall leave Fault only when all these conditions have cleared.",
+      "rationale": "Gives SYS-SR-010's Fault state a concrete, testable entry condition from signals the package already evaluates.",
+      "verification": "Test",
+      "acceptance": "Each condition injected alone moves the state to Fault within one tick; clearing it returns to the previous non-fault state.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-010",
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/safety_node.cpp:396-437",
+        "rover_safety/config/rover_safety.yaml:6"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Precedence between Emergency Stop, Fault and Low Battery to be defined with the state machine document."
+    },
+    {
+      "id": "SWR-SAF-022",
+      "category": "Functional",
+      "text": "The rover_safety shall, in rover_led_safety_node, display each SYS-SR-010 state with a dedicated rover_msgs/LedAnimation according to a documented state-to-LED mapping - at least Emergency Stop -> E_STOP (for hardware button, software button, motor-driver fault and held latch alike), Idle -> READY, Teleoperation -> MANUAL_ACTION, Autonomous -> AUTONOMOUS_READY/AUTONOMOUS_ACTION, Low Battery -> LOW_BATTERY, Fault -> ERROR - with colour and pattern per [TBD per SYS-SR-009].",
+      "rationale": "SYS-SR-009 requires the LED panels to show the system state; today only the hardware button produces E_STOP and there is no Autonomous, Fault or Low Battery state indication derived from a state machine.",
+      "verification": "Test, Demonstration",
+      "acceptance": "For each of the seven states injected on the state topic, the requested animation id matches the mapping table; a software E-Stop with the button released shows E_STOP.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-009",
+        "SYS-SR-010"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_safety/src/domain/led_animation_policy.cpp:29-35",
+        "rover_safety/src/led_safety_node.cpp:233-239",
+        "rover_msgs/msg/LedAnimation.msg:1-17"
+      ],
+      "implementation": "Deviation",
+      "verified_by": [],
+      "comments": "Animation ids listed exist in rover_msgs/LedAnimation.msg; AUTONOMOUS_* are defined but unused today. The Boot state mapping is TBD (no existing animation). Colours/patterns are owned by rover_led."
+    }
+  ]
+}

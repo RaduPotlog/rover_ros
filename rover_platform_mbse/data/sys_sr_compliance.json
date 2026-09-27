@@ -1,0 +1,261 @@
+{
+  "document": "ROVER-A1-ROVER_ROS_SYS-SR-COMPLIANCE-V-001",
+  "date": "2026-09-27",
+  "baseline": "src/rover_ros master 35aeb3e; SYS-SR V-002",
+  "verdicts": [
+    {
+      "verdict": "Compliant",
+      "meaning": "The as-built software meets the requirement (by evidence and/or model test)."
+    },
+    {
+      "verdict": "Partial",
+      "meaning": "Implemented, but part of the requirement is unmet or unverified."
+    },
+    {
+      "verdict": "Not Met",
+      "meaning": "The as-built software contradicts the requirement (evidence and/or failing model test)."
+    },
+    {
+      "verdict": "Gap",
+      "meaning": "Not implemented in rover_ros."
+    },
+    {
+      "verdict": "Blocked (TBD)",
+      "meaning": "Cannot be judged until the [TBD] values in the SYS-SR are set."
+    },
+    {
+      "verdict": "Not SW",
+      "meaning": "Allocated to hardware, mechanics or the environment; no software requirement derived."
+    }
+  ],
+  "items": [
+    {
+      "id": "SYS-SR-001",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Mass is a hardware property (CAD 54.35 kg, see the xlsx Mass Properties sheet). The URDF model carries 43.45 kg (SWR-DESC-012, Deviation): the simulation/model mass does not match the CAD."
+    },
+    {
+      "id": "SYS-SR-002",
+      "allocation": "SW+HW",
+      "verdict": "Partial",
+      "summary": "Velocity mode on 4 joints with PIDs at 100 Hz and diff_drive at 50 Hz (Compliant), but the DCC1000 encoder feedback refreshes at 20 Hz (rover_controller/README.md:57-58), so feedback is below 50 Hz. Model test tSkidSteerKinematics/testEncoderFeedbackRate fails (KnownDeviation)."
+    },
+    {
+      "id": "SYS-SR-003",
+      "allocation": "SW",
+      "verdict": "Partial",
+      "summary": "Skid-steer via diff_drive with 2 wheels/side and wheel_separation_multiplier 1.659; odometry on odometry/wheels. Kinematic model tests pass; the 5 % field accuracy is not measured and the radius multipliers are uncalibrated (SWR-CTL-007)."
+    },
+    {
+      "id": "SYS-SR-004",
+      "allocation": "SW",
+      "verdict": "Compliant",
+      "summary": "diff_drive limits 0.95 m/s / 1.5 rad/s apply after arbitration, so to every source; model test passes. CRSF node defaults (2.0 / 5.0) exceed the limit but the shipped YAML does not (SWR-CRSF-008). Open Questions answer '1.7 m/s2' read as 1.7 rad/s."
+    },
+    {
+      "id": "SYS-SR-005",
+      "allocation": "SW",
+      "verdict": "Compliant",
+      "summary": "The 4 sources and their order are fixed in rover_twist_mux.yaml: ELRS (110) > Foxglove joystick (100) > Driver UI (8) > Nav 2 (5). This resolves the SYS-SR [TBD]. Model test passes."
+    },
+    {
+      "id": "SYS-SR-006",
+      "allocation": "HW+SW",
+      "verdict": "Partial",
+      "summary": "One hardware button (Open Questions) sets the PLC latch and opens the contactor independently of software; software only monitors it. The PLC program is outside rover_ros, stop category and SYS-SR-014 distance are TBD."
+    },
+    {
+      "id": "SYS-SR-007",
+      "allocation": "SW",
+      "verdict": "Not Met",
+      "summary": "write() only sees the SW E-stop after the 10 Hz IO poll reads it back from the PLC. Model: <= 90 ms with an ideal link, 240 ms worst case behind one in-flight Modbus transaction (150 ms timeout). Service/Zenoh latency not included."
+    },
+    {
+      "id": "SYS-SR-008",
+      "allocation": "HW+SW",
+      "verdict": "Compliant",
+      "summary": "Set-dominant PLC latch held until an explicit latch reset; releasing the button or the SW E-stop does not resume motion. Model tests pass. Deviation vs the internal SAFETY_CHAIN.md: the latch reset has no zero-velocity check (SWR-HWI-010)."
+    },
+    {
+      "id": "SYS-SR-009",
+      "allocation": "SW",
+      "verdict": "Partial",
+      "summary": "LED panels show E_STOP only for the hardware button; SW E-stop and a held latch show READY; no Boot, Autonomous, Fault or Idle mapping and no documented mapping table (SWR-SAF-014/022, SWR-LED-020/021)."
+    },
+    {
+      "id": "SYS-SR-010",
+      "allocation": "SW",
+      "verdict": "Gap",
+      "summary": "No system state machine exists. Proposed: PlatformModeManager (behaviour model) implemented in rover_safety (SWR-SAF-018..021) with a system-state message (SWR-MSG-011) and the active mux source (SWR-MUX-020)."
+    },
+    {
+      "id": "SYS-SR-011",
+      "allocation": "SW",
+      "verdict": "Partial",
+      "summary": "twist_mux timeouts and diff_drive cmd_vel_timeout 0.5 s stop the rover, but the timeout is checked with '>' at 50 Hz, so deceleration starts up to 520 ms after the last command (model test, KnownDeviation). DCC1000 hardware failsafe 500 ms as back-up."
+    },
+    {
+      "id": "SYS-SR-012",
+      "allocation": "SW",
+      "verdict": "Blocked (TBD)",
+      "summary": "RC link loss: zero burst then silence after 200 ms (up to 1 s via link stats); Driver UI freshness filter; stale safety input locks motion after 1 s. No stop on operator-station loss for the web link; timeout value TBD."
+    },
+    {
+      "id": "SYS-SR-013",
+      "allocation": "SW",
+      "verdict": "Blocked (TBD)",
+      "summary": "diff_drive limits 2.7 m/s^2 and 3.74 rad/s^2 are enforced (model test passes); the SYS-SR values are TBD."
+    },
+    {
+      "id": "SYS-SR-014",
+      "allocation": "HW+SW",
+      "verdict": "Blocked (TBD)",
+      "summary": "Stopping distance depends on the PLC/contactor stop (category TBD) and the drive train. For software-commanded stops the 2.7 m/s^2 limit gives 0.95^2/(2*2.7) = 0.17 m plus latency. Limit TBD. No SWR derived."
+    },
+    {
+      "id": "SYS-SR-015",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Endurance is set by the battery (design_capacity 40 Ah) and the duty cycle; values TBD."
+    },
+    {
+      "id": "SYS-SR-016",
+      "allocation": "SW",
+      "verdict": "Not Met",
+      "summary": "battery_status is published once per BMS UDP packet with a 10 s watchdog, so >= 1 Hz is not guaranteed; header not stamped; 5 % accuracy not measured (SWR-BAT-003/012/013/014)."
+    },
+    {
+      "id": "SYS-SR-017",
+      "allocation": "SW",
+      "verdict": "Gap",
+      "summary": "Thresholds TBD. Today: LED warnings at 40 % / 10 % only; the BMS DEAD alarm trips the E-stop via rover_safety. No Low Battery state or SOC-based safe stop (SWR-SAF-020, proposed model)."
+    },
+    {
+      "id": "SYS-SR-018",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Charging method TBD (hardware). Software only reports charging_status (SWR-BAT-006/007)."
+    },
+    {
+      "id": "SYS-SR-019",
+      "allocation": "SW",
+      "verdict": "Not Met",
+      "summary": "The Phidget IMU samples at 125 Hz but imu_sensor_broadcaster publishes imu/data at 50 Hz (wheel_01_controller.yaml:150); the simulated IMU is 50 Hz too. Model test fails (KnownDeviation)."
+    },
+    {
+      "id": "SYS-SR-020",
+      "allocation": "SW",
+      "verdict": "Compliant",
+      "summary": "ROS 2 Lyrical with rmw_zenoh_cpp, ros2_control hardware interface RoverA1System. Resolves the SYS-SR [TBD distribution]."
+    },
+    {
+      "id": "SYS-SR-021",
+      "allocation": "SW",
+      "verdict": "Compliant",
+      "summary": "REP-103 axes and REP-105 frames (odom -> base_footprint from the EKF, base_link, sensor frames). map -> odom comes from the orchestrator (SLAM/AMCL) or the optional GPS EKF, outside the platform by default."
+    },
+    {
+      "id": "SYS-SR-022",
+      "allocation": "SW",
+      "verdict": "Partial",
+      "summary": "Every node publishes diagnostics at 1 Hz and the aggregator at 1.0 Hz (no margin). Gaps: no expected/timeout entries in the aggregator, no IMU diagnostic, the PLC link diagnostic never goes ERROR, no transport diagnostics."
+    },
+    {
+      "id": "SYS-SR-023",
+      "allocation": "SW",
+      "verdict": "Not Met",
+      "summary": "E-stop state reaches hardware_interface/safety_status through the 10 Hz IO poll and the 20 Hz publisher: up to 130 ms in the model (KnownDeviation), more with Modbus delays."
+    },
+    {
+      "id": "SYS-SR-024",
+      "allocation": "SW+Deployment",
+      "verdict": "Partial",
+      "summary": "Auto-start on power-up is done by rover_docker (outside rover_ros) and rover_bringup's staged start; there is no Idle state and the time is TBD."
+    },
+    {
+      "id": "SYS-SR-025",
+      "allocation": "HW+SW",
+      "verdict": "Blocked (TBD)",
+      "summary": "Links: ExpressLRS RC (UART) and LAN/Wi-Fi websocket (foxglove_bridge 8765, rosbridge 9090). Range and latency TBD and depend on the radio hardware."
+    },
+    {
+      "id": "SYS-SR-026",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Dimensions. The measured footprint is 0.913 x 0.803 m (Nav 2 footprint, outside rover_ros); limit TBD."
+    },
+    {
+      "id": "SYS-SR-027",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Payload capacity; TBD."
+    },
+    {
+      "id": "SYS-SR-028",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Slope/terrain; TBD. Tip-over check needs track 0.615 m (URDF) and CoM height 0.270 m (CAD): atan(0.3075/0.270) = 48.7 deg sideways."
+    },
+    {
+      "id": "SYS-SR-029",
+      "allocation": "HW",
+      "verdict": "Not SW",
+      "summary": "Temperature range and IP rating; TBD."
+    }
+  ],
+  "open_questions": [
+    {
+      "ref": "SYS-SR-004",
+      "question": "The Open Questions answer for the angular limit reads '1.7 m/s2'. Is it 1.7 rad/s (as the requirement text says)?"
+    },
+    {
+      "ref": "SYS-SR-005",
+      "question": "The code fixes the 4 sources and their order: ELRS RC (110) > Foxglove joystick (100) > Driver UI (8) > Nav 2 (5). Confirm and write them into SYS-SR-005."
+    },
+    {
+      "ref": "SYS-SR-007",
+      "question": "write() only sees the SW E-stop after the 10 Hz PLC poll reads it back (model: up to 90 ms ideal, 240 ms worst case). Change the design (set the E-stop locally at the service call, faster poll) or relax 100 ms?"
+    },
+    {
+      "ref": "SYS-SR-011",
+      "question": "The as-built watchdog starts decelerating up to 520 ms after the last command (0.5 s timeout checked at 50 Hz). Lower cmd_vel_timeout to 0.48 s, or accept 520 ms?"
+    },
+    {
+      "ref": "SYS-SR-019",
+      "question": "imu/data is published at 50 Hz (the sensor samples at 125 Hz). Raise rover_imu_broadcaster to 100 Hz (it divides the 100 Hz controller_manager rate)?"
+    },
+    {
+      "ref": "SYS-SR-023",
+      "question": "The E-stop state reaches safety_status through a 10 Hz poll and a 20 Hz publisher (up to 130 ms in the model). Poll faster and publish on change, or relax 100 ms?"
+    },
+    {
+      "ref": "SYS-SR-010",
+      "question": "Approve the proposed PlatformModeManager (behaviour/PlatformModeManager.slx): states, transitions, priorities (E-stop > Fault > Low Battery) and the owner (rover_safety)."
+    },
+    {
+      "ref": "SYS-SR-009",
+      "question": "Approve the proposed state-to-LED mapping (Idle READY, Teleoperation MANUAL_ACTION, Autonomous AUTONOMOUS_ACTION, E-stop E_STOP, Fault ERROR, Low Battery LOW_BATTERY / CRITICAL_BATTERY) and define a Boot animation."
+    },
+    {
+      "ref": "SYS-SR-017",
+      "question": "Set the Low Battery and safe-stop SOC thresholds. The model uses the LED thresholds 40 % / 10 % as an ASSUMPTION."
+    },
+    {
+      "ref": "SYS-SR-012",
+      "question": "Set the operator-link timeout. Must loss of the web (Wi-Fi) link stop the rover, as the RC link loss does?"
+    },
+    {
+      "ref": "SYS-SR-001",
+      "question": "The URDF inertials total 43.45 kg against 54.35 kg in CAD. Update the URDF masses from the CAD?"
+    },
+    {
+      "ref": "SYS-SR-020",
+      "question": "Write 'ROS 2 Lyrical, rmw_zenoh_cpp' into SYS-SR-020 to replace [TBD distribution]."
+    },
+    {
+      "ref": "SWR-HWI-010",
+      "question": "rover_arch/SAFETY_CHAIN.md section 5 says the zero-velocity reset invariant covers the latch, but resetEStopLatch() does not check it. Fix the code or the document?"
+    }
+  ]
+}

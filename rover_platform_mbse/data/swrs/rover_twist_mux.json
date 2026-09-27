@@ -1,0 +1,478 @@
+{
+  "package": "rover_twist_mux",
+  "prefix": "MUX",
+  "document": "ROVER-A1-ROVER_TWIST_MUX-SWRS-V-001",
+  "title": "rover_twist_mux Software Requirements Specification",
+  "scope": "rover_twist_mux arbitrates the rover's velocity command sources. It configures and launches the upstream twist_mux node (the sole publisher of cmd_vel) with four prioritised, time-limited TwistStamped inputs (ELRS RC, Foxglove joystick, Driver UI, Nav 2) and one safety lock, and it provides two adapters: rover_motion_lock_node, which maps the safety PLC state (hardware_interface/safety_status + safety_command_echo) onto the fail-safe-closed motion_lock (std_msgs/Bool) that masks every input, and rover_command_freshness_node, which drops Driver UI commands delivered late by a stalled websocket. It is gate 2 of the five motion gates in rover_arch/SAFETY_CHAIN.md; the contactor and the hardware interface's write() gate are independent of it.",
+  "requirements": [
+    {
+      "id": "SWR-MUX-001",
+      "category": "Interface",
+      "text": "The rover_twist_mux shall publish the arbitrated velocity command as geometry_msgs/TwistStamped on cmd_vel (twist_mux cmd_vel_out remapped) and shall be the only publisher of cmd_vel in the platform launch.",
+      "rationale": "A single arbiter prevents sources racing each other on cmd_vel; the drive controller consumes only this topic.",
+      "verification": "Inspection, Demonstration",
+      "acceptance": "With the platform running, 'ros2 topic info -v cmd_vel' lists exactly one publisher (rover_twist_mux_node) of type geometry_msgs/msg/TwistStamped.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/config/rover_twist_mux.yaml:3",
+        "rover_twist_mux/launch/rover_twist_mux.launch.py:110-119",
+        "rover_twist_mux/README.md:13-14"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "Sole-publisher property is documented (README) but not checked by any automated test."
+    },
+    {
+      "id": "SWR-MUX-002",
+      "category": "Functional",
+      "text": "The rover_twist_mux shall accept velocity commands from four inputs with strictly ordered priorities - cmd_elrs (teleop_elrs_cmd_vel_stamped, 110) > joystick (teleop_foxglove_cmd_vel_stamped, 100) > driver_interface (teleop_driver_interface_cmd_vel_fresh_stamped, 8) > nav (nav_cmd_vel_stamped, 5) - and shall forward only the highest-priority input that has not timed out.",
+      "rationale": "The line-of-sight RC operator has the last word; every teleop source pre-empts autonomy deterministically.",
+      "verification": "Test, Inspection",
+      "acceptance": "The shipped config lists the four inputs with priorities 110/100/8/5, no two equal and all within [1, 255]; with several inputs publishing simultaneously only the highest-priority input appears on cmd_vel.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/config/rover_twist_mux.yaml:4-24",
+        "rover_twist_mux/test/unit/test_twist_mux_priorities.py:34-93"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_twist_mux_priorities.py"
+      ],
+      "comments": "SYS-SR-005 lists its 4 sources as [TBD] (joystick, remote/web UI, navigation, autonomy/docking); the as-built set is ELRS RC, Foxglove, Driver UI, Nav 2 - there is no separate docking/autonomy input. Arbitration itself is upstream twist_mux; the test pins the configured order only."
+    },
+    {
+      "id": "SWR-MUX-003",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall stop forwarding an input when no message has been received on it within its timeout: 0.5 s for cmd_elrs, joystick and nav, and 0.3 s for driver_interface.",
+      "rationale": "A silent or dead source must not keep the rover moving on its last command; the Driver UI timeout is three periods of its 10 Hz stream.",
+      "verification": "Test",
+      "acceptance": "After the active source stops publishing, cmd_vel carries no further commands from that source after at most its configured timeout (0.5 s or 0.3 s) and the next unexpired input, if any, is forwarded.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011",
+        "SYS-SR-012"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/config/rover_twist_mux.yaml:8",
+        "rover_twist_mux/config/rover_twist_mux.yaml:14",
+        "rover_twist_mux/config/rover_twist_mux.yaml:18",
+        "rover_twist_mux/config/rover_twist_mux.yaml:23",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:30-33",
+        "rover_controller/config/wheel_01_controller.yaml:192"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "All timeouts are <= the 500 ms of SYS-SR-011. The actual zeroing of the wheels after the mux stops forwarding is done downstream by diff_drive's cmd_vel_timeout (0.5 s, rover_controller), so the end-to-end stop is a combination of both packages. No automated test exercises the upstream twist_mux timeouts."
+    },
+    {
+      "id": "SWR-MUX-004",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall mask every velocity input while motion_lock is true or has not been received within 0.5 s, by configuring the motion_lock lock at priority 200, above every input priority.",
+      "rationale": "An active E-Stop condition must stop all sources, and a dead lock publisher must close the mux rather than open it.",
+      "verification": "Test, Inspection",
+      "acceptance": "The lock priority (200) is strictly greater than every input priority; with motion_lock=true (or no motion_lock for > 0.5 s) no command from any input appears on cmd_vel.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006",
+        "SYS-SR-007",
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/config/rover_twist_mux.yaml:26-33",
+        "rover_twist_mux/test/unit/test_twist_mux_priorities.py:96-99",
+        "rover_arch/SAFETY_CHAIN.md:195-198"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_twist_mux_priorities.py"
+      ],
+      "comments": "Known gap (rover_arch/SAFETY_CHAIN.md:231-233): no end-to-end test shows that an asserted motion_lock actually stops cmd_vel at the third-party mux; needs a launch_testing fixture. Defence in depth only: the contactor and RoverA1System::write() gate motion independently."
+    },
+    {
+      "id": "SWR-MUX-005",
+      "category": "Interface",
+      "text": "The rover_twist_mux shall publish the motion lock state as std_msgs/Bool on motion_lock with QoS KeepLast(1), reliable, at publish_frequency (10.0 Hz).",
+      "rationale": "twist_mux treats a lock topic older than its 0.5 s timeout as locked, so the publisher must stay well inside that window.",
+      "verification": "Test",
+      "acceptance": "'ros2 topic hz motion_lock' reports 10 Hz (one message per 100 ms timer period); the publisher QoS is reliable, depth 1; data is true whenever any lock condition of SWR-MUX-007..010 holds.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:117-123",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:172-179",
+        "rover_twist_mux/config/rover_motion_lock.yaml:3"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp"
+      ],
+      "comments": "A rate tolerance is TBD; the integration test checks the lock value, not the rate."
+    },
+    {
+      "id": "SWR-MUX-006",
+      "category": "Interface",
+      "text": "The rover_twist_mux shall subscribe hardware_interface/safety_status (rover_msgs/SafetyStatus) and hardware_interface/safety_command_echo (rover_msgs/SafetyCommandEcho) with QoS KeepLast(1), reliable, volatile, and shall use SafetyCommandEcho fields only as reasons to inhibit motion.",
+      "rationale": "Matches the hardware interface publishers; a latched (transient-local) sample would hide a dead publisher. Echoes of commanded coils are never evidence of plant state.",
+      "verification": "Inspection, Test",
+      "acceptance": "Code review shows both subscriptions with reliable/volatile/depth 1; no code path unlocks motion based on a SafetyCommandEcho field.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:100-113",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:40-54",
+        "rover_arch/SAFETY_CHAIN.md:166-171"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MUX-007",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall assert motion_lock (true) from start-up until both a SafetyStatus and a SafetyCommandEcho message have been received.",
+      "rationale": "Fail-safe closed: with no safety IO there is no driving; acting on one half alone would read the missing half's stop conditions as inactive.",
+      "verification": "Test",
+      "acceptance": "With no safety topics, or only SafetyStatus, published: motion_lock is true on every sample for the whole test duration.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006",
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/domain/motion_lock_health.cpp:34-38",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:151-157",
+        "rover_twist_mux/include/rover_twist_mux/domain/motion_lock_health.hpp:45-46",
+        "rover_twist_mux/include/rover_twist_mux/domain/safety_io_flags.hpp:47-63"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp",
+        "rover_twist_mux/test/unit/test_motion_lock_health.cpp",
+        "rover_twist_mux/test/unit/test_motion_lock_policy.cpp"
+      ],
+      "comments": "Consequence: with no rover_hardware_interface running the rover accepts no velocity commands (README.md:74-76). Simulation does not launch this package."
+    },
+    {
+      "id": "SWR-MUX-008",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall assert motion_lock when the older of the two safety messages is older than gpio_timeout (1.0 s).",
+      "rationale": "A hardware interface that stops publishing must not leave the mux open on last-known values; neither topic may hide behind the other.",
+      "verification": "Test",
+      "acceptance": "After either safety topic stops while the other continues, motion_lock becomes true no later than 1.0 s plus one publish period (0.1 s) after the last message of the stopped topic.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-007",
+        "SYS-SR-023"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/domain/motion_lock_health.cpp:40-51",
+        "rover_twist_mux/config/rover_motion_lock.yaml:4"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp",
+        "rover_twist_mux/test/unit/test_motion_lock_health.cpp"
+      ],
+      "comments": "An age exactly equal to the timeout is still fresh (test OlderAgeExactlyAtTheTimeoutIsStillFresh)."
+    },
+    {
+      "id": "SWR-MUX-009",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall assert motion_lock while SafetyStatus.link_healthy is false, even when no stop condition is active.",
+      "rationale": "With the PLC link down the messages keep arriving with last-known-good values, so staleness alone cannot detect it.",
+      "verification": "Test",
+      "acceptance": "Publishing fresh all-clear safety messages with link_healthy=false yields motion_lock=true and an ERROR-level 'Motion lock' diagnostic.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006",
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/domain/motion_lock_health.cpp:55-62",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:166"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp",
+        "rover_twist_mux/test/unit/test_motion_lock_health.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MUX-010",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall assert motion_lock while any enabled stop condition is active - hardware E-Stop button pressed, software E-Stop user button triggered, motor-driver fault stop, or safety latch held - with all four conditions enabled in the shipped configuration.",
+      "rationale": "Any single active stop is sufficient to inhibit; the latch condition keeps motion inhibited after the trip source clears until an explicit reset.",
+      "verification": "Test",
+      "acceptance": "For each of the four flags set alone (others clear, fresh, link healthy), motion_lock is true and the diagnostic message names that reason; with all clear, motion_lock is false.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-006",
+        "SYS-SR-007",
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/domain/motion_lock_policy.cpp:39-54",
+        "rover_twist_mux/config/rover_motion_lock.yaml:6-10",
+        "rover_twist_mux/src/domain/motion_lock_health.cpp:71-77"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_motion_lock_policy.cpp",
+        "rover_twist_mux/test/unit/test_motion_lock_health.cpp",
+        "rover_twist_mux/test/integration/test_motion_lock_node.cpp"
+      ],
+      "comments": "The CPU watchdog heartbeat is deliberately not a lock condition (a stalled heartbeat trips the relay, which sets the latch)."
+    },
+    {
+      "id": "SWR-MUX-011",
+      "category": "Parameter",
+      "text": "The rover_twist_mux shall treat an open motor contactor as a lock condition only when require_motor_contactor_engaged is true, which shall be false in the shipped configuration.",
+      "rationale": "The contactor feedback has inverted sense and is unverified on hardware, so it is opt-in.",
+      "verification": "Test, Inspection",
+      "acceptance": "With require_motor_contactor_engaged=false an open contactor alone does not lock; with it true an open contactor locks and a closed one does not.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical option of the motion-lock policy; no system requirement asks for contactor-based gating in software (the contactor itself is SYS-SR-006 hardware).",
+      "evidence": [
+        "rover_twist_mux/src/domain/motion_lock_policy.cpp:56-60",
+        "rover_twist_mux/config/rover_motion_lock.yaml:12-14",
+        "rover_twist_mux/src/motion_lock_params.yaml:33-38"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_motion_lock_policy.cpp"
+      ],
+      "comments": "Marked 'unverified on hardware' in the config; enabling requires a hardware check first."
+    },
+    {
+      "id": "SWR-MUX-012",
+      "category": "Parameter",
+      "text": "The rover_twist_mux shall reject a motion-lock publish_frequency outside [1.0, 100.0] Hz and a gpio_timeout outside [0.1, 10.0] s.",
+      "rationale": "Bounds keep the lock republished inside the mux lock timeout and keep the staleness window meaningful.",
+      "verification": "Inspection",
+      "acceptance": "Starting rover_motion_lock_node with publish_frequency=0.5 or gpio_timeout=20.0 fails parameter validation.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Parameter validation (generate_parameter_library) supporting SWR-MUX-005 and SWR-MUX-008.",
+      "evidence": [
+        "rover_twist_mux/src/motion_lock_params.yaml:2-16"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": "The accepted lower bound 1.0 Hz is below 1 / 0.5 s (the mux lock timeout, rover_twist_mux.yaml:32) = 2 Hz, so a valid-but-low setting would make the mux flap to locked (fail-safe, but not usable). Consider raising the lower bound above 2 Hz."
+    },
+    {
+      "id": "SWR-MUX-013",
+      "category": "Diagnostics",
+      "text": "The rover_twist_mux shall report a 'Motion lock' diagnostic (hardware ID 'Motion Lock') that is STALE before the first evaluation, ERROR when the safety input is missing, stale or the PLC link is unhealthy, WARN when a stop condition holds the lock, and OK when motion is permitted, including the per-flag values, topic ages and policy settings.",
+      "rationale": "Operators need to see why the rover will not move; the diagnostic is derived from the same evaluation as the lock so they cannot disagree.",
+      "verification": "Test",
+      "acceptance": "On /diagnostics the 'Motion lock' status level matches the four cases above for injected inputs; induced input failures are reported as ERROR.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:125-126",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:194-227",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:69-79"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_motion_lock_health.cpp"
+      ],
+      "comments": "Publication rate is the diagnostic_updater default period (not overridden in this package)."
+    },
+    {
+      "id": "SWR-MUX-014",
+      "category": "Functional",
+      "text": "The rover_twist_mux shall relay a Driver UI command from teleop_driver_interface_cmd_vel_stamped to teleop_driver_interface_cmd_vel_fresh_stamped unchanged only if its receive-time-minus-stamp latency exceeds the latency baseline by at most max_delay (0.3 s), and shall drop commands with a zero or negative header stamp.",
+      "rationale": "twist_mux judges freshness by arrival time; a websocket that stalls on Wi-Fi delivers old commands in a burst, which would replay seconds-old motion.",
+      "verification": "Test",
+      "acceptance": "A command whose latency exceeds the baseline by more than 0.3 s is not republished; an unstamped command is not republished; commands within 0.3 s of the baseline are republished byte-identical.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011",
+        "SYS-SR-012"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/domain/command_freshness_filter.cpp:44-63",
+        "rover_twist_mux/src/infrastructure/command_freshness_node.cpp:102-122",
+        "rover_twist_mux/config/rover_command_freshness.yaml:4-9"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_command_freshness_filter.cpp",
+        "rover_twist_mux/test/integration/test_command_freshness_node.cpp"
+      ],
+      "comments": "Receive time is the wall clock (works under sim time). Limitation (README.md:101-102): a delay that stays steady for 2 s after a silence is indistinguishable from a clock step and is accepted."
+    },
+    {
+      "id": "SWR-MUX-015",
+      "category": "Functional",
+      "text": "The rover_twist_mux shall, in rover_command_freshness_node, let the filter's latency baseline rise by at most max_clock_drift (0.001 s per s of traffic, crediting at most 1.0 s per command gap), and shall re-baseline only on a run of rejected commands that starts after at least resync_gap (1.0 s) of silence and stays within max_delay of itself for resync_time (2.0 s).",
+      "rationale": "Follows clock drift between browser and rover and recovers from a backwards clock step, while a growing mid-stream backlog or a stale burst can never re-baseline itself.",
+      "verification": "Test",
+      "acceptance": "Unit tests: drift at <= 0.001 s/s is followed; a growing backlog is dropped and never resyncs; a backward clock step after >= 1.0 s silence resyncs after 2.0 s; a stale burst never resyncs.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-011"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/domain/command_freshness_filter.cpp:26-28",
+        "rover_twist_mux/src/domain/command_freshness_filter.cpp:54-95",
+        "rover_twist_mux/config/rover_command_freshness.yaml:11-17"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/unit/test_command_freshness_filter.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MUX-016",
+      "category": "Interface",
+      "text": "The rover_twist_mux shall, in rover_command_freshness_node, subscribe and publish geometry_msgs/TwistStamped with QoS KeepLast(10), reliable.",
+      "rationale": "Matches foxglove_bridge's reliable client publisher and twist_mux's SystemDefaults subscription; a best-effort hop would reintroduce the lost-zero risk.",
+      "verification": "Inspection",
+      "acceptance": "'ros2 topic info -v' shows reliable, depth 10 for both endpoints of rover_command_freshness_node.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/infrastructure/command_freshness_node.cpp:81-90"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_twist_mux/test/integration/test_command_freshness_node.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MUX-017",
+      "category": "Parameter",
+      "text": "The rover_twist_mux shall, in rover_command_freshness_node, treat the node's parameters as read-only and reject max_delay outside [0.05, 5.0] s, max_clock_drift outside [0.0, 0.1], resync_time outside [0.5, 60.0] s and resync_gap outside [0.1, 60.0] s.",
+      "rationale": "Prevents runtime changes to a safety-relevant filter and nonsensical settings.",
+      "verification": "Inspection",
+      "acceptance": "Setting any parameter at runtime is refused; starting with a value outside its bound fails validation.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Parameter validation of the freshness filter (SWR-MUX-014/015).",
+      "evidence": [
+        "rover_twist_mux/src/command_freshness_params.yaml:1-43"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MUX-018",
+      "category": "Diagnostics",
+      "text": "The rover_twist_mux shall, in rover_command_freshness_node, report a 'Command freshness' diagnostic (hardware ID 'Command Freshness') that is WARN for 5.0 s after any dropped command and OK otherwise, with accepted/dropped/resync counts, latency baseline, last excess delay and max_delay.",
+      "rationale": "Makes a stalling Driver UI link visible on a 1 Hz dashboard, not only in the log.",
+      "verification": "Inspection",
+      "acceptance": "After a late command is injected the diagnostic is WARN, and it returns to OK once 5.0 s pass without a drop.",
+      "priority": "Could",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-022"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/infrastructure/command_freshness_node.cpp:29-31",
+        "rover_twist_mux/src/infrastructure/command_freshness_node.cpp:124-160"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    },
+    {
+      "id": "SWR-MUX-019",
+      "category": "Safety",
+      "text": "The rover_twist_mux shall publish motion_lock immediately when a received SafetyStatus or SafetyCommandEcho changes the evaluated lock state, in addition to the periodic publication, so that the lock path contributes to the 100 ms software E-Stop budget.",
+      "rationale": "Today the lock is re-evaluated only in the 10 Hz timer, so a stop condition can wait up to one timer period after it arrives (on top of the 20 Hz safety_status period) before the mux is closed.",
+      "verification": "Test",
+      "acceptance": "Latency from publishing a SafetyCommandEcho with sw_e_stop_user_button=true to motion_lock=true is <= 100 ms in 20 of 20 trials, with the node publishing in the receiving callback rather than waiting for the timer.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-007"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:120-123",
+        "rover_twist_mux/src/infrastructure/motion_lock_node.cpp:134-145",
+        "rover_arch/SAFETY_CHAIN.md:141"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "The primary SYS-SR-007 path is the hardware interface write() gate and the PLC latch (SAFETY_CHAIN.md:199-202), so this is defence in depth; allocate the 100 ms budget across the chain before implementing."
+    },
+    {
+      "id": "SWR-MUX-020",
+      "category": "Interface",
+      "text": "The rover_twist_mux shall publish which input is currently selected (or none, or locked) on a ROS topic whenever the selection changes, for use by the platform mode manager.",
+      "rationale": "The SYS-SR-010 Teleoperation and Autonomous states can only be derived from which source currently commands the rover; no component exposes that today.",
+      "verification": "Test",
+      "acceptance": "Switching the active source between nav, driver_interface, joystick and cmd_elrs, and asserting motion_lock, each produces one message naming the new selection.",
+      "priority": "Should",
+      "status": "Proposed",
+      "parents": [
+        "SYS-SR-010"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_twist_mux/launch/rover_twist_mux.launch.py:110-119"
+      ],
+      "implementation": "Gap",
+      "verified_by": [],
+      "comments": "Upstream twist_mux has no selected-input topic; this may need a small wrapper or a diagnostics-based adapter. Consumer: SWR-SAF mode manager (see rover_safety SWRS)."
+    }
+  ]
+}

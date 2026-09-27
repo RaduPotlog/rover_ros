@@ -1,0 +1,337 @@
+{
+  "package": "rover_gps_heading",
+  "prefix": "GPSH",
+  "document": "ROVER-A1-ROVER_GPS_HEADING-SWRS-V-001",
+  "title": "rover_gps_heading Software Requirements Specification",
+  "scope": "rover_gps_heading provides rover_gps_heading_node, a C++ Clean Architecture node that derives the rover's absolute East-North-Up (ENU) heading from GNSS course while the rover drives straight. It estimates a fixed yaw offset between the local odom frame and ENU from gps/fix and odom, latches it once enough straight segments agree, and then republishes every odom yaw as an ENU heading on gps/heading_imu for rover_navsat_transform_node. It is localization logic, not a GPS driver: the receiver driver and fix-health diagnostics are in the sensor payload (rover_sensors, outside this boundary). It is started by rover_localization in GPS mode.",
+  "requirements": [
+    {
+      "id": "SWR-GPSH-001",
+      "category": "Interface",
+      "text": "The rover_gps_heading shall subscribe to sensor_msgs/NavSatFix on the relative topic gps/fix with QoS reliable, volatile, keep-last depth 10.",
+      "rationale": "GNSS fix is the project's reliable exception to best-effort sensor QoS: rover_gps_driver and the simulation bridge publish reliably, and navsat_transform subscribes reliably.",
+      "verification": "Test",
+      "acceptance": "`ros2 topic info -v gps/fix` shows the rover_gps_heading_node subscription as RELIABLE / VOLATILE, depth 10; the integration test SubscribesGpsFixReliably passes.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:101-106",
+        "rover_gps_heading/README.md:20"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp"
+      ],
+      "comments": "Matches the GNSS exception in .claude/rules/ros2_communication.md."
+    },
+    {
+      "id": "SWR-GPSH-002",
+      "category": "Interface",
+      "text": "The rover_gps_heading shall subscribe to nav_msgs/Odometry on the relative topic odom (QoS depth 10) and use its orientation yaw, twist.linear.x and twist.angular.z.",
+      "rationale": "The local EKF output (rover_ekf_node) provides the odom-frame yaw, forward speed and yaw rate used for straight-motion detection.",
+      "verification": "Test",
+      "acceptance": "Unit test OdometryToSample maps yaw, vx and yaw rate from an Odometry message; `ros2 topic info odom` lists rover_gps_heading_node as a subscriber.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:108-109",
+        "rover_gps_heading/src/infrastructure/gps_msg_conversions.cpp:70-80"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_gps_msg_conversions.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-GPSH-003",
+      "category": "Interface",
+      "text": "The rover_gps_heading shall publish sensor_msgs/Imu on gps/heading_imu (QoS depth 10) with frame_id heading_frame_id, orientation containing only the ENU yaw (x = y = 0), orientation covariance [0] = [4] = 1.0e3 and [8] = yaw std squared, and angular-velocity and linear-acceleration covariance [0] = -1 (not provided).",
+      "rationale": "navsat_transform_node needs an absolute ENU heading as an Imu message; -1 covariance marks the unused fields per the sensor_msgs convention (REP-103/REP-145 style).",
+      "verification": "Test",
+      "acceptance": "Unit test HeadingImuMessage passes; after alignment an echoed message has orientation.x = orientation.y = 0 and angular_velocity_covariance[0] = -1.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/ros2_heading_publisher.cpp:39",
+        "rover_gps_heading/src/infrastructure/gps_msg_conversions.cpp:34-35",
+        "rover_gps_heading/src/infrastructure/gps_msg_conversions.cpp:82-105"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_gps_msg_conversions.cpp",
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp"
+      ],
+      "comments": "Stamp is the node clock at publish time, not the odom message stamp (ros2_heading_publisher.cpp:46) [TBC whether this matters for navsat_transform]."
+    },
+    {
+      "id": "SWR-GPSH-004",
+      "category": "Functional",
+      "text": "The rover_gps_heading shall publish gps/heading_imu only after the alignment has reached the Aligned state and only when publish_heading is true, and then once for every received odom message with yaw = wrap(odom yaw + latched offset).",
+      "rationale": "An unaligned heading would place GPS fixes wrongly in the map frame.",
+      "verification": "Test",
+      "acceptance": "Integration test: no gps/heading_imu before alignment; after a simulated straight drive meeting the alignment conditions, messages are published with the expected ENU yaw; with publish_heading=false nothing is published.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/application/align_heading_use_case.cpp:47-67",
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:146-152"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_align_heading_use_case.cpp",
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp"
+      ],
+      "comments": "Output rate therefore equals the odom rate (rover_ekf_node, 50 Hz per rover_localization config)."
+    },
+    {
+      "id": "SWR-GPSH-005",
+      "category": "Functional",
+      "text": "The rover_gps_heading shall form one course measurement from each straight segment of at least alignment.min_segment_length_m (3.0 m) GNSS displacement, as offset = atan2(dNorth, dEast) - circular mean of odom yaw over the segment, adding pi when reversing (vx < 0).",
+      "rationale": "While not turning, the GNSS course equals the ENU heading and the antenna lever arm does not bias it.",
+      "verification": "Test",
+      "acceptance": "Unit tests AlignsWhileDrivingStraight, ReversingAddsHalfTurn and OffsetAcrossWrapAround pass.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:110-121",
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:180-199",
+        "rover_gps_heading/include/rover_gps_heading/domain/heading_alignment_estimator.hpp:30"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_heading_alignment_estimator.cpp",
+        "rover_gps_heading/test/unit/test_geo_math.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-GPSH-006",
+      "category": "Functional",
+      "text": "The rover_gps_heading shall treat motion as straight only when |vx| >= alignment.min_speed_m_s (0.3 m/s), |yaw rate| <= alignment.max_yaw_rate_rad_s (0.1 rad/s) and the yaw change since segment start is <= alignment.max_yaw_change_rad (0.1 rad), and shall abort the current segment otherwise or when the drive direction changes.",
+      "rationale": "Course equals heading only for straight motion.",
+      "verification": "Test",
+      "acceptance": "Unit tests TurningIsRejected and StandingStillIsRejected pass (no segment accepted).",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:56-75",
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:154-158",
+        "rover_gps_heading/include/rover_gps_heading/domain/heading_alignment_estimator.hpp:32-36"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_heading_alignment_estimator.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-GPSH-007",
+      "category": "Functional",
+      "text": "The rover_gps_heading shall ignore a GNSS fix for alignment (and abort the current segment) when it has no fix status, its horizontal 1-sigma error exceeds alignment.max_horizontal_std_m (5.0 m), the latest odometry is older than alignment.max_odometry_age_s (0.5 s), or the gap to the previous fix exceeds alignment.max_fix_gap_s (2.5 s).",
+      "rationale": "Poor or stale fixes would corrupt the course measurement.",
+      "verification": "Test",
+      "acceptance": "Unit test NoFixIsIgnored passes; unit test UnknownCovarianceAndNoFix maps STATUS_NO_FIX and unknown covariance correctly.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:77-103",
+        "rover_gps_heading/src/infrastructure/gps_msg_conversions.cpp:37-68",
+        "rover_gps_heading/include/rover_gps_heading/domain/heading_alignment_estimator.hpp:38-42"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_heading_alignment_estimator.cpp",
+        "rover_gps_heading/test/unit/test_gps_msg_conversions.cpp"
+      ],
+      "comments": "A fix with unknown covariance (horizontal std NaN) is accepted (heading_alignment_estimator.cpp:86-87)."
+    },
+    {
+      "id": "SWR-GPSH-008",
+      "category": "Functional",
+      "text": "The rover_gps_heading shall latch the circular mean of the most recent alignment.required_segments (3) offsets as the odom-to-ENU yaw offset when their circular standard deviation is <= alignment.max_offset_std_rad (0.1 rad), and keep it until reset.",
+      "rationale": "Agreement of several independent segments guards against a single bad measurement.",
+      "verification": "Test",
+      "acceptance": "Unit tests AlignsWhileDrivingStraight and NotAlignedBeforeEnoughSegments pass; after alignment further fixes do not change the offset.",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": ["SYS-SR-021"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:192-214",
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:77-81",
+        "rover_gps_heading/include/rover_gps_heading/domain/heading_alignment_estimator.hpp:44-46"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_heading_alignment_estimator.cpp"
+      ],
+      "comments": "No re-validation after latching: a drifting odom yaw (IMU gyro drift) is not corrected until a manual reset [TBC]."
+    },
+    {
+      "id": "SWR-GPSH-009",
+      "category": "Functional",
+      "text": "The rover_gps_heading shall report the published heading standard deviation as max(min_heading_std_rad, latched offset std), with min_heading_std_rad = 0.05 rad by default.",
+      "rationale": "Prevents over-confident heading covariance in navsat_transform and the global EKF.",
+      "verification": "Test",
+      "acceptance": "Unit test PublishesEnuHeadingOnceAligned passes; published orientation_covariance[8] >= 0.05^2.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical covariance contract with robot_localization.",
+      "evidence": [
+        "rover_gps_heading/src/application/align_heading_use_case.cpp:64-65",
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:47-49"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/unit/test_align_heading_use_case.cpp"
+      ],
+      "comments": ""
+    },
+    {
+      "id": "SWR-GPSH-010",
+      "category": "Interface",
+      "text": "The rover_gps_heading shall provide the std_srvs/Trigger service gps/reset_heading_alignment that discards the alignment, returns success true with the message 'Heading alignment reset; drive straight to realign.', and immediately republishes the (unaligned) alignment status.",
+      "rationale": "Lets the operator realign after a heading error without restarting the node.",
+      "verification": "Test",
+      "acceptance": "Integration test: calling the service after alignment returns success and gps/heading_imu stops until a new alignment; unit test ResetClearsAlignment passes.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical operability interface of the alignment.",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:111-113",
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:142-150",
+        "rover_gps_heading/src/application/align_heading_use_case.cpp:74-78"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp",
+        "rover_gps_heading/test/unit/test_heading_alignment_estimator.cpp"
+      ],
+      "comments": "rover_navsat_transform_node computes its transform only once, so it must be restarted after a reset (rover_gps_heading/README.md:39-40)."
+    },
+    {
+      "id": "SWR-GPSH-011",
+      "category": "Diagnostics",
+      "text": "The rover_gps_heading shall publish a 'Heading alignment' diagnostic (hardware ID 'RoverGpsHeading') with keys State, Accepted segments, Heading output and, once available, Yaw offset (deg) and Offset std (deg), updated by a 1 s timer and immediately at startup and on alignment.",
+      "rationale": "Shows the operator whether GPS fusion has an absolute heading (SYS-SR-022 sensor diagnostics).",
+      "verification": "Test",
+      "acceptance": "Within 2 s of start, <ns>/diagnostics contains 'rover_gps_heading_node: Heading alignment' with the State key; updates arrive at >= 1 Hz.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:94",
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:115-118",
+        "rover_gps_heading/src/infrastructure/ros2_heading_publisher.cpp:41",
+        "rover_gps_heading/src/infrastructure/ros2_heading_publisher.cpp:60-68"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp"
+      ],
+      "comments": "The tick timer is a wall timer (1 s). Grouped under /Rover/GPS by rover_diag_manager."
+    },
+    {
+      "id": "SWR-GPSH-012",
+      "category": "Diagnostics",
+      "text": "The rover_gps_heading shall grade the 'Heading alignment' diagnostic OK when aligned, OK when unaligned with publish_heading false, and WARN ('Drive straight to align the GNSS heading.') when unaligned with publish_heading true.",
+      "rationale": "An unaligned heading is only a fault when GPS fusion depends on it.",
+      "verification": "Test",
+      "acceptance": "Integration tests WarnsWhileUnaligned and HeadingOutputDisabled pass.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": ["SYS-SR-022"],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/ros2_heading_publisher.cpp:70-79"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp"
+      ],
+      "comments": "Never reports ERROR, and does not go STALE when gps/fix or odom stop arriving after alignment."
+    },
+    {
+      "id": "SWR-GPSH-013",
+      "category": "Parameter",
+      "text": "The rover_gps_heading shall declare publish_heading (default true), min_heading_std_rad (default 0.05, positive, max 3.2), heading_frame_id (default base_link) and the alignment.* parameters with the defaults min_segment_length_m 3.0, min_speed_m_s 0.3, max_yaw_rate_rad_s 0.1, max_yaw_change_rad 0.1, max_horizontal_std_m 5.0, max_fix_gap_s 2.5, max_odometry_age_s 0.5, required_segments 3 (range 1-100) and max_offset_std_rad 0.1.",
+      "rationale": "Declared, bounded parameters prevent silent misconfiguration.",
+      "verification": "Inspection, Test",
+      "acceptance": "`ros2 param describe` shows each parameter with its range; the defaults match the HeadingAlignmentConfig struct.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical parameter contract.",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:44-86",
+        "rover_gps_heading/include/rover_gps_heading/domain/heading_alignment_estimator.hpp:27-47"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp"
+      ],
+      "comments": "README.md:59 says all parameters are read-only; no on-set-parameters callback exists, so runtime changes have no effect."
+    },
+    {
+      "id": "SWR-GPSH-014",
+      "category": "Lifecycle",
+      "text": "The rover_gps_heading shall validate the alignment configuration at construction, rejecting non-positive limits or required_segments = 0, and shall then exit with code 1 and a FATAL log.",
+      "rationale": "Fail fast on inconsistent configuration instead of at the first fix.",
+      "verification": "Test",
+      "acceptance": "Integration test RejectsInvalidAlignmentConfig and unit test RejectsInvalidConfig pass; starting with alignment.min_speed_m_s:=0.0 exits with code 1.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Technical robustness requirement.",
+      "evidence": [
+        "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:89",
+        "rover_gps_heading/src/domain/heading_alignment_estimator.cpp:42-54",
+        "rover_gps_heading/src/rover_gps_heading.cpp:29-39"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_gps_heading/test/integration/test_rover_gps_heading_node.cpp",
+        "rover_gps_heading/test/unit/test_heading_alignment_estimator.cpp"
+      ],
+      "comments": "Plain rclcpp::Node (not lifecycle); it owns no hardware resource."
+    },
+    {
+      "id": "SWR-GPSH-015",
+      "category": "Build",
+      "text": "The rover_gps_heading shall keep its domain and application code (geo math, HeadingAlignmentEstimator, AlignHeadingUseCase) in the rover_gps_heading_core static library without ROS dependencies.",
+      "rationale": "Clean Architecture: the alignment logic is unit-testable without a ROS graph.",
+      "verification": "Inspection",
+      "acceptance": "rover_gps_heading_core sources include no rclcpp or *_msgs header; its unit tests link only the core library.",
+      "priority": "Should",
+      "status": "As-Built",
+      "parents": [],
+      "derived_rationale": "Project Clean Architecture convention (rules/clean_architecture.md).",
+      "evidence": [
+        "rover_gps_heading/CMakeLists.txt:29-44",
+        "rover_gps_heading/CMakeLists.txt:67-74",
+        "rover_gps_heading/README.md:61-69"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [],
+      "comments": ""
+    }
+  ]
+}
