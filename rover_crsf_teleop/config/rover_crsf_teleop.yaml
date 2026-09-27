@@ -106,13 +106,13 @@
     # rover_controller/config/wheel_01_controller.yaml: anything above them is clipped per axis
     # by diff_drive, which bends the commanded arc.
     linear_x_channel: 3
-    linear_x_out_min: -1.2    # m/s
-    linear_x_out_max: 1.2     # m/s
+    linear_x_out_min: -0.95   # m/s
+    linear_x_out_max: 0.95    # m/s
     linear_x_invert: false
 
     angular_z_channel: 1
-    angular_z_out_min: -1.0   # rad/s
-    angular_z_out_max: 1.0    # rad/s
+    angular_z_out_min: -1.5   # rad/s
+    angular_z_out_max: 1.5    # rad/s
     angular_z_invert: true
 
     # Stick expo per axis: (1 - e) * m + e * m^3 on the normalized deflection m. 0 = linear,
