@@ -337,7 +337,14 @@ return_type RoverSystem::read(const rclcpp::Time & time, const rclcpp::Duration 
         system_ros_interface_->updateSafetyLinkState(rover_controller_->linkHealth());
         system_ros_interface_->publishSafetyMsgs();
 
-        next_driver_state_update_time_ = time + driver_states_update_period_;
+        // Advance on a fixed schedule rather than from `time`: with a 20 ms control period,
+        // `time + 50 ms` only fires on the third cycle after it, i.e. every 60 ms (16.7 Hz).
+        // Stepping the deadline keeps the average at driver_states_update_frequency, one
+        // control period of jitter. After a stall, resync instead of bursting to catch up.
+        next_driver_state_update_time_ += driver_states_update_period_;
+        if (next_driver_state_update_time_ <= time) {
+            next_driver_state_update_time_ = time + driver_states_update_period_;
+        }
     }
 
     updateEStopState();

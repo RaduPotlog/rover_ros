@@ -2,10 +2,11 @@
 # wheel_01_controller.yaml (the spawner applies its param files in order, so these win).
 #
 # The real gains are tuned against 20 Hz encoders and ~0.2 s of motor dead time. Gazebo's
-# velocity joints have neither: the wheel reaches the commanded speed within one 10 ms control
-# step, so the derivative term acts with a loop gain of about d / dt = 0.04 / 0.01 = 4 and the
-# loop oscillates between +/-u_clamp even with the rover standing still. d = 0 keeps the rest of
-# the real tuning (feedforward, p, i, clamps) and is stable in simulation.
+# velocity joints have neither: the wheel reaches the commanded speed within one control step,
+# so the derivative term acts with a loop gain of about d / dt. At the old 100 Hz that was
+# 0.04 / 0.01 = 4 and the loop oscillated between +/-u_clamp even with the rover standing still;
+# at 50 Hz it is 0.04 / 0.02 = 2, still a pure-noise amplifier. d = 0 keeps the rest of the real
+# tuning (feedforward, p, i, clamps) and is stable in simulation.
 /**:
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:

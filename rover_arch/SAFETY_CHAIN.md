@@ -137,7 +137,7 @@ arbitrarily often. A waiting priority holder blocks *new* poll acquisitions.
 
 | Stage | Rate |
 |---|---|
-| `controller_manager`, `read()`/`write()` | 100 Hz |
+| `controller_manager`, `read()`/`write()` | 50 Hz |
 | `safety_status` / `safety_command_echo` publish | 20 Hz |
 | Modbus IO poll | 10 Hz |
 | Watchdog heartbeat toggle | 5 Hz |
@@ -251,7 +251,7 @@ inhibited, which is why the command-side deadband cannot be tightened below
   distance yet.
 * **`ros2_control`'s own GPIO mechanism is not used.** No `<gpio>` tags, no
   `gpio_controllers`. This is deliberate — the safety IO is polled at 10 Hz
-  behind a blocking link and hanging it off the 100 Hz resource manager buys
+  behind a blocking link and hanging it off the 50 Hz resource manager buys
   nothing — but it is a deviation worth knowing about rather than rediscovering.
 * **`read()`/`write()` always return `OK`.** PLC link health reaches diagnostics
   and the topics, never the resource manager, so `controller_manager` cannot

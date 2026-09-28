@@ -673,7 +673,7 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
         // driver alive for the duration of this call, not a handle we dereference.
 
         // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet -
-        // this command is dropped rather than queued. At the 100 Hz write() rate the next cycle's
+        // this command is dropped rather than queued. At the 50 Hz write() rate the next cycle's
         // command supersedes it almost immediately, so this is intentional, not an oversight; it
         // is not currently surfaced as an error/counter to the caller.
         if (set_speed_pending_) return;

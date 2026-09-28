@@ -215,7 +215,7 @@ def generate_launch_description():
         # --disable-rosout-logs: a log call made from update() (diff_drive's once-a-second
         # "Velocity command timed out" while idle) publishes on /rosout, and rmw_zenoh publishes
         # stall for seconds while another container tears down many nodes at once (the indoor
-        # manager switching maps). The 100 Hz loop froze for up to 4.2 s, past the 500 ms motor
+        # manager switching maps). The control loop froze for up to 4.2 s, past the 500 ms motor
         # watchdog, which latched motor_failsafe_tripped_error. Logging is set up once per
         # process, so this covers every controller too; console and ~/.ros/log output remain.
         arguments=[

@@ -185,6 +185,8 @@ public:
         return control_loop_use_case_ && rover_controller_ && rover_driver_ && e_stop_;
     }
 
+    int driverStateUpdates() const { return driver_state_updates_; }
+
 protected:
 
     void defineRoverDriver() override { rover_driver_ = fake_driver_; }
@@ -199,7 +201,8 @@ protected:
     }
 
     void updateHwStates(const rclcpp::Time & /* time */) override {}
-    void updateDriverStateMsg() override {}
+    // Runs once per driver-state/safety publish in read(), so it counts that publish's cadence.
+    void updateDriverStateMsg() override { ++driver_state_updates_; }
 
     void getSpeedCmd(std::vector<float> & speed_cmd) const override
     {
@@ -218,6 +221,7 @@ private:
     std::shared_ptr<FakeRoverGpioPort> fake_gpio_ = std::make_shared<FakeRoverGpioPort>();
     CallLog configure_calls_;
     std::shared_ptr<RecordingEmergencyStop> fake_e_stop_ = std::make_shared<RecordingEmergencyStop>();
+    int driver_state_updates_ = 0;
 };
 
 hardware_interface::ComponentInfo makeWheelJoint(const std::string & name)
@@ -300,11 +304,43 @@ protected:
 
     void write() { system_.write(rclcpp::Time(0, 0, RCL_ROS_TIME), rclcpp::Duration(0, 0)); }
 
+    void readAtMs(const std::int64_t ms)
+    {
+        system_.read(
+            rclcpp::Time(ms * 1000000, RCL_ROS_TIME), rclcpp::Duration::from_seconds(0.02));
+    }
+
     using State = lifecycle_msgs::msg::State;
 
     TestableRoverSystem system_;
     std::shared_ptr<FakeRoverDriver> driver_;
 };
+
+// driver_states_update_frequency is 20 Hz and controller_manager runs at 50 Hz. Rescheduling
+// from `time + period` fired on every third 20 ms cycle, i.e. at 16.7 Hz.
+TEST_F(RoverSystemWriteTest, DriverStatePublishHoldsItsRateOnA20msControlPeriod)
+{
+    for (std::int64_t ms = 0; ms < 1000; ms += 20) {
+        readAtMs(ms);
+    }
+    EXPECT_EQ(system_.driverStateUpdates(), 20);
+}
+
+// After a stalled loop, the schedule restarts from the late cycle rather than publishing on
+// every cycle until it has caught up with the missed deadlines.
+TEST_F(RoverSystemWriteTest, DriverStatePublishResyncsAfterAStallInsteadOfBursting)
+{
+    readAtMs(0);
+    ASSERT_EQ(system_.driverStateUpdates(), 1);
+
+    readAtMs(1000);
+    EXPECT_EQ(system_.driverStateUpdates(), 2);
+    readAtMs(1020);
+    readAtMs(1040);
+    EXPECT_EQ(system_.driverStateUpdates(), 2);
+    readAtMs(1060);
+    EXPECT_EQ(system_.driverStateUpdates(), 3);
+}
 
 TEST_F(RoverSystemWriteTest, ActiveWithoutEStopForwardsControllerCommand)
 {
