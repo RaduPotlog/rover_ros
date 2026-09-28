@@ -248,8 +248,7 @@ inhibited, which is why the command-side deadband cannot be tightened below
 * **The lidar guards are obstacle avoidance, not protection.** One 2D scan slice
   (±0.25 m around the lidar) misses low and overhanging obstacles; MANUAL, RC and
   Foxglove bypass them; the zone sizes are tunables without a measured stop
-  distance yet. They rely on `scan.self_filter` hiding the lidar support post,
-  or turning in place is blocked in ASSISTED.
+  distance yet.
 * **`ros2_control`'s own GPIO mechanism is not used.** No `<gpio>` tags, no
   `gpio_controllers`. This is deliberate — the safety IO is polled at 10 Hz
   behind a blocking link and hanging it off the 100 Hz resource manager buys
