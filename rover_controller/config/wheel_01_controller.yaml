@@ -169,7 +169,7 @@
 
       wheels_per_side: 2
       # Must match rover_description/config/wheel_01.yaml (enforced by test/test_wheel_geometry.py)
-      wheel_separation: 0.615
+      wheel_separation: 0.617
       wheel_radius: 0.1651
 
       # Calibrated as 1.63 against the old 0.62602 separation; rescaled to the measured 0.615 so
