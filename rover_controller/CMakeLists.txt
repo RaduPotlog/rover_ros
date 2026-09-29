@@ -10,8 +10,9 @@ find_package(pluginlib REQUIRED)
 ament_python_install_package(${PROJECT_NAME})
 
 # SeededPidController: pid_controller/PidController with its exported state seeded on
-# activation, so the chained diff_drive never reads NaN wheel feedback on its first cycle.
-add_library(${PROJECT_NAME} SHARED src/seeded_pid_controller.cpp)
+# activation, so the chained diff_drive never reads NaN wheel feedback on its first cycle, and
+# with each wheel's command from WheelSpeedLoop (stop at zero, model-reference integral).
+add_library(${PROJECT_NAME} SHARED src/seeded_pid_controller.cpp src/wheel_speed_loop.cpp)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -42,6 +43,9 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_seeded_pid_controller test/test_seeded_pid_controller.cpp)
   target_link_libraries(test_seeded_pid_controller ${PROJECT_NAME})
+  find_package(control_toolbox REQUIRED)
+  ament_add_gtest(test_wheel_speed_loop test/test_wheel_speed_loop.cpp)
+  target_link_libraries(test_wheel_speed_loop ${PROJECT_NAME} control_toolbox::control_toolbox)
 
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_wheel_geometry test/test_wheel_geometry.py)

@@ -37,7 +37,9 @@ protected:
   // Configure, loan interfaces the way controller_manager does, export, activate. Returns the
   // exported velocity state diff_drive would read on its first cycle.
   template<typename ControllerT>
-  double exported_after_activation(double hw_velocity, std::shared_ptr<ControllerT> & controller)
+  double exported_after_activation(
+    double hw_velocity, std::shared_ptr<ControllerT> & controller,
+    const std::vector<rclcpp::Parameter> & extra_parameters = {})
   {
     hw_state_ = hw_velocity;
     hw_command_ = 0.0;
@@ -47,13 +49,17 @@ protected:
     params.controller_name = "pid_controller_test";
     params.update_rate = 100;
     params.controller_manager_update_rate = 100;
-    params.node_options = rclcpp::NodeOptions().parameter_overrides({
+    std::vector<rclcpp::Parameter> overrides = {
       {"dof_names", std::vector<std::string>{kJoint}},
       {"command_interface", "velocity"},
       {"reference_and_state_interfaces", std::vector<std::string>{"velocity"}},
       {"gains." + kJoint + ".p", 0.05},
       {"gains." + kJoint + ".i", 1.0},
-    });
+      {"gains." + kJoint + ".feedforward_gain", 1.0},
+      {"gains." + kJoint + ".antiwindup_strategy", "back_calculation"},
+    };
+    overrides.insert(overrides.end(), extra_parameters.begin(), extra_parameters.end());
+    params.node_options = rclcpp::NodeOptions().parameter_overrides(overrides);
     EXPECT_EQ(controller->init(params), controller_interface::return_type::OK);
     EXPECT_EQ(
       controller->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
@@ -186,6 +192,76 @@ TEST_F(SeededPidControllerTest, SeededPidLeavesNanRatherThanSeedingAnotherWheel)
   for (const auto & exported : exported_) {
     EXPECT_TRUE(std::isnan(exported->get_optional().value())) << exported->get_name();
   }
+}
+
+// Runs one 50 Hz update with `reference` on the PID's reference interface (non-chained mode
+// keeps it, since no reference message has arrived); returns what went to the hardware.
+double command_after_update(
+  const std::shared_ptr<rover_controller::SeededPidController> & pid,
+  const hardware_interface::CommandInterface::SharedPtr & reference, double reference_value,
+  const double & hw_command, int cycle)
+{
+  EXPECT_TRUE(reference->set_value(reference_value));
+  EXPECT_EQ(
+    pid->update(rclcpp::Time(0, 20'000'000 * cycle), rclcpp::Duration::from_seconds(0.02)),
+    controller_interface::return_type::OK);
+  return hw_command;
+}
+
+TEST_F(SeededPidControllerTest, WithoutTheStopOptionALeftoverIntegralReachesTheHardware)
+{
+  std::shared_ptr<rover_controller::SeededPidController> pid;
+  exported_after_activation(0.0, pid);
+  hw_state_ = 1.0;
+  for (int k = 1; k <= 25; ++k) {
+    command_after_update(pid, reference_.at(0), 2.0, hw_command_, k);
+  }
+  hw_state_ = 0.0;
+  // Twice at zero, so the derivative of the step down is gone and only the integral is left.
+  command_after_update(pid, reference_.at(0), 0.0, hw_command_, 26);
+  EXPECT_GT(command_after_update(pid, reference_.at(0), 0.0, hw_command_, 27), 0.1);
+}
+
+TEST_F(SeededPidControllerTest, StopAtZeroReferenceSendsExactlyZeroToTheHardware)
+{
+  std::shared_ptr<rover_controller::SeededPidController> pid;
+  exported_after_activation(0.0, pid, {{"stop_at_zero_reference", true}});
+  hw_state_ = 1.0;
+  for (int k = 1; k <= 25; ++k) {
+    command_after_update(pid, reference_.at(0), 2.0, hw_command_, k);
+  }
+  EXPECT_GT(hw_command_, 2.0);
+  hw_state_ = 0.8;  // still coasting
+  EXPECT_EQ(command_after_update(pid, reference_.at(0), 0.0, hw_command_, 26), 0.0);
+}
+
+TEST_F(SeededPidControllerTest, WheelLoopParametersAreValidatedAtRuntime)
+{
+  std::shared_ptr<rover_controller::SeededPidController> pid;
+  exported_after_activation(0.0, pid);
+  auto node = pid->get_node();
+  EXPECT_TRUE(node->set_parameter({"integral_reference_delay", 0.25}).successful);
+  EXPECT_TRUE(node->set_parameter({"integral_reference_time_constant", 0.15}).successful);
+  EXPECT_FALSE(node->set_parameter({"integral_reference_delay", -0.1}).successful);
+  EXPECT_FALSE(node->set_parameter({"integral_reference_delay", 5.0}).successful);
+  EXPECT_FALSE(node->set_parameter({"zero_reference_tolerance", -1.0}).successful);
+  EXPECT_DOUBLE_EQ(node->get_parameter("integral_reference_delay").as_double(), 0.25);
+}
+
+TEST_F(SeededPidControllerTest, OutOfRangeWheelLoopParameterFailsInit)
+{
+  auto controller = std::make_shared<rover_controller::SeededPidController>();
+  controller_interface::ControllerInterfaceParams params;
+  params.controller_name = "pid_controller_test";
+  params.update_rate = 50;
+  params.controller_manager_update_rate = 50;
+  params.node_options = rclcpp::NodeOptions().parameter_overrides({
+    {"dof_names", std::vector<std::string>{kJoint}},
+    {"command_interface", "velocity"},
+    {"reference_and_state_interfaces", std::vector<std::string>{"velocity"}},
+    {"integral_reference_delay", 3.0},
+  });
+  EXPECT_EQ(controller->init(params), controller_interface::return_type::ERROR);
 }
 
 }  // namespace

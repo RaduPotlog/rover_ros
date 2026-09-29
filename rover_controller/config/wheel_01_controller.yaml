@@ -75,6 +75,22 @@
   #             0.25; rl/rr need ~0.33 to beat low-speed friction and have the headroom for it.
   # Measured with these gains (median of 4 wheels, wheels lifted, 3 consecutive runs):
   # overshoot <= 9.6 % and |steady-state error| <= 2.3 % on every step. Re-check on the ground.
+  #
+  # On the ground (2026-09-29) straight steps were fine, but in-place turns ran 37-56 % under the
+  # reference with every I-term pinned at its clamp (skid-steer needs ~+2 rad/s), and raising
+  # the clamp to fix that took straight-step overshoot to 17-23 %. Two wheel-loop options,
+  # implemented in SeededPidController, address this (all runtime-settable with ros2 param set):
+  #   stop_at_zero_reference  - at a zero reference, send exactly 0 and clear the integral. The
+  #             DCC1000 brakes only at a target of exactly 0; a leftover integral kept the brake
+  #             off after every stop (and made the wheels creep with larger clamps).
+  #   integral_reference_delay / _time_constant - the I-term integrates (reference delayed by
+  #             0.25 s, then lagged 0.15 s) - measurement instead of the raw error. That is the
+  #             step response the ground runs measured (dead time 0.24-0.32 s, rise 0.25-0.4 s),
+  #             so the error the plant removes by itself no longer winds the integral up, while a
+  #             persistent load error (skid turns, friction) still integrates fully.
+  #             0 / 0 = the plain upstream integral.
+  # The clamps are still the lifted-wheel values: raising them for turns (~2 rad/s) is the next
+  # on-ground step-response run, and test/test_wheel_geometry.py's rim budget has to follow.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
@@ -86,6 +102,11 @@
       reference_and_state_interfaces: 
         - velocity
         
+      # SeededPidController wheel loop (see the gains comment above).
+      stop_at_zero_reference: true
+      integral_reference_delay: 0.25
+      integral_reference_time_constant: 0.15
+
       gains:
         rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.33, "i_clamp_max": 0.33, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
@@ -100,6 +121,11 @@
       reference_and_state_interfaces:
         - velocity
         
+      # SeededPidController wheel loop (see the gains comment above).
+      stop_at_zero_reference: true
+      integral_reference_delay: 0.25
+      integral_reference_time_constant: 0.15
+
       gains:
         rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.33, "i_clamp_max": 0.33, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
@@ -114,6 +140,11 @@
       reference_and_state_interfaces:
         - velocity
         
+      # SeededPidController wheel loop (see the gains comment above).
+      stop_at_zero_reference: true
+      integral_reference_delay: 0.25
+      integral_reference_time_constant: 0.15
+
       gains:
         fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
@@ -128,6 +159,11 @@
       reference_and_state_interfaces:
         - velocity
         
+      # SeededPidController wheel loop (see the gains comment above).
+      stop_at_zero_reference: true
+      integral_reference_delay: 0.25
+      integral_reference_time_constant: 0.15
+
       gains:
         fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
         
