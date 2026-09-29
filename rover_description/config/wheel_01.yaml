@@ -7,4 +7,4 @@ mesh_package: rover_description
 folder_path: meshes/wheel_01
 mecanum: False
 wheelbase: 0.503
-wheel_separation: 0.615
+wheel_separation: 0.617

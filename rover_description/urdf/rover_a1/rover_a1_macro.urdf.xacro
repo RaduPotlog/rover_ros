@@ -35,7 +35,7 @@
     <xacro:property name="wheel_mount_point_x" value="${wheel_config['wheelbase'] / 2.0}" />
     <xacro:property name="wheel_mount_point_y" value="${wheel_config['wheel_separation'] / 2.0}" />
     <!-- Height of the wheel axis above body_link; also fixes the ground plane. -->
-    <xacro:property name="wheel_mount_point_z" value="0.033" />
+    <xacro:property name="wheel_mount_point_z" value="0.029" />
 
     <!-- Rover base macros -->
     <xacro:include filename="$(find rover_description)/urdf/rover_a1/base.urdf.xacro" ns="body" />
