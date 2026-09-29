@@ -1,5 +1,5 @@
-# Simulation-only overrides for the wheel PIDs, loaded after rover_controller's
-# wheel_01_controller.yaml (the spawner applies its param files in order, so these win).
+# Simulation-only overrides for the wheel PIDs and the drive controller, loaded after
+# rover_controller's wheel_01_controller.yaml (the spawner applies its param files in order, so these win).
 #
 # The real gains are tuned against 20 Hz encoders and ~0.2 s of motor dead time. Gazebo's
 # velocity joints have neither: the wheel reaches the commanded speed within one control step,
@@ -27,3 +27,10 @@
     ros__parameters:
       gains:
         fr_wheel_base_to_fr_wheel_joint: {"d": 0.0}
+
+  # Gazebo's wheels are rigid cylinders of the CAD tyre radius (rover_description wheel_01.yaml
+  # tyre_radius), so they roll at 0.1699, not at the real tyre's loaded 0.1651 the odometry is
+  # tuned on. Without this the simulated wheel odometry under-reports distance by ~2.9 %.
+  rover_drive_controller:
+    ros__parameters:
+      wheel_radius: 0.1699

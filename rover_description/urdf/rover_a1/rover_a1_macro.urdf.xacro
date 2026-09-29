@@ -19,12 +19,14 @@
       <xacro:property name="imu_xyz" value="-0.09 0.0 0.2" />
       <xacro:property name="imu_rpy" value="0.0 0.0 0.0" />
       <!-- Keep the ROVER_LIDAR_* mount when one is set; with the all-zero default the
-           gpu_lidar would sit inside the body mesh (top at z = 0.241), so lift it above.
-           Its lowest ring (-15 deg) must clear the body's far corner (0.47 m out), which
-           needs >= 0.126 m above the top; 0.45 gives 0.21 m. Lower, the rover sees itself
-           and the costmaps mark obstacles inside the footprint. -->
+           gpu_lidar would sit inside the body mesh, so lift it above. Its lowest ring
+           (-15 deg) must clear the far corner of the front arch's top (z = 0.555 at
+           x 0.251, y +/-0.253, 0.356 m out), which needs >= 0.555 + 0.356 * tan(15 deg)
+           = 0.650, and the body's far corner (top z = 0.30, 0.52 m out), which needs
+           >= 0.44; 0.68 clears both (0.62 was verified to hit the arch in Gazebo). Lower,
+           the rover sees itself and the costmaps mark obstacles inside the footprint. -->
       <xacro:if value="${[float(v) for v in str(lidar_xyz).split()] == [0.0, 0.0, 0.0]}">
-        <xacro:property name="lidar_xyz" value="0.0 0.0 0.45" />
+        <xacro:property name="lidar_xyz" value="0.0 0.0 0.68" />
       </xacro:if>
     </xacro:if>
 
@@ -34,8 +36,9 @@
          mount point sits at half of them (REP-103: +x forward, +y left, +z up). -->
     <xacro:property name="wheel_mount_point_x" value="${wheel_config['wheelbase'] / 2.0}" />
     <xacro:property name="wheel_mount_point_y" value="${wheel_config['wheel_separation'] / 2.0}" />
-    <!-- Height of the wheel axis above body_link; also fixes the ground plane. -->
-    <xacro:property name="wheel_mount_point_z" value="0.029" />
+    <!-- Height of the wheel axis above body_link; also fixes the ground plane. From the
+         SolidWorks export (joint_*_* origin z in solidworks_exported/.../urdf/*.csv). -->
+    <xacro:property name="wheel_mount_point_z" value="0.037363" />
 
     <!-- Rover base macros -->
     <xacro:include filename="$(find rover_description)/urdf/rover_a1/base.urdf.xacro" ns="body" />
@@ -58,7 +61,7 @@
     
     <!-- Rover body -->
     <xacro:body.body
-      wheel_radius="${wheel_config['wheel_radius']}"
+      wheel_radius="${wheel_config['tyre_radius']}"
       wheel_mount_point_z="${wheel_mount_point_z}"
       imu_xyz="${imu_xyz}"
       imu_rpy="${imu_rpy}"

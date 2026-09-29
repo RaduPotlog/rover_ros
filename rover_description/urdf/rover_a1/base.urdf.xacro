@@ -33,29 +33,42 @@
     </joint>
 
     <link name="body_link">
+      <!-- base.stl is the SolidWorks base_link.STL (solidworks_exported/
+           ROVER_1000_WATT_VARIANT.SLDASM) decimated 4x; body_link is its CAD frame. -->
       <visual>
         <geometry>
           <mesh filename="package://rover_description/meshes/rover_a1/base.stl" />
         </geometry>
+        <material name="">
+          <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+        </material>
       </visual>
 
-      <!-- Simulation only: a box over the base.stl bounds (x +/-0.351, y +/-0.313,
-           z -0.015..0.241) so the body hits obstacles in Gazebo. Gazebo does not
-           self-collide a model's links, so it cannot fight the wheels. -->
+      <!-- Simulation only: boxes over the base.stl bounds so the body hits obstacles in
+           Gazebo - the main body (x -0.410..0.413, y +/-0.27, z -0.02..0.30) and the front
+           arch (x 0.161..0.251, y +/-0.253, z 0.30..0.555). Gazebo does not self-collide a
+           model's links, so they cannot fight the wheels. -->
       <xacro:if value="${use_sim}">
         <collision>
-          <origin xyz="0.0 0.0 0.113" rpy="0.0 0.0 0.0" />
+          <origin xyz="0.0015 0.0 0.14" rpy="0.0 0.0 0.0" />
           <geometry>
-            <box size="0.702 0.626 0.256" />
+            <box size="0.823 0.54 0.32" />
+          </geometry>
+        </collision>
+        <collision>
+          <origin xyz="0.206 0.0 0.4275" rpy="0.0 0.0 0.0" />
+          <geometry>
+            <box size="0.09 0.506 0.255" />
           </geometry>
         </collision>
       </xacro:if>
 
+      <!-- From the SolidWorks export (base_link row of solidworks_exported/.../urdf/*.csv). -->
       <inertial>
-        <origin xyz="-0.0352516654672473 0.000230769565957786 0.0766816513547671" rpy="0 0 0" />
-        <mass value="33.445952" />
-        <inertia ixx="0.233794970398492" ixy="-0.000820762950210979" ixz="1.94037912313266E-05"
-                 iyy="0.228604041647293" iyz="3.84951327810773E-08" izz="0.363260170153768" />
+        <origin xyz="0.0246948542048735 0.00173673823842259 0.103380099372497" rpy="0 0 0" />
+        <mass value="35.6474447622668" />
+        <inertia ixx="0.319501966637767" ixy="-0.000816646517455797" ixz="4.83728654778507E-06"
+                 iyy="0.310232207152549" iyz="-5.04256505510483E-05" izz="0.559515096198424" />
       </inertial>
     </link>
 

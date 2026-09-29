@@ -27,6 +27,9 @@ import yaml
 
 WHEEL_TYPES = ['wheel_01']
 
+# joint_*_* origin z in solidworks_exported/ROVER_1000_WATT_VARIANT.SLDASM/urdf/*.csv.
+CAD_WHEEL_AXIS_Z = 0.037363
+
 
 def _load(path):
     with open(path, encoding='utf-8') as stream:
@@ -71,7 +74,16 @@ def test_urdf_wheel_placement_matches_convention(wheel_type):
         # All four wheels mount at the same height.
         assert z == pytest.approx(origins['body_to_fl_wheel_base_joint'][2])
 
-    # base_footprint is the root on the ground: base_link sits wheel radius - axis height above it.
+    # Wheel axis height above body_link, from the SolidWorks export's joint origins.
     axis_z = origins['body_to_fl_wheel_base_joint'][2]
+    assert axis_z == pytest.approx(CAD_WHEEL_AXIS_Z)
+
+    # base_footprint is the root on the ground: base_link sits tyre radius - axis height above it.
     base_z = origins['footprint_to_base_joint'][2]
-    assert base_z == pytest.approx(wheel['wheel_radius'] - axis_z)
+    assert base_z == pytest.approx(wheel['tyre_radius'] - axis_z)
+
+    # The wheel collision cylinder is the tyre, so it touches the same ground plane.
+    for link in root.findall('link'):
+        if link.get('name').endswith('_wheel_link'):
+            radius = float(link.find('collision/geometry/cylinder').get('radius'))
+            assert radius == pytest.approx(wheel['tyre_radius']), link.get('name')
