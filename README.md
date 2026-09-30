@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icons/Logo-Arm-WhiteOrange-372x372-1.png" alt="Mechatronics Academy" width="140">
+</p>
+
 # rover_ros
 
 Mechatronics Academy's Rover A1 ROS2.
