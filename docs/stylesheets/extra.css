@@ -1,0 +1,10 @@
+/* Wider content area: the manual is table-heavy. */
+.md-grid {
+  max-width: 1600px;
+}
+
+/* Keep file paths in table cells from breaking mid-word into one-letter columns. */
+.md-typeset table:not([class]) code {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}

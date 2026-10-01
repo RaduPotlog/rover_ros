@@ -51,3 +51,5 @@ qtcreator-*
 CATKIN_IGNORE
 
 *.drawio.bkp
+# MkDocs build output
+/site/

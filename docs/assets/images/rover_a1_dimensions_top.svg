@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" font-family="Roboto, Helvetica, Arial, sans-serif" font-size="14">
+  <title>Rover A1 top view, main dimensions</title>
+  <!-- Scale: 500 px per metre. Origin (base_link) at (320, 250). x forward = up. -->
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f4511e"/>
+    </marker>
+  </defs>
+  <!-- Body (0.823 x 0.617 m from base.stl bounds) -->
+  <rect x="165.75" y="43.5" width="308.5" height="411.5" rx="6" fill="#9e9e9e" fill-opacity="0.25" stroke="#9e9e9e" stroke-width="2"/>
+  <!-- Wheels: centres at x = +/-0.2515, y = +/-0.3085; tyre 2 x 0.1699 long, 0.108 wide -->
+  <g fill="#616161" fill-opacity="0.85" stroke="#424242">
+    <rect x="138.75" y="39.3" width="54" height="169.9" rx="10"/>
+    <rect x="447.25" y="39.3" width="54" height="169.9" rx="10"/>
+    <rect x="138.75" y="290.8" width="54" height="169.9" rx="10"/>
+    <rect x="447.25" y="290.8" width="54" height="169.9" rx="10"/>
+  </g>
+  <!-- Wheel centrelines -->
+  <g stroke="#f4511e" stroke-dasharray="6 4" stroke-width="1.5">
+    <line x1="165.75" y1="20" x2="165.75" y2="480"/>
+    <line x1="474.25" y1="20" x2="474.25" y2="480"/>
+    <line x1="120" y1="124.25" x2="520" y2="124.25"/>
+    <line x1="120" y1="375.75" x2="520" y2="375.75"/>
+  </g>
+  <!-- base_link and forward arrow -->
+  <circle cx="320" cy="250" r="5" fill="#f4511e"/>
+  <line x1="320" y1="250" x2="320" y2="190" stroke="#f4511e" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="330" y="205" fill="#f4511e">x (forward)</text>
+  <text x="330" y="270" fill="#9e9e9e">base_link</text>
+  <!-- Track dimension -->
+  <line x1="165.75" y1="500" x2="474.25" y2="500" stroke="#f4511e" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="320" y="494" text-anchor="middle" fill="#f4511e">track 0.617 m</text>
+  <!-- Wheelbase dimension -->
+  <line x1="560" y1="124.25" x2="560" y2="375.75" stroke="#f4511e" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="572" y="255" fill="#f4511e">wheelbase</text>
+  <text x="572" y="273" fill="#f4511e">0.503 m</text>
+  <!-- Overall length -->
+  <line x1="40" y1="39.3" x2="40" y2="460.7" stroke="#9e9e9e" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="52" y="245" fill="#9e9e9e">length</text>
+  <text x="52" y="263" fill="#9e9e9e">0.843 m</text>
+  <!-- Overall width -->
+  <line x1="138.75" y1="14" x2="501.25" y2="14" stroke="#9e9e9e" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="320" y="34" text-anchor="middle" fill="#9e9e9e">width 0.722 m</text>
+</svg>

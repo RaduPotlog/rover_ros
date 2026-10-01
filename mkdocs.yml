@@ -1,0 +1,83 @@
+site_name: Rover A1 Platform Manual
+site_description: Hardware and software manual for the Mechatronics Academy Rover A1 mobile platform (rover_ros).
+site_url: https://radupotlog.github.io/rover_ros/
+repo_url: https://github.com/RaduPotlog/rover_ros
+repo_name: RaduPotlog/rover_ros
+edit_uri: edit/master/docs/
+copyright: Mechatronics Academy
+
+exclude_docs: |
+  tools/
+  requirements.txt
+
+theme:
+  name: material
+  icon:
+    logo: material/robot-industrial
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Overview: index.md
+  - Hardware:
+      - Specification: hardware/specification.md
+      - Components: hardware/components.md
+      - Power and battery: hardware/power-and-battery.md
+      - IO and network: hardware/io-and-network.md
+  - Safety: safety.md
+  - Software:
+      - Overview: software/overview.md
+      - ROS 2 API: software/ros-api.md
+      - Drive and control: software/drive-and-control.md
+      - Teleop and LEDs: software/teleop-and-leds.md
+      - Simulation: software/simulation.md
+  - Open items: open-items.md
