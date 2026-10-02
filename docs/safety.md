@@ -106,9 +106,6 @@ The hardware interface node `rover_hardware_controller` offers three `std_srvs/T
 
 Source: `rover_hardware_interface/src/rover_system/rover_system.cpp` (`resetEStop()`, `resetEStopLatch()`, `areVelocityCommandsNearZero()`), `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`.
 
-!!! warning "Source conflict"
-    `rover_arch/SAFETY_CHAIN.md` §6 gives `velocity_command_zero_tolerance` as 0.35 rad/s. The URDF that the hardware interface reads sets 0.4 rad/s (`rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`). This page uses 0.4 rad/s.
-
 The state is published on two topics at 20 Hz (reliable, volatile, keep last 1):
 
 | Topic | Type | Use |

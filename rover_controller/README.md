@@ -27,8 +27,28 @@ ros2 param set <ns>/pid_controller_fl_wheel_base_to_fl_wheel_joint \
   gains.fl_wheel_base_to_fl_wheel_joint.p 0.0     # likewise .i and .d, and for each wheel
 ```
 
-`i_clamp_max/min` is per wheel (fl/fr 0.25, rl/rr 0.33) and is the gain that actually
-bounds overshoot - see the comment above the gains in `config/wheel_01_controller.yaml`.
+Each PID is a `rover_controller/SeededPidController`: `pid_controller/PidController` with its
+exported state seeded on activation (so diff_drive never reads NaN feedback on its first
+cycle), and each wheel's command computed by `WheelSpeedLoop`. With every option below off,
+`WheelSpeedLoop` gives exactly `control_toolbox::Pid`'s output (`test/test_wheel_speed_loop.cpp`).
+The options are live parameters, like the gains:
+
+| Parameter | Config | Effect |
+|---|---|---|
+| `stop_at_zero_reference` | `true` | At a zero reference (below `zero_reference_tolerance`, default 0.001 rad/s), send exactly 0 and clear the integral. The DCC1000 brakes only at a target of exactly 0. |
+| `integral_reference_delay` / `integral_reference_time_constant` | 0.15 s / 0.08 s | The integral works on (the reference delayed, then lagged) - measurement, a model of the plant's own response, so only the error the plant won't remove by itself (load, skid, friction) winds it up. 0 / 0 = the plain integral. The delay is limited to 1.0 s. |
+| `scale_integral_with_reference` | `true` | The integral fades with \|reference\| below the largest reference since the last stop (cleared on reversal), so turns end on time. |
+
+All four wheels use the same gains, with `i_clamp` ±2.0: with the model-reference integral the
+clamp only has to cover the persistent load error (in-place turns need ~2 rad/s of trim). The
+comment above the gains in `config/wheel_01_controller.yaml` records why, with the
+2026-10-02 ground-tune results. The reference model depends on the DCC1000 ramp
+(`motor_acceleration` in the URDF): re-fit it whenever that changes. Keep
+`stop_at_zero_reference` on for the real rover: with it off, a frozen integral (up to 2.0
+rad/s) sits above the hardware interface's E-Stop reset deadband
+(`velocity_command_zero_tolerance` 0.4 rad/s) and the E-Stop can't be reset.
+`rover_gazebo/config/sim_wheel_pid.yaml` sets the delay and time constant to 0 in
+simulation, which has no motor dead time.
 
 Each PID publishes `<pid>/controller_state` (reference, feedback, error, output).
 `save_i_term: false` clears each PID's integral whenever it is (re)activated; pid_controller
@@ -61,10 +81,12 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
    dead times as accurate to about 50 ms. The driver logs each channel's actual
    encoder interval at startup.
 
-   `docs/wheel_pid_tuning_notes.md` records the measurements behind the current
-   gains, what each knob actually does on this plant (`i_clamp` is what bounds
-   overshoot, not `i`; `p` above ~0.1 rings the loop; `d` above 0.04 amplifies
-   encoder noise) and the remaining on-ground work. Read it before changing a gain.
+   `docs/wheel_pid_tuning_notes.md` records the lifted-wheel measurements behind
+   `p`, `i` and `d` and what each knob does on this plant (`p` above ~0.1 rings the
+   loop; `d` above 0.04 amplifies encoder noise; with the plain integral, `i_clamp`
+   bounded overshoot). The on-ground tune of the clamps and the wheel loop options
+   is in the comment above the gains in `config/wheel_01_controller.yaml`. Read both
+   before changing a gain.
 
    ```bash
    ros2 run rover_controller wheel_step_response --ros-args -r __ns:=/<ns> -p enable_motion:=true
@@ -76,7 +98,9 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
    If the result equals the current `linear.x/angular.z` limits in this file, the
    controller ramp was the bottleneck, not the wheels. Relax those limits for one
    measurement run and repeat. The DCC1000 on-board ramp (`motor_acceleration` in
-   the URDF) adds lag of its own, so raise it once the PID owns the speed dynamics.
+   the URDF) adds lag of its own and sets the plant response the wheel PIDs'
+   integral reference models: after changing it, repeat step 1 on the ground and
+   re-fit `integral_reference_delay` / `_time_constant`.
    Then set the limits from the inside out:
    `rover_drive_controller` >= Nav2 `velocity_smoother` `max_accel`/`max_decel`
    = MPPI `ax_max`/`ax_min`/`az_max` >= `behavior_server.rotational_acc_lim`.
@@ -84,7 +108,9 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
 3. **Skid-steer calibration.** Spin in place at several rates in both directions.
    The tool compares the rotation the measured wheel speeds explain with the IMU
    gyro and reports `wheel_separation_multiplier`. Run it on the surface the rover
-   mostly drives on, because the value depends on the surface.
+   mostly drives on, because the value depends on the surface. The IMU is mounted
+   upside down, so the tool negates the gyro yaw rate (`imu_yaw_sign` -1); if every
+   spin segment is rejected although the rover turned, re-run with `-p imu_yaw_sign:=1`.
 
    ```bash
    ros2 run rover_controller wheel_odom_calibration --ros-args -r __ns:=/<ns> -p mode:=spin -p enable_motion:=true

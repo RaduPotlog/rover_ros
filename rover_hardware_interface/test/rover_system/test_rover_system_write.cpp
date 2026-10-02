@@ -424,10 +424,11 @@ TEST_F(RoverSystemWriteTest, UnconfiguredSendsNothingButStillDropsPendingCommand
 
 // --- E-Stop reset invariant: measured velocity ----------------------------------------------
 //
-// The command-side check alone is a weak guarantee: the wheel PIDs park their command at a frozen
-// I-term (up to i_clamp_max, 0.33 rad/s) whenever motion is inhibited, which is why the URDF
-// tolerance had drifted up to 1.2 rad/s (~0.2 m/s) - fast enough to walk beside. The measured
-// velocity has no such artifact, so it is what actually prevents clearing the E-Stop mid-roll.
+// The command-side check alone is a weak guarantee: a wheel PID without stop_at_zero_reference
+// parks its command at a frozen I-term (up to i_clamp_max) whenever motion is inhibited, which is
+// why the URDF tolerance had drifted up to 1.2 rad/s (~0.2 m/s) - fast enough to walk beside. The
+// measured velocity has no such artifact, so it is what actually prevents clearing the E-Stop
+// mid-roll.
 
 TEST_F(RoverSystemWriteTest, RefusesEStopResetWhileTheWheelsAreStillTurning)
 {

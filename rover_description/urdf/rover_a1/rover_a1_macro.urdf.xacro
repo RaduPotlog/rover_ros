@@ -223,13 +223,14 @@
           <param name="motor_failsafe_timeout_ms">500</param>
 
           <!-- On-board duty-cycle ramp of each DCC1000, in duty/s (DCC1000 range 0.5-10000).
-               10.0 = up to 0.1 s from stop to full duty, so diff_drive's acceleration limits
-               shape the motion, not this ramp. The ramp also applies when slowing down, and
-               braking only engages at duty 0, so a slow ramp lengthens every stop, E-stop
-               included. The wheel PIDs' integral_reference_delay/_time_constant model the
-               motor response (rover_controller/config/wheel_01_controller.yaml, tuned on the
-               ground at 10.0 on 2026-10-02): re-run wheel_step_response and re-fit them after
-               changing it. Optional - omitting it keeps the compiled-in
+               2.0 = up to 0.5 s from stop to full duty (10.0 would be 0.1 s, so diff_drive's
+               acceleration limits would shape the motion instead of this ramp). The ramp also
+               applies when slowing down, and braking only engages at duty 0, so a slow ramp
+               lengthens every stop, E-stop included. The wheel PIDs' integral_reference_delay/
+               _time_constant model the motor response (rover_controller/config/
+               wheel_01_controller.yaml). They were fitted on the ground at 10.0 (2026-10-02) and
+               have not been re-fitted for 2.0: re-run wheel_step_response and re-fit them after
+               changing this. Optional - omitting it keeps the compiled-in
                kDefaultMotorAcceleration (2.0). -->
           <param name="motor_acceleration">2.0</param>
 
@@ -266,20 +267,24 @@
                invariant (see domain/emergency_stop.cpp). Optional: omitting it keeps the
                compiled-in kDefaultVelocityCommandZeroTolerance (0.01).
 
-               Why 0.35 and not 0.01: the wheel PIDs run with feedforward_gain 1.0 and an
-               integral clamped at i_clamp_max (0.25 front, 0.33 rear - see
-               rover_controller/config/wheel_01_controller.yaml). While motion is inhibited the
-               reference and the measured velocity are both zero, so the PID error is zero, and a
-               PI integrator holds its value at zero error instead of decaying. The command
-               therefore parks at the frozen I-term - up to 0.33 rad/s - and no command-side
-               tolerance below that can ever be satisfied. 0.4 is the smallest value that clears
-               the largest i_clamp with a little margin.
+               Why 0.4 and not 0.01: the wheel PIDs used to run a plain integral clamped at
+               i_clamp_max (then 0.25 front, 0.33 rear). While motion is inhibited the reference
+               and the measured velocity are both zero, so the PID error is zero, and a PI
+               integrator holds its value at zero error instead of decaying. The command parked
+               at the frozen I-term - up to 0.33 rad/s - and no command-side tolerance below that
+               could be satisfied. 0.4 cleared the largest i_clamp with a little margin.
+
+               The wheel PIDs now run with stop_at_zero_reference (rover_controller/config/
+               wheel_01_controller.yaml): at a zero reference they send exactly 0 and clear the
+               integral, which is the I-term reset this guard was waiting for. This value can
+               come back down toward 0.01 once that is verified on the rover. Until then, and
+               for as long as this guard relies on it, keep stop_at_zero_reference on: i_clamp_max
+               is now 2.0, so a frozen I-term would sit far above 0.4 and the E-Stop could not be
+               reset.
 
                This was previously 1.2 (~0.2 m/s at the A1's 0.1651 m wheel radius), which is
-               fast enough to walk beside and made the invariant largely decorative. The way to
-               get back to 0.01 is to reset the PID I-term when motion is inhibited, not to keep
-               widening this - hence velocity_state_zero_tolerance below, which closes the real
-               hazard in the meantime. -->
+               fast enough to walk beside and made the invariant largely decorative.
+               velocity_state_zero_tolerance below closes the real hazard regardless. -->
           <param name="velocity_command_zero_tolerance">0.4</param>
 
           <!-- Deadband (rad/s at the wheel) below which a *measured* wheel velocity counts as

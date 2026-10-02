@@ -225,9 +225,11 @@ the platform at all. They sit in front of the mux inputs, so nothing above chang
 Plus the **E-Stop reset invariant** (`EmergencyStop::resetEStop()`): the latch
 cannot be cleared while the rover is being commanded to move *or* while the
 wheels are still turning. The second half exists because the first is weak on its
-own — the wheel PIDs park their command at a frozen I-term whenever motion is
-inhibited, which is why the command-side deadband cannot be tightened below
-`i_clamp_max` and had drifted to 1.2 rad/s (~0.2 m/s).
+own — a wheel PID with a plain integral parks its command at a frozen I-term
+whenever motion is inhibited, which is why the command-side deadband could not be
+tightened below `i_clamp_max` and had drifted to 1.2 rad/s (~0.2 m/s). The PIDs
+now run with `stop_at_zero_reference`, which sends exactly 0 and clears the
+integral at a zero reference.
 
 ---
 
@@ -239,9 +241,12 @@ inhibited, which is why the command-side deadband cannot be tightened below
   coils. This is the single most useful change available on the PLC side: it
   turns "the rover stopped" into "the rover stopped because the watchdog
   expired".
-* **`velocity_command_zero_tolerance` is 0.35 rad/s, not 0.01.** Bounded below by
-  the PIDs' `i_clamp_max`. Getting to 0.01 means resetting the PID integral when
-  motion is inhibited.
+* **`velocity_command_zero_tolerance` is 0.4 rad/s, not 0.01.** It was bounded
+  below by the PIDs' frozen integral (`i_clamp_max`, then 0.25 / 0.33). The PIDs'
+  `stop_at_zero_reference` now clears the integral at a zero reference, so the
+  tolerance can come down toward 0.01 once that is verified on the rover. Keep
+  `stop_at_zero_reference` on meanwhile: with it off, `i_clamp_max` (now 2.0)
+  would make the E-Stop unresettable.
 * **No end-to-end test** that an asserted `motion_lock` actually stops `cmd_vel`
   at the mux. Every stage either side of the mux is covered; the mux itself is a
   third-party node and testing it needs a launch fixture.

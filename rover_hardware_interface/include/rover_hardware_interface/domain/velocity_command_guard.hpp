@@ -33,14 +33,16 @@ constexpr double kDefaultVelocityCommandZeroTolerance = 0.01;
 // Default tolerance (rad/s at the wheel) below which a *measured* wheel velocity counts as
 // "not moving", for the second half of the same invariant.
 //
-// The command check alone turned out to be a weak guarantee in practice. The wheel PIDs run with
-// feedforward_gain 1.0 and an integral clamped at i_clamp_max (0.25-0.33 rad/s, see
-// wheel_01_controller.yaml). While motion is inhibited the reference and the measured velocity
-// are both zero, so the error is zero - and a PI integrator holds its value at zero error rather
-// than decaying. The command therefore parks at the frozen I-term, up to ~0.33 rad/s, which no
-// amount of tightening the *command* tolerance can get below without making the E-Stop
-// unresettable. That is why the URDF had been widened to 1.2 rad/s (~0.2 m/s): a workaround for
-// a PID artifact, which silently gave away the actual invariant.
+// The command check alone turned out to be a weak guarantee in practice. The wheel PIDs ran with
+// feedforward_gain 1.0 and a plain integral clamped at i_clamp_max (then 0.25-0.33 rad/s). While
+// motion is inhibited the reference and the measured velocity are both zero, so the error is
+// zero - and a PI integrator holds its value at zero error rather than decaying. The command
+// therefore parked at the frozen I-term, up to ~0.33 rad/s, which no amount of tightening the
+// *command* tolerance could get below without making the E-Stop unresettable. That is why the
+// URDF had been widened to 1.2 rad/s (~0.2 m/s): a workaround for a PID artifact, which silently
+// gave away the actual invariant. The PIDs now clear the integral and send exactly 0 at a zero
+// reference (stop_at_zero_reference in wheel_01_controller.yaml), but only while that option is
+// on - with it off, i_clamp_max is now 2.0 rad/s.
 //
 // Measured velocity has no such artifact: a stationary wheel reads zero regardless of what the
 // integrator remembers. Checking it closes the real hazard - clearing the E-Stop while the rover

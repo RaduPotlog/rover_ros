@@ -4,9 +4,18 @@ Working notes from the **wheels-lifted** tuning session (2026-09-20), kept so th
 session can pick up without re-deriving anything. Gains from this session are already in
 `config/wheel_01_controller.yaml` (commit `a516610`).
 
-**Status: step 1 of the README "Drive-train tuning" list is done for lifted wheels only.**
-Steps 2 (acceleration limits) and 3 (skid-steer calibration) are untouched.
-**Next action: re-run the same procedure with the wheels on the ground.**
+> **Partly superseded (2026-10-02).** The `p`, `i` and `d` findings (§2.1–§2.3, §2.5) still
+> hold. The `i_clamp` values and §2.4 / §6 describe the *plain* integral. On the ground
+> (2026-09-29) in-place turns ran 37–56 % under the reference with every I-term pinned, so
+> `SeededPidController` gained wheel loop options (`stop_at_zero_reference`, a model-reference
+> integral `integral_reference_delay` / `_time_constant`, `scale_integral_with_reference`) and
+> `i_clamp` became ±2.0 on all four wheels. The ground tune and its results are in the comment
+> above the gains in `config/wheel_01_controller.yaml`; the options are in the README.
+> `wheel_separation_multiplier` is now 1.659: the calibrated 1.63, rescaled to a measured
+> separation of 0.615 m (see the comment in the controller config).
+
+**Status at the time: step 1 of the README "Drive-train tuning" list was done for lifted
+wheels only.** Steps 2 (acceleration limits) and 3 (skid-steer calibration) were untouched.
 
 ---
 
@@ -171,15 +180,15 @@ ros2 launch rover_bringup rover_bringup.launch.py
 Wait for `Configured and activated all the parsed controllers list : [...]` in the log.
 
 ### The E-Stop latch blocks all motion at startup — this will bite you
-`motion_lock` is `true` (**true = motion inhibited**) after every boot because
-`gpio_pin_sw_e_stop_latch_status` is latched. The step-response tool will publish happily
-and the wheels will not move. Clear it:
+`motion_lock` is `true` (**true = motion inhibited**) after every boot because the safety
+latch is set. The step-response tool will publish happily and the wheels will not move.
+Clear it:
 
 ```bash
 ros2 service call /rover/hardware_interface/sw_e_stop_latch_reset std_srvs/srv/Trigger "{}"
 
-# verify: latch_status false, motor_contactor_engaged true, motion_lock false
-ros2 topic echo /rover/hardware_interface/gpio_state --once
+# verify: latch_active false, motor_contactor_engaged true, motion_lock false
+ros2 topic echo /rover/hardware_interface/safety_status --once
 ros2 topic echo /rover/motion_lock --once
 ```
 
@@ -324,4 +333,5 @@ not the wheels** — per the README, relax those limits for one measurement run 
 before setting anything.
 
 ### Then step 3 (skid-steer calibration) — not started
-`wheel_odom_calibration`, on the real surface. `wheel_separation_multiplier` is currently 1.63.
+`wheel_odom_calibration`, on the real surface. `wheel_separation_multiplier` was 1.63 at the
+time; it is now 1.659, the calibrated value rescaled to a measured separation of 0.615 m.

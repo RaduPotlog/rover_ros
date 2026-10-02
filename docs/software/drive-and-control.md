@@ -170,10 +170,8 @@ On any E-Stop or latched fault, `write()` keeps sending **zero** commands so the
 
 Source: `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`, `rover_hardware_interface/README.md`.
 
-!!! note "URDF comment conflicts"
+!!! note "URDF comment conflict"
     The URDF comment for `motor_current_limit` describes 10 A, but the value set is 15.0 A. The hardware interface uses 15.0 A.
-
-    The comment for `motor_acceleration` describes 10.0 ("up to 0.1 s from stop to full duty"), but the value set is 2.0. The hardware interface uses 2.0.
 
 ## Wheel PID controller
 
