@@ -222,9 +222,13 @@ the platform at all. They sit in front of the mux inputs, so nothing above chang
   MANUAL, the RC transmitter and the Foxglove joystick bypass them by design, so
   the operator can always move the rover.
 
-Plus the **E-Stop reset invariant** (`EmergencyStop::resetEStop()`): the latch
-cannot be cleared while the rover is being commanded to move *or* while the
-wheels are still turning. The second half exists because the first is weak on its
+Plus the **E-Stop reset invariant** (`EmergencyStop::resetEStop()`): the software
+user E-Stop (`hardware_interface/sw_user_e_stop_reset`) cannot be released while
+the rover is being commanded to move *or* while the wheels are still turning. The
+latch reset (`hardware_interface/sw_e_stop_latch_reset`, `resetEStopLatch()`) has
+no such check: it only needs the hardware interface ACTIVE, like the user E-Stop
+reset. While the user E-Stop is still asserted the set-dominant latch can't clear
+anyway. The second half of the invariant exists because the first is weak on its
 own — a wheel PID with a plain integral parks its command at a frozen I-term
 whenever motion is inhibited, which is why the command-side deadband could not be
 tightened below `i_clamp_max` and had drifted to 1.2 rad/s (~0.2 m/s). The PIDs

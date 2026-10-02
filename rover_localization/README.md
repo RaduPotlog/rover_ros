@@ -6,7 +6,7 @@ selects between two modes:
 
 | Mode | Nodes | Transforms |
 |------|-------|------------|
-| `ROVER_USE_GPS=false` (default) | `rover_ekf_node`: wheels + IMU yaw rate | `<ns>/odom → <ns>/base_link` |
+| `ROVER_USE_GPS=false` (default) | `rover_ekf_node`: wheels + IMU yaw rate | `<ns>/odom → <ns>/base_footprint` |
 | `ROVER_USE_GPS=true` | `rover_ekf_node` (unchanged), `rover_ekf_global_node`: wheels + IMU yaw rate + GPS position, `rover_gps_heading_node`, `rover_navsat_transform_node` | also `<ns>/map → <ns>/odom`, only with `ROVER_GPS_PUBLISH_MAP_TF=true` |
 
 With GPS, `odom` stays continuous for local control, and GPS corrections show up only in
@@ -29,7 +29,7 @@ comes from `rover_gps_heading_node` (package `rover_gps_heading`), started here 
 | sub | `odometry/wheels` | `nav_msgs/Odometry` (from `rover_controller`'s `rover_drive_controller`) |
 | sub | `imu/data` | `sensor_msgs/Imu` (from `rover_controller`'s `rover_imu_broadcaster`) |
 | pub | `odom` | `nav_msgs/Odometry` (the EKF's `odometry/filtered`, remapped) |
-| pub | `/tf` | `<namespace>/odom → <namespace>/base_link` (`tf_prefix` = namespace) |
+| pub | `/tf` | `<namespace>/odom → <namespace>/base_footprint` (`tf_prefix` = namespace) |
 | srv | `localization/set_pose`, `localization/enable`, `localization/toggle` | robot_localization services |
 | pub | `diagnostics` | robot_localization status |
 
@@ -88,7 +88,7 @@ The filters run at 50 Hz in 2D mode (`two_d_mode: true`).
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `use_ekf` | `False` | Start the EKFs. `rover_bringup` and `rover_gazebo` pass `True`. |
-| `fuse_gps` | `$ROVER_USE_GPS`, else `false` | GPS mode (`true`/`1`/`yes`/`on`, any case). Selects the `_with_gps` config. `rover_bringup` passes its `use_gps`; `rover_gazebo` passes `False`. |
+| `fuse_gps` | `$ROVER_USE_GPS`, else `false` | GPS mode (`true`/`1`/`yes`/`on`, any case). Selects the `_with_gps` config. `rover_bringup` and `rover_gazebo` pass their `use_gps` (default `$ROVER_USE_GPS`, else `false`). |
 | `publish_global_tf` | `$ROVER_GPS_PUBLISH_MAP_TF`, else `false` | GPS mode only: `rover_ekf_global_node` broadcasts `map → odom` (`true`/`1`/`yes`/`on`, any case). Overrides the config's `publish_tf`. `false` (default) leaves `map → odom` to SLAM/AMCL; `odometry/global` is still published. |
 | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace and TF prefix. |
 | `localization_mode` | `rel` | `rel`: relative to the start pose; `enu`: East-North-Up orientation. Selects `config/<mode>_localization[_with_gps].yaml`. |

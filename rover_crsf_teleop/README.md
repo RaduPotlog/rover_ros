@@ -7,8 +7,8 @@ lost.
 
 ## How RC input reaches this node
 
-The UART is **not** opened here. `rover_serial_driver`'s `rover_serial_bridge_node` node (from `rover_transport`)
-owns the port and publishes raw bytes; this node subscribes to them and decodes CRSF in-process.
+The UART is **not** opened here. `rover_serial_driver`'s serial bridge (from `rover_transport`), running
+as node `rover_crsf_serial_bridge`, owns the port and publishes raw bytes; this node subscribes to them and decodes CRSF in-process.
 The launch file loads both as components (`rover_serial_driver`'s
 `rover::transport::serial::SerialBridgeNode` and `rover_crsf_teleop::RoverCrsfTeleopNode`) into one
 single-threaded container, `rover_crsf_container`, with intra-process communication, so the ~250
@@ -17,7 +17,7 @@ the lifecycle shutdown, so the final stop command comes from twist_mux's timeout
 standalone `rover_crsf_teleop_node` executable still sends it.
 
 ```
-ELRS receiver ──UART @460800──▶ rover_serial_bridge_node ──rc/raw (UInt8MultiArray)──▶ rover_crsf_teleop_node
+ELRS receiver ──UART @460800──▶ rover_crsf_serial_bridge ──rc/raw (UInt8MultiArray)──▶ rover_crsf_teleop_node
                                                                               │
                                         teleop_elrs_cmd_vel_stamped ◀─────────┤
                                         hardware_interface/sw_* (Trigger) ◀───┤
@@ -31,13 +31,14 @@ code that acts on it.
 
 **Baud rate.** ASIO supports 460800 natively, which is what the A1's receiver is flashed for.
 CRSF's own default of 420000 is *not* in ASIO's table, so a receiver reflashed to 420000 could not
-be opened by `rover_serial_bridge_node` at all. Keep it at 460800.
+be opened by `rover_crsf_serial_bridge` at all. Keep it at 460800.
 
 ## Interfaces
 
 | Direction | Name | Type |
 |---|---|---|
-| sub | `rc/raw` | `std_msgs/UInt8MultiArray` (reliable, depth 100) — raw CRSF bytes from `rover_serial_bridge_node` |
+| sub | `rc/raw` | `std_msgs/UInt8MultiArray` (reliable, depth 100) — raw CRSF bytes from `rover_crsf_serial_bridge` |
+| sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` (reliable, volatile, depth 1) — E-Stop state that gates RC calibration |
 | pub | `teleop_elrs_cmd_vel_stamped` | `geometry_msgs/TwistStamped`, frame `base_link` |
 | pub | `rc/channels` | `rover_msgs/RcChannels` (best effort) — echo, for tuning only |
 | pub | `rc/link` | `rover_msgs/RcLinkStatus` (best effort) — echo, for tuning only |
@@ -79,7 +80,7 @@ deactivated. Channel N is `channels[N-1]`.
   high = reset; latch-reset channel low = reset latch. Their resting position is learned over
   `switch_settle_frames` ticks at startup and never fires.
 - **Diagnostics** (hardware ID `RC Receiver`) never report ERROR — RC teleop is optional.
-  `RC serial link` covers the byte stream (is `rover_serial_bridge_node` alive?), `RC link` the RC signal
+  `RC serial link` covers the byte stream (is `rover_crsf_serial_bridge` alive?), `RC link` the RC signal
   (is the transmitter in range?), and they fail for different reasons.
 
 ## RC calibration

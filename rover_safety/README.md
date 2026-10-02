@@ -16,7 +16,7 @@ Both are `nav2::LifecycleNode`s that configure and activate themselves (`autosta
 |-----------|------|------|
 | sub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` (latest-state QoS) |
 | sub | `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` |
-| sub | `hardware_interface/gpio_state` | `rover_msgs/GpioState` |
+| sub | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` (`sw_e_stop_user_button` → `sw_e_stop_state`) |
 | sub | `system_status` | `rover_msgs/SystemStatus` (from `rover_diag_manager`, CPU temperature) |
 | client | `hardware_interface/sw_user_e_stop_set` | `std_srvs/Trigger` (called from the trees) |
 | service | `~/shutdown` | `std_srvs/Trigger`: shuts down the ROS controller (`shutdown.service_enabled`) |
@@ -157,7 +157,8 @@ Indicator only: calls nothing but `led/set_animation`; not part of the E-Stop ch
 
 Animation ids are the `rover_msgs/LedAnimation` constants.
 
-The node also runs in simulation.
+The simulation (`rover_gazebo`) does not include `rover_safety.launch.py`, so neither node runs
+there.
 
 ## Behavior trees
 
@@ -265,8 +266,9 @@ colcon test --packages-select rover_safety && colcon test-result --all --verbose
   not implemented (see the TODO in `src/safety_node.cpp`).
 - Both nodes build their trees at configure time, and the nav2 service BT nodes wait up to 3 s for
   their servers there (`hardware_interface/sw_user_e_stop_set`, `led/set_animation`). If a server is
-  missing, configure fails and is not retried automatically; run
-  `ros2 lifecycle set <node> configure` once it is up.
+  missing, configure fails. An autostarted node then retries configure and activate every
+  `configure_retry_period` (5.0 s) until it succeeds (`infrastructure/configure_retry`); under a
+  lifecycle manager, retrying is left to the manager.
 - Anyone on the ROS graph can call `~/shutdown`. Set `shutdown.service_enabled: false` to remove it.
 - Nothing in this workspace publishes `joy`, so `MANUAL_ACTION` is never shown unless a joystick
   driver is added.

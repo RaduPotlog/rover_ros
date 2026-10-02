@@ -32,9 +32,13 @@ rover's router would join the simulated nodes to the real rover.
   - `include/spawn_robot.launch.py` spawns the URDF at `x`/`y`/`z`/`roll`/`pitch`/`yaw`
     (default `0, -2.0, 0.2`). The model is named after the namespace, else `rover_a1`.
   - `rover_controller` with `use_sim:=True`, so `gz_ros2_control` owns the controller manager.
-    `config/sim_wheel_pid.yaml` is loaded after the real controller config and sets the wheel
+    `config/sim_wheel_pid.yaml` is loaded after the real controller config. It sets the wheel
     PIDs' `d` to 0: Gazebo's wheels have none of the encoder/motor lag that gain is tuned for,
-    and with it the loop oscillates between its limits.
+    and with it the loop oscillates between its limits. For the same reason it sets
+    `integral_reference_delay` and `integral_reference_time_constant` to 0, so the integral works
+    on the plain error. It also sets `rover_drive_controller`'s `wheel_radius` to 0.1699 m, the
+    CAD tyre radius the simulated wheel cylinders roll on, instead of the real tyre's 0.1651 m;
+    without it the simulated wheel odometry under-reports distance by ~2.9 %.
   - `rover_localization` with `use_sim:=True use_ekf:=True`; `fuse_gps` follows `use_gps`, which
     adds `rover_gps_heading_node`, `rover_navsat_transform_node` and `rover_ekf_global_node`.
   - `rover_twist_mux` (mux + `rover_motion_lock_node`), as on the rover:
@@ -76,9 +80,9 @@ Frames carry the namespace prefix, like `robot_state_publisher`'s TF.
 In simulation only, `body_link` gets a box collision over the `base.stl` bounds, so the body
 collides with obstacles. The hardware URDF keeps visual-only geometry.
 
-The lidar uses the `ROVER_LIDAR_*` mount pose; with none set it sits 0.45 m above `body_link`,
-high enough that its lowest ring (-15°) clears the body. A custom mount lower than about
-0.37 m makes the rover see itself. The GNSS uses `ROVER_GPS_*`. The world's `<spherical_coordinates>` sets
+The lidar uses the `ROVER_LIDAR_*` mount pose; with none set it sits 0.68 m above `body_link`,
+high enough that its lowest ring (-15°) clears the body and the front arch. A custom mount lower
+than about 0.65 m makes the rover see itself (0.62 m was verified to hit the arch). The GNSS uses `ROVER_GPS_*`. The world's `<spherical_coordinates>` sets
 the datum (50.088384 N, 19.939128 E).
 
 ## Config Files

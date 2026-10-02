@@ -5,7 +5,10 @@ it can also run on its own to open a world without a robot.
 
 ## World Files
 
-- `world/rover_world.sdf` - empty world (default).
+- `world/rover_world.sdf` - the default world: a 25 × 25 m ground plane enclosed by four 1 m
+  walls (a 22 × 22 m square), with four boxes (0.8–1.2 m tall) and three 1.5 m pillars as
+  static obstacles, so the lidar, costmaps and SLAM have structure to work with. It also
+  sets `<spherical_coordinates>` for the simulated GNSS.
 
 ## Config Files
 

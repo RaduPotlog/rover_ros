@@ -168,9 +168,6 @@ The rover has two SK9822 LED panels, front and rear bumper. Each is 2 rows × 20
 
 Source: `rover_led/config/rover_a1_animations.yaml`, `rover_led/config/rover_a1_driver.yaml`, `rover_led/config/rover_a1_udp_led_channel_1.yaml`, `rover_led/config/rover_a1_udp_led_channel_2.yaml`.
 
-!!! warning "Source conflict"
-    `rover_led/README.md` gives port 3333 for both channels. `rover_led/config/rover_a1_udp_led_channel_1.yaml` sets 3334 for channel 1. The node uses 3334.
-
 ### Services and topics
 
 | Direction | Name | Type | Note |

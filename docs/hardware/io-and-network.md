@@ -132,9 +132,6 @@ The platform has two IP networks. The safety PLC sits on a dedicated Ethernet li
 
 The ROS controller addresses `192.168.88.10` and `192.168.77.203`, and the router addresses, appear only in the architecture diagram, not in a config file. The router's uplink is site-specific and not covered here.
 
-!!! note "Stale README"
-    `rover_led/README.md` says both LED channels use port 3333. The config uses 3334 for channel 1 (`rover_led/config/rover_a1_udp_led_channel_1.yaml`) and 3333 for channel 2.
-
 ## USB devices
 
 | Device | Connection | Settings | Source |

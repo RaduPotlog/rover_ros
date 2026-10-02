@@ -143,9 +143,9 @@ void RoverCrsfTeleopNode::declareParameters()
     // How long a safety_status sample stays trustworthy. It is published at 20 Hz, so a second is
     // 20 missed messages; matches rover_twist_mux's gpio_timeout.
     declare_parameter<double>("e_stop_state_timeout_s", 1.0);
-    // How long the E-Stop must stay un-engaged before a running calibration is cancelled. The
-    // driver reports a Modbus read error as "clear" and the underlying IO only refreshes at
-    // 2 Hz, so a single not-engaged sample must not throw away a measurement.
+    // How long the E-Stop must stay un-engaged before a running calibration is cancelled. A
+    // single not-engaged sample (a Modbus read hiccup; the IO is polled every 100 ms) must not
+    // throw away a measurement.
     declare_parameter<double>("e_stop_grace_s", 1.0);
 
     declare_parameter<int>("linear_x_channel", 3);

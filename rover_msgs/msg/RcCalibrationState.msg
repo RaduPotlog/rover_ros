@@ -23,10 +23,11 @@ float32 progress
 # True while teleop is held off because a calibration is running. Always true when phase != IDLE.
 bool teleop_inhibited
 
-# The E-Stop state the node verified for itself from hardware_interface/gpio_state, which is what
+# The E-Stop state the node verified for itself from hardware_interface/safety_status, which is what
 # actually gates a calibration - the operator's confirmation is a second, independent condition.
-# ENGAGED means any of the motion-inhibiting stops is active (hardware button, software button,
-# motor-driver fault, or the safety latch), the same set rover_twist_mux locks motion on.
+# ENGAGED means all three of: the physical E-Stop button is pressed, the PLC has latched, and the
+# motor contactor has opened. A software E-Stop alone is not enough, because it can be cleared
+# remotely mid-sweep (rover_crsf_teleop/include/rover_crsf_teleop/domain/safety_io_flags.hpp).
 #
 # UNKNOWN is not "probably fine": nothing has been received, or the last sample is too old to
 # trust. A calibration is refused in that state, because the absence of evidence that the rover

@@ -173,9 +173,10 @@
           <param name="safety_wdg_kick_period_ms">200</param>
 
           <!-- Period (ms) of the discrete-IO poll that refreshes the cache read() serves to
-               GpioState and the E-Stop mirror. Telemetry only - a missed poll degrades freshness
-               and is caught by rover_twist_mux's 1.0 s gpio_state staleness timeout; it never
-               endangers the relay's watchdog window. 100 ms keeps link duty low; it is also the
+               hardware_interface/safety_status, safety_command_echo and the E-Stop mirror.
+               Telemetry only - a missed poll degrades freshness and is caught by the 1.0 s
+               safety_status staleness timeout in rover_twist_mux's motion lock (gpio_timeout);
+               it never endangers the relay's watchdog window. 100 ms keeps link duty low; it is also the
                floor on how quickly software notices a latch trip, which is defense-in-depth
                behind the contactor opening in hardware. -->
           <param name="safety_io_poll_period_ms">100</param>

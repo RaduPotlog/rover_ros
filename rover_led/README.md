@@ -71,7 +71,7 @@ These are lifecycle `rover::transport::udp::UdpSenderNode` components, loaded in
 `rover_led_container` next to the driver with intra-process communication (hardware only), so the
 50 Hz frames never cross the Zenoh router. Each one subscribes to
 `udp_write/led_channel_<n>` and sends to the address in
-`config/rover_a1_udp_led_channel_<n>.yaml` (channel 1 → `192.168.77.202`, channel 2 → `192.168.77.201`, port `3333`).
+`config/rover_a1_udp_led_channel_<n>.yaml` (channel 1 → `192.168.77.202:3334`, channel 2 → `192.168.77.201:3333`).
 
 ## Animations
 
@@ -80,12 +80,13 @@ bumper is channel 1, the rear bumper is channel 2, and each bumper is one full-w
 Front and rear play different images for the same state, and directional animations such as
 blinkers work.
 
-Both panels are physically 2 rows × 20 LEDs wired in series, with LED 0 on the robot's right:
-seen from the front the front panel reads 0–19 over 39–20, and seen from behind the rear panel
-reads 19–0 over 20–39. Each panel's `rows: 2` folds the logical 40-LED frame into that wiring
-(logical LEDs 2k and 2k+1 are the two LEDs of column k from the robot's right), so on both bumpers
-segment LED 0 is the robot's right and every animation, blinkers included, lights the same physical
-side front and rear.
+Both panels are physically 2 rows × 20 LEDs wired in series: LEDs 0–19 run away from LED 0 and
+LEDs 20–39 come back. The rear panel has LED 0 on the robot's right (seen from behind it reads
+19–0 over 20–39). The front panel is mounted the other way round, with LED 0 on the robot's left.
+Each panel's `rows: 2` folds the logical 40-LED frame into that wiring (logical LEDs 2k and 2k+1
+are the two LEDs of column k, counted from the end LED 0 is on), and the front segment runs `39-0`
+so that it also counts from the robot's right. On both bumpers segment LED 0 is the robot's right,
+so every animation, blinkers included, lights the same physical side front and rear.
 
 ```yaml
 panels:            # physical strips: UDP channel + LED count
@@ -98,7 +99,7 @@ panels:            # physical strips: UDP channel + LED count
 segments:          # virtual strips on a panel; a reversed range runs backwards
   - name: front
     channel: 1
-    led_range: 0-39
+    led_range: 39-0
   - name: rear
     channel: 2
     led_range: 0-39
@@ -115,12 +116,12 @@ led_animations:
         segments: front
         animation:
           image: $(find rover_led)/animations/rover_a1/estop_front.png
-          duration: 6
+          duration: 4
       - type: rover_led::ImageAnimation
         segments: rear
         animation:
           image: $(find rover_led)/animations/rover_a1/estop_rear.png
-          duration: 6
+          duration: 4
 ```
 
 Every segment has four layers, indexed by `priority`. They are composited with `ERROR` on top,

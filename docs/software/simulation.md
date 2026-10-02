@@ -143,12 +143,6 @@ Source: `rover_gazebo/launch/include/simulate_robot.launch.py`, `rover_gazebo/co
 `rover_description/urdf/rover_a1/base.urdf.xacro`, `rover_description/launch/rover_load_urdf.launch.py`,
 `rover_gazebo/config/gz_bridge.yaml`.
 
-!!! warning "Source conflict"
-    `rover_gazebo/README.md` says the simulated lidar sits 0.45 m above `body_link` when no
-    `ROVER_LIDAR_*` pose is set, and that a mount lower than about 0.37 m makes the rover see
-    itself. `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro` sets `0.68` m and says
-    0.62 m was seen to hit the front arch in Gazebo. This page uses `0.68` m.
-
 ### Simulated battery
 
 The URDF adds Gazebo's `LinearBatteryPlugin` in simulation only. It runs inside Gazebo; nothing

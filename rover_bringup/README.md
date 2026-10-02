@@ -7,7 +7,7 @@ Top-level launch files that start the whole Rover A1 stack on real hardware. For
 
 ### `rover_bringup.launch.py`
 
-Starts the rover driver stack on hardware. Run it inside `rovera1-app` (`rover_docker`), or
+Starts the rover driver stack on hardware. Run it inside the `rover-a1-platform` container (`rover_docker`), or
 directly:
 
 ```bash
@@ -64,7 +64,7 @@ Every included launch file receives `namespace`, `log_level` and, where supporte
 
 ### `rover_web_bridges.launch.py`
 
-Starts the web bridges under rover-prefixed node names. `rover_docker/rovera1_app/start.sh`
+Starts the web bridges under rover-prefixed node names. `rover_docker/rover_a1_platform/start.sh`
 launches it next to the bringup.
 
 | Node | Package | Notes |

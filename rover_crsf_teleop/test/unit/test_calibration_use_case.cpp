@@ -488,7 +488,7 @@ TEST(CalibrationUseCaseTest, StartIsRefusedWhenTheEStopCannotBeVerified)
     Fixture fixture;
     auto use_case = fixture.make();
 
-    // Nothing on gpio_state is not "probably fine". The operator ticking the box does not make
+    // Nothing on safety_status is not "probably fine". The operator ticking the box does not make
     // the rover safe, which is the whole reason the topic is consulted at all.
     const CalibrationOutcome outcome = use_case.start(true, EStopState::kUnknown, fixture.now);
 

@@ -121,9 +121,8 @@ flowchart LR
 | `odom_frame_id` / `base_frame_id` | `odom` / `base_footprint` |
 
 !!! warning "Source conflict"
-    `rover_description/README.md` says `wheel_separation_multiplier: 1.5`; the controller config
-    `rover_controller/config/wheel_01_controller.yaml` uses `1.659`. The same config's comment
-    says the multiplier was rescaled to a measured separation of `0.615` m, while
+    The controller config `rover_controller/config/wheel_01_controller.yaml` uses
+    `wheel_separation_multiplier` `1.659`. Its comment says the multiplier was rescaled to a measured separation of `0.615` m, while
     `wheel_separation` there and in `rover_description/config/wheel_01.yaml` is `0.617` m. This
     page uses the configured values (`1.659`, `0.617` m).
 
@@ -312,11 +311,6 @@ Parameters (`config/rover_a1_driver.yaml`): `frame_timeout` `0.1` s, `global_bri
 
 Subscribes `udp_write/led_channel_<n>` and sends to the LED board: channel 1 →
 `192.168.77.202:3334`, channel 2 → `192.168.77.201:3333`.
-
-!!! warning "Source conflict"
-    `rover_led/README.md` gives port `3333` for both channels. The config uses `3334` for channel 1
-    (`rover_led/config/rover_a1_udp_led_channel_1.yaml`) and `3333` for channel 2
-    (`rover_led/config/rover_a1_udp_led_channel_2.yaml`). This page uses the config values.
 
 Source: `rover_led/launch/rover_led.launch.py`, `rover_led/src/infrastructure/*.cpp`,
 `rover_led/src/*_parameters.yaml`, `rover_led/config/*.yaml`.

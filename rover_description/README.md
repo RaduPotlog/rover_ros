@@ -64,9 +64,10 @@ a positive joint velocity drives the rover **forward** (`+x`). No wheel needs a
 negated axis. `rover_drive_controller`'s `left_wheel_names` are correspondingly the
 `+y` pair (`rl`, `fl`) and `right_wheel_names` the `-y` pair (`rr`, `fr`).
 
-`base_link` is the root and coincides with `body_link` (the chassis centre).
-`base_footprint` is its ground projection, derived in the URDF as
-`wheel axis height - wheel_radius`.
+`base_footprint` is the root (REP 105): the ground projection of `base_link`. The odometry
+filters publish `odom → base_footprint`, so in 2D mode `odom` stays on the ground plane.
+`base_link` sits `tyre_radius - wheel_mount_point_z` above it and coincides with `body_link`
+(the chassis centre).
 
 ## Config Files
 
@@ -76,11 +77,12 @@ negated axis. `rover_drive_controller`'s `left_wheel_names` are correspondingly 
   single source of truth for wheel geometry; `rover_controller/config/wheel_01_controller.yaml`
   must match it (checked by `rover_controller/test/test_wheel_geometry.py`).
 
-  Note that `wheel_separation_multiplier: 1.5` in that controller config is **not** geometry -
+  Note that `wheel_separation_multiplier` in that controller config is **not** geometry -
   it is the usual empirical skid-steer correction (a 4-wheel skid-steer's effective track
-  exceeds its physical track), so it is not expected to match anything here. The 1.5 was
-  set by hand; measure it with `rover_controller`'s `wheel_odom_calibration` tool (see
-  "Drive-train tuning" in `rover_controller/README.md`) and record the date and surface.
+  exceeds its physical track), so it is not expected to match anything here. It is measured
+  with `rover_controller`'s `wheel_odom_calibration` tool (see "Drive-train tuning" in
+  `rover_controller/README.md`); the controller config records the current value and where
+  it came from.
 
 - `battery.yaml` - Simulated battery (Gazebo `LinearBatteryPlugin`) configuration.
 

@@ -108,7 +108,7 @@ flowchart LR
 Source: `rover_arch/rover_a1_arch.drawio`, `rover_battery/README.md`, `rover_led/README.md`, `rover_crsf_teleop/README.md`, `rover_hardware_interface/README.md`. Addresses and ports are on [IO and network](io-and-network.md).
 
 !!! warning "Source conflict"
-    The diagram `rover_arch/rover_a1_arch.drawio` connects the battery monitor to the controller over **RS485/RS232** (node `battery_monitor` on a serial port). The code receives BMS data over **UDP** from the ESP32 bridge, which reads the Daly BMS over BLE (`rover_battery/README.md`, `rover_battery/launch/rover_battery.launch.py`). This page follows the code. The drawio software page also still shows the removed `/hardware_interface/gpio_state` topic and `GpioController`.
+    The hardware part of the diagram `rover_arch/rover_a1_arch.drawio` still connects the battery monitor to the controller over **RS485/RS232**. The code receives BMS data over **UDP** from the ESP32 bridge, which reads the Daly BMS over BLE (`rover_battery/README.md`, `rover_battery/launch/rover_battery.launch.py`). The software part of the diagram shows `rover_battery` on a UDP socket. This page follows the code.
 
 ## Datasheets and protocol documents
 
