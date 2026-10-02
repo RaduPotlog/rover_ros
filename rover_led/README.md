@@ -75,10 +75,10 @@ These are lifecycle `rover::transport::udp::UdpSenderNode` components, loaded in
 
 ## Animations
 
-`config/rover_a1_animations.yaml` describes the hardware and the animation catalog. It is a port
-of Husarion Panther's `panther_animations.yaml`: the front bumper is channel 1, the rear bumper is
-channel 2, and each bumper is one full-width segment. Front and rear play different images for the
-same state, and directional animations such as blinkers work.
+`config/rover_a1_animations.yaml` describes the hardware and the animation catalog. The front
+bumper is channel 1, the rear bumper is channel 2, and each bumper is one full-width segment.
+Front and rear play different images for the same state, and directional animations such as
+blinkers work.
 
 Both panels are physically 2 rows × 20 LEDs wired in series, with LED 0 on the robot's right:
 seen from the front the front panel reads 0–19 over 39–20, and seen from behind the rear panel

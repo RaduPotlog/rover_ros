@@ -41,7 +41,7 @@ The node is not started with `use_sim:=True`.
 
 ### Shutting down the ROS controller
 
-Mirrors `husarion_ugv_manager`'s safety manager. A shutdown starts when:
+A shutdown starts when:
 
 - the `RoverSafety` tree runs `SignalShutdown` (battery `SHUTDOWN` verdict), or
 - anything calls `~/shutdown` (`std_srvs/Trigger`), e.g.
@@ -97,7 +97,7 @@ power-off request is accepted, 1 when every method failed, and 2 on bad usage.
 ### Remote hosts
 
 `config/shutdown_hosts.yaml` (launch argument `shutdown_hosts_config_path`) lists hosts to shut
-down before the ROS controller. It uses the husarion format:
+down before the ROS controller. It uses this format:
 
 ```yaml
 hosts:

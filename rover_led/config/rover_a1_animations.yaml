@@ -1,4 +1,4 @@
-# Panther-style layout: one full-width segment per bumper.
+# Layout: one full-width segment per bumper.
 # Both bumpers are 2 rows x 20 LEDs wired in series: LEDs 0-19 run away from LED 0,
 # LEDs 20-39 come back.
 #   rear  = channel 2, LED 0 on the robot's right; seen from behind: 19 ... 0 over 20 ... 39
