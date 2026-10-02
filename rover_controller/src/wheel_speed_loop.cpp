@@ -35,6 +35,8 @@ void WheelSpeedLoop::reset()
   clear_history(0.0);
   model_ = 0.0;
   i_term_ = 0.0;
+  last_reference_ = 0.0;
+  reference_peak_ = 0.0;
   last_error_ = 0.0;
   last_output_ = 0.0;
 }
@@ -70,6 +72,24 @@ double WheelSpeedLoop::reference_at(double time) const
   return before_history_;
 }
 
+void WheelSpeedLoop::scale_integral(double reference)
+{
+  const double magnitude = std::abs(reference);
+  if (reference * last_reference_ < 0.0) {
+    // Reversal: the trim was for the other direction.
+    i_term_ = 0.0;
+    reference_peak_ = magnitude;
+  } else if (last_reference_ != 0.0) {
+    // last |reference| never exceeds the peak, so this scales down while the reference falls
+    // and back up (at most to the peak's integral) while it recovers.
+    i_term_ *= std::min(magnitude, reference_peak_) / std::abs(last_reference_);
+    reference_peak_ = std::max(reference_peak_, magnitude);
+  } else {
+    reference_peak_ = magnitude;
+  }
+  last_reference_ = reference;
+}
+
 double WheelSpeedLoop::update(
   double reference, double measured, double dt, const WheelLoopGains & gains,
   const WheelLoopOptions & options)
@@ -90,8 +110,15 @@ double WheelSpeedLoop::update(
     clear_history(0.0);
     model_ = 0.0;
     i_term_ = 0.0;
+    last_reference_ = 0.0;
+    reference_peak_ = 0.0;
     last_error_ = error;
     return last_output_ = 0.0;
+  }
+
+  if (options.scale_integral_with_reference) {
+    scale_integral(reference);
+    i_term_ = std::clamp(i_term_, gains.i_min, gains.i_max);
   }
 
   // Reference the integral compares against: delayed, then first-order lagged.

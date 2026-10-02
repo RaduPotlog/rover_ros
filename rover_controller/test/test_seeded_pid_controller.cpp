@@ -235,6 +235,23 @@ TEST_F(SeededPidControllerTest, StopAtZeroReferenceSendsExactlyZeroToTheHardware
   EXPECT_EQ(command_after_update(pid, reference_.at(0), 0.0, hw_command_, 26), 0.0);
 }
 
+TEST_F(SeededPidControllerTest, ScaledIntegralFadesWithTheReferenceOnceSetAtRuntime)
+{
+  std::shared_ptr<rover_controller::SeededPidController> pid;
+  exported_after_activation(0.0, pid);
+  ASSERT_TRUE(pid->get_node()->set_parameter({"scale_integral_with_reference", true}).successful);
+  hw_state_ = 1.0;
+  for (int k = 1; k <= 25; ++k) {
+    command_after_update(pid, reference_.at(0), 2.0, hw_command_, k);
+  }
+  ASSERT_GT(hw_command_ - 2.0, 0.1);  // the integral the slow wheel built up
+  // Reference ramped down to 1 % of where the integral was built; the wheel follows it. Twice,
+  // so the derivative of the step is gone: what is left is feed-forward + 1 % of the integral.
+  hw_state_ = 0.02;
+  command_after_update(pid, reference_.at(0), 0.02, hw_command_, 26);
+  EXPECT_NEAR(command_after_update(pid, reference_.at(0), 0.02, hw_command_, 27), 0.02, 0.01);
+}
+
 TEST_F(SeededPidControllerTest, WheelLoopParametersAreValidatedAtRuntime)
 {
   std::shared_ptr<rover_controller::SeededPidController> pid;

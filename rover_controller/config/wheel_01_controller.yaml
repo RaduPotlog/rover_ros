@@ -86,14 +86,19 @@
   #             turns, friction) still integrates fully. 0 / 0 = the plain upstream integral.
   #             If the model is SLOWER than the plant, the integral winds the wrong way on every
   #             rise and leaves a slow tail - re-fit it whenever the motor ramp changes.
+  #   scale_integral_with_reference - the integral fades with |reference| below the largest
+  #             reference since the last stop (restored if it comes back up, cleared on reversal).
+  #             A skid turn's ~1.5 rad/s of trim otherwise kept pushing through the whole
+  #             ramp-down, and the turn ended late.
   #
   # Ground tune 2026-10-02 (motor_acceleration 10.0, 26.6 V, wheel_step_response runs): dead time
   # 0.17-0.22 s. The old 0.25 / 0.15 s model (fitted at ramp 1-2) was now slower than the plant
   # (t90 ~1.5 s at 0.5 m/s); 0.15 / 0.08 s gives t90 ~0.6 s. i_clamp 2.0 took in-place turns from
   # 32-53 % under the reference to 5-8 % (turn overshoot 7-15 %), while straight steps stayed at
   # overshoot <= 4.3 % and |error| <= 1.7 % (0.3-0.8 m/s) - straight driving uses only ~0.4 of it.
-  # d 0.04 does not chatter at the faster ramp. Known leftover: during a turn's ramp-down the
-  # integral still pushes, so in-place turns stop ~0.3 s late.
+  # d 0.04 does not chatter at the faster ramp. During a turn's ramp-down the integral still pushed
+  # 1.3-1.5 rad/s, so the wheels were at 1-4 rad/s when the reference reached 0 (turns ended
+  # ~0.3 s late): scale_integral_with_reference.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
@@ -109,6 +114,7 @@
       stop_at_zero_reference: true
       integral_reference_delay: 0.15
       integral_reference_time_constant: 0.08
+      scale_integral_with_reference: true
 
       gains:
         rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -128,6 +134,7 @@
       stop_at_zero_reference: true
       integral_reference_delay: 0.15
       integral_reference_time_constant: 0.08
+      scale_integral_with_reference: true
 
       gains:
         rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -147,6 +154,7 @@
       stop_at_zero_reference: true
       integral_reference_delay: 0.15
       integral_reference_time_constant: 0.08
+      scale_integral_with_reference: true
 
       gains:
         fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -166,6 +174,7 @@
       stop_at_zero_reference: true
       integral_reference_delay: 0.15
       integral_reference_time_constant: 0.08
+      scale_integral_with_reference: true
 
       gains:
         fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}

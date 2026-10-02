@@ -22,6 +22,7 @@ constexpr char kStopAtZeroReference[] = "stop_at_zero_reference";
 constexpr char kZeroReferenceTolerance[] = "zero_reference_tolerance";
 constexpr char kIntegralReferenceDelay[] = "integral_reference_delay";
 constexpr char kIntegralReferenceTimeConstant[] = "integral_reference_time_constant";
+constexpr char kScaleIntegralWithReference[] = "scale_integral_with_reference";
 
 // Why `value` is not acceptable for parameter `name`, or empty if it is.
 std::string reject_reason(const std::string & name, double value)
@@ -48,6 +49,7 @@ controller_interface::CallbackReturn SeededPidController::on_init()
   }
   try {
     auto_declare<bool>(kStopAtZeroReference, stop_at_zero_reference_.load());
+    auto_declare<bool>(kScaleIntegralWithReference, scale_integral_with_reference_.load());
     auto_declare<double>(kZeroReferenceTolerance, zero_reference_tolerance_.load());
     auto_declare<double>(kIntegralReferenceDelay, integral_reference_delay_.load());
     auto_declare<double>(
@@ -69,6 +71,8 @@ controller_interface::CallbackReturn SeededPidController::on_init()
     }
   }
   stop_at_zero_reference_ = get_node()->get_parameter(kStopAtZeroReference).as_bool();
+  scale_integral_with_reference_ =
+    get_node()->get_parameter(kScaleIntegralWithReference).as_bool();
   zero_reference_tolerance_ = get_node()->get_parameter(kZeroReferenceTolerance).as_double();
   integral_reference_delay_ = get_node()->get_parameter(kIntegralReferenceDelay).as_double();
   integral_reference_time_constant_ =
@@ -81,7 +85,7 @@ controller_interface::CallbackReturn SeededPidController::on_init()
       result.successful = true;
       for (const auto & parameter : parameters) {
         const auto & name = parameter.get_name();
-        if (name == kStopAtZeroReference) {
+        if (name == kStopAtZeroReference || name == kScaleIntegralWithReference) {
           continue;  // the type check is rclcpp's
         }
         if (name == kZeroReferenceTolerance || name == kIntegralReferenceDelay ||
@@ -98,6 +102,8 @@ controller_interface::CallbackReturn SeededPidController::on_init()
         const auto & name = parameter.get_name();
         if (name == kStopAtZeroReference) {
           stop_at_zero_reference_ = parameter.as_bool();
+        } else if (name == kScaleIntegralWithReference) {
+          scale_integral_with_reference_ = parameter.as_bool();
         } else if (name == kZeroReferenceTolerance) {
           zero_reference_tolerance_ = parameter.as_double();
         } else if (name == kIntegralReferenceDelay) {
@@ -229,6 +235,7 @@ WheelLoopOptions SeededPidController::wheel_options() const
   options.zero_reference_tolerance = zero_reference_tolerance_;
   options.integral_reference_delay = integral_reference_delay_;
   options.integral_reference_time_constant = integral_reference_time_constant_;
+  options.scale_integral_with_reference = scale_integral_with_reference_;
   return options;
 }
 

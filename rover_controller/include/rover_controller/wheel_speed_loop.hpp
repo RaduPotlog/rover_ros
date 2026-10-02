@@ -44,6 +44,13 @@ struct WheelLoopOptions
   // plant will NOT remove by itself (load, friction, skid) is integrated.
   double integral_reference_delay = 0.0;           // s
   double integral_reference_time_constant = 0.0;   // s, first-order lag after the delay
+  // Scale the integral with |reference| while the reference is below the largest magnitude
+  // reached since it last stopped or reversed, and clear it when the reference changes sign.
+  // The trim a skid turn needs is roughly proportional to the commanded speed, so when the
+  // reference ramps down to a stop the trim fades with it instead of pushing the wheel on until
+  // the reference reaches 0; when the reference comes back up (command noise, a brief slow-down)
+  // the trim is restored, so it does not leak away.
+  bool scale_integral_with_reference = false;
 };
 
 /**
@@ -75,6 +82,7 @@ private:
   void clear_history(double value);
   void push_reference(double reference);
   double reference_at(double time) const;
+  void scale_integral(double reference);
 
   std::vector<double> times_;
   std::vector<double> values_;
@@ -86,6 +94,8 @@ private:
 
   double model_ = 0.0;
   double i_term_ = 0.0;
+  double last_reference_ = 0.0;
+  double reference_peak_ = 0.0;  // largest |reference| since the last stop or reversal
   double last_error_ = 0.0;
   double last_output_ = 0.0;
 };

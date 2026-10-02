@@ -180,6 +180,76 @@ TEST(WheelSpeedLoop, DelayedIntegralStillRemovesAPersistentLoadError)
   EXPECT_LT(shipped.final_speed, 0.8 * 4.65);
 }
 
+// A skid turn at 1.5 rad/s, then diff_drive's 3.74 rad/s^2 ramp back to 0 (11.6 rad/s^2 at the
+// wheel): how fast the wheel is still turning when the reference reaches 0.
+double speed_when_the_turn_reference_reaches_zero(const WheelLoopOptions & options)
+{
+  WheelSpeedLoop loop;
+  WheelPlant plant(0.7, 0.15, 0.08);
+  const auto gains = rover_gains(2.0);
+  for (int k = 0; k < static_cast<int>(4.0 / kDt); ++k) {
+    plant.step(loop.update(4.65, plant.speed(), kDt, gains, options));
+  }
+  EXPECT_GT(loop.integral(), 1.5);
+  for (double reference = 4.65 - 11.6 * kDt; reference > 0.0; reference -= 11.6 * kDt) {
+    plant.step(loop.update(reference, plant.speed(), kDt, gains, options));
+  }
+  return plant.speed();
+}
+
+TEST(WheelSpeedLoop, ScaledIntegralLetsATurnStopWithItsReference)
+{
+  // Rover 2026-10-02: the ~1.5 rad/s skid-turn integral kept pushing through the whole ramp-down,
+  // so the wheels were still at 1-4 rad/s when the reference reached 0 and the turn ended late.
+  // Scaling removes that push (0.7 of the ~2 rad/s integral at the wheel by the end of the ramp);
+  // what is left is the plant lagging the ramp, which no integral change can remove.
+  WheelLoopOptions options;
+  options.integral_reference_delay = 0.15;
+  options.integral_reference_time_constant = 0.08;
+  const double plain = speed_when_the_turn_reference_reaches_zero(options);
+  options.scale_integral_with_reference = true;
+  const double scaled = speed_when_the_turn_reference_reaches_zero(options);
+  EXPECT_GT(plain, 2.5);
+  EXPECT_LT(scaled, plain - 0.5);
+}
+
+TEST(WheelSpeedLoop, ScaledIntegralComesBackWhenTheReferenceRecovers)
+{
+  // Command noise must not drain the trim: dips scale it down, the recovery scales it back.
+  WheelSpeedLoop loop;
+  WheelLoopOptions options;
+  options.scale_integral_with_reference = true;
+  for (int k = 0; k < 100; ++k) {
+    loop.update(4.65, 3.5, kDt, rover_gains(2.0), options);
+  }
+  const double built = loop.integral();
+  ASSERT_GT(built, 1.0);
+  auto frozen = rover_gains(2.0);
+  frozen.i = 0.0;  // isolate the scaling from further integration
+  for (double reference : {4.5, 4.65, 4.3, 4.1, 4.65, 2.0, 4.65}) {
+    loop.update(reference, 3.5, kDt, frozen, options);
+    EXPECT_NEAR(loop.integral(), built * reference / 4.65, 1e-9) << reference;
+  }
+  // Above the peak it was built at, the integral is not scaled up any further.
+  loop.update(6.0, 3.5, kDt, frozen, options);
+  EXPECT_NEAR(loop.integral(), built, 1e-9);
+}
+
+TEST(WheelSpeedLoop, ScaledIntegralIsClearedWhenTheReferenceReverses)
+{
+  WheelSpeedLoop loop;
+  WheelLoopOptions options;
+  options.scale_integral_with_reference = true;
+  for (int k = 0; k < 100; ++k) {
+    loop.update(3.0, 2.0, kDt, rover_gains(2.0), options);
+  }
+  ASSERT_GT(loop.integral(), 1.0);
+  auto frozen = rover_gains(2.0);
+  frozen.i = 0.0;
+  loop.update(-0.2, 0.0, kDt, frozen, options);  // through 0 between two cycles
+  EXPECT_EQ(loop.integral(), 0.0);
+}
+
 TEST(WheelSpeedLoop, IntegralReferenceFollowsTheDelayedReference)
 {
   WheelSpeedLoop loop;

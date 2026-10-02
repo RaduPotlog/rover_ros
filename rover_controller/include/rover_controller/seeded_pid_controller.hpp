@@ -40,6 +40,7 @@ namespace rover_controller
  *   zero_reference_tolerance          rad/s under which the reference counts as zero
  *   integral_reference_delay          s, dead time of the reference the integral compares against
  *   integral_reference_time_constant  s, first-order lag of that reference
+ *   scale_integral_with_reference     fade the integral with |reference| as it ramps down
  * Any other configuration (external measured states, position + velocity references, angle
  * wraparound) keeps the upstream update unchanged.
  */
@@ -76,6 +77,7 @@ protected:
   std::atomic<double> zero_reference_tolerance_{1e-3};
   std::atomic<double> integral_reference_delay_{0.0};
   std::atomic<double> integral_reference_time_constant_{0.0};
+  std::atomic<bool> scale_integral_with_reference_{false};
 
 private:
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr on_set_parameters_handle_;
