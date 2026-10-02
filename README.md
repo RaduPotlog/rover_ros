@@ -63,6 +63,8 @@ Mechatronics Academy's Rover A1 ROS2.
 - [`rover_platform_mbse`](rover_platform_mbse/README.md) - MATLAB/Simulink MBSE project for
   the platform: System Composer architecture, per-package software requirements
   (Requirements Toolbox), behaviour models and tests, traceability and SYS-SR compliance.
+- [`docs`](docs/index.md) - the platform manual (MkDocs), published at
+  <https://radupotlog.github.io/rover_ros/>. See [Platform manual](#platform-manual).
 
 ## Quick start
 
@@ -165,6 +167,65 @@ colcon test-result --all
 ```
 
 Run node tests one at a time: parallel workers make them flaky under the zenoh middleware.
+
+## Platform manual
+
+The platform manual is a [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) site
+built from `docs/` and `mkdocs.yml`. It's published at
+<https://radupotlog.github.io/rover_ros/>. Run the commands below from the repository root
+(`src/rover_ros`).
+
+### Preview locally
+
+Serve the manual with live reload at <http://127.0.0.1:8000>:
+
+```bash
+uvx --with 'mkdocs-material>=9.5,<10' --with 'mkdocs>=1.6,<2' mkdocs serve
+```
+
+Or, without `uv`:
+
+```bash
+python3 -m venv .venv-docs
+source .venv-docs/bin/activate
+pip install -r docs/requirements.txt
+mkdocs serve
+```
+
+### Build the static site
+
+```bash
+mkdocs build --strict
+```
+
+The output goes to `site/`, which is git-ignored. CI uses `--strict`, so broken links or a
+page missing from `nav:` fail the build. Run it before you push.
+
+### Regenerate the rover renders
+
+After a mesh or URDF change, re-render the images in `docs/assets/images/`
+(`rover_a1_iso.png`, `rover_a1_top.png`, `rover_a1_side.png`). The script also prints the
+overall dimensions, so update the manual pages that quote them:
+
+```bash
+uv run --with trimesh,matplotlib,numpy,pyyaml,fast-simplification python docs/tools/render_meshes.py
+```
+
+### Publish
+
+[`.github/workflows/docs.yml`](.github/workflows/docs.yml) builds the site and deploys it to
+GitHub Pages on every push to `master` that touches `docs/**`, `mkdocs.yml` or the workflow.
+To deploy without a push, run the **docs** workflow from the Actions tab.
+
+One-time setup: GitHub → **Settings → Pages → Build and deployment → Source** = **GitHub
+Actions**.
+
+### Editing conventions
+
+- Keep MkDocs below 2.0, because 2.0 breaks Material. The pins are in `docs/requirements.txt`.
+- Add every new page to `nav:` in `mkdocs.yml`.
+- Every value cites the repository file it comes from. If the repository doesn't define a
+  value, write **TBD** and list it in `docs/open-items.md`. List source conflicts there too.
 
 ## Related repositories
 
