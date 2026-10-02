@@ -44,7 +44,11 @@ class WheelOdomCalibration(DriveSession):
         self.declare_parameter('left_joints', LEFT)
         self.declare_parameter('right_joints', RIGHT)
         self.declare_parameter('wheel_radius', 0.1651)
-        self.declare_parameter('wheel_separation', 0.62602)
+        self.declare_parameter('wheel_separation', 0.617)
+        # imu/data is in imu_link, which rover_description mounts upside down (roll pi,
+        # ROVER_IMU_ORIENTATION_R), so its z rate is minus the body yaw rate. With +1 every spin
+        # segment came out non-physical and was rejected (rover, 2026-09-29).
+        self.declare_parameter('imu_yaw_sign', -1.0)
         self.wheels = []   # (t, left rim m/s, right rim m/s)
         self.gyro = []     # (t, yaw rate)
         self.distance = 0.0
@@ -73,7 +77,8 @@ class WheelOdomCalibration(DriveSession):
 
     def _on_imu(self, msg):
         if self._start is not None:
-            self.gyro.append((self.elapsed(), msg.angular_velocity.z))
+            self.gyro.append((self.elapsed(), self.get_parameter('imu_yaw_sign').value *
+                              msg.angular_velocity.z))
 
     def start(self) -> bool:
         mode = self.get_parameter('mode').value
@@ -125,7 +130,13 @@ class WheelOdomCalibration(DriveSession):
                 right_rim_speed=mean(w[2] for w in wheels),
                 imu_yaw_rate=mean(g[1] for g in gyro)))
         separation = self.get_parameter('wheel_separation').value
-        result = calibrate_separation(segments, separation)
+        try:
+            result = calibrate_separation(segments, separation)
+        except ValueError as error:
+            self.get_logger().error(
+                f'{error}. If the rover did turn, the gyro sign is probably wrong: re-run with '
+                f'-p imu_yaw_sign:={-self.get_parameter("imu_yaw_sign").value:+.0f}.')
+            return
         rows = []
         for seg in segments:
             rows.append({'commanded': seg.commanded_yaw_rate, 'imu': round(seg.imu_yaw_rate, 4),

@@ -42,8 +42,8 @@ class WheelStepResponse(DriveSession):
         self.declare_parameter('angular_steps', [0.5, 1.0, -1.0])
         # Must match rover_drive_controller; only used to turn wheel accel into body limits.
         self.declare_parameter('wheel_radius', 0.1651)
-        self.declare_parameter('wheel_separation', 0.62602)
-        self.declare_parameter('wheel_separation_multiplier', 1.5)
+        self.declare_parameter('wheel_separation', 0.617)
+        self.declare_parameter('wheel_separation_multiplier', 1.659)
         self.declare_parameter('margin', 0.8)
         self.samples = {}  # wheel -> list of (t, reference, feedback, output)
         for pid in self.get_parameter('pid_controllers').value:

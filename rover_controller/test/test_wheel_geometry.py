@@ -90,8 +90,10 @@ def _urdf_wheel_velocity_limit():
 def test_drive_limits_respect_joint_velocity_limit(wheel_type):
     """Full linear + full angular must keep the outer wheel under the URDF limit.
 
-    diff_drive limits linear.x and angular.z independently, and each wheel PID adds up to
-    i_clamp_max (plus a small P term) on top of its feed-forward reference, outside u_clamp.
+    diff_drive limits linear.x and angular.z independently. Each wheel PID adds up to
+    i_clamp_max (plus a small P term) on top of its feed-forward reference, outside u_clamp, but
+    the integral only builds while the wheel is slower than its reference - so the reference must
+    fit the joint limit, and reference + I must fit full duty (u_clamp_max).
     """
     config = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')['/**']
     drive = config['rover_drive_controller']['ros__parameters']
@@ -101,12 +103,14 @@ def test_drive_limits_respect_joint_velocity_limit(wheel_type):
     wheel_reference = (max_v + max_w * half_track) / drive['wheel_radius']
 
     limit = _urdf_wheel_velocity_limit()
+    assert wheel_reference <= limit, (
+        f'outer wheel reference {wheel_reference:.2f} rad/s exceeds the URDF limit {limit} rad/s')
     for wheel in drive['left_wheel_names'] + drive['right_wheel_names']:
         pid_name, joint = wheel.split('/', 1)
-        i_clamp = config[pid_name]['ros__parameters']['gains'][joint]['i_clamp_max']
-        assert wheel_reference + i_clamp <= limit, (
-            f'{joint}: outer wheel reference {wheel_reference:.2f} rad/s + I {i_clamp} '
-            f'exceeds the URDF limit {limit} rad/s')
+        gains = config[pid_name]['ros__parameters']['gains'][joint]
+        assert wheel_reference + gains['i_clamp_max'] <= gains['u_clamp_max'], (
+            f'{joint}: outer wheel reference {wheel_reference:.2f} rad/s + I '
+            f'{gains["i_clamp_max"]} exceeds full duty (u_clamp_max {gains["u_clamp_max"]} rad/s)')
 
 
 @pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
