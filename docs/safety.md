@@ -297,7 +297,8 @@ The full animation catalog and the LED services are in [Teleop and LEDs](softwar
 From `rover_arch/SAFETY_CHAIN.md` §6, plus what the code shows:
 
 - **The PLC cannot say why it tripped.** `SafetyStatus.latch_cause` exists but reads `LATCH_CAUSE_UNKNOWN` until the PLC program latches the cause into readable coils.
-- **The command-side reset deadband is wide.** `velocity_command_zero_tolerance` is bounded below by the wheel PIDs' `i_clamp_max` (0.25 / 0.33). Getting it to 0.01 means resetting the PID integral while motion is inhibited. The measured-velocity check (0.05 rad/s) closes the actual hazard in the meantime.
+- **The command-side reset deadband is still wide.** `velocity_command_zero_tolerance` is 0.4 rad/s. It was set that way because the wheel PIDs' frozen integral (then `i_clamp_max` 0.25 / 0.33) kept the command above zero while motion was inhibited. The wheel PIDs now run with `stop_at_zero_reference`, which sends exactly 0 and clears the integral at a zero reference, so that reason no longer holds. The tolerance has not been lowered yet. The measured-velocity check (0.05 rad/s) closes the actual hazard in the meantime.
+- **Don't turn off `stop_at_zero_reference` on the real rover.** Without it, the frozen integral can hold the command at up to `i_clamp_max` (now 2.0 rad/s) while motion is inhibited. That is above the 0.4 rad/s tolerance, so the E-Stop could not be reset, and the DCC1000 would not brake.
 - **No end-to-end test** that an asserted `motion_lock` stops `cmd_vel` at the mux.
 - **The lidar guards are obstacle avoidance, not protection.** One 2D scan slice misses low and overhanging obstacles. MANUAL, RC and Foxglove bypass them. No measured stop distance yet.
 - **`ros2_control`'s GPIO mechanism is not used** for the safety IO (deliberate).

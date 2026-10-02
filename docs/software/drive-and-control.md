@@ -102,6 +102,8 @@ Source: `rover_controller/config/wheel_01_controller.yaml`, `rover_description/u
 
 Because the two axes are limited separately, the outer wheel's rim speed can reach v + ω × (effective track) / 2. The config comment gives 0.95 + 1.5 × 0.5102 = 1.715 m/s (10.39 rad/s at r = 0.1651 m), under the URDF joint limit. RC teleop additionally scales stick commands so the outer rim stays under `max_wheel_rim_speed` (1.7 m/s).
 
+`test/test_wheel_geometry.py` checks two budgets. The outer wheel reference must stay under the URDF joint limit (10.39 ≤ 10.958 rad/s). The reference plus the PID's full integral must stay under full duty: 10.39 + `i_clamp_max` 2.0 = 12.39 ≤ `u_clamp_max` 12.58 rad/s.
+
 !!! warning "Source conflict"
     The effective track width is `wheel_separation` × `wheel_separation_multiplier` = 0.617 × 1.659 = 1.0236 m from `rover_controller/config/wheel_01_controller.yaml`. The comment in the same file says the product is 1.020 m (it assumes a separation of 0.615 m), and `rover_crsf_teleop/config/rover_crsf_teleop.yaml` uses `effective_track_width: 1.0204` (0.62602 × 1.63). The controller uses 0.617 × 1.659.
 
@@ -155,7 +157,7 @@ Source: `rover_controller/config/wheel_01_controller.yaml`, `rover_localization/
 
 | Parameter | Value | Meaning |
 |---|---|---|
-| `motor_acceleration` | 1.0 duty/s | DCC1000 on-board ramp. Also lengthens every stop. |
+| `motor_acceleration` | 2.0 duty/s | DCC1000 on-board ramp. Also lengthens every stop. The wheel PID reference model depends on it (see [Wheel PID controller](#wheel-pid-controller)). |
 | `motor_current_limit` | 15.0 A | Per motor |
 | `motor_supply_voltage` | 24.0 V | Used for the current regulator gain |
 | `max_rpm_motor_speed` | 2800 rpm | |
@@ -168,31 +170,49 @@ On any E-Stop or latched fault, `write()` keeps sending **zero** commands so the
 
 Source: `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`, `rover_hardware_interface/README.md`.
 
-!!! note "URDF comment conflict"
+!!! note "URDF comment conflicts"
     The URDF comment for `motor_current_limit` describes 10 A, but the value set is 15.0 A. The hardware interface uses 15.0 A.
+
+    The comment for `motor_acceleration` describes 10.0 ("up to 0.1 s from stop to full duty"), but the value set is 2.0. The hardware interface uses 2.0.
 
 ## Wheel PID controller
 
-Each wheel has a `rover_controller/SeededPidController`. It is the stock `pid_controller/PidController` with one change: on activation it seeds its exported state from the hardware, so the chained `diff_drive` never reads NaN on its first cycle. Without it, `controller_manager` deactivated the whole chain on every activation on the real rover.
+Each wheel has a `rover_controller/SeededPidController`, built on the stock `pid_controller/PidController`. It adds two things:
 
-| Gain | fl, fr | rl, rr |
+- **State seeding.** On activation it seeds its exported state from the hardware, so the chained `diff_drive` never reads NaN on its first cycle. Without it, `controller_manager` deactivated the whole chain on every activation on the real rover.
+- **The wheel speed loop.** Each wheel's command comes from `WheelSpeedLoop`, which adds the options below on top of the PID. With every option off, its output is identical to `control_toolbox::Pid` (a gtest checks this).
+
+| Gain | Value (all four wheels) |
+|---|---|
+| `p` | 0.05 |
+| `i` | 1.0 |
+| `d` | 0.04 |
+| `feedforward_gain` | 1.0 |
+| `i_clamp_min` / `i_clamp_max` | ±2.0 |
+| `u_clamp_min` / `u_clamp_max` | ±12.58 |
+| `antiwindup_strategy` | `back_calculation` |
+| `save_i_term` | `false` |
+
+| Wheel loop option | Value | Effect |
 |---|---|---|
-| `p` | 0.05 | 0.05 |
-| `i` | 1.0 | 1.0 |
-| `d` | 0.04 | 0.04 |
-| `feedforward_gain` | 1.0 | 1.0 |
-| `i_clamp_min` / `i_clamp_max` | ±0.25 | ±0.33 |
-| `u_clamp_min` / `u_clamp_max` | ±12.58 | ±12.58 |
-| `antiwindup_strategy` | `back_calculation` | `back_calculation` |
-| `save_i_term` | `false` | `false` |
+| `stop_at_zero_reference` | `true` | At a zero reference, send exactly 0 and clear the integral. The DCC1000 brakes only at a target of exactly 0, so a leftover integral used to keep the brake off after every stop. |
+| `zero_reference_tolerance` | 0.001 rad/s (default, not set in the config) | References below this count as zero. |
+| `integral_reference_delay` | 0.15 s (accepted range 0–1.0 s) | The integral works on the reference, delayed and then lagged, minus the measurement, instead of on the raw error. This model follows the plant's own step response. The error the plant removes by itself no longer winds the integral up, and a persistent load error (skid turns, friction) still integrates fully. |
+| `integral_reference_time_constant` | 0.08 s | The lag of that model. Delay and time constant both 0 give the plain upstream integral. |
+| `scale_integral_with_reference` | `true` | The integral fades with \|reference\| below the largest reference since the last stop. It comes back if the reference rises again and is cleared on a reversal. Without it, a skid turn's trim kept pushing through the ramp-down and the turn ended late. |
 
-The feedforward carries most of the command, and the PID trims load, battery and slip error. With `p = i = d = 0` the drive is open loop, which is the quickest A/B comparison. `i_clamp` is what bounds overshoot. Each PID publishes `<pid>/controller_state`.
+All five are live parameters (`ros2 param set`) and take effect on the next update. A negative, non-finite or over-range value is rejected.
 
-Measured with these gains (wheels lifted, median of 4 wheels): overshoot ≤ 9.6 % and steady-state error ≤ 2.3 %. On-ground tuning is still open.
+The feedforward carries most of the command, and the PID trims load, battery and slip error. With `p = i = d = 0` the drive is open loop, which is the quickest A/B comparison. Each PID publishes `<pid>/controller_state`.
 
-Source: `rover_controller/config/wheel_01_controller.yaml`, `rover_controller/include/rover_controller/seeded_pid_controller.hpp`, `rover_controller/docs/wheel_pid_tuning_notes.md`.
+**Ground tune (2026-10-02, `motor_acceleration` 10.0, 26.6 V).** The measured dead time was 0.17–0.22 s. A delay of 0.15 s with a time constant of 0.08 s gave t90 ≈ 0.6 s. With `i_clamp` 2.0, in-place turns went from 32–53 % under the reference to 5–8 % under (turn overshoot 7–15 %). Straight steps from 0.3 to 0.8 m/s stayed at overshoot ≤ 4.3 % and |error| ≤ 1.7 %.
 
-Details: [rover_controller README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_controller/README.md) and [wheel PID tuning notes](https://github.com/RaduPotlog/rover_ros/blob/master/rover_controller/docs/wheel_pid_tuning_notes.md). Read the tuning notes before changing a gain.
+!!! warning "Reference model fitted at a different motor ramp"
+    The reference model (0.15 s / 0.08 s) was fitted with `motor_acceleration` 10.0. The URDF now sets 2.0, and the model has not been re-fitted. The config says to re-fit the model whenever the motor ramp changes: run `wheel_step_response` on the ground and adjust the delay and time constant. If the model is slower than the plant, the integral winds the wrong way on every rise and leaves a slow tail.
+
+Source: `rover_controller/config/wheel_01_controller.yaml`, `rover_controller/include/rover_controller/seeded_pid_controller.hpp`, `rover_controller/src/seeded_pid_controller.cpp`, `rover_controller/include/rover_controller/wheel_speed_loop.hpp`, `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`.
+
+Details: [rover_controller README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_controller/README.md) and [wheel PID tuning notes](https://github.com/RaduPotlog/rover_ros/blob/master/rover_controller/docs/wheel_pid_tuning_notes.md). The tuning notes cover the earlier lifted-wheel tuning of p, i and d. The ground tune of the clamps and the wheel loop options is in the comment above the gains in `wheel_01_controller.yaml`.
 
 ## Calibration tools
 
@@ -211,15 +231,14 @@ Run them in this order:
 
 2. **Acceleration limits.** Use the limits reported in step 1 to set `linear.x` / `angular.z` acceleration in `wheel_01_controller.yaml`.
 
-3. **Skid-steer calibration** (`wheel_odom_calibration`). `mode:=spin` spins in place at several rates (default ±0.3, ±0.6, ±1.0 rad/s), compares the rotation the wheel speeds explain with the IMU gyro and reports `wheel_separation_multiplier`. `mode:=straight` drives until wheel odometry reads `distance`; tape-measure the real distance `d` and set both wheel radius multipliers to `d / distance`.
+3. **Skid-steer calibration** (`wheel_odom_calibration`). `mode:=spin` spins in place at several rates (default ±0.3, ±0.6, ±1.0 rad/s), compares the rotation the wheel speeds explain with the IMU gyro and reports `wheel_separation_multiplier`. The IMU is mounted upside down, so the tool negates the gyro yaw rate (`imu_yaw_sign` −1). If every spin segment is rejected while the rover clearly turned, re-run with `-p imu_yaw_sign:=1`. `mode:=straight` drives until wheel odometry reads `distance`; tape-measure the real distance `d` and set both wheel radius multipliers to `d / distance`.
 
     ```bash
     ros2 run rover_controller wheel_odom_calibration --ros-args -r __ns:=/rover -p mode:=spin -p enable_motion:=true
     ros2 run rover_controller wheel_odom_calibration --ros-args -r __ns:=/rover -p mode:=straight -p distance:=5.0 -p enable_motion:=true
     ```
 
-!!! warning "Source conflict"
-    The tools' built-in geometry defaults do not match the controller config. `wheel_step_response` declares `wheel_separation` 0.62602 and `wheel_separation_multiplier` 1.5. `wheel_odom_calibration` declares `wheel_separation` 0.62602. `rover_controller/config/wheel_01_controller.yaml` uses 0.617 and 1.659. Pass the current values as parameters (for example `-p wheel_separation:=0.617`) when you run the tools.
+Both tools default to the controller config's geometry: `wheel_separation` 0.617, and in `wheel_step_response` also `wheel_separation_multiplier` 1.659. If you change the config, pass the new values as parameters (for example `-p wheel_separation:=0.617`).
 
 Source: `rover_controller/README.md`, `rover_controller/rover_controller/wheel_step_response.py`, `rover_controller/rover_controller/wheel_odom_calibration.py`, `rover_controller/rover_controller/drive_session.py`.
 

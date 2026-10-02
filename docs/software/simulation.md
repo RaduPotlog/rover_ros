@@ -129,6 +129,7 @@ Source: `rover_gazebo/scripts/sim_gpio_state.py`.
 | Nodes not started | | `rover_safety`, `rover_led`, `rover_battery`, `rover_crsf_teleop`, `rover_diag_manager`. The web bridges are not part of the simulation launch |
 | Battery | BMS over UDP to `rover_battery`, `rover_battery/battery_status` | Gazebo `LinearBatteryPlugin` (below). Not bridged to ROS: no battery topic |
 | Wheel PID gains | `d` `0.04` | `d` `0.0` (`sim_wheel_pid.yaml`): Gazebo wheels have no encoder or motor lag, and the D term made the loop oscillate |
+| Wheel PID integral reference | `integral_reference_delay` `0.15` s, `integral_reference_time_constant` `0.08` s | Both `0.0` (`sim_wheel_pid.yaml`): the model stands for the real motors' dead time, which Gazebo doesn't have, so the integral works on the plain error |
 | Drive `wheel_radius` | `0.1651` m (tuned rolling radius) | `0.1699` m (CAD tyre radius of the simulated wheel cylinders) |
 | Body collision | Visual mesh only | Two boxes over the body and front arch, so the body hits obstacles |
 | IMU mount | `ROVER_IMU_*` variables, default `-0.09 0.0 0.2` m, roll `3.14159` rad | Fixed at `-0.09 0.0 0.2` m, rpy `0 0 0` |

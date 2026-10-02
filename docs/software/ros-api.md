@@ -61,7 +61,7 @@ hardware only.
 | `driver_states_update_frequency` | `20.0` | Driver state update rate [Hz]. |
 | `driver_comm_timeout_ms` | `300` | Max age of Phidget telemetry before a driver comm error. |
 | `motor_failsafe_timeout_ms` | `500` | Phidget board watchdog: brakes the motor if `write()` stalls. |
-| `motor_acceleration` | `1.0` | DCC1000 on-board duty ramp [duty/s]. |
+| `motor_acceleration` | `2.0` | DCC1000 on-board duty ramp [duty/s]. |
 | `motor_current_limit` | `15.0` | DCC1000 current limit [A]. |
 | `motor_supply_voltage` | `24.0` | Motor supply [V], used for the current regulator gain. |
 | `max_rpm_motor_speed` / `gear_ratio` | `2800` / `23.3` | Motor speed and gearbox ratio. |
@@ -133,9 +133,12 @@ flowchart LR
 |-----------|------|------|-------------|
 | pub | `pid_controller_<wheel>.../controller_state` | `control_msgs/MultiDOFStateStamped` | Reference, feedback, error and output of one wheel loop. |
 
-Gains are live parameters: `gains.<joint>.p` `0.05`, `.i` `1.0`, `.d` `0.04`,
-`.feedforward_gain` `1.0`, `.u_clamp_max` `12.58` rad/s, `.i_clamp_max` `0.25` (front) or
-`0.33` (rear). See [Drive and control](drive-and-control.md).
+Gains are live parameters, the same on all four wheels: `gains.<joint>.p` `0.05`, `.i` `1.0`,
+`.d` `0.04`, `.feedforward_gain` `1.0`, `.u_clamp_max` `12.58` rad/s, `.i_clamp_max` `2.0`.
+The wheel loop options are live too: `stop_at_zero_reference` `true`, `zero_reference_tolerance`
+`0.001` rad/s (default), `integral_reference_delay` `0.15` s (≤ 1.0 s),
+`integral_reference_time_constant` `0.08` s, `scale_integral_with_reference` `true`. See
+[Drive and control](drive-and-control.md#wheel-pid-controller).
 
 ### Broadcasters and robot state publisher
 
