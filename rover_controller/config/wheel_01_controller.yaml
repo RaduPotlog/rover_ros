@@ -50,8 +50,8 @@
         node_options_args: ["-r", "~/imu:=imu/data",
                             "-r", "~/transition_event:=_rover_imu_broadcaster/transition_event"]
 
-  # Wheel PID gains. Units: rad/s in, rad/s out. Same p/i/d on all four; i_clamp differs
-  # front/rear (see below). Tuned with wheel_step_response, wheels lifted.
+  # Wheel PID gains. Units: rad/s in, rad/s out. Same values on all four wheels. p/i/d were tuned
+  # with wheel_step_response, wheels lifted; the clamps and the integral reference on the ground.
   # The hardware command is already rad/s scaled to duty (open loop), so feedforward_gain 1.0
   # carries the bulk and PID only trims load/battery/slip error. p = i = d = 0 with feedforward
   # 1.0 is exactly the old open-loop behaviour - use it for A/B runs:
@@ -68,13 +68,9 @@
   #   d 0.04  - damps the overshoot the integral causes without touching steady state. There is
   #             no derivative filter, so this is near the noise limit: d = 0.08 amplified encoder
   #             quantisation and made overshoot much WORSE (up to 29 %). Do not raise it.
-  #   i_clamp - this, not i, is what bounds overshoot: the integral winds up through the dead
-  #             time and saturates, so peak overshoot ~ i_clamp / step amplitude. The required
-  #             trim is roughly constant in rad/s while the overshoot budget is a percentage,
-  #             so the clamp is set per wheel from measurement: fl/fr overshoot most and need
-  #             0.25; rl/rr need ~0.33 to beat low-speed friction and have the headroom for it.
-  # Measured with these gains (median of 4 wheels, wheels lifted, 3 consecutive runs):
-  # overshoot <= 9.6 % and |steady-state error| <= 2.3 % on every step. Re-check on the ground.
+  #   i_clamp - with the plain integral, this bounded overshoot (it wound up through the dead
+  #             time), so the lifted tuning used 0.25 front / 0.33 rear. With the model-reference
+  #             integral below it only has to cover the persistent load error: 2.0 (see 2026-10-02).
   #
   # On the ground (2026-09-29) straight steps were fine, but in-place turns ran 37-56 % under the
   # reference with every I-term pinned at its clamp (skid-steer needs ~+2 rad/s), and raising
@@ -84,13 +80,20 @@
   #             DCC1000 brakes only at a target of exactly 0; a leftover integral kept the brake
   #             off after every stop (and made the wheels creep with larger clamps).
   #   integral_reference_delay / _time_constant - the I-term integrates (reference delayed by
-  #             0.25 s, then lagged 0.15 s) - measurement instead of the raw error. That is the
-  #             step response the ground runs measured (dead time 0.24-0.32 s, rise 0.25-0.4 s),
-  #             so the error the plant removes by itself no longer winds the integral up, while a
-  #             persistent load error (skid turns, friction) still integrates fully.
-  #             0 / 0 = the plain upstream integral.
-  # The clamps are still the lifted-wheel values: raising them for turns (~2 rad/s) is the next
-  # on-ground step-response run, and test/test_wheel_geometry.py's rim budget has to follow.
+  #             the delay, then lagged by the time constant) - measurement instead of the raw
+  #             error. Shaped like the plant's own step response, so the error the plant removes
+  #             by itself no longer winds the integral up, while a persistent load error (skid
+  #             turns, friction) still integrates fully. 0 / 0 = the plain upstream integral.
+  #             If the model is SLOWER than the plant, the integral winds the wrong way on every
+  #             rise and leaves a slow tail - re-fit it whenever the motor ramp changes.
+  #
+  # Ground tune 2026-10-02 (motor_acceleration 10.0, 26.6 V, wheel_step_response runs): dead time
+  # 0.17-0.22 s. The old 0.25 / 0.15 s model (fitted at ramp 1-2) was now slower than the plant
+  # (t90 ~1.5 s at 0.5 m/s); 0.15 / 0.08 s gives t90 ~0.6 s. i_clamp 2.0 took in-place turns from
+  # 32-53 % under the reference to 5-8 % (turn overshoot 7-15 %), while straight steps stayed at
+  # overshoot <= 4.3 % and |error| <= 1.7 % (0.3-0.8 m/s) - straight driving uses only ~0.4 of it.
+  # d 0.04 does not chatter at the faster ramp. Known leftover: during a turn's ramp-down the
+  # integral still pushes, so in-place turns stop ~0.3 s late.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
@@ -104,11 +107,11 @@
         
       # SeededPidController wheel loop (see the gains comment above).
       stop_at_zero_reference: true
-      integral_reference_delay: 0.25
-      integral_reference_time_constant: 0.15
+      integral_reference_delay: 0.15
+      integral_reference_time_constant: 0.08
 
       gains:
-        rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.33, "i_clamp_max": 0.33, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
+        rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_rr_wheel_base_to_rr_wheel_joint:
     ros__parameters:
@@ -123,11 +126,11 @@
         
       # SeededPidController wheel loop (see the gains comment above).
       stop_at_zero_reference: true
-      integral_reference_delay: 0.25
-      integral_reference_time_constant: 0.15
+      integral_reference_delay: 0.15
+      integral_reference_time_constant: 0.08
 
       gains:
-        rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.33, "i_clamp_max": 0.33, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
+        rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_fl_wheel_base_to_fl_wheel_joint:
     ros__parameters:
@@ -142,11 +145,11 @@
         
       # SeededPidController wheel loop (see the gains comment above).
       stop_at_zero_reference: true
-      integral_reference_delay: 0.25
-      integral_reference_time_constant: 0.15
+      integral_reference_delay: 0.15
+      integral_reference_time_constant: 0.08
 
       gains:
-        fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
+        fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
 
   pid_controller_fr_wheel_base_to_fr_wheel_joint:
     ros__parameters:
@@ -161,11 +164,11 @@
         
       # SeededPidController wheel loop (see the gains comment above).
       stop_at_zero_reference: true
-      integral_reference_delay: 0.25
-      integral_reference_time_constant: 0.15
+      integral_reference_delay: 0.15
+      integral_reference_time_constant: 0.08
 
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -0.25, "i_clamp_max": 0.25, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
         
   # Per-controller update rates. The controller_manager loop and the wheel PIDs run at 50 Hz:
   # the encoders only report at 20 Hz, so 100 Hz just re-ran the PIDs on stale feedback
@@ -236,10 +239,13 @@
       # 0.95 + 1.5 * 0.5102 = 1.715 m/s (10.39 rad/s at r = 0.1651), under the URDF joint limit
       # (10.958 rad/s). Linear was cut from 1.2 so angular could rise from 1.0 to 1.5: 1.0 rad/s
       # did not give the in-place turn enough wheel duty.
-      # The margin is for the wheel PIDs: their output is feedforward * reference + P + I + D,
-      # and u_clamp only bounds the P + I + D part, so up to ~i_clamp (0.25 front, 0.33 rear)
-      # of trim rides on top of the reference. Enforced by test/test_wheel_geometry.py. rover_crsf_teleop scales stick
-      # commands against the same budget (max_wheel_rim_speed / effective_track_width).
+      # The wheel PIDs' output is feedforward * reference + P + I + D, and u_clamp only bounds the
+      # P + I + D part, so up to ~i_clamp (2.0) of trim rides on top of the reference: 10.39 + 2.0
+      # = 12.39 rad/s of command, under full duty (u_clamp 12.58). That trim only builds up while
+      # the wheel runs SLOWER than its reference (skid turns, load), so the wheel speed itself stays
+      # within the reference and the joint limit. Both bounds are enforced by
+      # test/test_wheel_geometry.py. rover_crsf_teleop scales stick commands against the same
+      # budget (max_wheel_rim_speed / effective_track_width).
       linear:
         x:
           max_velocity: 0.95 # m/s
