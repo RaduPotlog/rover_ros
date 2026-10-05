@@ -30,3 +30,60 @@
   ros_type_name: sensor_msgs/msg/NavSatFix
   gz_type_name: gz.msgs.NavSat
   direction: GZ_TO_ROS
+
+# Gazebo GUI "Rover Safety" panel (rover_gazebo_plugins) -> sim_safety_plc: the maintained
+# HW E-Stop button and the SW E-Stop / SW reset / latch reset buttons.
+- ros_topic_name: /<namespace>/sim_safety/hw_e_stop_button
+  gz_topic_name: /<namespace>/sim_safety/hw_e_stop_button
+  ros_type_name: std_msgs/msg/Bool
+  gz_type_name: gz.msgs.Boolean
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /<namespace>/sim_safety/sw_e_stop_set
+  gz_topic_name: /<namespace>/sim_safety/sw_e_stop_set
+  ros_type_name: std_msgs/msg/Empty
+  gz_type_name: gz.msgs.Empty
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /<namespace>/sim_safety/sw_e_stop_reset
+  gz_topic_name: /<namespace>/sim_safety/sw_e_stop_reset
+  ros_type_name: std_msgs/msg/Empty
+  gz_type_name: gz.msgs.Empty
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /<namespace>/sim_safety/latch_reset
+  gz_topic_name: /<namespace>/sim_safety/latch_reset
+  ros_type_name: std_msgs/msg/Empty
+  gz_type_name: gz.msgs.Empty
+  direction: GZ_TO_ROS
+
+# sim_safety_plc / rover_motion_lock_node -> the panel's lamps and result line.
+- ros_topic_name: /<namespace>/sim_safety/sw_e_stop
+  gz_topic_name: /<namespace>/sim_safety/sw_e_stop
+  ros_type_name: std_msgs/msg/Bool
+  gz_type_name: gz.msgs.Boolean
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /<namespace>/sim_safety/latch_active
+  gz_topic_name: /<namespace>/sim_safety/latch_active
+  ros_type_name: std_msgs/msg/Bool
+  gz_type_name: gz.msgs.Boolean
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /<namespace>/sim_safety/contactor_engaged
+  gz_topic_name: /<namespace>/sim_safety/contactor_engaged
+  ros_type_name: std_msgs/msg/Bool
+  gz_type_name: gz.msgs.Boolean
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /<namespace>/motion_lock
+  gz_topic_name: /<namespace>/motion_lock
+  ros_type_name: std_msgs/msg/Bool
+  gz_type_name: gz.msgs.Boolean
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /<namespace>/sim_safety/result
+  gz_topic_name: /<namespace>/sim_safety/result
+  ros_type_name: std_msgs/msg/String
+  gz_type_name: gz.msgs.StringMsg
+  direction: ROS_TO_GZ

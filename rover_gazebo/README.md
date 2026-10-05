@@ -43,10 +43,15 @@ rover's router would join the simulated nodes to the real rover.
     adds `rover_gps_heading_node`, `rover_navsat_transform_node` and `rover_ekf_global_node`.
   - `rover_twist_mux` (mux + `rover_motion_lock_node`), as on the rover:
     `nav_cmd_vel_stamped` / teleop → `cmd_vel`, gated by `motion_lock`.
-  - `sim_gpio_state_publisher` (`scripts/sim_gpio_state.py`): an all-clear
-    `hardware_interface/safety_status` + `hardware_interface/safety_command_echo`, which
-    `rover_motion_lock_node` needs to open the lock.
-    `ros2 param set <ns>/sim_gpio_state_publisher e_stop true` simulates a software E-Stop.
+  - `sim_safety_plc` (`scripts/sim_safety_plc.py`, latch logic in `scripts/sim_safety_plc_model.py`):
+    the safety PLC stand-in. It publishes `hardware_interface/safety_status` and
+    `hardware_interface/safety_command_echo`, which `rover_motion_lock_node` needs to open the lock.
+    It models the set-dominant E-Stop latch and serves the rover's
+    `hardware_interface/sw_user_e_stop_set`, `sw_user_e_stop_reset` and `sw_e_stop_latch_reset`.
+    The Gazebo **Rover Safety** panel (`rover_gazebo_plugins`) drives it with the HW E-STOP
+    (maintained), SW E-STOP, SW RESET and RESET LATCH buttons, over `sim_safety/*` in `gz_bridge`.
+    While the latch is set it publishes zero `cmd_vel` in place of the open contactor.
+    The latch starts clear (`latch_set_at_startup:=false`).
   - `gz_bridge` (`ros_gz_bridge/parameter_bridge`) configured by `config/gz_bridge.yaml`.
   - `rover_rs16_lidar_scan` (`pointcloud_to_laserscan`): `scan` sliced from `rslidar_points`
     with the real driver's settings (±0.25 m, 360° at 0.5°, 0.2–20 m).

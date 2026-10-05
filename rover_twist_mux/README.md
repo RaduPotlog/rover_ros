@@ -74,9 +74,10 @@ well inside the lock's 0.5 s timeout, and is launched alongside the mux.
 A consequence worth knowing: with no hardware interface running there is no safety state, so the
 rover will not accept velocity commands at all. That is intended — no safety IO means no driving.
 Simulation launches this package too (`rover_gazebo`'s `simulate_robot.launch.py`), so Nav 2 and
-teleop take the same command path as on the rover. There, `sim_gpio_state_publisher` stands in
-for the hardware interface and publishes an all-clear `safety_status` and `safety_command_echo`
-with `link_healthy` set, which opens the lock.
+teleop take the same command path as on the rover. There, `rover_gazebo`'s `sim_safety_plc` stands in
+for the hardware interface. It publishes `safety_status` and `safety_command_echo` with
+`link_healthy` set, which opens the lock until the Gazebo Rover Safety panel or the E-Stop
+services set its latch.
 
 At the default lock priority of 200 an active E-Stop stops the rover outright. To gate autonomy
 only and leave all teleop sources free, lower it to 7; see the comment in

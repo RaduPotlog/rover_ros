@@ -128,6 +128,7 @@ Source: `rover_bringup/launch/rover_bringup.launch.py`, `rover_controller/launch
 |---------|--------------|--------------|--------|
 | `rover_bringup` | Bringup | Top-level launch for real hardware, plus the web bridges launch. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_bringup/README.md) |
 | `rover_gazebo` | Simulation | Gazebo Sim bringup with `gz_ros2_control`, the same controllers, EKF and twist_mux. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_gazebo/README.md) |
+| `rover_gazebo_plugins` | Simulation | Gazebo GUI plugins: the Rover Safety panel (HW / SW E-Stop, latch reset) for `rover_gazebo`'s `sim_safety_plc`. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_gazebo_plugins/README.md) |
 | `rover_world` | Simulation | Gazebo worlds. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_world/README.md) |
 | `rover_description` | Model | URDF/xacro: links, joints, meshes, sensors, `<ros2_control>` components. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_description/README.md) |
 | `rover_metapackage` | Build | Selects `rover_bringup` or `rover_gazebo` by `ROVER_ROS_BUILD_TYPE`; holds the `.repos` lists. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_metapackage/README.md) |

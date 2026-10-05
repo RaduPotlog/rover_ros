@@ -171,11 +171,12 @@ def generate_launch_description():
         }.items(),
     )
 
-    # Stands in for the hardware interface's safety I/O, which rover_motion_lock_node reads.
-    sim_gpio_state = Node(
+    # Stands in for the safety PLC and the hardware interface's E-Stop topics and services, which
+    # rover_motion_lock_node and the drive UI use; the Gazebo "Rover Safety" panel drives it.
+    sim_safety_plc = Node(
         package="rover_gazebo",
-        executable="sim_gpio_state.py",
-        name="sim_gpio_state_publisher",
+        executable="sim_safety_plc.py",
+        name="sim_safety_plc",
         namespace=namespace,
         arguments=["--ros-args", "--log-level", log_level],
         emulate_tty=True,
@@ -267,7 +268,7 @@ def generate_launch_description():
         rover_controller_launch,
         rover_ekf_launch,
         rover_twist_mux_launch,
-        sim_gpio_state,
+        sim_safety_plc,
         rover_gz_bridge,
         pointcloud_to_laserscan,
         rover_world_transform,

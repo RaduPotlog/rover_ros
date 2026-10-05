@@ -14,10 +14,10 @@ graph looks like the rover's apart from `use_sim_time`.
 | Controllers | `rover_drive_controller`, the four wheel PIDs, `rover_joint_state_broadcaster`, `rover_imu_broadcaster`. | `rover_controller/config/wheel_01_controller.yaml` |
 | Localization | `rover_ekf_node`; with `use_gps` also `rover_gps_heading_node`, `rover_navsat_transform_node`, `rover_ekf_global_node`. | `rover_localization/launch/rover_localization.launch.py` |
 | Command path | `rover_twist_mux_node`, `rover_motion_lock_node`, `rover_command_freshness_node`, as on the rover. | `rover_twist_mux/launch/rover_twist_mux.launch.py` |
-| Safety IO stand-in | `sim_gpio_state_publisher`: an all-clear `hardware_interface/safety_status` and `hardware_interface/safety_command_echo` at 5.0 Hz, so the motion lock opens. | `rover_gazebo/scripts/sim_gpio_state.py` |
+| Safety PLC stand-in | `sim_safety_plc`: the E-Stop latch (HW button, SW E-Stop, latch reset), `hardware_interface/safety_status` and `hardware_interface/safety_command_echo` at 5.0 Hz, and the `hardware_interface/sw_*` E-Stop services. Driven by the Gazebo **Rover Safety** panel. | `rover_gazebo/scripts/sim_safety_plc.py`, `rover_gazebo_plugins` |
 | Bridge | `gz_bridge` (`ros_gz_bridge/parameter_bridge`). | `rover_gazebo/config/gz_bridge.yaml` |
 | Laser scan | `rover_rs16_lidar_scan` (`pointcloud_to_laserscan`): `scan` from `rslidar_points`, height slice ±0.25 m, 360° at 0.008727 rad, 0.2 to 20.0 m. | `rover_gazebo/launch/include/simulate_robot.launch.py` |
-| Visualization | RViz (`use_rviz`), Gazebo GUI with a teleop panel. | `rover_gazebo/launch/simulation.launch.py` |
+| Visualization | RViz (`use_rviz`), Gazebo GUI with a teleop panel and the Rover Safety panel. | `rover_gazebo/launch/simulation.launch.py` |
 | World frame | Optional static `world` → `rover/odom` at the spawn pose (`add_world_transform:=True`). | `rover_gazebo/launch/include/simulate_robot.launch.py` |
 
 ### Simulated sensors
@@ -108,24 +108,50 @@ Source: `rover_gazebo/scripts/rover_sim.sh`, `rover_scripts/README.md`.
 Source: `rover_gazebo/launch/simulation.launch.py`, `rover_gazebo/launch/include/simulate_robot.launch.py`,
 `rover_world/launch/rover_world.launch.py`.
 
-### Simulate a software E-Stop
+### E-Stop and latch
+
+The Gazebo GUI docks a **Rover Safety** panel (`rover_gazebo_plugins/RoverSafetyPanel`) above
+Teleop. It drives `sim_safety_plc`, which models the safety PLC's set-dominant latch
+(`rover_arch/SAFETY_CHAIN.md`):
+
+| Control | Real rover counterpart | Effect in simulation |
+|---------|------------------------|----------------------|
+| **HW E-STOP** | Physical mushroom button (maintained) | Click to press, click again to release. Sets the latch; reported as `hw_e_stop_user_button` |
+| **SW E-STOP** | `hardware_interface/sw_user_e_stop_set` | Sets the SW user E-Stop coil and the latch |
+| **SW RESET** | `hardware_interface/sw_user_e_stop_reset` | Releases the SW coil. Refused while any wheel turns faster than 0.05 rad/s. The latch stays set |
+| **RESET LATCH** | `hardware_interface/sw_e_stop_latch_reset` | Clears the latch, unless the HW button is pressed or the SW coil is set |
+
+To drive again after **SW E-STOP**, press SW RESET then RESET LATCH. After **HW E-STOP**,
+release it, then press RESET LATCH. The panel lamps show the SW coil, the latch, the contactor
+and `motion_lock`. They turn grey when `sim_safety_plc` stops answering. The line below the lamps
+shows the outcome of the last request.
+
+While the latch is set, the contactor reads open. `rover_motion_lock_node` then closes
+`motion_lock`, and twist_mux stops every input. Standing in for the unpowered motors,
+`sim_safety_plc` also publishes zero commands on `cmd_vel` at 5.0 Hz.
+
+The same three `std_srvs/Trigger` services as on the rover are served, so the drive UI and the CLI
+share the panel's state:
 
 ```bash
-ros2 param set /rover/sim_gpio_state_publisher e_stop true    # latch set, contactor open
-ros2 param set /rover/sim_gpio_state_publisher e_stop false
+ros2 service call /rover/hardware_interface/sw_user_e_stop_set std_srvs/srv/Trigger
+ros2 service call /rover/hardware_interface/sw_user_e_stop_reset std_srvs/srv/Trigger
+ros2 service call /rover/hardware_interface/sw_e_stop_latch_reset std_srvs/srv/Trigger
 ```
 
-With `e_stop` true the stand-in reports the SW E-Stop echo, an active latch and an open contactor,
-so `rover_motion_lock_node` closes `motion_lock` and twist_mux stops every input.
+The panel talks gz-transport and `gz_bridge` maps it to ROS (`/rover/sim_safety/*`). The latch
+starts clear (`latch_set_at_startup` `false`). The real PLC starts latched.
 
-Source: `rover_gazebo/scripts/sim_gpio_state.py`.
+Source: `rover_gazebo/scripts/sim_safety_plc.py`, `rover_gazebo/scripts/sim_safety_plc_model.py`,
+`rover_gazebo_plugins/src/rover_safety_panel/`, `rover_gazebo/config/gz_bridge.yaml`,
+`rover_gazebo/config/teleop.config`.
 
 ## Differences from the real rover
 
 | Area | Real rover | Simulation |
 |------|------------|------------|
 | Hardware plugin | `rover_hardware_interface/RoverA1System` and `PhidgetImuSensor` | `gz_ros2_control/GazeboSimSystem`; the IMU interfaces are part of it |
-| Safety PLC and E-Stop | Modbus TCP to the PLC; `hardware_interface/*` services; hardware E-Stop button and relay | No PLC and no E-Stop chain. `sim_gpio_state_publisher` publishes an all-clear safety state. The `hardware_interface/sw_*` services, `aux_output_*/set`, `aux_io_state` and `rover_driver_state` do not exist |
+| Safety PLC and E-Stop | Modbus TCP to the PLC; `hardware_interface/*` services; hardware E-Stop button and relay | `sim_safety_plc` models the latch, HW button and SW E-Stop, and serves the three `hardware_interface/sw_*` E-Stop services. The latch starts clear. There is no watchdog, motor-driver-fault coil or welded-contactor check. `aux_output_*/set`, `aux_io_state` and `rover_driver_state` do not exist |
 | Nodes not started | | `rover_safety`, `rover_led`, `rover_battery`, `rover_crsf_teleop`, `rover_diag_manager`. The web bridges are not part of the simulation launch |
 | Battery | BMS over UDP to `rover_battery`, `rover_battery/battery_status` | Gazebo `LinearBatteryPlugin` (below). Not bridged to ROS: no battery topic |
 | Wheel PID gains | `d` `0.04` | `d` `0.0` (`sim_wheel_pid.yaml`): Gazebo wheels have no encoder or motor lag, and the D term made the loop oscillate |
