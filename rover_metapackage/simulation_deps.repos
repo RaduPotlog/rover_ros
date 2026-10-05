@@ -1,1 +1,5 @@
 repositories:
+  rover_orchestrator:
+    type: git
+    url: https://github.com/RaduPotlog/rover_orchestrator.git
+    version: master
