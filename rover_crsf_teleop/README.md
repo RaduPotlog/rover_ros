@@ -228,6 +228,7 @@ than failing when the receiver is absent.
 
 The CRSF decoder (`domain/crsf/crc8.*`, `domain/crsf/crsf_parser.*`) is derived from
 [`ros2_crsf_receiver`](https://github.com/AndreyTulyakov/ros2_crsf_receiver) by Andrey Tulyakov,
-MIT licensed. The CRSF wire constants in `domain/crsf/crsf_protocol.hpp` were restated from the
-Team Black Sheep specification (BSD-2-Clause) rather than copied from the upstream
-GPL-licensed flight-controller header.
+MIT licensed; its license notice is reproduced in [`THIRD_PARTY_LICENSES`](THIRD_PARTY_LICENSES)
+and installed with the package. The CRSF wire constants in `domain/crsf/crsf_protocol.hpp` were
+restated from the Team Black Sheep specification (BSD-2-Clause) rather than copied from the
+upstream GPL-licensed flight-controller header.

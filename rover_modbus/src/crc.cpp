@@ -1,3 +1,7 @@
+// Modbus for c++ <https://github.com/Mazurel/Modbus>
+// Copyright (c) 2020 Mateusz Mazur aka Mazurel
+// Licensed under: MIT License <http://opensource.org/licenses/MIT>
+
 #include "MB/crc.hpp"
 
 uint16_t MB::CRC::calculateCRC(const uint8_t *buff, std::size_t len) {

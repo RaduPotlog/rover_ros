@@ -110,6 +110,7 @@ install(TARGETS ${PROJECT_NAME}_component
         RUNTIME DESTINATION bin)
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
+install(FILES THIRD_PARTY_LICENSES DESTINATION share/${PROJECT_NAME})
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})
 

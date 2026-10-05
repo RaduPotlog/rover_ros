@@ -1,3 +1,7 @@
+// Modbus for c++ <https://github.com/Mazurel/Modbus>
+// Copyright (c) 2020 Mateusz Mazur aka Mazurel
+// Licensed under: MIT License <http://opensource.org/licenses/MIT>
+
 #include <cstdint>
 #include <optional>
 #include <vector>

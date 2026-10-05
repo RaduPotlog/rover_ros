@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Derived from crsf_receiver (MIT, Andrey Tulyakov) - https://github.com/AndreyTulyakov/ros2_crsf_receiver
+// Derived from crsf_receiver - https://github.com/AndreyTulyakov/ros2_crsf_receiver
+// Portions Copyright (c) Andrey Tulyakov, MIT License - see THIRD_PARTY_LICENSES.
 
 #include "rover_crsf_teleop/domain/crsf/crc8.hpp"
 
