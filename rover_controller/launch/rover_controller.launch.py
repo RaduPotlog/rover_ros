@@ -19,11 +19,11 @@ from rover_utils.logging import limit_log_level_to_info
 from rover_utils.shutdown import shutdown_unless_shutting_down
 from launch import LaunchDescription
 from launch.actions import (
-    DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription, LogError,
+    DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription, LogError, LogWarning,
     OpaqueFunction, RegisterEventHandler, SetLaunchConfiguration, Shutdown,
 )
 from launch.conditions import UnlessCondition
-from launch.event_handlers import OnProcessExit
+from launch.event_handlers import OnProcessExit, OnProcessIO
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     EnvironmentVariable,
@@ -36,12 +36,38 @@ from launch_ros.substitutions import FindPackageShare
 from nav2_common.launch import ReplaceString
 import yaml
 
-def spawner_exit_handler(controller_name, next_action=None):
-    """Continue only after successful activation of a mandatory controller."""
+# The spawner prints this once the controller (or group) is active.
+SPAWNER_ACTIVATED = b'Configured and activated'
+
+
+def spawner_activation_watcher(spawner, activated):
+    """Set activated["seen"] when the spawner reports the activation."""
+    def on_output(event):
+        if SPAWNER_ACTIVATED in event.text:
+            activated['seen'] = True
+
+    return RegisterEventHandler(
+        OnProcessIO(target_action=spawner, on_stdout=on_output, on_stderr=on_output)
+    )
+
+
+def spawner_exit_handler(controller_name, next_action=None, activated=None):
+    """Continue only after successful activation of a mandatory controller.
+
+    A spawner can exit non-zero after it activated its controller: under rmw_zenoh,
+    rclpy.shutdown() raises "Failed to close the session" when closing the Zenoh session times
+    out. The controller is active by then, so that exit must not take the whole stack down.
+    """
     def on_exit(event, context):
         if context.is_shutdown:
             return []
         if event.returncode != 0:
+            if activated is not None and activated['seen']:
+                warning = LogWarning(msg=(
+                    f"{controller_name} spawner exited with code {event.returncode} after "
+                    'activating it (failed shutdown); continuing'
+                ))
+                return [warning] + ([next_action] if next_action is not None else [])
             reason = f"{controller_name} spawner failed with exit code {event.returncode}"
             return [LogError(msg=reason), Shutdown(reason=reason)]
         return [next_action] if next_action is not None else []
@@ -292,14 +318,23 @@ def generate_launch_description():
         imu_broadcaster_spawner = make_spawner(
             'rover_imu_broadcaster', include_log_args=True
         )
+        joint_state_broadcaster_activated = {'seen': False}
+        drive_controller_activated = {'seen': False}
+        imu_broadcaster_activated = {'seen': False}
 
         return [
+            spawner_activation_watcher(
+                joint_state_broadcaster_spawner, joint_state_broadcaster_activated
+            ),
+            spawner_activation_watcher(drive_controller_spawner, drive_controller_activated),
+            spawner_activation_watcher(imu_broadcaster_spawner, imu_broadcaster_activated),
             RegisterEventHandler(
                 event_handler=OnProcessExit(
                     target_action=joint_state_broadcaster_spawner,
                     on_exit=spawner_exit_handler(
                         'rover_joint_state_broadcaster',
                         drive_controller_spawner,
+                        joint_state_broadcaster_activated,
                     ),
                 )
             ),
@@ -307,7 +342,8 @@ def generate_launch_description():
                 event_handler=OnProcessExit(
                     target_action=drive_controller_spawner,
                     on_exit=spawner_exit_handler(
-                        'rover_drive_controller', imu_broadcaster_spawner
+                        'rover_drive_controller', imu_broadcaster_spawner,
+                        drive_controller_activated,
                     ),
                 ),
             ),
@@ -317,7 +353,8 @@ def generate_launch_description():
                     # The last mandatory controller: rover_bringup starts the rest of the
                     # stack on this event.
                     on_exit=spawner_exit_handler(
-                        'rover_imu_broadcaster', EmitEvent(event=ControllersActive())
+                        'rover_imu_broadcaster', EmitEvent(event=ControllersActive()),
+                        imu_broadcaster_activated,
                     ),
                 )
             ),
