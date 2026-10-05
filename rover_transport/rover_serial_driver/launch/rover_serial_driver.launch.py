@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Modified 2026 by Mechatronics Academy: adapted from serial_driver's launch file
+# (ros-drivers/transport_drivers v1.2.0) for rover_serial_driver.
 
 import os
 
