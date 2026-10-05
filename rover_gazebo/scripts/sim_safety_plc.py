@@ -24,7 +24,8 @@ The E-Stop latch itself is SimSafetyPlc (sim_safety_plc_model.py). It is driven 
   * the real rover's std_srvs/Trigger services hardware_interface/sw_user_e_stop_set,
     sw_user_e_stop_reset and sw_e_stop_latch_reset (drive UI, CLI);
   * the Gazebo "Rover Safety" panel (rover_gazebo_plugins), over ros_gz_bridge: the maintained
-    HW E-Stop button on sim_safety/hw_e_stop_button and the three buttons on
+    HW E-Stop button on sim_safety/hw_e_stop_button (releasing it also resets the latch, as the
+    rover's HW reset button does) and the three buttons on
     sim_safety/{sw_e_stop_set,sw_e_stop_reset,latch_reset}.
 The panel's lamps read sim_safety/{sw_e_stop,latch_active,contactor_engaged} and the outcome of
 the last request on sim_safety/result.
@@ -146,9 +147,7 @@ class SimSafetyPlcNode(Node):
     def _on_hw_button(self, msg: Bool):
         if msg.data == self._plc.hw_button:
             return  # the panel republishes its button state periodically
-        self._plc.set_hw_button(msg.data)
-        self._report(TriggerResult(
-            True, "HW E-Stop pressed" if msg.data else "HW E-Stop released"))
+        self._report(self._plc.set_hw_button(msg.data))
 
     def _on_joint_states(self, msg: JointState):
         self._wheel_velocities = [

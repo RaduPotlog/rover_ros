@@ -55,14 +55,41 @@ def test_latch_reset_has_no_effect_while_hw_button_pressed():
     assert plc.latch_active
 
 
-def test_releasing_hw_button_keeps_the_latch_until_reset():
+def test_releasing_hw_button_resets_the_latch():
     plc = SimSafetyPlc()
     plc.set_hw_button(True)
-    plc.set_hw_button(False)
-    assert plc.latch_active
-    assert plc.latch_reset().success
+    result = plc.set_hw_button(False)
+    assert result.message == "HW E-Stop released, latch reset"
     assert not plc.latch_active
+    assert plc.contactor_engaged
     assert plc.latch_cause == LATCH_CAUSE_UNKNOWN
+
+
+def test_releasing_hw_button_keeps_the_latch_while_sw_e_stop_set():
+    plc = SimSafetyPlc()
+    plc.sw_set()
+    plc.set_hw_button(True)
+    result = plc.set_hw_button(False)
+    assert "SW E-Stop set" in result.message
+    assert plc.latch_active
+
+
+def test_releasing_hw_button_clears_a_latch_left_by_a_released_sw_e_stop():
+    plc = SimSafetyPlc()
+    plc.sw_set()
+    plc.sw_reset(wheels_stopped=True)
+    plc.set_hw_button(True)
+    plc.set_hw_button(False)
+    assert not plc.latch_active
+
+
+def test_repeated_released_state_is_not_a_reset():
+    # The panel republishes the released state every second; only the release edge resets.
+    plc = SimSafetyPlc()
+    plc.sw_set()
+    plc.sw_reset(wheels_stopped=True)
+    assert plc.set_hw_button(False).message == "HW E-Stop released"
+    assert plc.latch_active
 
 
 def test_sw_set_latches_and_is_echoed():

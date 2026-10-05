@@ -116,13 +116,13 @@ Teleop. It drives `sim_safety_plc`, which models the safety PLC's set-dominant l
 
 | Control | Real rover counterpart | Effect in simulation |
 |---------|------------------------|----------------------|
-| **HW E-STOP** | Physical mushroom button (maintained) | Click to press, click again to release. Sets the latch; reported as `hw_e_stop_user_button` |
+| **HW E-STOP** | Physical mushroom button (maintained) and the HW reset button | Click to press, click again to release. Pressing sets the latch; reported as `hw_e_stop_user_button`. Releasing it resets the latch, like the HW reset button, unless the SW coil is still set |
 | **SW E-STOP** | `hardware_interface/sw_user_e_stop_set` | Sets the SW user E-Stop coil and the latch |
 | **SW RESET** | `hardware_interface/sw_user_e_stop_reset` | Releases the SW coil. Refused while any wheel turns faster than 0.05 rad/s. The latch stays set |
 | **RESET LATCH** | `hardware_interface/sw_e_stop_latch_reset` | Clears the latch, unless the HW button is pressed or the SW coil is set |
 
 To drive again after **SW E-STOP**, press SW RESET then RESET LATCH. After **HW E-STOP**,
-release it, then press RESET LATCH. The panel lamps show the SW coil, the latch, the contactor
+release it; that also resets the latch. The panel lamps show the SW coil, the latch, the contactor
 and `motion_lock`. They turn grey when `sim_safety_plc` stops answering. The line below the lamps
 shows the outcome of the last request.
 

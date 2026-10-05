@@ -98,7 +98,7 @@ Rectangle {
         border.color: _RoverSafetyPanel.hwPressed ? "#ffeb3b" : "#424242"
       }
       ToolTip.visible: hovered
-      ToolTip.text: "Physical E-Stop button (maintained). Sets the latch; the latch can't be reset while pressed."
+      ToolTip.text: "Physical E-Stop button (maintained). Pressing sets the latch; releasing resets it, unless the SW E-Stop is still set."
     }
 
     ActionButton {
@@ -147,7 +147,7 @@ Rectangle {
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
       color: staleGrey
-      text: "After SW E-STOP: SW RESET, then RESET LATCH.\nAfter HW E-STOP: release it, then RESET LATCH."
+      text: "After SW E-STOP: SW RESET, then RESET LATCH.\nAfter HW E-STOP: release it (resets the latch)."
     }
 
     Item { Layout.fillHeight: true }

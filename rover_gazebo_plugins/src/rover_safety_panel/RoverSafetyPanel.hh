@@ -32,7 +32,8 @@ namespace rover_gazebo_plugins
 //
 // Speaks gz-transport only; ros_gz_bridge carries the topics to and from ROS (see
 // rover_gazebo/config/gz_bridge.yaml). Commands, all under /<namespace>/sim_safety/:
-//   hw_e_stop_button  gz.msgs.Boolean  maintained HW E-Stop button, on change and every second
+//   hw_e_stop_button  gz.msgs.Boolean  maintained HW E-Stop button, on change and every second;
+//                                      releasing it also resets the latch
 //   sw_e_stop_set     gz.msgs.Empty    SW user E-Stop
 //   sw_e_stop_reset   gz.msgs.Empty    release the SW user E-Stop (refused while wheels move)
 //   latch_reset       gz.msgs.Empty    reset the E-Stop latch (no effect while a stop is asserted)

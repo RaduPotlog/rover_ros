@@ -16,7 +16,8 @@
 
 Mirrors rover_arch/SAFETY_CHAIN.md: a set-dominant SR latch whose SET sources are the physical
 HW E-Stop button and the SW user E-Stop coil, and whose open/closed state drives the motor
-contactor. Resetting the latch has no effect while any SET source is still asserted; the SW coil
+contactor. Its RESET sources are the SW latch reset pulse and the HW reset button. In simulation,
+releasing the HW E-Stop button acts as the HW reset button. Resetting the latch has no effect while any SET source is still asserted; the SW coil
 can only be released while the wheels are at rest (RoverA1System's zero-velocity check).
 
 The SW motor-driver-fault coil and the CPU watchdog are not modelled: nothing in the simulation
@@ -68,10 +69,20 @@ class SimSafetyPlc:
         # The latch opens the contactor; the simulation has no welded contacts.
         return not self._latch
 
-    def set_hw_button(self, pressed: bool) -> None:
-        """The maintained HW mushroom button: pressed stays pressed until released."""
+    def set_hw_button(self, pressed: bool) -> TriggerResult:
+        """The maintained HW mushroom button: pressed stays pressed until released.
+
+        Releasing it also resets the latch, standing in for the HW reset button on the PLC's
+        RESET input. The reset is still set-dominant, so a set SW E-Stop keeps the latch set.
+        """
+        was_pressed = self._hw_button
         self._hw_button = pressed
-        self._apply_set_sources()
+        if pressed:
+            self._apply_set_sources()
+            return TriggerResult(True, "HW E-Stop pressed")
+        if not was_pressed:
+            return TriggerResult(True, "HW E-Stop released")
+        return TriggerResult(True, "HW E-Stop released, " + self.latch_reset().message)
 
     def sw_set(self) -> TriggerResult:
         self._sw_user_coil = True

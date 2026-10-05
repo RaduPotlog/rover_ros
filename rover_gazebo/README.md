@@ -49,7 +49,8 @@ rover's router would join the simulated nodes to the real rover.
     It models the set-dominant E-Stop latch and serves the rover's
     `hardware_interface/sw_user_e_stop_set`, `sw_user_e_stop_reset` and `sw_e_stop_latch_reset`.
     The Gazebo **Rover Safety** panel (`rover_gazebo_plugins`) drives it with the HW E-STOP
-    (maintained), SW E-STOP, SW RESET and RESET LATCH buttons, over `sim_safety/*` in `gz_bridge`.
+    (maintained; releasing it also resets the latch, like the rover's HW reset button), SW E-STOP,
+    SW RESET and RESET LATCH buttons, over `sim_safety/*` in `gz_bridge`.
     While the latch is set it publishes zero `cmd_vel` in place of the open contactor.
     The latch starts clear (`latch_set_at_startup:=false`).
   - `gz_bridge` (`ros_gz_bridge/parameter_bridge`) configured by `config/gz_bridge.yaml`.

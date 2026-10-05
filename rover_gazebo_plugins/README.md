@@ -11,7 +11,7 @@ set-dominant E-Stop latch.
 
 | Button | Real rover counterpart |
 |--------|------------------------|
-| HW E-STOP | Physical E-Stop button. Maintained: click to press, click again to release |
+| HW E-STOP | Physical E-Stop button. Maintained: click to press, click again to release. Releasing it also resets the latch, standing in for the HW reset button |
 | SW E-STOP | `hardware_interface/sw_user_e_stop_set` |
 | SW RESET | `hardware_interface/sw_user_e_stop_reset`; refused while the wheels turn |
 | RESET LATCH | `hardware_interface/sw_e_stop_latch_reset`; no effect while a stop is still asserted |
