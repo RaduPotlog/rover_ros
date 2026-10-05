@@ -18,6 +18,9 @@
                file: <remapping> here applies to the controller manager only. -->
         </ros>
       </plugin>
+      <!-- Must come after gz_ros2_control: shuts its rclcpp context down before the server
+           exits, which rmw_zenoh needs (rover_gazebo_plugins/README.md). -->
+      <plugin filename="RosContextShutdown" name="rover_gazebo_plugins::RosContextShutdown" />
     </gazebo>
     
   </xacro:macro>

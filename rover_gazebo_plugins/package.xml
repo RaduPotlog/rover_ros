@@ -3,7 +3,7 @@
 <package format="3">
   <name>rover_gazebo_plugins</name>
   <version>1.0.1</version>
-  <description>Gazebo GUI plugins for the rover simulation (Rover Safety E-Stop panel)</description>
+  <description>Gazebo plugins for the rover simulation (Rover Safety E-Stop panel, ROS context shutdown)</description>
   <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>
   <license>Apache License 2.0</license>
 
@@ -13,9 +13,11 @@
   <depend>gz_gui_vendor</depend>
   <depend>gz_msgs_vendor</depend>
   <depend>gz_plugin_vendor</depend>
+  <depend>gz_sim_vendor</depend>
   <depend>gz_transport_vendor</depend>
   <depend>qt6-base-dev</depend>
   <depend>qt6-declarative-dev</depend>
+  <depend>rclcpp</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

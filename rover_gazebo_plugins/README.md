@@ -1,6 +1,6 @@
 # rover_gazebo_plugins
 
-Gazebo Sim (Jetty, gz-gui 10 / Qt 6) GUI plugins for the Rover A1 simulation. They are built only
+Gazebo Sim (Jetty, gz-gui 10 / Qt 6) plugins for the Rover A1 simulation. They are built only
 for simulation: `rover_gazebo` depends on this package when `ROVER_ROS_BUILD_TYPE=simulation`.
 
 ## RoverSafetyPanel
@@ -40,3 +40,33 @@ Configuration in the GUI config:
 
 An environment hook adds this package's `lib/` to `GZ_GUI_PLUGIN_PATH`, so `gz sim` finds the
 plugin after `source install/setup.bash`.
+
+## RosContextShutdown
+
+A gz-sim **system** plugin with no behaviour of its own: when the server tears its systems down,
+it calls `rclcpp::shutdown()`.
+
+`gz_ros2_control` calls `rclcpp::init()` in the Gazebo process but never `rclcpp::shutdown()`, so
+the default context is otherwise shut down by its static destructor inside `exit()`. Under
+`rmw_zenoh_cpp` that runs after Zenoh's Tokio thread-local storage is destroyed, and the process
+aborts on every Ctrl+C:
+
+```
+thread '<unnamed>' panicked at .../zenoh-runtime/src/lib.rs:154:21:
+The Thread Local Storage inside Tokio is destroyed. ...
+[gazebo-1] Aborted
+[ERROR] [launch]: Caught exception in launch (see debug for traceback): Cannot shutdown a ROS adapter that is not running
+```
+
+rmw_zenoh lists this under "Known issues": whoever initialises the context has to shut it down
+before the process exits.
+
+`rover_description/urdf/common/gazebo_system.urdf.xacro` loads it in the same `<gazebo>` block,
+**after** `gz_ros2_control`, so the controller manager is stopped first:
+
+```xml
+<plugin filename="RosContextShutdown" name="rover_gazebo_plugins::RosContextShutdown" />
+```
+
+With several models each instance holds a reference and the last one destroyed shuts the context
+down. A second hook adds this package's `lib/` to `GZ_SIM_SYSTEM_PLUGIN_PATH`.

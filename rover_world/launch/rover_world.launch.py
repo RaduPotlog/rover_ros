@@ -19,11 +19,23 @@ from launch_ros.substitutions import FindPackageShare
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    EmitEvent,
     IncludeLaunchDescription,
     OpaqueFunction,
+    RegisterEventHandler,
 )
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+
+def shutdown_unless_shutting_down(event, context):
+    """Ends the launch when Gazebo exits on its own (window closed, crash)."""
+    # process_name is "gazebo-<n>"; the action is ros_gz_sim's ExecuteProcess(name="gazebo").
+    if event.process_name.rsplit("-", 1)[0] != "gazebo" or context.is_shutdown:
+        return None
+    return EmitEvent(event=Shutdown(reason="gazebo exited"))
+
 
 def launch_setup(context):
     
@@ -43,10 +55,17 @@ def launch_setup(context):
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([FindPackageShare("ros_gz_sim"), "launch", "gz_sim.launch.py"])
         ),
-        launch_arguments={"gz_args": gz_args, 'on_exit_shutdown': 'true'}.items()
+        launch_arguments={"gz_args": gz_args}.items()
     )
 
-    return [gz_sim]
+    # Not ros_gz_sim's on_exit_shutdown: on Ctrl+C Gazebo exits while the launch is already
+    # shutting down, and that second Shutdown event re-runs launch_ros' ROS adapter shutdown
+    # handler, which raises "Cannot shutdown a ROS adapter that is not running".
+    shutdown_on_gazebo_exit = RegisterEventHandler(
+        OnProcessExit(on_exit=shutdown_unless_shutting_down)
+    )
+
+    return [shutdown_on_gazebo_exit, gz_sim]
 
 
 def generate_launch_description():

@@ -15,8 +15,11 @@ find_package(gz_msgs_vendor REQUIRED)
 find_package(gz-msgs REQUIRED)
 find_package(gz_plugin_vendor REQUIRED)
 find_package(gz-plugin REQUIRED COMPONENTS register)
+find_package(gz_sim_vendor REQUIRED)
+find_package(gz-sim REQUIRED)
 find_package(gz_transport_vendor REQUIRED)
 find_package(gz-transport REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick)
 
 set(CMAKE_AUTOMOC ON)
@@ -41,11 +44,26 @@ target_link_libraries(RoverSafetyPanel PRIVATE
   Qt6::Quick
 )
 
-install(TARGETS RoverSafetyPanel
+# gz-sim system plugin: shuts the rclcpp context down before the server process exits
+# (see RosContextShutdown.hh).
+add_library(RosContextShutdown SHARED
+  src/ros_context_shutdown/RosContextShutdown.cc
+)
+target_compile_features(RosContextShutdown PRIVATE cxx_std_17)
+target_link_libraries(RosContextShutdown PRIVATE
+  gz-common::gz-common
+  gz-plugin::gz-plugin-register
+  gz-sim::gz-sim
+  rclcpp::rclcpp
+)
+
+install(TARGETS RoverSafetyPanel RosContextShutdown
   LIBRARY DESTINATION lib
 )
 
-# Lets `gz sim` find the panel by its filename in the GUI config.
+# Lets `gz sim` find the panel by its filename in the GUI config, and the system plugin by its
+# filename in the URDF.
 ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/gz_gui_plugin_path.sh.in")
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/gz_sim_system_plugin_path.sh.in")
 
 ament_package()
