@@ -225,5 +225,55 @@
       </link>
     </model>
 
+    <!-- 5 deg up-and-over ramp along y = -8, x from -3.99 to +3.99 (clear of box_3 and the
+         south wall). Each ramp is a 3.0 x 1.6 x 0.1 m slab pitched by 5 deg (0.0873 rad):
+         rise = 3.0 sin(5 deg) = 0.2615 m. Slab centre z = (L/2) sin - (t/2) cos = 0.0809 m puts
+         the low edge flush with the ground; centre x = +/-(1 + (L/2) cos - (t/2) sin) puts the
+         high edge on the platform edge at x = +/-1. -->
+    <model name="ramp_up">
+      <static>true</static>
+      <pose>-2.4899 -8 0.0809 0 -0.0873 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <material><ambient>0.3 0.5 0.3 1</ambient><diffuse>0.3 0.5 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="ramp_platform">
+      <static>true</static>
+      <pose>0 -8 0.13075 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>2.0 1.6 0.2615</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 1.6 0.2615</size></box></geometry>
+          <material><ambient>0.25 0.4 0.25 1</ambient><diffuse>0.25 0.4 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="ramp_down">
+      <static>true</static>
+      <pose>2.4899 -8 0.0809 0 0.0873 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <material><ambient>0.3 0.5 0.3 1</ambient><diffuse>0.3 0.5 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
   </world>
 </sdf>
