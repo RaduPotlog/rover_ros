@@ -19,7 +19,7 @@
           <topic>${ns}lidar</topic>
           <update_rate>10</update_rate>
           <!-- Frames carry the namespace prefix (robot_state_publisher frame_prefix). -->
-          <gz_frame_id>${ns}${reference_frame}</gz_frame_id>
+          <frame_id>${ns}${reference_frame}</frame_id>
           <lidar>
             <scan>
               <horizontal>

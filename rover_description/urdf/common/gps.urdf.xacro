@@ -18,7 +18,7 @@
         <sensor name="${ns}gps" type="navsat">
           <topic>${ns}gps/fix</topic>
           <update_rate>5</update_rate>
-          <gz_frame_id>${ns}${reference_frame}</gz_frame_id>
+          <frame_id>${ns}${reference_frame}</frame_id>
           <always_on>1</always_on>
           <visualize>false</visualize>
           <navsat>

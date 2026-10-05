@@ -58,7 +58,7 @@
           <topic>${ns}imu/data_raw</topic>
           <visualize>false</visualize>
           <enable_metrics>false</enable_metrics>
-          <gz_frame_id>${ns}${reference_frame}</gz_frame_id>
+          <frame_id>${ns}${reference_frame}</frame_id>
           <imu>
             <orientation_reference_frame>
             <localization>ENU</localization>
