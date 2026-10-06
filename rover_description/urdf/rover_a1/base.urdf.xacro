@@ -11,6 +11,8 @@
             lidar_rpy
             gps_xyz
             gps_rpy
+            camera_xyz:='0.25 0.0 0.2'
+            camera_rpy:='0.0 0.0 0.0'
             use_sim:=false">
 
     <!-- REP-105 root: ground projection of base_link. The odometry filters publish
@@ -96,6 +98,18 @@
     </joint>
 
     <link name="gps_link" />
+
+    <!-- RealSense D435i. camera_link is the driver's TF root (REP-103, x forward): the realsense
+         node publishes camera_link -> optical frames itself. Mount pose is an ASSUMPTION until
+         measured on the rover; override with ROVER_CAMERA_LOCALIZATION_* / ROVER_CAMERA_ORIENTATION_*.
+         The frame always exists so the TF tree does not change when ROVER_USE_CAMERA toggles. -->
+    <joint name="body_to_camera_joint" type="fixed">
+      <origin xyz="${camera_xyz}" rpy="${camera_rpy}" />
+      <parent link="body_link" />
+      <child link="camera_link" />
+    </joint>
+
+    <link name="camera_link" />
 
   </xacro:macro>
 </robot>

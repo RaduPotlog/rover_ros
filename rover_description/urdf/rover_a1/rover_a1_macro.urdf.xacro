@@ -13,6 +13,8 @@
             lidar_rpy:='0.0 0.0 0.0'
             gps_xyz:='0.0 0.0 0.0'
             gps_rpy:='0.0 0.0 0.0'
+            camera_xyz:='0.25 0.0 0.2'
+            camera_rpy:='0.0 0.0 0.0'
             namespace:=''">
 
     <xacro:if value="${use_sim}">
@@ -69,6 +71,8 @@
       lidar_rpy="${lidar_rpy}"
       gps_xyz="${gps_xyz}"
       gps_rpy="${gps_rpy}"
+      camera_xyz="${camera_xyz}"
+      camera_rpy="${camera_rpy}"
       use_sim="${use_sim}" />
 
     <!-- Rover wheel -->

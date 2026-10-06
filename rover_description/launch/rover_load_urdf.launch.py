@@ -144,6 +144,15 @@ def generate_launch_description():
     gps_rot_p = _env_float("ROVER_GPS_ORIENTATION_P", "0.0")
     gps_rot_y = _env_float("ROVER_GPS_ORIENTATION_Y", "0.0")
 
+    # RealSense mount pose relative to body_link. ASSUMPTION (not measured): 250 mm forward,
+    # 200 mm up, looking forward. Measure it on the rover and set the variables.
+    camera_pos_x = _env_float("ROVER_CAMERA_LOCALIZATION_X", "0.25")
+    camera_pos_y = _env_float("ROVER_CAMERA_LOCALIZATION_Y", "0.0")
+    camera_pos_z = _env_float("ROVER_CAMERA_LOCALIZATION_Z", "0.2")
+    camera_rot_r = _env_float("ROVER_CAMERA_ORIENTATION_R", "0.0")
+    camera_rot_p = _env_float("ROVER_CAMERA_ORIENTATION_P", "0.0")
+    camera_rot_y = _env_float("ROVER_CAMERA_ORIENTATION_Y", "0.0")
+
     urdf_file = PythonExpression(["'", robot_model, ".urdf.xacro'"])
     robot_description_content = Command(
         [
@@ -170,6 +179,10 @@ def generate_launch_description():
             f"'{gps_pos_x} {gps_pos_y} {gps_pos_z}'",
             " gps_rpy:=",
             f"'{gps_rot_r} {gps_rot_p} {gps_rot_y}'",
+            " camera_xyz:=",
+            f"'{camera_pos_x} {camera_pos_y} {camera_pos_z}'",
+            " camera_rpy:=",
+            f"'{camera_rot_r} {camera_rot_p} {camera_rot_y}'",
             " namespace:=",
             namespace,
         ]
