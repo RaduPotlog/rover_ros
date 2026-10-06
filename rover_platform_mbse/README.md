@@ -73,7 +73,7 @@ SWRS prefixes:
 With the MATLAB MCP server (workspace `.mcp.json`; its start folder is this directory):
 
 ```matlab
-% evaluate_matlab_code, project_path = \\wsl.localhost\Ubuntu\home\rover-a1\ros2_ws\rover_a1\src\rover_ros\rover_platform_mbse
+% evaluate_matlab_code, project_path = \\wsl.localhost\Ubuntu-26.04\home\rover-a1\ros2_ws\rover_a1\src\rover_ros\rover_platform_mbse
 addpath scripts; build_all
 ```
 
