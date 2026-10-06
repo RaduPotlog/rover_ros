@@ -27,7 +27,7 @@
       "verified_by": [
         "rover_controller/test/test_wheel_geometry.py"
       ],
-      "comments": "The DCC1000 encoders report at most every 50 ms (20 Hz) (README.md:57-60, yaml:63), so each PID gets a new measurement only every ~5 cycles. The loop rate meets SYS-SR-002; the feedback rate is 20 Hz."
+      "comments": "The DCC1000 encoders report at most every 100 ms (10 Hz) (README.md:57-60, yaml:63), so each PID gets a new measurement only every ~10 cycles. The loop rate meets SYS-SR-002; the feedback rate is 10 Hz."
     },
     {
       "id": "SWR-CTL-002",

@@ -61,9 +61,9 @@ The joint-state and IMU broadcasters are spawned as before.
 
 controller_manager runs at 50 Hz, and each controller at its own `update_rate`: the
 wheel PIDs, `rover_drive_controller` and `rover_imu_broadcaster` at the manager's 50 Hz
-(also the EKF's rate), `rover_joint_state_broadcaster` at 25 Hz (the nearest divisor of
-50 to the encoders' 20 Hz). Every rate must divide the manager's
-(`test/test_wheel_geometry.py`). The manager used to run at 100 Hz; with 20 Hz encoders
+(also the EKF's rate), `rover_joint_state_broadcaster` at 25 Hz. The encoders report at
+most every 100 ms (10 Hz). Every rate must divide the manager's
+(`test/test_wheel_geometry.py`). The manager used to run at 100 Hz; with 10 Hz encoders
 that only re-ran the PIDs on stale feedback.
 
 ## Drive-train tuning

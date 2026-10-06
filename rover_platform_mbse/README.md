@@ -109,7 +109,7 @@ Results as of 2026-09-27: 25 passed, 7 known deviations confirmed.
 | E-stop state publish latency (10 Hz poll → 20 Hz publish) | SYS-SR-023 (100 ms) | 130 ms |
 | Command watchdog (0.5 s timeout checked at 50 Hz) | SYS-SR-011 (500 ms) | 520 ms |
 | IMU publish rate | SYS-SR-019 (≥ 100 Hz) | 50 Hz |
-| Encoder feedback rate | SYS-SR-002 (≥ 50 Hz) | 20 Hz |
+| Encoder feedback rate | SYS-SR-002 (≥ 50 Hz) | 10 Hz |
 | Latch reset while moving | SWR-HWI-010 (SAFETY_CHAIN.md §5) | accepted |
 | Boot LED animation | SYS-SR-009, SWR-LED-020 | none defined |
 

@@ -55,10 +55,10 @@ Baseline before tuning (`p=0.05, i=1.0, d=0, i_clamp=0.4`) was already fine on s
 
 Four findings, each backed by a run. They are what make the gains above non-obvious.
 
-### 2.1 Encoders are 20 Hz, so dead time is ~0.2 s and loop gain must stay tiny
+### 2.1 Encoders are 10 Hz, so dead time is ~0.2 s and loop gain must stay tiny
 Measured dead time was 0.15–0.26 s on every run (README says read these as ±50 ms).
 The gains in this file were tuned with the controllers at 100 Hz, where each PID saw a new
-measurement only every ~5 cycles. The manager now runs at 50 Hz (~2.5 cycles per measurement).
+measurement only every ~10 cycles. The manager now runs at 50 Hz (~5 cycles per measurement).
 The integral is rate-independent, but the D term's spike on each fresh sample is about half as
 large, so re-run the step response at 50 Hz before trusting the overshoot numbers here.
 
@@ -132,7 +132,7 @@ changing a gain** — use `perwheel.py` in §5.
 
 ### 2.5 `d=0.04` is at the noise limit — do not raise it
 There is no derivative filter in `pid_controller`. `d` cuts overshoot without touching
-steady state (exactly as theory predicts), but it amplifies 20 Hz encoder quantisation:
+steady state (exactly as theory predicts), but it amplifies 10 Hz encoder quantisation:
 
 | d (with p=0.05, i=1.0) | result |
 |------|--------|

@@ -39,7 +39,7 @@
       "id": "SYS-SR-002",
       "allocation": "SW+HW",
       "verdict": "Partial",
-      "summary": "Velocity mode on 4 joints with PIDs at 100 Hz and diff_drive at 50 Hz (Compliant), but the DCC1000 encoder feedback refreshes at 20 Hz (rover_controller/README.md:57-58), so feedback is below 50 Hz. Model test tSkidSteerKinematics/testEncoderFeedbackRate fails (KnownDeviation)."
+      "summary": "Velocity mode on 4 joints with PIDs at 100 Hz and diff_drive at 50 Hz (Compliant), but the DCC1000 encoder feedback refreshes at 10 Hz (100 ms) (rover_controller/README.md:57-58), so feedback is below 50 Hz. Model test tSkidSteerKinematics/testEncoderFeedbackRate fails (KnownDeviation)."
     },
     {
       "id": "SYS-SR-003",

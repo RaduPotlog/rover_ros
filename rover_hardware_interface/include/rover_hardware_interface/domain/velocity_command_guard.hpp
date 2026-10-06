@@ -47,7 +47,7 @@ constexpr double kDefaultVelocityCommandZeroTolerance = 0.01;
 // Measured velocity has no such artifact: a stationary wheel reads zero regardless of what the
 // integrator remembers. Checking it closes the real hazard - clearing the E-Stop while the rover
 // is still rolling - directly rather than by proxy. 0.05 rad/s is ~8 mm/s at the A1's 0.1651 m
-// wheel radius, comfortably above 20 Hz encoder quantisation and far below walking pace.
+// wheel radius, comfortably above 10 Hz encoder quantisation and far below walking pace.
 constexpr double kDefaultVelocityStateZeroTolerance = 0.05;
 
 // True when every command is finite and within `tolerance` of zero. A non-finite command (NaN

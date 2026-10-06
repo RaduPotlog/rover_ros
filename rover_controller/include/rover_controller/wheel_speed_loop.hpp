@@ -49,7 +49,7 @@ struct WheelLoopOptions
   bool stop_at_zero_reference = false;
   double zero_reference_tolerance = 1e-3;  // rad/s
   // The integral works on (delayed, lagged reference - measurement) instead of the raw error.
-  // The encoders (20 Hz) and the DCC1000 duty ramp delay the response ~0.25 s, so the raw error
+  // The encoders (10 Hz) and the DCC1000 duty ramp delay the response ~0.25 s, so the raw error
   // after a step is mostly the plant catching up; integrating it winds the I-term up and
   // overshoots. Against a reference shaped like the plant's own response, only the error the
   // plant will NOT remove by itself (load, friction, skid) is integrated.

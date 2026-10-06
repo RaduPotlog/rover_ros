@@ -60,7 +60,7 @@
   # save_i_term false: the integral is cleared each time the PIDs are (re)activated
   # (e-stop, controller switch), so a stale I-term never carries into the next drive.
   #
-  # Why these values (encoders are 20 Hz, so dead time is ~0.2 s and loop gain must stay low):
+  # Why these values (encoders are 10 Hz, so dead time is ~0.2 s and loop gain must stay low):
   #   p 0.05  - P is nearly useless here: p = 1.0 rang the loop to 40-90 % overshoot. Keep it small.
   #   i 1.0   - the integral does all the steady-state work. Open loop the feedforward is ~21 %
   #             slow at 0.2 m/s (friction/deadband) and ~3 % fast at 0.8 m/s, so a single
@@ -180,13 +180,14 @@
         fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
         
   # Per-controller update rates. The controller_manager loop and the wheel PIDs run at 50 Hz:
-  # the encoders only report at 20 Hz, so 100 Hz just re-ran the PIDs on stale feedback
-  # 4 cycles in 5 (and made the D term spike on each fresh sample) against ~0.2 s of dead time.
+  # the encoders only report every 100 ms (10 Hz), so 100 Hz just re-ran the PIDs on stale
+  # feedback 9 cycles in 10 (and made the D term spike on each fresh sample) against ~0.2 s of
+  # dead time.
   # Everything that only publishes runs at the rate its consumers use, because each message
   # crosses the Zenoh router to other containers. Each rate must divide 50 evenly
   # (test/test_wheel_geometry.py), or controller_manager updates it at an uneven period.
-  #   joint_states  25 Hz - the encoders are 20 Hz, but 20 does not divide 50; 25 is the nearest
-  #                         rate that does. robot_state_publisher turns each message into /tf,
+  #   joint_states  25 Hz - the encoders are 10 Hz, so wheel positions change at most every
+  #                         100 ms. robot_state_publisher turns each message into /tf,
   #                         which every TF listener on the rover receives.
   #   imu/data      50 Hz - rover_ekf_node runs at 50 Hz.
   #   odometry/wheels 50 Hz - diff_drive publishes odometry every update (it has no separate

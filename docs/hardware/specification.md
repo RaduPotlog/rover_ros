@@ -105,7 +105,7 @@ Sources: `rover_controller/config/wheel_01_controller.yaml`,
 | Sensor | Model | Rate | Notes |
 |---|---|---|---|
 | IMU | Phidgets Spatial MOT0110 (USB) | 8 ms data interval (125 Hz), published at 50 Hz | Orientation filter (gain/zeta), magnetometer off (`use_mag: false`), ENU |
-| Wheel encoders | Built into the motors | 20 Hz driver state, 50 Hz control loop | |
+| Wheel encoders | Built into the motors | 10 Hz encoder updates (100 ms), 20 Hz driver state, 50 Hz control loop | |
 | Battery telemetry | Daly BMS | **TBD** | |
 
 The lidar, GNSS and cameras are payload: they belong to the `rover_sensors` repository and are

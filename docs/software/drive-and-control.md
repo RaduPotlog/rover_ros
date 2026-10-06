@@ -114,9 +114,9 @@ Because the two axes are limited separately, the outer wheel's rim speed can rea
 | `controller_manager` | 50 Hz | `read()` / `write()` cycle |
 | Wheel PIDs, `rover_drive_controller` | 50 Hz | Odometry published every update |
 | `rover_imu_broadcaster` | 50 Hz | Matches the EKF |
-| `rover_joint_state_broadcaster` | 25 Hz | Nearest divisor of 50 to the 20 Hz encoders |
+| `rover_joint_state_broadcaster` | 25 Hz | Divides 50; the encoders are 10 Hz |
 | Motor driver state, safety topics | 20 Hz | `driver_states_update_frequency` |
-| Encoder updates (DCC1000) | 20 Hz (every 50 ms at most) | |
+| Encoder updates (DCC1000) | 10 Hz (every 100 ms at most) | |
 | EKF (`rover_ekf_node`) | 50 Hz | |
 
 Every controller rate must divide the manager's 50 Hz (`rover_controller/test/test_wheel_geometry.py`).

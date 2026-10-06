@@ -121,7 +121,7 @@ public:
     // reporting every `data_interval_ms`. Without it a wheel that stops keeps reporting its last
     // non-zero speed if the callback doesn't fire at standstill. 3x the interval so one or two
     // late/missed events don't zero the speed of a turning wheel - the DCC1000 encoder can't
-    // report faster than every 50 ms, so the timeout must never be near a single interval.
+    // report faster than every 100 ms, so the timeout must never be near a single interval.
     static std::chrono::nanoseconds encoderStaleTimeout(const std::uint32_t data_interval_ms);
 
 private:

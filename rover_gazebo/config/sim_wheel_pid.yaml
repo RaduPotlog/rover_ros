@@ -1,7 +1,7 @@
 # Simulation-only overrides for the wheel PIDs and the drive controller, loaded after
 # rover_controller's wheel_01_controller.yaml (the spawner applies its param files in order, so these win).
 #
-# The real gains are tuned against 20 Hz encoders and ~0.2 s of motor dead time. Gazebo's
+# The real gains are tuned against 10 Hz encoders and ~0.2 s of motor dead time. Gazebo's
 # velocity joints have neither: the wheel reaches the commanded speed within one control step,
 # so the derivative term acts with a loop gain of about d / dt. At the old 100 Hz that was
 # 0.04 / 0.01 = 4 and the loop oscillated between +/-u_clamp even with the rover standing still;
