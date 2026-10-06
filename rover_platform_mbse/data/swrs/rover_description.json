@@ -180,7 +180,7 @@
     {
       "id": "SWR-DESC-008",
       "category": "Parameter",
-      "text": "The rover_description shall set the RoverA1System drive-train parameters driver_states_update_frequency 20.0, max_rover_driver_initialization_attempts 3, max_rover_driver_activation_attempts 3, the three error-filter counts 2, driver_comm_timeout_ms 300, motor_failsafe_timeout_ms 500, motor_acceleration 4.0, motor_current_limit 15.0, motor_supply_voltage 24.0, motor_torque_constant 0.11, max_rpm_motor_speed 2800, gear_ratio 23.3, gearbox_efficiency 0.70, raw_current_to_amps_scale 0.001 and encoder_resolution 1024.",
+      "text": "The rover_description shall set the RoverA1System drive-train parameters driver_states_update_frequency 20.0, max_rover_driver_initialization_attempts 3, max_rover_driver_activation_attempts 3, the three error-filter counts 2, driver_comm_timeout_ms 300, motor_failsafe_timeout_ms 500, motor_acceleration 1.0, motor_current_limit 15.0, motor_supply_voltage 24.0, motor_torque_constant 0.11, max_rpm_motor_speed 2800, gear_ratio 23.3, gearbox_efficiency 0.70, raw_current_to_amps_scale 0.001 and encoder_resolution 1024.",
       "rationale": "Drive actuation and feedback scaling (SYS-SR-002) and the DCC1000 command-loss failsafe (SYS-SR-011).",
       "verification": "Inspection, Test",
       "acceptance": "The generated URDF contains exactly these values and RoverA1System on_init() accepts them.",
@@ -198,7 +198,7 @@
       "verified_by": [
         "rover_hardware_interface/test/rover_system/test_rover_a1_system_on_init.cpp"
       ],
-      "comments": "Comment drift in the URDF: motor_current_limit comment (lines 228-232) describes 10 A, value is 15.0; motor_acceleration comment (222-225) describes 2.0 duty/s, value is 4.0."
+      "comments": "Comment drift in the URDF: motor_current_limit comment (lines 228-232) describes 10 A, value is 15.0."
     },
     {
       "id": "SWR-DESC-009",

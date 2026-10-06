@@ -65,7 +65,7 @@ The manual uses the value the code runs with. The other source should be correct
 These come from reading the code while writing the manual. They are not documentation errors.
 
 - The wheel PIDs' reference model (`integral_reference_delay` 0.15 s / `_time_constant` 0.08 s)
-  was fitted on the ground with `motor_acceleration` 10.0. The URDF now sets 2.0 and the model
+  was fitted on the ground with `motor_acceleration` 10.0. The URDF now sets 1.0 and the model
   has not been re-fitted (`rover_controller/config/wheel_01_controller.yaml`).
 - `velocity_command_zero_tolerance` is still 0.4 rad/s. The reason for it (a frozen PID
   integral) is gone while `stop_at_zero_reference` is on, so it can come down toward 0.01 once

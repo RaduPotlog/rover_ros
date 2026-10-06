@@ -48,7 +48,7 @@ The A1 is a four-wheel-drive skid-steer platform. Each wheel has its own motor, 
 | Motor torque constant | 0.11 N·m/A | `rover_a1_macro.urdf.xacro` (`motor_torque_constant`) |
 | Motor stall current | 16 A at 24 V | comment on `motor_current_limit` in `rover_a1_macro.urdf.xacro` |
 | DCC1000 current limit | 15 A | `rover_a1_macro.urdf.xacro` (`motor_current_limit`) |
-| DCC1000 on-board ramp | 2.0 duty/s | `rover_a1_macro.urdf.xacro` (`motor_acceleration`) |
+| DCC1000 on-board ramp | 1.0 duty/s | `rover_a1_macro.urdf.xacro` (`motor_acceleration`) |
 | DCC1000 failsafe timeout | 500 ms | `rover_a1_macro.urdf.xacro` (`motor_failsafe_timeout_ms`) |
 
 The tyre radius and the odometry radius differ on purpose. The CAD radius places the model on the ground. The odometry radius is the one the controllers are tuned on.

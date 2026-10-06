@@ -63,7 +63,7 @@
     {
       "id": "SWR-HWI-003",
       "category": "Parameter",
-      "text": "The rover_hardware_interface shall configure each DCC1000 with the URDF motor_acceleration (4.0 duty/s) and motor_current_limit (15.0 A) and fail on_init() when motor_acceleration is outside [0.5, 10000] duty/s, motor_current_limit outside [2, 25] A, motor_supply_voltage outside [8, 30] V or the derived current regulator gain outside [1, 100].",
+      "text": "The rover_hardware_interface shall configure each DCC1000 with the URDF motor_acceleration (1.0 duty/s) and motor_current_limit (15.0 A) and fail on_init() when motor_acceleration is outside [0.5, 10000] duty/s, motor_current_limit outside [2, 25] A, motor_supply_voltage outside [8, 30] V or the derived current regulator gain outside [1, 100].",
       "rationale": "The current limit protects motor, DCC1000 and gearbox; rejecting out-of-range values at on_init() avoids a late SDK failure after the drive is energised.",
       "verification": "Test",
       "acceptance": "on_init() succeeds with the rover_description values; on_init() returns ERROR for motor_acceleration 0.4, motor_current_limit 26 or motor_supply_voltage 31; the DCC1000 reports current limit 15.0 A after configure.",

@@ -224,16 +224,16 @@
           <param name="motor_failsafe_timeout_ms">500</param>
 
           <!-- On-board duty-cycle ramp of each DCC1000, in duty/s (DCC1000 range 0.5-10000).
-               2.0 = up to 0.5 s from stop to full duty (10.0 would be 0.1 s, so diff_drive's
+               1.0 = up to 1 s from stop to full duty (10.0 would be 0.1 s, so diff_drive's
                acceleration limits would shape the motion instead of this ramp). The ramp also
                applies when slowing down, and braking only engages at duty 0, so a slow ramp
                lengthens every stop, E-stop included. The wheel PIDs' integral_reference_delay/
                _time_constant model the motor response (rover_controller/config/
                wheel_01_controller.yaml). They were fitted on the ground at 10.0 (2026-10-02) and
-               have not been re-fitted for 2.0: re-run wheel_step_response and re-fit them after
+               have not been re-fitted for 1.0: re-run wheel_step_response and re-fit them after
                changing this. Optional - omitting it keeps the compiled-in
                kDefaultMotorAcceleration (2.0). -->
-          <param name="motor_acceleration">2.0</param>
+          <param name="motor_acceleration">1.0</param>
 
           <!-- DCC1000 motor current limit in A (device range 2-25). The motor stalls at 16 A on
                24 V, and a direction reversal can briefly reach ~2x stall as back-EMF adds to the
