@@ -157,7 +157,7 @@ Source: `rover_controller/config/wheel_01_controller.yaml`, `rover_localization/
 
 | Parameter | Value | Meaning |
 |---|---|---|
-| `motor_acceleration` | 1.0 duty/s | DCC1000 on-board ramp. Also lengthens every stop. The wheel PID reference model depends on it (see [Wheel PID controller](#wheel-pid-controller)). |
+| `motor_acceleration` | 2.0 duty/s | DCC1000 on-board ramp. Also lengthens every stop. The wheel PID reference model depends on it (see [Wheel PID controller](#wheel-pid-controller)). |
 | `motor_current_limit` | 15.0 A | Per motor |
 | `motor_supply_voltage` | 24.0 V | Used for the current regulator gain |
 | `max_rpm_motor_speed` | 2800 rpm | |
@@ -206,7 +206,7 @@ The feedforward carries most of the command, and the PID trims load, battery and
 **Ground tune (2026-10-02, `motor_acceleration` 10.0, 26.6 V).** The measured dead time was 0.17–0.22 s. A delay of 0.15 s with a time constant of 0.08 s gave t90 ≈ 0.6 s. With `i_clamp` 2.0, in-place turns went from 32–53 % under the reference to 5–8 % under (turn overshoot 7–15 %). Straight steps from 0.3 to 0.8 m/s stayed at overshoot ≤ 4.3 % and |error| ≤ 1.7 %.
 
 !!! warning "Reference model fitted at a different motor ramp"
-    The reference model (0.15 s / 0.08 s) was fitted with `motor_acceleration` 10.0. The URDF now sets 1.0, and the model has not been re-fitted. The config says to re-fit the model whenever the motor ramp changes: run `wheel_step_response` on the ground and adjust the delay and time constant. If the model is slower than the plant, the integral winds the wrong way on every rise and leaves a slow tail.
+    The reference model was fitted at `motor_acceleration` 10.0 (0.15 s / 0.08 s, 2026-10-02) and again at 1.0 (0.40 s / 0.12 s, 2026-10-06). The URDF now sets 2.0 and the model has not been re-fitted for it, nor have the acceleration limits (1.4 m/s², 1.3 rad/s², measured at 1.0). The config says to re-fit the model whenever the motor ramp changes: run `wheel_step_response` on the ground and adjust the delay and time constant. If the model is slower than the plant, the integral winds the wrong way on every rise and leaves a slow tail.
 
 Source: `rover_controller/config/wheel_01_controller.yaml`, `rover_controller/include/rover_controller/seeded_pid_controller.hpp`, `rover_controller/src/seeded_pid_controller.cpp`, `rover_controller/include/rover_controller/wheel_speed_loop.hpp`, `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro`.
 

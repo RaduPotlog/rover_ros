@@ -120,6 +120,8 @@
   # allows). Straight steps were unchanged, but turn overshoot rose to 22-38 % on single wheels and
   # the end-of-hold error scattered +-20 % both ways (the integral swings). Not a clear win, and it
   # costs top speed. Re-fit the model again whenever motor_acceleration changes.
+  # PENDING (2026-10-07): the URDF now sets motor_acceleration 2.0 (was 1.0). The model above
+  # and the acceleration limits below were measured at 1.0 and are not yet re-fitted.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
