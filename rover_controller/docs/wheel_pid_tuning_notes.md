@@ -25,7 +25,8 @@ session can pick up without re-deriving anything. Gains from this session are al
 > was fitted), so the 0.15 / 0.08 s model was ~0.3 s too fast and straight steps overshot 9-21 %.
 > Measured plant ~0.45 s delay + 0.14 s lag; `integral_reference_delay` 0.40 /
 > `_time_constant` 0.12 gave straight overshoot <= 2.6 %, |error| <= 2.0 %. `i_clamp` 3.0 helped turns
-> but exceeds the full-duty guard (<= 2.17), so the shipped clamp is 2.1. Turn per-wheel scatter
+> but needs the max linear velocity cut from 0.95 to 0.75 m/s to satisfy the full-duty guard
+> (reference 9.18 + 3.0 <= 12.58); both are now shipped. Turn per-wheel scatter
 > (+-12-25 %) is skid-steer noise, not a gain limit.
 
 **Status at the time: step 1 of the README "Drive-train tuning" list was done for lifted
