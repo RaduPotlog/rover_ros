@@ -21,6 +21,13 @@ session can pick up without re-deriving anything. Gains from this session are al
 > 4.7-4.9 %, speed error <= 1.1 % (two runs). Ground re-check still pending. Gotcha: `ros2 param
 > set` needs doubles (`0.0`, not `0`) or it fails with exit code 0; the CLI needs `--no-daemon`.
 
+> **Ground re-fit (2026-10-06).** `motor_acceleration` is now 1.0 (was 10.0 when the integral model
+> was fitted), so the 0.15 / 0.08 s model was ~0.3 s too fast and straight steps overshot 9-21 %.
+> Measured plant ~0.45 s delay + 0.14 s lag; `integral_reference_delay` 0.40 /
+> `_time_constant` 0.12 gave straight overshoot <= 2.6 %, |error| <= 2.0 %. `i_clamp` 3.0 helped turns
+> but exceeds the full-duty guard (<= 2.17), so the shipped clamp is 2.1. Turn per-wheel scatter
+> (+-12-25 %) is skid-steer noise, not a gain limit.
+
 **Status at the time: step 1 of the README "Drive-train tuning" list was done for lifted
 wheels only.** Steps 2 (acceleration limits) and 3 (skid-steer calibration) were untouched.
 
