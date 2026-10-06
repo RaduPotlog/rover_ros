@@ -21,6 +21,11 @@ session can pick up without re-deriving anything. Gains from this session are al
 > 4.7-4.9 %, speed error <= 1.1 % (two runs). Ground re-check still pending. Gotcha: `ros2 param
 > set` needs doubles (`0.0`, not `0`) or it fails with exit code 0; the CLI needs `--no-daemon`.
 
+> **Acceleration limits (2026-10-06, ground).** Measured with limits relaxed to 20 / 40: the controller
+> ramp (16 rad/s^2) was not the bottleneck, the wheels were (sustained 10-90 % slope 1.5-11 rad/s^2, best
+> 10.2 at 0.75 m/s). Shipped `linear.x` 1.4 m/s^2, `angular.z` 1.3 rad/s^2 (were 2.7 / 3.74). The
+> tool's peak "wheel accel" is encoder quantisation noise - use the rise slope.
+
 > **Rejected (2026-10-06):** `i_clamp` 3.0 + `linear.x` 0.75 m/s. Straight steps unchanged; turns got
 > worse (single-wheel overshoot 22-38 % vs <= 10 % at 2.1, error +-20 % both signs). Kept 2.1 / 0.95.
 > **Ground re-fit (2026-10-06).** `motor_acceleration` is now 1.0 (was 10.0 when the integral model
