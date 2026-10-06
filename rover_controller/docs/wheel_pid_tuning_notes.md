@@ -14,6 +14,13 @@ session can pick up without re-deriving anything. Gains from this session are al
 > `wheel_separation_multiplier` is now 1.659: the calibrated 1.63, rescaled to a measured
 > separation of 0.615 m (see the comment in the controller config).
 
+> **Update (2026-10-06, wheels lifted, 50 Hz).** Shipped gains (`i_clamp` ±2.0, model-reference
+> integral) re-measured: median worst overshoot 4.9-5.7 %, speed error <= 1.7 %. Open loop only
+> `fr` overshoots (5.2 % at +0.60, 7.8 % at +0.80); closed loop `fr` peaked at 9.7-11.8 % on
+> +0.80. `fr` `feedforward_gain` 0.96 (others 1.0) brought that to 7.7 / 6.2 %, median worst
+> 4.7-4.9 %, speed error <= 1.1 % (two runs). Ground re-check still pending. Gotcha: `ros2 param
+> set` needs doubles (`0.0`, not `0`) or it fails with exit code 0; the CLI needs `--no-daemon`.
+
 **Status at the time: step 1 of the README "Drive-train tuning" list was done for lifted
 wheels only.** Steps 2 (acceleration limits) and 3 (skid-steer calibration) were untouched.
 

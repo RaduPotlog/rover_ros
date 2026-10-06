@@ -50,12 +50,17 @@
         node_options_args: ["-r", "~/imu:=imu/data",
                             "-r", "~/transition_event:=_rover_imu_broadcaster/transition_event"]
 
-  # Wheel PID gains. Units: rad/s in, rad/s out. Same values on all four wheels. p/i/d were tuned
+  # Wheel PID gains. Units: rad/s in, rad/s out. Same values on all four wheels except the front-right
+  # feedforward (see below). p/i/d were tuned
   # with wheel_step_response, wheels lifted; the clamps and the integral reference on the ground.
   # The hardware command is already rad/s scaled to duty (open loop), so feedforward_gain 1.0
   # carries the bulk and PID only trims load/battery/slip error. p = i = d = 0 with feedforward
   # 1.0 is exactly the old open-loop behaviour - use it for A/B runs:
   #   ros2 param set <ns>/pid_controller_<wheel> gains.<joint>.p 0.0   (and .i, .d)
+  # fr feedforward_gain 0.96 (others 1.0): open loop (2026-10-06, wheels lifted) the fr plant alone
+  # overshoots 5-8 % at +0.60/+0.80 m/s while fl/rl/rr do not. Trimming fr's feedforward cut its
+  # closed-loop overshoot from 9.7/11.8 % to 7.7/6.2 % (two runs each at 50 Hz); median worst case
+  # stayed 4.7-4.9 %, speed error <= 1.1 %. Re-check on the ground.
   # u_clamp is the hardware full-duty speed (2800 rpm / 23.3 = 12.58 rad/s).
   # save_i_term false: the integral is cleared each time the PIDs are (re)activated
   # (e-stop, controller switch), so a stale I-term never carries into the next drive.
@@ -177,7 +182,7 @@
       scale_integral_with_reference: true
 
       gains:
-        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
+        fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 0.96, "i_clamp_min": -2.0, "i_clamp_max": 2.0, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
         
   # Per-controller update rates. The controller_manager loop and the wheel PIDs run at 50 Hz:
   # the encoders only report every 100 ms (10 Hz), so 100 Hz just re-ran the PIDs on stale
