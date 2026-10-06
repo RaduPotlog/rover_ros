@@ -21,6 +21,17 @@ session can pick up without re-deriving anything. Gains from this session are al
 > 4.7-4.9 %, speed error <= 1.1 % (two runs). Ground re-check still pending. Gotcha: `ros2 param
 > set` needs doubles (`0.0`, not `0`) or it fails with exit code 0; the CLI needs `--no-daemon`.
 
+> **Skid-steer calibration (2026-10-06/07, ground; README step 3). No config change.** Spin
+> (`wheel_odom_calibration mode:=spin`, `imu_yaw_sign` -1): `wheel_separation_multiplier` 1.672 (median
+> of 6; mean of the four 0.6 / 1.0 rad/s segments 1.666, five-segment mean 1.654) against the
+> shipped 1.659. The -0.30 rad/s segment barely turned the rover (stiction, 5.0) and is not real; the
+> slow +/-0.3 segments are unreliable. Straight (2.0 m at 0.3 m/s, two runs, tape-measured 2.2 m
+> both): wheel odometry 2.196 / 2.228 m after coasting (2.007 / 2.004 m at the stop command, so
+> compare the tape with the post-coast figure) -> radius multiplier 1.002 / 0.987, mean 0.995. That is
+> inside the tape resolution (~1 cm), so left/right radius multipliers stay 1.0. The tool's own distance
+> readout stops at the stop command and misses the coast; capture the odometry pose after the rover
+> has stopped (watchdog script) before dividing.
+
 > **Acceleration limits (2026-10-06, ground).** Measured with limits relaxed to 20 / 40: the controller
 > ramp (16 rad/s^2) was not the bottleneck, the wheels were (sustained 10-90 % slope 1.5-11 rad/s^2, best
 > 10.2 at 0.75 m/s). Shipped `linear.x` 1.4 m/s^2, `angular.z` 1.3 rad/s^2 (were 2.7 / 3.74). The
