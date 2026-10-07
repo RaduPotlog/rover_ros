@@ -16,14 +16,18 @@
 
 #include <algorithm>
 #include <array>
+#include <cinttypes>
 #include <cmath>
 #include <chrono>
+#include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <functional>
 #include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
@@ -160,6 +164,9 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
 
         system_ros_interface_->addDiagnosticTask(
         std::string("safety plc link"), this, &RoverSystem::diagnoseSafetyLink);
+
+        system_ros_interface_->addDiagnosticTask(
+        std::string("command path"), this, &RoverSystem::diagnoseCommandPath);
 
         const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
         system_ros_interface_->updateMsgGpioStates(gpio_state);
@@ -372,6 +379,8 @@ return_type RoverSystem::write(const rclcpp::Time & /* time */, const rclcpp::Du
         lifecycle_state == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE,
         e_stop_active_,
         control_loop_use_case_->isHardwareFaultLatched());
+
+    control_loop_use_case_->recordWriteMode(mode);
 
     if (mode == WriteCommandMode::kCommandMotion) {
         handleRoverDriverWriteOperation([this] {
@@ -814,6 +823,80 @@ unsigned char toDiagnosticLevel(const SafetyLinkSeverity s)
 }
 
 }  // namespace
+
+// Where does a velocity command go missing between write() and the motor? Every row of this
+// answers one question: how many were issued, how many were dropped (and why), how the driver's
+// asynchronous calls completed and how long they took, and what each write() cycle did. Counters
+// are cumulative since start; compare two reads to get a rate. Instrumentation only.
+void RoverSystem::diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    if (!rover_driver_ || !control_loop_use_case_) {
+        status.summary(diagnostic_updater::DiagnosticStatusWrapper::WARN, "Not configured.");
+        return;
+    }
+
+    const std::array<std::pair<DriverNames, const char *>, 4> wheels{{
+        {DriverNames::FRONT_LEFT, "Front Left"},
+        {DriverNames::FRONT_RIGHT, "Front Right"},
+        {DriverNames::REAR_LEFT, "Rear Left"},
+        {DriverNames::REAR_RIGHT, "Rear Right"}}};
+
+    unsigned char level{diagnostic_updater::DiagnosticStatusWrapper::OK};
+    std::uint64_t total_attempted = 0;
+    std::uint64_t total_dropped_pending = 0;
+    std::uint64_t total_dropped_no_driver = 0;
+    std::uint64_t total_errors = 0;
+    std::uint32_t worst_latency_us = 0;
+
+    for (const auto & [name, label] : wheels) {
+        const auto s = rover_driver_->getCommandStats(name);
+        const std::string p = std::string(label) + " ";
+
+        status.add(p + "commands submitted", s.submitted);
+        status.add(p + "dropped, previous command still pending", s.dropped_pending);
+        status.add(p + "dropped, driver object gone", s.dropped_no_driver);
+        status.addf(p + "dropped while pending (%)", "%.2f", 100.0 * s.droppedPendingRatio());
+        status.add(p + "completed ok", s.completed_ok);
+        status.add(p + "completed failsafe-rejected", s.completed_failsafe);
+        status.add(p + "completed with other error", s.completed_error);
+        status.add(p + "last non-ok return code", static_cast<int>(s.last_error_code));
+        status.addf(p + "completion latency last (ms)", "%.2f", s.latency_last_us / 1000.0);
+        status.addf(p + "completion latency mean (ms)", "%.2f", s.meanLatencyUs() / 1000.0);
+        status.addf(p + "completion latency max (ms)", "%.2f", s.latency_max_us / 1000.0);
+        status.add(p + "command in flight now", s.pending);
+        status.add(p + "in flight for (ms)", s.pending_age_ms);
+
+        total_attempted += s.attempted();
+        total_dropped_pending += s.dropped_pending;
+        total_dropped_no_driver += s.dropped_no_driver;
+        total_errors += s.completed_error;
+        worst_latency_us = std::max(worst_latency_us, s.latency_max_us);
+    }
+
+    const auto w = control_loop_use_case_->writeCycleStats();
+    status.add("write cycles: forwarded motion", w.motion_cycles);
+    status.add("write cycles: inhibited, zeros sent", w.zero_cycles);
+    status.add("write cycles: skipped, nothing sent", w.skip_cycles);
+    status.add("write cycles: skipped, mutex busy", w.lock_contentions);
+    status.add("write cycles: operation threw", w.exceptions);
+
+    // The informational counters never raise the level; only things that mean a command was lost
+    // for a reason other than ordinary back-pressure do.
+    std::string message = "Command path counters.";
+
+    if (total_errors > 0 || total_dropped_no_driver > 0 || w.exceptions > 0) {
+        level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
+        message = "Commands lost: driver errors/exceptions seen.";
+    }
+
+    char summary[160];
+    std::snprintf(
+        summary, sizeof(summary),
+        "%s %" PRIu64 " dropped-pending of %" PRIu64 " attempted, worst completion %.1f ms.",
+        message.c_str(), total_dropped_pending, total_attempted, worst_latency_us / 1000.0);
+
+    status.summary(level, summary);
+}
 
 // The safety link had no diagnostic of its own: read()/write() always return OK, so a dead PLC
 // link reached nothing but a stale gpio_state topic. This reports the link and the two threads

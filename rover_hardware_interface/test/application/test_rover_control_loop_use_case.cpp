@@ -182,6 +182,52 @@ TEST_F(RoverControlLoopUseCaseTest, PerformWriteOperationReportsLockContentionWi
     holder.join();
 }
 
+TEST_F(RoverControlLoopUseCaseTest, WriteCycleStatsStartAtZero)
+{
+    const auto s = use_case.writeCycleStats();
+
+    EXPECT_EQ(s.motion_cycles, 0u);
+    EXPECT_EQ(s.zero_cycles, 0u);
+    EXPECT_EQ(s.skip_cycles, 0u);
+    EXPECT_EQ(s.lock_contentions, 0u);
+    EXPECT_EQ(s.exceptions, 0u);
+}
+
+TEST_F(RoverControlLoopUseCaseTest, RecordWriteModeCountsEachModeSeparately)
+{
+    use_case.recordWriteMode(WriteCommandMode::kCommandMotion);
+    use_case.recordWriteMode(WriteCommandMode::kCommandMotion);
+    use_case.recordWriteMode(WriteCommandMode::kCommandMotion);
+    use_case.recordWriteMode(WriteCommandMode::kCommandZero);
+    use_case.recordWriteMode(WriteCommandMode::kSkip);
+    use_case.recordWriteMode(WriteCommandMode::kSkip);
+
+    const auto s = use_case.writeCycleStats();
+    EXPECT_EQ(s.motion_cycles, 3u);
+    EXPECT_EQ(s.zero_cycles, 1u);
+    EXPECT_EQ(s.skip_cycles, 2u);
+}
+
+TEST_F(RoverControlLoopUseCaseTest, WriteCycleStatsCountExceptionsAndLockContentions)
+{
+    // A successful operation touches neither counter.
+    use_case.performWriteOperation([] {});
+    EXPECT_EQ(use_case.writeCycleStats().exceptions, 0u);
+    EXPECT_EQ(use_case.writeCycleStats().lock_contentions, 0u);
+
+    use_case.performWriteOperation([] { throw std::runtime_error("boom"); });
+    EXPECT_EQ(use_case.writeCycleStats().exceptions, 1u);
+
+    // Calling it from inside a running operation finds the mutex busy, exactly as a concurrent
+    // writer would, and skips that cycle.
+    WriteOperationResult inner{};
+    use_case.performWriteOperation([this, &inner] { inner = use_case.performWriteOperation([] {}); });
+
+    EXPECT_EQ(inner.outcome, WriteOperationOutcome::kLockContention);
+    EXPECT_EQ(use_case.writeCycleStats().lock_contentions, 1u);
+    EXPECT_EQ(use_case.writeCycleStats().exceptions, 1u);
+}
+
 TEST(RoverControlLoopUseCaseShouldCommandMotionTest, TrueOnlyWhenActiveAndEStopNotActive)
 {
     EXPECT_TRUE(RoverControlLoopUseCase::shouldCommandMotion(true, false));

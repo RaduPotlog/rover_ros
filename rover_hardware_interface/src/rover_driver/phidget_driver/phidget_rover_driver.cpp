@@ -214,6 +214,22 @@ bool PhidgetRoverDriver::isFailsafeTripped()
     return false;
 }
 
+MotorCommandStats PhidgetRoverDriver::getCommandStats(const DriverNames name)
+{
+    // drivers_ is only mutated by initialize()/deinitialize(), never while diagnostics run, and
+    // the counters themselves are lock-free atomics. An unknown name reads as all-zero rather than
+    // throwing: this is instrumentation and must never disturb its caller.
+    const auto it = drivers_.find(name);
+
+    if (it == drivers_.end() || !it->second) {
+        return {};
+    }
+
+    const auto motor_driver = it->second->getMotorDriver(MotorNames::DEFAULT);
+
+    return motor_driver ? motor_driver->getCommandStats() : MotorCommandStats{};
+}
+
 DriverDataSnapshot PhidgetRoverDriver::getData(const DriverNames name)
 {
     // `last_known_data_` mirrors `data_`'s keys 1:1 (both seeded together in initialize(), never

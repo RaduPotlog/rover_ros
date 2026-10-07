@@ -23,6 +23,8 @@
 #include <mutex>
 #include <string>
 
+#include "rover_hardware_interface/domain/command_stats.hpp"
+
 namespace rover_hardware_interface
 {
 
@@ -158,6 +160,11 @@ public:
     // because the hardware watchdog had tripped. Latched by the implementation until
     // resetFailsafe() succeeds - never auto-clears on its own.
     virtual bool isFailsafeTripped() = 0;
+
+    // Cumulative counters about this motor's command path (issued / dropped / completed, with
+    // latencies) - instrumentation for diagnostics only, never read by the control loop. Cheap and
+    // lock-free; safe to call from any thread. Defaults to all-zero for drivers that don't count.
+    virtual MotorCommandStats getCommandStats() const { return {}; }
 };
 
 }  // namespace rover_hardware_interface

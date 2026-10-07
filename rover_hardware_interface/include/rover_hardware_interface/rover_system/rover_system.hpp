@@ -165,6 +165,10 @@ protected:
         const std::string & key, const double default_value) const;
 
     void diagnoseSafetyLink(diagnostic_updater::DiagnosticStatusWrapper & status);
+
+    // Command-path instrumentation: per-wheel issued/dropped/completed counts and latencies plus
+    // what each write() cycle did. Runs on the diagnostics thread, reads lock-free counters only.
+    void diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrapper & status);
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 
     virtual void updateDriverStateMsg() = 0;

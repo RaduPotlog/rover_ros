@@ -71,6 +71,8 @@ public:
 
     bool isFailsafeTripped() override;
 
+    MotorCommandStats getCommandStats(const DriverNames name) override;
+
     DriverDataSnapshot getData(const DriverNames name) override;
 
 protected:

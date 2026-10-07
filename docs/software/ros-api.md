@@ -38,7 +38,27 @@ hardware only.
 | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` | Plant state of the safety chain: HW E-Stop button, contactor feedback, latch, latch cause, link health. Reliable, volatile, depth 1. |
 | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` | Read-back of the coils software drives (SW E-Stop, driver-fault stop, latch reset, watchdog heartbeat). Diagnostic only. Reliable, volatile, depth 1. |
 | `hardware_interface/aux_io_state` | `rover_msgs/AuxIoState` | General-purpose aux IO on the PLC (DIO06..11 inputs, DIO00..05 output read-back). Not safety. Reliable, volatile, depth 1. |
-| `diagnostics` | `diagnostic_msgs/DiagnosticArray` | Hardware id `Rover System`. Tasks `system errors`, `system status`, `safety plc link`. |
+| `diagnostics` | `diagnostic_msgs/DiagnosticArray` | Hardware id `Rover System`. Tasks `system errors`, `system status`, `safety plc link`, `command path`. |
+
+**`command path` diagnostic (instrumentation).** Cumulative counters since start, per wheel
+(`Front Left`, `Front Right`, `Rear Left`, `Rear Right`), answering "where did a velocity command go
+missing between `write()` and the motor?". Compare two reads to get a rate. All counters are lock-free
+and never read by the control loop.
+
+| Key (prefixed with the wheel name) | Meaning |
+|---|---|
+| `commands submitted` | Asynchronous velocity calls actually issued to the Phidget driver. |
+| `dropped, previous command still pending` | `sendCmdVel()` returned early because the previous call had not completed. Silent before this task existed. |
+| `dropped, driver object gone` | The owning driver no longer existed. Should stay 0. |
+| `dropped while pending (%)` | The two above as a share of everything `write()` tried to send. |
+| `completed ok` / `completed failsafe-rejected` / `completed with other error` | How the asynchronous calls finished. The third means the command may never have reached the motor. |
+| `last non-ok return code` | The last Phidget return code that was not OK (0 = none yet). |
+| `completion latency last / mean / max (ms)` | Submit-to-completion time of the asynchronous call. |
+| `command in flight now`, `in flight for (ms)` | A call in flight and its age. An age that keeps growing means a completion never arrived. |
+
+System-wide: `write cycles: forwarded motion`, `inhibited, zeros sent`, `skipped, nothing sent`,
+`skipped, mutex busy`, `operation threw`. The level is `WARN` only if a call completed with an error,
+the driver object was gone, or a write operation threw; dropped-while-pending is informational.
 
 **Services**
 

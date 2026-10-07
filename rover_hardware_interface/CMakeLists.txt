@@ -218,6 +218,10 @@ if(BUILD_TESTING)
     test_velocity_command_guard test/domain/test_velocity_command_guard.cpp)
   target_link_libraries(test_velocity_command_guard ${PROJECT_NAME}_core)
 
+  # Command-path instrumentation counters (issued / dropped / completed, latencies). Header-only.
+  ament_add_gtest(test_command_stats test/domain/test_command_stats.cpp)
+  target_link_libraries(test_command_stats ${PROJECT_NAME}_core)
+
   # Cross-check of the E-Stop latch against the contactor's aux-contact feedback (EDM). Time is
   # injected, so these run instantly.
   ament_add_gtest(test_contactor_monitor test/domain/test_contactor_monitor.cpp)

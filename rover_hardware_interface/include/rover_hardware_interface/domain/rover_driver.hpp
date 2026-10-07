@@ -68,6 +68,10 @@ public:
     virtual void resetFailsafe() = 0;
 
     virtual bool isFailsafeTripped() = 0;
+
+    // Per-wheel command-path counters (see MotorCommandStats) for diagnostics. Lock-free and safe
+    // from any thread. Defaults to all-zero for drivers that don't count.
+    virtual MotorCommandStats getCommandStats(const DriverNames /* name */) { return {}; }
 };
 
 }  // namespace rover_hardware_interface

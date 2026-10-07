@@ -14,6 +14,7 @@
 
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_motor_driver.hpp"
 
+#include <chrono>
 #include <cstdio>
 #include <string>
 
@@ -22,6 +23,20 @@
 
 namespace rover_hardware_interface
 {
+
+namespace
+{
+
+// Steady-clock nanoseconds, the time base of the command-path counters (domain/command_stats.hpp).
+// Reading the clock is RT-safe (no syscall on Linux, no allocation).
+std::int64_t steadyNowNs()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
+}  // namespace
 
 PhidgetDriver::PhidgetDriver()
 {
@@ -591,6 +606,18 @@ void CCONV PhidgetMotorDriver::setTargetVelocityHandler(
 
     PhidgetMotorDriver * driver = static_cast<PhidgetMotorDriver*>(ctx);
 
+    // Recorded before pending is cleared: once it is clear the RT thread may submit again and
+    // restamp the submit time this latency is measured against.
+    if (res == EPHIDGET_OK) {
+        driver->command_stats_.onCompletion(CommandCompletion::kOk, 0, steadyNowNs());
+    } else if (isFailsafeTrippedReturnCode(res)) {
+        driver->command_stats_.onCompletion(
+            CommandCompletion::kFailsafe, static_cast<std::int32_t>(res), steadyNowNs());
+    } else {
+        driver->command_stats_.onCompletion(
+            CommandCompletion::kError, static_cast<std::int32_t>(res), steadyNowNs());
+    }
+
     driver->set_speed_pending_ = false;
 
     if (isFailsafeTrippedReturnCode(res)) {
@@ -687,7 +714,10 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
         // this command is dropped rather than queued. At the 50 Hz write() rate the next cycle's
         // command supersedes it almost immediately, so this is intentional, not an oversight; it
         // is not currently surfaced as an error/counter to the caller.
-        if (set_speed_pending_) return;
+        if (set_speed_pending_) {
+            command_stats_.onDroppedPending();
+            return;
+        }
 
         float cmd_temp = 0.0f;
 
@@ -697,6 +727,9 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
             cmd_temp = cmd;
         }
 
+        // Stamped before the call: the completion can fire on the SDK thread at any moment after it.
+        command_stats_.onSubmit(steadyNowNs());
+
         PhidgetDCMotor_setTargetVelocity_async(
             motor_handle_,
             cmd_temp,
@@ -704,7 +737,14 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
             this);
 
         set_speed_pending_ = true;
+    } else {
+        command_stats_.onDroppedNoDriver();
     }
+}
+
+MotorCommandStats PhidgetMotorDriver::getCommandStats() const
+{
+    return command_stats_.snapshot(set_speed_pending_.load(std::memory_order_relaxed), steadyNowNs());
 }
 
 }  // namespace rover_hardware_interface

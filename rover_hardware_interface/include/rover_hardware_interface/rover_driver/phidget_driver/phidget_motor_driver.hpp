@@ -91,6 +91,8 @@ public:
 
     bool isFailsafeTripped() override;
 
+    MotorCommandStats getCommandStats() const override;
+
     // Pure logic, factored out so it's unit-testable without any Phidget SDK handles: whether a
     // PhidgetReturnCode reported by the async setTargetVelocity completion means the hardware
     // watchdog rejected the command.
@@ -217,6 +219,11 @@ private:
     // true while a PhidgetDCMotor_setTargetVelocity_async() call is in flight (cleared by
     // setTargetVelocityHandler() once the SDK reports completion).
     std::atomic<bool> set_speed_pending_{false};
+
+    // Instrumentation: counts what sendCmdVel() issued, dropped and how the async calls completed.
+    // Written from the RT thread (sendCmdVel) and the SDK callback thread (setTargetVelocityHandler),
+    // read by diagnostics via getCommandStats(); all relaxed atomics, no locks.
+    CommandStatsRecorder command_stats_;
 
     // Set by setTargetVelocityHandler() (Phidget SDK callback thread) when a command completion
     // reports the watchdog has tripped; read via isFailsafeTripped() (RT thread). Only cleared by

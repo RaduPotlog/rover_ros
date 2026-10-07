@@ -141,6 +141,7 @@ WriteOperationResult RoverControlLoopUseCase::performWriteOperation(
     std::unique_lock<std::mutex> write_lck(write_mtx_, std::defer_lock);
 
     if (!write_lck.try_lock()) {
+        lock_contentions_.fetch_add(1, std::memory_order_relaxed);
         error_filter_.updateError(ErrorsFilterIds::WRITE_CMDS, true);
         return {WriteOperationOutcome::kLockContention, ""};
     }
@@ -150,6 +151,7 @@ WriteOperationResult RoverControlLoopUseCase::performWriteOperation(
         error_filter_.updateError(ErrorsFilterIds::WRITE_CMDS, false);
         return {WriteOperationOutcome::kSucceeded, ""};
     } catch (const std::exception & e) {
+        exceptions_.fetch_add(1, std::memory_order_relaxed);
         // Copies e.what() into error_message on every exception, unlike the old inline
         // RCLCPP_WARN_STREAM_THROTTLE call this replaced, which only paid its string-building
         // cost on ticks the 5s throttle let through - the caller (RoverSystem::
@@ -159,6 +161,34 @@ WriteOperationResult RoverControlLoopUseCase::performWriteOperation(
         error_filter_.updateError(ErrorsFilterIds::WRITE_CMDS, true);
         return {WriteOperationOutcome::kExceptionThrown, e.what()};
     }
+}
+
+void RoverControlLoopUseCase::recordWriteMode(const WriteCommandMode mode)
+{
+    switch (mode) {
+        case WriteCommandMode::kCommandMotion:
+            motion_cycles_.fetch_add(1, std::memory_order_relaxed);
+            break;
+
+        case WriteCommandMode::kCommandZero:
+            zero_cycles_.fetch_add(1, std::memory_order_relaxed);
+            break;
+
+        case WriteCommandMode::kSkip:
+            skip_cycles_.fetch_add(1, std::memory_order_relaxed);
+            break;
+    }
+}
+
+WriteCycleStats RoverControlLoopUseCase::writeCycleStats() const
+{
+    WriteCycleStats s;
+    s.motion_cycles = motion_cycles_.load(std::memory_order_relaxed);
+    s.zero_cycles = zero_cycles_.load(std::memory_order_relaxed);
+    s.skip_cycles = skip_cycles_.load(std::memory_order_relaxed);
+    s.lock_contentions = lock_contentions_.load(std::memory_order_relaxed);
+    s.exceptions = exceptions_.load(std::memory_order_relaxed);
+    return s;
 }
 
 }  // namespace rover_hardware_interface

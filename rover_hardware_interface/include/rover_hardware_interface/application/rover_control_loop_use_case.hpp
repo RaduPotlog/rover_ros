@@ -15,7 +15,9 @@
 #ifndef ROVER_HARDWARE_INTERFACE_APPLICATION_ROVER_CONTROL_LOOP_USE_CASE_HPP_
 #define ROVER_HARDWARE_INTERFACE_APPLICATION_ROVER_CONTROL_LOOP_USE_CASE_HPP_
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -59,6 +61,17 @@ enum class WriteCommandMode
     kCommandZero,
     // Drivers aren't configured: drop the controller's commands and send nothing.
     kSkip,
+};
+
+// Cumulative counts of what RoverSystem::write() did each cycle. Instrumentation for diagnostics
+// only: nothing in the control loop reads them. See RoverControlLoopUseCase::writeCycleStats().
+struct WriteCycleStats
+{
+    std::uint64_t motion_cycles{0};      // Forwarded the controller's commands (kCommandMotion).
+    std::uint64_t zero_cycles{0};        // Inhibited: sent zeros instead (kCommandZero).
+    std::uint64_t skip_cycles{0};        // Drivers not configured: sent nothing (kSkip).
+    std::uint64_t lock_contentions{0};   // performWriteOperation() found the mutex busy: cycle skipped.
+    std::uint64_t exceptions{0};         // performWriteOperation()'s operation threw.
 };
 
 // Application layer: the safety- and error-filter-relevant decisions RoverSystem's RT
@@ -177,6 +190,12 @@ public:
     // heap-allocate on every RT write() - capture a pointer to state rather than the state itself.
     WriteOperationResult performWriteOperation(const std::function<void()> & write_operation);
 
+    // Counts one write() cycle under `mode`. RT-safe: a single relaxed atomic increment.
+    void recordWriteMode(const WriteCommandMode mode);
+
+    // Snapshot of the counters, for diagnostics. Lock-free; any thread.
+    WriteCycleStats writeCycleStats() const;
+
 private:
 
     std::shared_ptr<RoverDriverInterface> rover_driver_;
@@ -189,6 +208,12 @@ private:
     // and updateFaultFlagStatus() (error-flag reset) shared before this extraction, so the two
     // remain mutually exclusive against each other exactly as before.
     std::mutex write_mtx_;
+
+    std::atomic<std::uint64_t> motion_cycles_{0};
+    std::atomic<std::uint64_t> zero_cycles_{0};
+    std::atomic<std::uint64_t> skip_cycles_{0};
+    std::atomic<std::uint64_t> lock_contentions_{0};
+    std::atomic<std::uint64_t> exceptions_{0};
 };
 
 }  // namespace rover_hardware_interface
