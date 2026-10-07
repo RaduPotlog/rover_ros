@@ -66,8 +66,9 @@ Sources: `rover_description/config/wheel_01.yaml`, `rover_description/README.md`
 | Angular acceleration / deceleration | 3.74 rad/s² | |
 | Velocity command timeout | 0.5 s | The drive controller stops when `cmd_vel` goes quiet |
 | Maximum wheel speed | 10.958 rad/s | URDF joint limit; 1.81 m/s at the rim (**derived**, × 0.1651 m) |
-| Motors | 4 × DC motor with gearbox and encoder, 24 V | One per wheel |
+| Motors | 4 × DOBTIAN 250 W, 24 V brushed DC gear motor with MT6835 encoder | One per wheel; 120 RPM at the output shaft (2800 rpm ÷ 23.3). Seller listing: "250w low speed brush motor" (Dobtian); identifier 254324557 (from the owner). See [Components](components.md) |
 | Motor rated speed | 2800 rpm | |
+| Motor rated voltage / current | 24 V / 13.4 A | Seller listing, not a datasheet. The 15 A driver limit is 112 % of the rated current. Four motors at rated current would draw about 54 A (about 1.3 kW) |
 | Gear ratio | 23.3 : 1 | Gearbox efficiency 0.70 |
 | Motor torque constant | 0.11 N·m/A | |
 | Motor current limit | 15 A | Per motor controller; see the open items |
@@ -105,7 +106,7 @@ Sources: `rover_controller/config/wheel_01_controller.yaml`,
 | Sensor | Model | Rate | Notes |
 |---|---|---|---|
 | IMU | Phidgets Spatial MOT0110 (USB) | 8 ms data interval (125 Hz), published at 50 Hz | Orientation filter (gain/zeta), magnetometer off (`use_mag: false`), ENU |
-| Wheel encoders | Built into the motors | 10 Hz encoder updates (100 ms), 20 Hz driver state, 50 Hz control loop | |
+| Wheel encoders | MT6835 magnetic encoders on the motors (5 V, 1024 lines per revolution as configured) | 10 Hz encoder updates (100 ms, the DCC1000's minimum), 20 Hz driver state, 50 Hz control loop | The sensor's propagation delay is under 10 µs; the 100 ms is the DCC1000's reporting interval. See [Components](components.md) |
 | Battery telemetry | Daly BMS | **TBD** | |
 
 The lidar, GNSS and cameras are payload: they belong to the `rover_sensors` repository and are

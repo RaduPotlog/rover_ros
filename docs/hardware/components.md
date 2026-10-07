@@ -12,7 +12,7 @@ This page lists the main hardware blocks of the Rover A1 platform, how they conn
 | 4 | Hardware E-Stop button | **TBD** (`PB1` / `E_BTN` in the diagram) | Trips the PLC latch | 24 V input to the PLC (`IX 0.0`), read as `CONTACT_0` |
 | 5 | Motor controllers (4×) | Phidget DCC1000 | DC motor drive, encoder input, on-board failsafe | VINT hub ports 0, 1, 4, 5 (Phidget22 SDK) |
 | 6 | VINT hub | **TBD** | Connects the four DCC1000 boards to the ROS controller | USB |
-| 7 | Drive motors (4×) | **TBD** (DC motor with gearbox and encoder) | Wheel drive, one per wheel | Motor leads and encoder to its DCC1000 |
+| 7 | Drive motors (4×) | DOBTIAN "250W 24V 120RPM Low Speed Brush Motor" (brushed DC gear motor, 250 W, 24 V, 120 RPM at the output shaft; see the note below the wheel table for the model identifiers), with an MT6835 magnetic encoder | Wheel drive, one per wheel | Motor leads and encoder to its DCC1000 |
 | 8 | IMU | Phidgets Spatial MOT0110 | Orientation, angular velocity, linear acceleration (Madgwick filter, magnetometer off) | USB |
 | 9 | Battery management system | Daly BMS (model **TBD**) | Cell monitoring, protection, telemetry | BLE to the ESP32 bridge |
 | 10 | BMS bridge / rear LED controller | ESP32, firmware `rover_led_bms_ble_controller` | Polls the BMS over BLE and forwards it over UDP. Also drives the rear LED panel | Wi-Fi, `192.168.77.201` |
@@ -60,7 +60,7 @@ The tyre radius and the odometry radius differ on purpose. The CAD radius places
 | Rear left | `rl_wheel_base_to_rl_wheel_joint` | 4 | yes | same |
 | Rear right | `rr_wheel_base_to_rr_wheel_joint` | 5 | no | same |
 
-The motor model and power rating are **TBD**. Control loop details are in [Drive and control](../software/drive-and-control.md).
+The motors are DOBTIAN 250 W, 24 V, 120 RPM permanent-magnet brushed DC gear motors. From the seller listing (AliExpress, brand Dobtian; copied by the owner, not from a datasheet): "Model Number: 250w low speed brush motor", rated voltage 24 V, rated current 13.4 A, power 250 W, speed options 75 or 120 r/min (the rover has the 120 r/min variant). The owner also gives the identifier 254324557 (source not stated: it is not the listing's model-number field). The listing's gear ratio, stall current, torque, weight, shaft and encoder details are not given. Its "waterproof" claim has no IP rating and is not used. The 120 RPM is the output shaft: the URDF's 2800 rpm motor speed divided by the 23.3 gear ratio is 120.2 rpm, which is 12.58 rad/s at the wheel (the wheel loop's full-duty speed). Each motor carries an **MT6835** magnetic encoder (MagnTek/Novosense, 21-bit absolute) on a board powered from 5 V with no regulator. The board's `JP3` header carries +5 V, A, B, Z, U, V, W and GND, and `JP1`/`JP2` carry the SPI lines (CS, CLK, MOSI, MISO) and `HVPP`. The A/B/Z outputs are push-pull at 5 V (from the board schematic, not yet measured). The DCC1000 reads A/B in open-collector mode with 10K pull-ups, which is harmless with push-pull outputs, and reports the encoder every 100 ms (its minimum, read back at startup). The sensor itself is not the limit: its propagation delay is under 10 µs. How the board is wired to the DCC1000 (pins, cable length) is **TBD**. Control loop details are in [Drive and control](../software/drive-and-control.md).
 
 ## Block diagram
 
@@ -119,6 +119,6 @@ Source: `rover_arch/rover_a1_arch.drawio`, `rover_battery/README.md`, `rover_led
 | [Part 3 - Daly CAN Protocol.pdf](https://github.com/RaduPotlog/rover_ros/blob/master/rover_battery/docs/Part%203%20-%20Daly%20CAN%20Protocol.pdf) | Daly BMS CAN protocol |
 | [Part 4 - Daly RS485+UART Protocol.pdf](https://github.com/RaduPotlog/rover_ros/blob/master/rover_battery/docs/Part%204%20-%20Daly%20RS485%2BUART%20Protocol.pdf) | Daly BMS RS485/UART protocol (data units used by the bridge) |
 
-Datasheets for the Portenta Machine Control, the motors, the ELRS receiver, the VINT hub and the router are not in the repository (**TBD**).
+Datasheets for the Portenta Machine Control, the motors and the MT6835 encoder board, the ELRS receiver, the VINT hub and the router are not in the repository (**TBD**).
 
 Further reading: [rover_hardware_interface README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_hardware_interface/README.md), [rover_description README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_description/README.md), [rover_arch README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_arch/README.md).
