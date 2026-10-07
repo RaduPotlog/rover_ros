@@ -224,7 +224,10 @@
                service. Optional - omitting it keeps the compiled-in
                kDefaultMotorFailsafeTimeoutMs (500). Tune at bench test: short enough to be a
                meaningful backstop, long enough that ordinary write() cycle jitter never trips
-               it. -->
+               it. The watchdog can be switched off entirely with the optional
+               motor_failsafe_enabled param (true/false, default true) - for instrumented builds
+               only: with it off, a stalled write() loop leaves each wheel at its last duty
+               command instead of braking it. -->
           <param name="motor_failsafe_timeout_ms">500</param>
 
           <!-- On-board duty-cycle ramp of each DCC1000, in duty/s (DCC1000 range 0.5-10000).

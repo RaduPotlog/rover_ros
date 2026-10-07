@@ -509,6 +509,29 @@ void RoverSystem::readDrivetrainSettings()
             : static_cast<unsigned>(
                   std::stoi(info_.hardware_parameters.at("motor_failsafe_timeout_ms")));
 
+    // Optional as well; absent keeps the failsafe armed. Strictly parsed so a typo can never
+    // silently disable a safety mechanism.
+    if (info_.hardware_parameters.count("motor_failsafe_enabled") != 0) {
+        const std::string & value = info_.hardware_parameters.at("motor_failsafe_enabled");
+
+        if (value == "true" || value == "1") {
+            drivetrain_settings_.motor_failsafe_enabled = true;
+        } else if (value == "false" || value == "0") {
+            drivetrain_settings_.motor_failsafe_enabled = false;
+        } else {
+            throw std::runtime_error(
+                "motor_failsafe_enabled must be true, false, 1 or 0, got '" + value + "'.");
+        }
+    }
+
+    if (!drivetrain_settings_.motor_failsafe_enabled) {
+        RCLCPP_WARN_STREAM(
+            logger_,
+            "DCC1000 motor failsafe DISABLED (motor_failsafe_enabled=false): a stalled write() loop "
+            "will NOT brake the motors. Instrumented build only - keep wheels lifted or speeds low "
+            "and the RC E-Stop within reach.");
+    }
+
     // Optional as well; absent keeps the previously hard-coded ramp.
     drivetrain_settings_.motor_acceleration =
         info_.hardware_parameters.count("motor_acceleration") == 0

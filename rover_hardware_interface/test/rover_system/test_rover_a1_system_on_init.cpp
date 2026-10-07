@@ -218,6 +218,42 @@ TEST(RoverA1SystemOnInit, FailsWithUnparsableMotorFailsafeTimeoutMs)
     EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR);
 }
 
+// motor_failsafe_enabled is optional and defaults to true (armed): buildValidHardwareInfo() omits
+// it, so every test above runs with the failsafe armed. It is parsed strictly - a typo must fail
+// on_init() instead of silently switching a safety mechanism off.
+TEST(RoverA1SystemOnInit, SucceedsWithMotorFailsafeDisabled)
+{
+    for (const char * value : {"false", "0"}) {
+        RoverA1System system;
+        auto info = buildValidHardwareInfo();
+        info.hardware_parameters["motor_failsafe_enabled"] = value;
+
+        EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::SUCCESS) << value;
+    }
+}
+
+TEST(RoverA1SystemOnInit, SucceedsWithMotorFailsafeExplicitlyEnabled)
+{
+    for (const char * value : {"true", "1"}) {
+        RoverA1System system;
+        auto info = buildValidHardwareInfo();
+        info.hardware_parameters["motor_failsafe_enabled"] = value;
+
+        EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::SUCCESS) << value;
+    }
+}
+
+TEST(RoverA1SystemOnInit, FailsWithUnparsableMotorFailsafeEnabled)
+{
+    for (const char * value : {"flase", "off", "", "2", "FALSE"}) {
+        RoverA1System system;
+        auto info = buildValidHardwareInfo();
+        info.hardware_parameters["motor_failsafe_enabled"] = value;
+
+        EXPECT_EQ(system.on_init(makeParams(info)), CallbackReturn::ERROR) << "'" << value << "'";
+    }
+}
+
 // motor_acceleration is optional too (default kDefaultMotorAcceleration), but must be within
 // the DCC1000's 0.5-10000 duty/s.
 TEST(RoverA1SystemOnInit, SucceedsWithMotorAccelerationOverride)

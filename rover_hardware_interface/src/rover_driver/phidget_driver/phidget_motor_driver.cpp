@@ -112,6 +112,7 @@ PhidgetMotorDriver::PhidgetMotorDriver(
 , direction_reversed_(dir_reverse)
 , comm_timeout_(std::chrono::milliseconds(drivetrain_settings.driver_comm_timeout_ms))
 , failsafe_timeout_ms_(drivetrain_settings.motor_failsafe_timeout_ms)
+, failsafe_configured_(drivetrain_settings.motor_failsafe_enabled)
 {
     encoder_resolution_ = drivetrain_settings.encoder_resolution;
     motor_acceleration_ = drivetrain_settings.motor_acceleration;
@@ -607,8 +608,12 @@ bool PhidgetMotorDriver::isFailsafeTrippedReturnCode(const PhidgetReturnCode res
 }
 
 PhidgetMotorDriver::FailsafeAction PhidgetMotorDriver::selectFailsafeAction(
-    const bool enabled, const bool tripped)
+    const bool configured, const bool enabled, const bool tripped)
 {
+    if (!configured) {
+        return FailsafeAction::kNone;
+    }
+
     if (tripped) {
         return FailsafeAction::kReopenAndEnable;
     }
@@ -620,7 +625,13 @@ void PhidgetMotorDriver::armFailsafe()
 {
     std::lock_guard<std::mutex> lck(failsafe_mtx_);
 
-    switch (selectFailsafeAction(failsafe_enabled_, isFailsafeTripped())) {
+    switch (selectFailsafeAction(failsafe_configured_, failsafe_enabled_, isFailsafeTripped())) {
+        case FailsafeAction::kNone:
+            // Configured off: never enable, feed or re-open. Nothing is armed on the channel (it
+            // is opened fresh at start and closing it also disarms), so EPHIDGET_FAILSAFE cannot
+            // occur and failsafe_tripped_ is only cleared below, never set.
+            break;
+
         case FailsafeAction::kEnable:
             enableFailsafe();
             break;

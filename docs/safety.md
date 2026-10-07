@@ -188,6 +188,7 @@ The driving modes (MANUAL, ASSISTED, AUTOMATIC) and the lidar collision monitors
 | `twist_mux` input timeouts | 0.3 s (Driver UI), 0.5 s (others) | `rover_twist_mux/config/rover_twist_mux.yaml` |
 | `diff_drive` `cmd_vel_timeout` | 0.5 s | `rover_controller/config/wheel_01_controller.yaml` |
 | Motor driver hardware watchdog | 500 ms | `motor_failsafe_timeout_ms`, URDF |
+| Motor driver hardware watchdog on/off | on | `motor_failsafe_enabled`, URDF, optional. Off only on instrumented builds: a stalled `write()` loop then leaves the last duty command in place, and the PLC heartbeat (its own thread) does not catch a loop-only stall. Keep wheels lifted or speeds low and the RC E-Stop within reach |
 | Contactor drop-out tolerance | 500 ms | `contactor_monitor.hpp` |
 | RC frame timeout / zero burst | 200 ms / 300 ms | `rover_crsf_teleop/config/rover_crsf_teleop.yaml` |
 

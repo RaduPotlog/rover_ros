@@ -35,22 +35,40 @@ using FailsafeAction = PhidgetMotorDriver::FailsafeAction;
 
 TEST(PhidgetMotorDriverFailsafeTest, NeverEnabledChannelIsEnabled)
 {
-    EXPECT_EQ(PhidgetMotorDriver::selectFailsafeAction(false, false), FailsafeAction::kEnable);
+    EXPECT_EQ(
+        PhidgetMotorDriver::selectFailsafeAction(true, false, false), FailsafeAction::kEnable);
 }
 
 TEST(PhidgetMotorDriverFailsafeTest, AlreadyEnabledHealthyChannelIsOnlyFed)
 {
     // Re-enabling an already-enabled failsafe on an open channel is rejected by the SDK.
-    EXPECT_EQ(PhidgetMotorDriver::selectFailsafeAction(true, false), FailsafeAction::kFeed);
+    EXPECT_EQ(
+        PhidgetMotorDriver::selectFailsafeAction(true, true, false), FailsafeAction::kFeed);
 }
 
 TEST(PhidgetMotorDriverFailsafeTest, TrippedChannelIsReopened)
 {
     // A tripped channel rejects both resetFailsafe and enableFailsafe until it is re-opened.
     EXPECT_EQ(
-        PhidgetMotorDriver::selectFailsafeAction(true, true), FailsafeAction::kReopenAndEnable);
+        PhidgetMotorDriver::selectFailsafeAction(true, true, true),
+        FailsafeAction::kReopenAndEnable);
     EXPECT_EQ(
-        PhidgetMotorDriver::selectFailsafeAction(false, true), FailsafeAction::kReopenAndEnable);
+        PhidgetMotorDriver::selectFailsafeAction(true, false, true),
+        FailsafeAction::kReopenAndEnable);
+}
+
+TEST(PhidgetMotorDriverFailsafeTest, ConfiguredOffNeverArmsFeedsOrReopens)
+{
+    // motor_failsafe_enabled=false (instrumented build): whatever the channel state, armFailsafe()
+    // must do nothing - in particular it must not re-open a "tripped" channel to re-arm it.
+    for (const bool enabled : {false, true}) {
+        for (const bool tripped : {false, true}) {
+            EXPECT_EQ(
+                PhidgetMotorDriver::selectFailsafeAction(false, enabled, tripped),
+                FailsafeAction::kNone)
+                << "enabled=" << enabled << " tripped=" << tripped;
+        }
+    }
 }
 
 TEST(PhidgetMotorDriverEncoderTest, CountsConvertToMotorRpm)

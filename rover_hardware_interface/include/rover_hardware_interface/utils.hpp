@@ -71,6 +71,12 @@ struct DrivetrainSettings
     // Motor supply voltage in V; only used to derive the current regulator gain (see
     // motorCurrentRegulatorGain()). Optional in the URDF.
     float motor_supply_voltage{kDefaultMotorSupplyVoltage};
+    // Whether the motor driver's own hardware watchdog (motor_failsafe_timeout_ms above) is armed.
+    // Optional in the URDF; absent means enabled, so every existing URDF keeps its protection.
+    // Only an instrumented build (logging/tracing that can stall the RT loop past the timeout)
+    // should ever set this to false: with it off a stalled write() loop leaves each wheel at its
+    // last duty command instead of braking it.
+    bool motor_failsafe_enabled{true};
 };
 
 constexpr unsigned kDefaultMotorFailsafeTimeoutMs = 500;

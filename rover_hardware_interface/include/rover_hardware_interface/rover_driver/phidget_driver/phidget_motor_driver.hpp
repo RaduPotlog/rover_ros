@@ -106,10 +106,14 @@ public:
         kEnable,           // Never enabled on this open channel - enable it.
         kFeed,             // Already enabled and healthy - just reset (feed) the timer.
         kReopenAndEnable,  // Tripped - close/re-open the channel, reconfigure, then enable.
+        kNone,             // The failsafe is configured off (motor_failsafe_enabled=false) - do nothing.
     };
 
     // Pure logic, factored out so it's unit-testable without any Phidget SDK handles.
-    static FailsafeAction selectFailsafeAction(const bool enabled, const bool tripped);
+    // `configured` is DrivetrainSettings::motor_failsafe_enabled; when false the watchdog is never
+    // armed, so the other two inputs are irrelevant (nothing can trip).
+    static FailsafeAction selectFailsafeAction(
+        const bool configured, const bool enabled, const bool tripped);
 
     // Motor-shaft RPM from a change of raw quadrature counts over dt_s seconds, for an encoder
     // with `lines` lines per revolution (4 counts per line). Works on raw counts so no remainder
@@ -243,6 +247,11 @@ private:
     // than a call-site literal) so resetFailsafe()'s re-open-and-re-arm recovery (see
     // phidget_motor_driver.cpp) uses the same configured value.
     const std::uint32_t failsafe_timeout_ms_;
+
+    // DrivetrainSettings::motor_failsafe_enabled. False (instrumented builds only) means the
+    // DCC1000's on-board watchdog is never armed by armFailsafe(), so a stalled write() loop
+    // leaves the last duty command in place instead of braking the motor.
+    const bool failsafe_configured_;
 
     rclcpp::Logger logger_{rclcpp::get_logger("PhidgetMotorDriver")};
 };

@@ -61,6 +61,7 @@ hardware only.
 | `driver_states_update_frequency` | `20.0` | Driver state update rate [Hz]. |
 | `driver_comm_timeout_ms` | `300` | Max age of Phidget telemetry before a driver comm error. |
 | `motor_failsafe_timeout_ms` | `500` | Phidget board watchdog: brakes the motor if `write()` stalls. |
+| `motor_failsafe_enabled` | `true` | Optional. `false` never arms that watchdog (instrumented builds only): a stalled `write()` then leaves each wheel at its last duty command. Anything but `true`/`false`/`1`/`0` fails `on_init()`. |
 | `motor_acceleration` | `2.0` | DCC1000 on-board duty ramp [duty/s]. |
 | `motor_current_limit` | `15.0` | DCC1000 current limit [A]. |
 | `motor_supply_voltage` | `24.0` | Motor supply [V], used for the current regulator gain. |
