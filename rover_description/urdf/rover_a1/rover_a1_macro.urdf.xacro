@@ -230,6 +230,15 @@
                command instead of braking it. -->
           <param name="motor_failsafe_timeout_ms">500</param>
 
+          <!-- INSTRUMENTED BRANCH ONLY (instrumented/failsafe-off) - DO NOT MERGE TO MASTER.
+               The DCC1000's on-board watchdog is never armed, so measurement instrumentation that
+               stalls the RT write() loop cannot trip it (motor_failsafe_tripped_error). Cost: a
+               stalled write() loop leaves each wheel at its last duty command instead of braking
+               it, and the PLC heartbeat does not catch a loop-only stall. Run with the wheels
+               lifted or at low speed and the RC E-Stop within reach. motor_failsafe_timeout_ms
+               above is ignored while this is false. -->
+          <param name="motor_failsafe_enabled">false</param>
+
           <!-- On-board duty-cycle ramp of each DCC1000, in duty/s (DCC1000 range 0.5-10000).
                2.0 = up to 0.5 s from stop to full duty (1.0 was 1 s, 10.0 would be 0.1 s, so
                diff_drive's acceleration limits would shape the motion instead of this ramp). The
