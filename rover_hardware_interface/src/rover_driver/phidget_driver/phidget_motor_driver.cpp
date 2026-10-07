@@ -712,8 +712,8 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
 
         // A previous async PhidgetDCMotor_setTargetVelocity_async() call hasn't completed yet -
         // this command is dropped rather than queued. At the 50 Hz write() rate the next cycle's
-        // command supersedes it almost immediately, so this is intentional, not an oversight; it
-        // is not currently surfaced as an error/counter to the caller.
+        // command supersedes it almost immediately, so this is intentional, not an oversight. It
+        // is not an error to the caller, but it is counted (see getCommandStats()).
         if (set_speed_pending_) {
             command_stats_.onDroppedPending();
             return;
@@ -727,16 +727,18 @@ void PhidgetMotorDriver::sendCmdVel(const float cmd)
             cmd_temp = cmd;
         }
 
-        // Stamped before the call: the completion can fire on the SDK thread at any moment after it.
+        // Stamped and marked pending BEFORE the call: the completion can fire on the SDK thread at
+        // any moment after it, and it is what clears the flag. Setting the flag afterwards let a
+        // fast completion clear it first, after which this thread set it again with nothing left
+        // in flight - every later command was then dropped until reopenMotorChannel().
         command_stats_.onSubmit(steadyNowNs());
+        set_speed_pending_ = true;
 
         PhidgetDCMotor_setTargetVelocity_async(
             motor_handle_,
             cmd_temp,
             PhidgetMotorDriver::setTargetVelocityHandler,
             this);
-
-        set_speed_pending_ = true;
     } else {
         command_stats_.onDroppedNoDriver();
     }
