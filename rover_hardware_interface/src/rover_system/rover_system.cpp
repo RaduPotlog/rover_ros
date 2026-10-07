@@ -42,6 +42,7 @@
 #include <hardware_interface/types/hardware_interface_return_values.hpp>
 
 #include "rover_hardware_interface/domain/safety_link_diagnosis.hpp"
+#include "rover_hardware_interface/domain/imu_data_health.hpp"
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
 #include "rover_hardware_interface/utils.hpp"
@@ -167,6 +168,9 @@ CallbackReturn RoverSystem::on_configure(const rclcpp_lifecycle::State &)
 
         system_ros_interface_->addDiagnosticTask(
         std::string("command path"), this, &RoverSystem::diagnoseCommandPath);
+
+        system_ros_interface_->addDiagnosticTask(
+        std::string("imu data"), this, &RoverSystem::diagnoseImuData);
 
         const auto & gpio_state = rover_controller_->queryControlInterfaceIOStates();
         system_ros_interface_->updateMsgGpioStates(gpio_state);
@@ -805,6 +809,20 @@ void RoverSystem::updateCommunicationStatus()
 namespace
 {
 
+unsigned char toDiagnosticLevel(const HealthLevel level)
+{
+    switch (level) {
+        case HealthLevel::kOk:
+            return diagnostic_updater::DiagnosticStatusWrapper::OK;
+        case HealthLevel::kWarn:
+            return diagnostic_updater::DiagnosticStatusWrapper::WARN;
+        case HealthLevel::kError:
+            return diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+    }
+
+    return diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+}
+
 unsigned char toDiagnosticLevel(const SafetyLinkSeverity s)
 {
     switch (s) {
@@ -827,7 +845,9 @@ unsigned char toDiagnosticLevel(const SafetyLinkSeverity s)
 // Where does a velocity command go missing between write() and the motor? Every row of this
 // answers one question: how many were issued, how many were dropped (and why), how the driver's
 // asynchronous calls completed and how long they took, and what each write() cycle did. Counters
-// are cumulative since start; compare two reads to get a rate. Instrumentation only.
+// are cumulative since start; compare two reads to get a rate. The level is ERROR only while
+// completions are still returning errors (see domain/command_path_health.hpp), so a board that
+// is no longer attached (return code 0x34) cannot hide behind a quiet "OK".
 void RoverSystem::diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrapper & status)
 {
     if (!rover_driver_ || !control_loop_use_case_) {
@@ -841,16 +861,38 @@ void RoverSystem::diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrappe
         {DriverNames::REAR_LEFT, "Rear Left"},
         {DriverNames::REAR_RIGHT, "Rear Right"}}};
 
-    unsigned char level{diagnostic_updater::DiagnosticStatusWrapper::OK};
+    // An error counted within this window is "still happening". The diagnostics task runs about
+    // once a second, so three seconds tolerates one missed look without crying wolf.
+    constexpr std::int64_t kRecentNs = 3000000000;
+    const std::int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+
     std::uint64_t total_attempted = 0;
     std::uint64_t total_dropped_pending = 0;
     std::uint64_t total_dropped_no_driver = 0;
     std::uint64_t total_errors = 0;
     std::uint32_t worst_latency_us = 0;
+    bool errors_increasing = false;
+    double seconds_since_error = -1.0;
+
+    std::size_t wheel_index = 0;
 
     for (const auto & [name, label] : wheels) {
         const auto s = rover_driver_->getCommandStats(name);
         const std::string p = std::string(label) + " ";
+
+        auto & trend = command_error_trend_[wheel_index++];
+        trend.update(s.completed_error, now_ns);
+
+        if (trend.increasedWithin(now_ns, kRecentNs)) {
+            errors_increasing = true;
+        }
+
+        const double since = trend.secondsSinceIncrease(now_ns);
+
+        if (since >= 0.0 && (seconds_since_error < 0.0 || since < seconds_since_error)) {
+            seconds_since_error = since;
+        }
 
         status.add(p + "commands submitted", s.submitted);
         status.add(p + "dropped, previous command still pending", s.dropped_pending);
@@ -859,7 +901,10 @@ void RoverSystem::diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrappe
         status.add(p + "completed ok", s.completed_ok);
         status.add(p + "completed failsafe-rejected", s.completed_failsafe);
         status.add(p + "completed with other error", s.completed_error);
-        status.add(p + "last non-ok return code", static_cast<int>(s.last_error_code));
+        status.add(
+            p + "last non-ok return code",
+            s.last_error_code == 0 ? std::string("none")
+                                   : rover_driver_->describeReturnCode(s.last_error_code));
         status.addf(p + "completion latency last (ms)", "%.2f", s.latency_last_us / 1000.0);
         status.addf(p + "completion latency mean (ms)", "%.2f", s.meanLatencyUs() / 1000.0);
         status.addf(p + "completion latency max (ms)", "%.2f", s.latency_max_us / 1000.0);
@@ -880,22 +925,65 @@ void RoverSystem::diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrappe
     status.add("write cycles: skipped, mutex busy", w.lock_contentions);
     status.add("write cycles: operation threw", w.exceptions);
 
-    // The informational counters never raise the level; only things that mean a command was lost
-    // for a reason other than ordinary back-pressure do.
-    std::string message = "Command path counters.";
+    CommandPathHealthInput input;
+    input.command_errors_increasing = errors_increasing;
+    input.command_errors_total = total_errors;
+    input.seconds_since_command_error = seconds_since_error;
+    input.dropped_no_driver = total_dropped_no_driver;
+    input.write_exceptions = w.exceptions;
+    const auto verdict = evaluateCommandPathHealth(input);
 
-    if (total_errors > 0 || total_dropped_no_driver > 0 || w.exceptions > 0) {
-        level = diagnostic_updater::DiagnosticStatusWrapper::WARN;
-        message = "Commands lost: driver errors/exceptions seen.";
-    }
-
-    char summary[160];
+    char summary[200];
     std::snprintf(
         summary, sizeof(summary),
         "%s %" PRIu64 " dropped-pending of %" PRIu64 " attempted, worst completion %.1f ms.",
-        message.c_str(), total_dropped_pending, total_attempted, worst_latency_us / 1000.0);
+        verdict.message.c_str(), total_dropped_pending, total_attempted, worst_latency_us / 1000.0);
 
-    status.summary(level, summary);
+    status.summary(toDiagnosticLevel(verdict.level), summary);
+}
+
+void RoverSystem::diagnoseImuData(diagnostic_updater::DiagnosticStatusWrapper & status)
+{
+    if (!system_ros_interface_) {
+        status.summary(diagnostic_updater::DiagnosticStatusWrapper::WARN, "Not configured.");
+        return;
+    }
+
+    const auto s = system_ros_interface_->imuDataStats();
+    const auto verdict = evaluateImuDataHealth(s);
+
+    const std::int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    double rate_hz = 0.0;
+
+    if (imu_prev_ns_ != 0 && now_ns > imu_prev_ns_) {
+        rate_hz = static_cast<double>(s.total - imu_prev_total_) /
+            (static_cast<double>(now_ns - imu_prev_ns_) * 1e-9);
+    }
+
+    imu_prev_total_ = s.total;
+    imu_prev_ns_ = now_ns;
+
+    status.add("messages received", s.total);
+    status.add("messages valid", s.valid);
+    status.add("messages with NaN/inf", s.not_finite);
+    status.addf("message rate since last look (Hz)", "%.1f", rate_hz);
+
+    if (s.received_any) {
+        status.addf("last message age (s)", "%.2f", s.last_message_age_s);
+    } else {
+        status.add("last message age (s)", "never");
+    }
+
+    if (s.valid > 0) {
+        status.addf("last valid message age (s)", "%.2f", s.last_valid_age_s);
+    } else {
+        status.add("last valid message age (s)", "never");
+    }
+
+    status.add("last message valid", s.last_finite);
+
+    status.summary(toDiagnosticLevel(verdict.level), verdict.message);
 }
 
 // The safety link had no diagnostic of its own: read()/write() always return OK, so a dead PLC

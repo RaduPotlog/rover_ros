@@ -20,6 +20,7 @@
 #include <utility>
 
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_rover_driver.hpp"
+#include "rover_hardware_interface/rover_driver/phidget_driver/phidget_utils.hpp"
 
 namespace rover_hardware_interface {
 
@@ -212,6 +213,11 @@ bool PhidgetRoverDriver::isFailsafeTripped()
     }
 
     return false;
+}
+
+std::string PhidgetRoverDriver::describeReturnCode(const std::int32_t code) const
+{
+    return phidgetReturnCodeToString(static_cast<PhidgetReturnCode>(code));
 }
 
 MotorCommandStats PhidgetRoverDriver::getCommandStats(const DriverNames name)

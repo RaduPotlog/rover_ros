@@ -431,16 +431,7 @@ void PhidgetMotorDriver::enableFailsafe()
 
 std::string PhidgetMotorDriver::returnCodeToString(const PhidgetReturnCode ret)
 {
-    char hex[16];
-    std::snprintf(hex, sizeof(hex), "0x%02x", static_cast<unsigned>(ret));
-
-    const char * description = nullptr;
-
-    if (Phidget_getErrorDescription(ret, &description) == EPHIDGET_OK && description != nullptr) {
-        return std::string(hex) + " (" + description + ")";
-    }
-
-    return std::string(hex);
+    return phidgetReturnCodeToString(ret);
 }
 
 MotorDriverState PhidgetMotorDriver::readState()

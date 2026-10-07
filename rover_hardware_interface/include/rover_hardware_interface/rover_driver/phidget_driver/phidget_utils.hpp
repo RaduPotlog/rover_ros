@@ -38,6 +38,10 @@ void openWaitForAttachment(
 
 void closeAndDelete(PhidgetHandle * handle) noexcept;
 
+// "0x34 (Phidget not physically attached)"-style text for a PhidgetReturnCode, for logs and
+// diagnostics. Falls back to the bare hex code if the SDK has no description.
+std::string phidgetReturnCodeToString(const PhidgetReturnCode ret);
+
 }  // namespace rover_hardware_interface
 
 #endif  // ROVER_HARDWARE_INTERFACE_ROVER_DRIVER_PHIDGET_DRIVER_PHIDGET_UTILS_HPP_

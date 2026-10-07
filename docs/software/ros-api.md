@@ -38,7 +38,7 @@ hardware only.
 | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` | Plant state of the safety chain: HW E-Stop button, contactor feedback, latch, latch cause, link health. Reliable, volatile, depth 1. |
 | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` | Read-back of the coils software drives (SW E-Stop, driver-fault stop, latch reset, watchdog heartbeat). Diagnostic only. Reliable, volatile, depth 1. |
 | `hardware_interface/aux_io_state` | `rover_msgs/AuxIoState` | General-purpose aux IO on the PLC (DIO06..11 inputs, DIO00..05 output read-back). Not safety. Reliable, volatile, depth 1. |
-| `diagnostics` | `diagnostic_msgs/DiagnosticArray` | Hardware id `Rover System`. Tasks `system errors`, `system status`, `safety plc link`, `command path`. |
+| `diagnostics` | `diagnostic_msgs/DiagnosticArray` | Hardware id `Rover System`. Tasks `system errors`, `system status`, `safety plc link`, `command path`, `imu data`. |
 
 **`command path` diagnostic (instrumentation).** Cumulative counters since start, per wheel
 (`Front Left`, `Front Right`, `Rear Left`, `Rear Right`), answering "where did a velocity command go
@@ -52,13 +52,30 @@ and never read by the control loop.
 | `dropped, driver object gone` | The owning driver no longer existed. Should stay 0. |
 | `dropped while pending (%)` | The two above as a share of everything `write()` tried to send. |
 | `completed ok` / `completed failsafe-rejected` / `completed with other error` | How the asynchronous calls finished. The third means the command may never have reached the motor. |
-| `last non-ok return code` | The last Phidget return code that was not OK (0 = none yet). |
+| `last non-ok return code` | The last Phidget return code that was not OK, with its meaning, e.g. `0x34 (Phidget not physically attached)` (`none` if there has been none). |
 | `completion latency last / mean / max (ms)` | Submit-to-completion time of the asynchronous call. |
 | `command in flight now`, `in flight for (ms)` | A call in flight and its age. An age that keeps growing means a completion never arrived. |
 
 System-wide: `write cycles: forwarded motion`, `inhibited, zeros sent`, `skipped, nothing sent`,
-`skipped, mutex busy`, `operation threw`. The level is `WARN` only if a call completed with an error,
-the driver object was gone, or a write operation threw; dropped-while-pending is informational.
+`skipped, mutex busy`, `operation threw`.
+
+**Levels.** `ERROR` while driver completions are *still* returning errors (an error counted within
+the last 3 s), e.g. the wheel boards are no longer attached after a USB flap. `WARN` for earlier
+errors that stopped (with how long ago), a missing driver object or a throwing write. Dropped-while-
+pending is ordinary back-pressure and is informational.
+
+**`system status` and `system errors`.** `system status` is `ERROR` while "Communication error"
+is true (a wheel driver stopped reporting); it used to stay `OK` whatever it said. `system errors`
+now also lists each wheel's last driver return code with its meaning, so "timed out" comes with a
+cause.
+
+**`imu data` diagnostic.** Judges `imu/data` itself, because the IMU is a separate hardware
+component with no diagnostics: a component that never activated makes the broadcaster publish NaN
+at full rate, which the controller_manager's own "Hardware Components Activity" status reports only
+as an `OK`-level text. `OK` for valid, fresh data. `WARN` for the first 20 s while waiting for the
+first message. `ERROR` for no message after that, a latest message older than 1 s, or a latest
+message containing NaN/inf. Keys: messages received / valid / with NaN/inf, message rate since the
+last look, and the age of the last message and of the last valid message.
 
 **Services**
 

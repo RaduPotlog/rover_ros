@@ -73,6 +73,8 @@ public:
 
     MotorCommandStats getCommandStats(const DriverNames name) override;
 
+    std::string describeReturnCode(const std::int32_t code) const override;
+
     DriverDataSnapshot getData(const DriverNames name) override;
 
 protected:

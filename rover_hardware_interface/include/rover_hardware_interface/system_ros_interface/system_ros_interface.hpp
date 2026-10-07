@@ -28,6 +28,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <realtime_tools/realtime_publisher.hpp>
 
+#include <sensor_msgs/msg/imu.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
@@ -41,6 +42,7 @@
 
 #include "rover_hardware_interface/domain/driver.hpp"
 #include "rover_hardware_interface/domain/driver_data_snapshot.hpp"
+#include "rover_hardware_interface/domain/imu_data_health.hpp"
 
 #include "rover_hardware_interface/rover_safety_controller/rover_safety_controller_types.hpp"
 
@@ -122,6 +124,10 @@ public:
         diagnostic_updater_.broadcast(level, message);
     }
 
+    // What the imu/data subscription has seen so far (see domain/imu_data_health.hpp). Lock-free,
+    // any thread - the diagnostics thread reads it while the executor thread writes it.
+    ImuDataStats imuDataStats() const;
+
     void updateMsgErrorFlags(
         const DriverNames name,
         const DriverDataSnapshot & data);
@@ -179,6 +185,11 @@ protected:
 
     rclcpp::Publisher<AuxIoStateMsg>::SharedPtr aux_io_state_publisher_;
     std::unique_ptr<realtime_tools::RealtimePublisher<AuxIoStateMsg>> realtime_aux_io_state_publisher_;
+
+    // Watches imu/data so a missing, stale or NaN IMU is visible in diagnostics whatever the cause.
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
+    ImuDataRecorder imu_recorder_;
+    std::int64_t imu_monitor_start_ns_{0};
 
     diagnostic_updater::Updater diagnostic_updater_;
 

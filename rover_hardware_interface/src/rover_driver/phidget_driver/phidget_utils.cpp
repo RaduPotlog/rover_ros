@@ -14,6 +14,9 @@
 
 #include "rover_hardware_interface/rover_driver/phidget_driver/phidget_utils.hpp"
 
+#include <cstdio>
+#include <string>
+
 namespace rover_hardware_interface
 {
 
@@ -61,6 +64,20 @@ void closeAndDelete(PhidgetHandle *handle) noexcept
 {
     Phidget_close(*handle);
     Phidget_delete(handle);
+}
+
+std::string phidgetReturnCodeToString(const PhidgetReturnCode ret)
+{
+    char hex[16];
+    std::snprintf(hex, sizeof(hex), "0x%02x", static_cast<unsigned>(ret));
+
+    const char * description = nullptr;
+
+    if (Phidget_getErrorDescription(ret, &description) == EPHIDGET_OK && description != nullptr) {
+        return std::string(hex) + " (" + description + ")";
+    }
+
+    return std::string(hex);
 }
 
 }  // namespace rover_hardware_interface

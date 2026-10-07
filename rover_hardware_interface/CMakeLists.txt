@@ -26,6 +26,7 @@ set(PACKAGE_DEPENDENCIES
     rover_modbus_driver
     rover_msgs
     phidgets_api
+    sensor_msgs
     pluginlib
     rclcpp
     rclcpp_lifecycle
@@ -117,6 +118,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     ${imu_filter_madgwick_TARGETS}
     ${rover_msgs_TARGETS}
     ${phidgets_api_TARGETS}
+    ${sensor_msgs_TARGETS}
     ${pluginlib_TARGETS}
     ${rclcpp_TARGETS}
     ${rclcpp_lifecycle_TARGETS}
@@ -221,6 +223,13 @@ if(BUILD_TESTING)
   # Command-path instrumentation counters (issued / dropped / completed, latencies). Header-only.
   ament_add_gtest(test_command_stats test/domain/test_command_stats.cpp)
   target_link_libraries(test_command_stats ${PROJECT_NAME}_core)
+
+  # Severity rules for the 'command path' and 'imu data' diagnostics (pure, header-only).
+  ament_add_gtest(test_command_path_health test/domain/test_command_path_health.cpp)
+  target_link_libraries(test_command_path_health ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_imu_data_health test/domain/test_imu_data_health.cpp)
+  target_link_libraries(test_imu_data_health ${PROJECT_NAME}_core)
 
   # Cross-check of the E-Stop latch against the contactor's aux-contact feedback (EDM). Time is
   # injected, so these run instantly.

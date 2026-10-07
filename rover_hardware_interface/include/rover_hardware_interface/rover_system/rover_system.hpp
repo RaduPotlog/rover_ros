@@ -15,7 +15,9 @@
 #ifndef ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_SYSTEM_HPP_
 #define ROVER_HARDWARE_INTERFACE_ROVER_SYSTEM_ROVER_SYSTEM_HPP_
 
+#include <array>
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -35,6 +37,7 @@
 #include "rover_hardware_interface/system_ros_interface/system_ros_interface.hpp"
 
 #include "rover_hardware_interface/application/rover_control_loop_use_case.hpp"
+#include "rover_hardware_interface/domain/command_path_health.hpp"
 #include "rover_hardware_interface/domain/emergency_stop.hpp"
 #include "rover_hardware_interface/domain/rover_error_filter.hpp"
 #include "rover_hardware_interface/domain/rover_gpio_port.hpp"
@@ -169,6 +172,10 @@ protected:
     // Command-path instrumentation: per-wheel issued/dropped/completed counts and latencies plus
     // what each write() cycle did. Runs on the diagnostics thread, reads lock-free counters only.
     void diagnoseCommandPath(diagnostic_updater::DiagnosticStatusWrapper & status);
+
+    // Is imu/data valid and fresh? Judges the data, so it catches an IMU component that never
+    // activated (the broadcaster then publishes NaN), a detached device and a stopped broadcaster.
+    void diagnoseImuData(diagnostic_updater::DiagnosticStatusWrapper & status);
     virtual void updateHwStates(const rclcpp::Time & time) = 0;
 
     virtual void updateDriverStateMsg() = 0;
@@ -280,6 +287,11 @@ protected:
     // and rclcpp::Time comparisons throw std::runtime_error when the two operands use
     // different clock types. Seeding from the actual `time` guarantees the clock types
     // always match, regardless of what clock the caller happens to use.
+    // Diagnostics-thread state for the command-path and IMU tasks (one thread owns it).
+    std::array<ErrorTrend, 4> command_error_trend_;
+    std::uint64_t imu_prev_total_{0};
+    std::int64_t imu_prev_ns_{0};
+
     bool driver_state_update_time_initialized_{false};
     rclcpp::Time next_driver_state_update_time_{0, 0, RCL_ROS_TIME};
     rclcpp::Duration driver_states_update_period_{0, 0};

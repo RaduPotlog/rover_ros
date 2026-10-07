@@ -15,6 +15,7 @@
 #ifndef ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_DRIVER_HPP_
 #define ROVER_HARDWARE_INTERFACE_DOMAIN_ROVER_DRIVER_HPP_
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -72,6 +73,13 @@ public:
     // Per-wheel command-path counters (see MotorCommandStats) for diagnostics. Lock-free and safe
     // from any thread. Defaults to all-zero for drivers that don't count.
     virtual MotorCommandStats getCommandStats(const DriverNames /* name */) { return {}; }
+
+    // Human-readable text for a driver return code, e.g. one reported in MotorCommandStats::
+    // last_error_code, for diagnostics. Any thread.
+    virtual std::string describeReturnCode(const std::int32_t code) const
+    {
+        return "code " + std::to_string(code);
+    }
 };
 
 }  // namespace rover_hardware_interface

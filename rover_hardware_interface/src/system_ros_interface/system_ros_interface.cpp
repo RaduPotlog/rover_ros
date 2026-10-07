@@ -16,6 +16,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -40,6 +41,14 @@ constexpr uint64_t kSafetyLinkStalePollAgeMs = 500;
 
 namespace
 {
+
+// Steady-clock nanoseconds: the time base of the imu/data monitor (domain/imu_data_health.hpp).
+std::int64_t steadyNowNs()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
 // driverNamesToString() builds a fresh std::string on every call; getDriverStateByName() is on
 // the RT path (called every driver-state-update cycle), so look the name up in a table computed
@@ -185,9 +194,30 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
     realtime_aux_io_state_publisher_ =
         std::make_unique<realtime_tools::RealtimePublisher<AuxIoStateMsg>>(aux_io_state_publisher_);
 
+    // The IMU is its own hardware component with no diagnostics of its own, so judge its output
+    // instead: the broadcaster keeps publishing NaN when the component never activated.
+    imu_monitor_start_ns_ = steadyNowNs();
+    imu_subscription_ = node_->create_subscription<sensor_msgs::msg::Imu>(
+        "imu/data", rclcpp::SensorDataQoS().keep_last(5),
+        [this](const sensor_msgs::msg::Imu::ConstSharedPtr msg) {
+            const auto & o = msg->orientation;
+            const auto & w = msg->angular_velocity;
+            const auto & a = msg->linear_acceleration;
+            const bool finite = std::isfinite(o.x) && std::isfinite(o.y) && std::isfinite(o.z) &&
+                std::isfinite(o.w) && std::isfinite(w.x) && std::isfinite(w.y) &&
+                std::isfinite(w.z) && std::isfinite(a.x) && std::isfinite(a.y) &&
+                std::isfinite(a.z);
+            imu_recorder_.onMessage(finite, steadyNowNs());
+        });
+
     diagnostic_updater_.setHardwareID("Rover System");
 
     RCLCPP_INFO(rclcpp::get_logger("SystemROSInterface"), "Node constructed successfully.");
+}
+
+ImuDataStats SystemROSInterface::imuDataStats() const
+{
+    return imu_recorder_.snapshot(steadyNowNs(), imu_monitor_start_ns_);
 }
 
 SystemROSInterface::~SystemROSInterface()

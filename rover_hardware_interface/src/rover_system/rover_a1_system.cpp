@@ -14,15 +14,18 @@
 
 #include "rover_hardware_interface/rover_system/rover_a1_system.hpp"
 
+#include <array>
 #include <chrono>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "rclcpp/logging.hpp"
+
 #include "diagnostic_updater/diagnostic_status_wrapper.hpp"
 
 #include "rover_hardware_interface/rover_driver/rover_a1_driver.hpp"
@@ -259,6 +262,24 @@ void RoverA1System::diagnoseErrors(diagnostic_updater::DiagnosticStatusWrapper &
             status, rover_error_filter_->getErrorMap(), "Error filter - ");
     }
 
+    // The flags above only say a driver "timed out"; the driver's own return code says why (for
+    // example 0x34, the board is no longer attached). Shown whenever one has been seen.
+    const std::array<std::pair<DriverNames, const char *>, 4> wheels{{
+        {DriverNames::FRONT_LEFT, "Front left"},
+        {DriverNames::FRONT_RIGHT, "Front right"},
+        {DriverNames::REAR_LEFT, "Rear left"},
+        {DriverNames::REAR_RIGHT, "Rear right"}}};
+
+    for (const auto & [name, label] : wheels) {
+        const auto stats = rover_driver_->getCommandStats(name);
+
+        if (stats.last_error_code != 0) {
+            status.add(
+                std::string(label) + " driver last return code",
+                rover_driver_->describeReturnCode(stats.last_error_code));
+        }
+    }
+
     status.summary(level, message);
 }
 
@@ -267,7 +288,16 @@ void RoverA1System::diagnoseStatus(diagnostic_updater::DiagnosticStatusWrapper &
     unsigned char level{diagnostic_updater::DiagnosticStatusWrapper::OK};
     std::string message{"Rover A1 system status monitoring."};
 
-    status.add("Communication error", rover_driver_->isCommunicationError());
+    // This task used to keep its level at OK whatever it reported, so a wheel that had stopped
+    // answering (all four drivers timed out) still read as healthy next to the ERROR in "system
+    // errors". The flag is the whole point of this line, so it now sets the level.
+    const bool communication_error = rover_driver_->isCommunicationError();
+    status.add("Communication error", communication_error);
+
+    if (communication_error) {
+        level = diagnostic_updater::DiagnosticStatusWrapper::ERROR;
+        message = "Communication error: a wheel driver stopped reporting.";
+    }
 
     const auto front_left_driver_state = rover_driver_->getData(DriverNames::FRONT_LEFT).getDriverState();
     const auto front_right_driver_state = rover_driver_->getData(DriverNames::FRONT_RIGHT).getDriverState();
