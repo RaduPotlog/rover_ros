@@ -69,7 +69,7 @@
         "rover_twist_mux/config/rover_twist_mux.yaml:14",
         "rover_twist_mux/config/rover_twist_mux.yaml:18",
         "rover_twist_mux/config/rover_twist_mux.yaml:23",
-        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:30-33",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:32-35",
         "rover_controller/config/wheel_01_controller.yaml:192"
       ],
       "implementation": "Implemented",

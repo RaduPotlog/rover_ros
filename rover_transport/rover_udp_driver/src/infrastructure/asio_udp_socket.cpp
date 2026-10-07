@@ -17,12 +17,15 @@
 // Modified 2026 by Mechatronics Academy: relayouted from udp_driver/src/udp_socket.cpp
 // (ros-drivers/transport_drivers v1.2.0). Three defects fixed while moving - see
 // asyncSend(), asyncReceiveHandler() and send()/receive(). Later: close() waits for the
-// socket's handlers (AsyncOpGuard), so the owner can destroy what the callback uses.
+// socket's handlers (AsyncOpGuard), so the owner can destroy what the callback uses; reads
+// land in sender_endpoint_ instead of overwriting host_endpoint_; an optional source filter
+// (setSourceFilter()).
 
 #include "rover_udp_driver/infrastructure/asio_udp_socket.hpp"
 
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -91,8 +94,10 @@ std::size_t AsioUdpSocket::send(const std::vector<uint8_t> & buffer)
 std::size_t AsioUdpSocket::receive(std::vector<uint8_t> & buffer)
 {
     asio::error_code error;
+    // A local endpoint, not sender_endpoint_: that one belongs to the async read and its strand.
+    asio::ip::udp::endpoint sender;
     const std::size_t len = udp_socket_.receive_from(
-        asio::buffer(buffer), host_endpoint_, 0, error);
+        asio::buffer(buffer), sender, 0, error);
 
     if (error && error != asio::error::message_size) {
         RCLCPP_ERROR_STREAM(rclcpp::get_logger("AsioUdpSocket::receive"), error.message());
@@ -133,7 +138,7 @@ void AsioUdpSocket::armReceive()
 {
     udp_socket_.async_receive_from(
         asio::buffer(recv_buffer_),
-        host_endpoint_,
+        sender_endpoint_,
         guard_.wrap(
             [this](std::error_code error, std::size_t bytes_transferred)
             {
@@ -169,6 +174,22 @@ void AsioUdpSocket::asyncReceiveHandler(
         return;
     }
 
+    if (source_filter_ && sender_endpoint_.address() != *source_filter_) {
+        // Not from the expected source: drop it before it reaches any consumer. Logged at
+        // 1, 2, 4, 8, ... rejections so a flood cannot flood the log as well.
+        const std::uint64_t rejected = ++rejected_datagrams_;
+        if ((rejected & (rejected - 1)) == 0) {
+            RCLCPP_WARN_STREAM(
+                rclcpp::get_logger("AsioUdpSocket::asyncReceiveHandler"),
+                "Dropped datagram from " << sender_endpoint_.address().to_string() << ":"
+                                         << sender_endpoint_.port() << " (only "
+                                         << source_filter_->to_string() << " is accepted); "
+                                         << rejected << " dropped so far.");
+        }
+        armReceive();
+        return;
+    }
+
     if (bytes_transferred > 0 && callback_) {
         // Upstream resized the receive buffer down to the datagram length, handed it to the
         // callback, resized it back up, and then re-armed with a lambda that resized it
@@ -190,6 +211,30 @@ std::string AsioUdpSocket::remoteIp() const
 std::uint16_t AsioUdpSocket::remotePort() const
 {
     return remote_endpoint_.port();
+}
+
+void AsioUdpSocket::setSourceFilter(const std::string & source_ip)
+{
+    if (source_ip.empty()) {
+        source_filter_.reset();
+        return;
+    }
+
+    asio::error_code error;
+    const auto address = asio::ip::make_address(source_ip, error);
+    if (error) {
+        throw std::invalid_argument("invalid source address '" + source_ip + "': " + error.message());
+    }
+    // The socket is IPv4-only (open()), so an IPv6 filter would silently reject everything.
+    if (!address.is_v4()) {
+        throw std::invalid_argument("source address '" + source_ip + "' is not IPv4");
+    }
+    source_filter_ = address;
+}
+
+std::uint64_t AsioUdpSocket::rejectedDatagrams() const
+{
+    return rejected_datagrams_.load();
 }
 
 std::string AsioUdpSocket::hostIp() const
@@ -234,10 +279,13 @@ bool AsioUdpSocket::isOpen() const
 
 std::unique_ptr<ByteStreamPort> makeUdpReceiver(
     const IoContext & ctx,
-    const UdpEndpoint & endpoint)
+    const UdpEndpoint & endpoint,
+    const std::string & source_ip)
 {
-    return std::make_unique<AsioUdpSocket>(
+    auto socket = std::make_unique<AsioUdpSocket>(
         ctx, endpoint.ip(), endpoint.port(), SocketRole::RECEIVER);
+    socket->setSourceFilter(source_ip);
+    return socket;
 }
 
 std::unique_ptr<ByteStreamPort> makeUdpSender(

@@ -28,7 +28,7 @@ using SteadyTime = std::chrono::steady_clock::time_point;
 struct LinkMonitorConfig
 {
     // A decoded RC frame older than this means the receiver has stopped delivering frames (or
-    // the serial bridge has). At the receiver's 50 Hz packet rate, 200 ms is 10 missed frames.
+    // the path from it - router, network, UDP receiver - has). At the receiver's 50 Hz packet rate, 200 ms is 10 missed frames.
     std::chrono::milliseconds channel_timeout{200};
 
     // rc/link older than this means the link quality below can no longer be trusted. Link stats

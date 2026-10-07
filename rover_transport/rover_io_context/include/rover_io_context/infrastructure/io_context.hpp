@@ -73,7 +73,7 @@ struct ThreadGroup
 };
 
 // Owns an ASIO io_service and the pool of threads running it. Every ByteStreamPort adapter
-// in rover_serial_driver / rover_udp_driver borrows one of these by const reference; the
+// in rover_udp_driver borrows one of these by const reference; the
 // node owns it, so the context always outlives the ports it serves.
 class IoContext
 {

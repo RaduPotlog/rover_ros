@@ -24,7 +24,7 @@ in the `rover_bringup` banner.
 | `simulation_deps.repos` | none (the file has a `repositories:` key with no entries) |
 
 The transport packages (`rover_asio_cmake_module`, `rover_io_context`,
-`rover_serial_driver`, `rover_udp_driver`) are **vendored in-tree** under
+`rover_udp_driver`) are **vendored in-tree** under
 `rover_transport/`, not pulled by `vcs`. They are a hard fork of
 [ros-drivers/transport_drivers](https://github.com/ros-drivers/transport_drivers)
 v1.2.0 - see `rover_transport/README.md`.

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // rclcpp_components registration of RoverCrsfTeleopNode. The launch file loads it into one
-// container with rover_serial_driver's SerialBridgeNode, so the ~250 raw-byte messages a
-// second on rc/raw stay in-process instead of crossing the Zenoh router twice each.
+// container with rover_udp_driver's UdpReceiverNode, so the ~250 datagrams a second on
+// rc/raw_udp stay in-process instead of crossing the Zenoh router twice each.
 //
 // Compiled straight into the SHARED rover_crsf_teleop_component library, never into the
 // STATIC _ros archive: the linker drops archive members nothing references, and with them the

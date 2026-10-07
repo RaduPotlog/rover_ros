@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The launch file's structure: one container, both nodes intra-process, names unchanged."""
+"""The launch file's structure: one container, both nodes intra-process, names, UDP settings."""
 
 import importlib.util
 from pathlib import Path
@@ -51,7 +51,8 @@ def _setup(teleop_launch, monkeypatch, tmp_path, use_sim):
     monkeypatch.setattr(teleop_launch, 'ComposableNode', capture_node)
     config = tmp_path / 'rover_crsf_teleop.yaml'
     config.write_text(
-        '/**:\n  ros__parameters:\n    serial_device: /dev/ttyTEST\n    serial_baudrate: 115200\n')
+        '/**:\n  ros__parameters:\n    udp_bind_ip: 10.0.0.5\n    udp_port: 15000\n'
+        '    udp_source_ip: 10.0.0.1\n')
     context = LaunchContext()
     context.launch_configurations.update(
         namespace='rover', log_level='INFO', use_sim=use_sim,
@@ -63,7 +64,7 @@ def _setup(teleop_launch, monkeypatch, tmp_path, use_sim):
 
 
 @pytest.mark.parametrize('use_sim', ['False', 'True'])
-def test_bridge_and_teleop_share_one_single_threaded_container(
+def test_receiver_and_teleop_share_one_single_threaded_container(
         teleop_launch, monkeypatch, tmp_path, use_sim):
     container, nodes, context = _setup(teleop_launch, monkeypatch, tmp_path, use_sim)
 
@@ -74,30 +75,64 @@ def test_bridge_and_teleop_share_one_single_threaded_container(
 
     # Node names are unchanged from the standalone processes: the Cockpit RC page and the
     # diagnostic aggregator key on them.
-    assert set(nodes) == {'rover_crsf_serial_bridge', 'rover_crsf_teleop_node'}
+    assert set(nodes) == {'rover_crsf_udp_receiver', 'rover_crsf_teleop_node'}
     assert [node for node, _ in nodes.values()] == container['composable_node_descriptions']
 
-    bridge = nodes['rover_crsf_serial_bridge'][1]
+    receiver = nodes['rover_crsf_udp_receiver'][1]
     teleop = nodes['rover_crsf_teleop_node'][1]
-    assert bridge['plugin'] == 'rover::transport::serial::SerialBridgeNode'
+    assert receiver['plugin'] == 'rover::transport::udp::UdpReceiverNode'
     assert teleop['plugin'] == 'rover_crsf_teleop::RoverCrsfTeleopNode'
-    for node in (bridge, teleop):
+    for node in (receiver, teleop):
         assert {'use_intra_process_comms': True} in node['extra_arguments']
     # Lifecycle nodes, activated by their own `autostart` parameter: launch_ros'
     # ComposableLifecycleNode autostart never reaches a namespaced component.
-    assert bridge['parameters'][0]['autostart'] is True
+    assert receiver['parameters'][0]['autostart'] is True
     assert {'autostart': True} in teleop['parameters']
 
-    # The serial bridge only exists on hardware.
-    assert bridge['condition'].evaluate(context) is (use_sim == 'False')
+    # The UDP receiver only exists on hardware.
+    assert receiver['condition'].evaluate(context) is (use_sim == 'False')
     assert 'condition' not in teleop
 
 
-def test_bridge_publishes_where_the_teleop_listens(teleop_launch, monkeypatch, tmp_path):
+def test_receiver_publishes_where_the_teleop_listens(teleop_launch, monkeypatch, tmp_path):
     _, nodes, _ = _setup(teleop_launch, monkeypatch, tmp_path, 'False')
-    bridge = nodes['rover_crsf_serial_bridge'][1]
-    assert ('serial_read', 'rc/raw') in bridge['remappings']
-    # Serial settings come from the teleop config (single source of truth).
-    parameters = bridge['parameters'][0]
-    assert parameters['device_name'] == '/dev/ttyTEST'
-    assert parameters['baud_rate'] == 115200
+    receiver = nodes['rover_crsf_udp_receiver'][1]
+    assert ('udp_read', 'rc/raw_udp') in receiver['remappings']
+    # UDP settings come from the teleop config (single source of truth).
+    parameters = receiver['parameters'][0]
+    assert parameters['ip'] == '10.0.0.5'
+    assert parameters['port'] == 15000
+    assert parameters['source_ip'] == '10.0.0.1'
+
+
+def test_receiver_only_accepts_the_router_by_default(teleop_launch, monkeypatch, tmp_path):
+    """The shipped config must keep the source filter: CRSF is unauthenticated."""
+    config = Path(__file__).resolve().parents[1] / 'config' / 'rover_crsf_teleop.yaml'
+    bind_ip, port, source_ip = teleop_launch._udp_settings(
+        LaunchContext(), _Literal(str(config)))
+    assert (bind_ip, port, source_ip) == ('192.168.1.201', 10111, '192.168.1.1')
+
+
+def test_a_blank_source_ip_keeps_the_router(teleop_launch, tmp_path):
+    """A blank YAML value loads as None; it must not silently open the RC port to anyone."""
+    config = tmp_path / 'blank.yaml'
+    config.write_text('/**:\n  ros__parameters:\n    udp_source_ip:\n')
+    _, _, source_ip = teleop_launch._udp_settings(LaunchContext(), _Literal(str(config)))
+    assert source_ip == '192.168.1.1'
+
+
+def test_an_explicit_empty_source_ip_accepts_any(teleop_launch, tmp_path):
+    config = tmp_path / 'any.yaml'
+    config.write_text('/**:\n  ros__parameters:\n    udp_source_ip: ""\n')
+    _, _, source_ip = teleop_launch._udp_settings(LaunchContext(), _Literal(str(config)))
+    assert source_ip == ''
+
+
+class _Literal:
+    """Stands in for a LaunchConfiguration that resolves to a fixed path."""
+
+    def __init__(self, value):
+        self._value = value
+
+    def perform(self, context):
+        return self._value

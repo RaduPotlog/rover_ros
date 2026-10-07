@@ -15,25 +15,28 @@
 # limitations under the License.
 
 """
-RC teleop bring-up: the serial bridge that owns the UART, and the teleop node that decodes CRSF
+RC teleop bring-up: the UDP receiver that owns the socket, and the teleop node that decodes CRSF
 from it.
 
-The UART is deliberately not opened by the teleop node. rover_serial_driver's rover_serial_bridge_node already
-does it, is lifecycle-managed, and is maintained upstream; the teleop node subscribes to the raw
-bytes it publishes. That also keeps asio out of this package entirely.
+The ELRS receiver hangs off the RUTX11 router's USB port; the router forwards its raw CRSF bytes
+over UDP (Serial Utilities -> Over IP, see scripts/rutx11_elrs_udp_forwarding.sh). The socket is
+deliberately not opened by the teleop node: rover_udp_driver's receiver node already does it, is
+lifecycle-managed, and filters on the sender (`source_ip`), which the published UdpPacket cannot
+tell the teleop node. That also keeps asio out of this package entirely.
 
 Both run as components of one single-threaded container, rover_crsf_container, with intra-process
-communication: the bridge publishes one rc/raw message per UART read (~250/s), and as separate
-processes each of them crossed the Zenoh router. The single thread is also what the teleop node
-was written for (see RoverCrsfTeleopNode).
+communication: the receiver publishes one rc/raw_udp message per datagram (~250/s), and as
+separate processes each of them would cross the Zenoh router. The single thread is also what the
+teleop node was written for (see RoverCrsfTeleopNode).
 
 One trade-off: on Ctrl-C a component container exits without running the lifecycle shutdown
 transition, so the teleop node's on_shutdown() doesn't publish its final stop command. The rover
 still stops - twist_mux drops the RC input after its timeout and diff_drive's cmd_vel_timeout
 zeroes the wheels - just as it would if the process crashed. The standalone executables
-(rover_crsf_teleop_node, rover_serial_bridge_node) still run the transition.
+(rover_crsf_teleop_node, rover_udp_receiver_node) still run the transition.
 """
 
+import launch.logging
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.conditions import UnlessCondition
@@ -50,16 +53,16 @@ from launch_ros.substitutions import FindPackageShare
 import yaml
 
 
-def _serial_settings(context, config_path):
+def _udp_settings(context, config_path):
     """
-    Read the serial device and baud rate out of the teleop config.
+    Read the UDP bind address, port and accepted source out of the teleop config.
 
     They live there, not inline here, so there is a single source of truth: the teleop node
-    declares the same two parameters and reports them in its "RC serial link" diagnostic, and an
+    declares the same three parameters and reports them in its "RC UDP link" diagnostic, and an
     operator editing the config does not have to know that a second node also needs the value.
     """
     resolved = config_path.perform(context)
-    device, baudrate = '/dev/ttyUSB0', 460800
+    bind_ip, port, source_ip = '192.168.1.201', 10111, '192.168.1.1'
 
     try:
         with open(resolved, 'r') as handle:
@@ -67,14 +70,23 @@ def _serial_settings(context, config_path):
 
         for entry in params.values():
             settings = (entry or {}).get('ros__parameters', {})
-            device = settings.get('serial_device', device)
-            baudrate = settings.get('serial_baudrate', baudrate)
-    except (OSError, yaml.YAMLError):
+            bind_ip = settings.get('udp_bind_ip', bind_ip)
+            port = settings.get('udp_port', port)
+            # A blank 'udp_source_ip:' loads as None. Treat it as unset - keep the router - rather
+            # than as "any sender": only an explicit "" opens the RC port to everyone.
+            if settings.get('udp_source_ip') is not None:
+                source_ip = settings['udp_source_ip']
+    except (OSError, yaml.YAMLError) as error:
         # Fall back to the defaults rather than failing the whole bring-up: the teleop node still
         # comes up and reports the problem through diagnostics.
-        pass
+        launch.logging.get_logger('rover_crsf_teleop.launch').warning(
+            f'Could not read {resolved} ({error}); using the default UDP settings.')
 
-    return device, int(baudrate)
+    if not source_ip:
+        launch.logging.get_logger('rover_crsf_teleop.launch').warning(
+            'udp_source_ip is empty: the RC UDP port accepts datagrams from ANY sender.')
+
+    return str(bind_ip), int(port), str(source_ip)
 
 
 def _launch_setup(context, *args, **kwargs):
@@ -83,34 +95,33 @@ def _launch_setup(context, *args, **kwargs):
     use_sim = LaunchConfiguration('use_sim')
     config_path = LaunchConfiguration('rover_crsf_config_path')
 
-    device, baudrate = _serial_settings(context, config_path)
+    bind_ip, port, source_ip = _udp_settings(context, config_path)
 
-    # The UART owner: opens the port, publishes raw bytes on `serial_read` and accepts writes on
-    # `serial_write`. We never write to the receiver, so `serial_write` is remapped out of the way
-    # rather than left on a generic name.
+    # The socket owner: binds udp_bind_ip:udp_port and publishes each datagram on `udp_read`.
+    # `source_ip` makes it drop every datagram not sent by the router, inside the socket - the
+    # published UdpPacket carries the bound address, not the sender, so the teleop node could not
+    # filter on it.
     #
-    # `serial_read` is remapped to rc/raw because the default name is generic and this rover has
-    # other serial devices; the teleop node's `serial_topic` parameter must match.
+    # `udp_read` is remapped to rc/raw_udp because the default name is generic and this rover has
+    # other UDP receivers; the teleop node's `udp_topic` parameter must match.
     #
     # Both nodes are lifecycle nodes brought to active by their own `autostart` parameter:
     # launch_ros' ComposableLifecycleNode autostart misses the namespace and never reaches them.
-    serial_bridge_node = ComposableNode(
-        package='rover_serial_driver',
-        plugin='rover::transport::serial::SerialBridgeNode',
-        name='rover_crsf_serial_bridge',
+    udp_receiver_node = ComposableNode(
+        package='rover_udp_driver',
+        plugin='rover::transport::udp::UdpReceiverNode',
+        name='rover_crsf_udp_receiver',
         namespace=namespace,
         parameters=[{
-            'device_name': device,
-            'baud_rate': baudrate,
-            'flow_control': 'none',
-            'parity': 'none',
-            'stop_bits': '1',
+            'ip': bind_ip,
+            'port': port,
+            'source_ip': source_ip,
             'autostart': True,
         }],
-        remappings=[('serial_read', 'rc/raw'), ('serial_write', 'rc/raw_write')],
+        remappings=[('udp_read', 'rc/raw_udp')],
         extra_arguments=[{'use_intra_process_comms': True}],
-        # No receiver exists in simulation, so starting a node that can only fail to open
-        # /dev/ttyUSB0 is pure noise.
+        # No receiver exists in simulation, and the sim machine does not own 192.168.1.201, so
+        # starting a node that can only fail to bind is pure noise.
         condition=UnlessCondition(use_sim),
     )
 
@@ -132,7 +143,7 @@ def _launch_setup(context, *args, **kwargs):
         executable='component_container',
         name='rover_crsf_container',
         namespace=namespace,
-        composable_node_descriptions=[serial_bridge_node, rover_crsf_node],
+        composable_node_descriptions=[udp_receiver_node, rover_crsf_node],
         arguments=[
             '--ros-args',
             '--log-level',
@@ -164,7 +175,7 @@ def generate_launch_description():
     declare_use_sim_arg = DeclareLaunchArgument(
         'use_sim',
         default_value='False',
-        description='Simulation mode: do not start the serial bridge, there is no receiver.',
+        description='Simulation mode: do not start the UDP receiver, there is no RC receiver.',
     )
 
     common_dir_path = LaunchConfiguration('common_dir_path')

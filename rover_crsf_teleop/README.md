@@ -1,27 +1,35 @@
 # rover_crsf_teleop
 
-RC teleop for the rover over a CRSF (ExpressLRS) receiver: raw serial bytes are decoded into RC
+RC teleop for the rover over a CRSF (ExpressLRS) receiver: raw CRSF bytes, forwarded over UDP by the RUTX11 router, are decoded into RC
 frames, stick positions become velocity commands for `twist_mux`, two switches drive the hardware
 interface's software E-Stop, and an RC link failsafe stops the rover when the transmitter link is
 lost.
 
 ## How RC input reaches this node
 
-The UART is **not** opened here. `rover_serial_driver`'s serial bridge (from `rover_transport`), running
-as node `rover_crsf_serial_bridge`, owns the port and publishes raw bytes; this node subscribes to them and decodes CRSF in-process.
-The launch file loads both as components (`rover_serial_driver`'s
-`rover::transport::serial::SerialBridgeNode` and `rover_crsf_teleop::RoverCrsfTeleopNode`) into one
+The ELRS receiver is **not** connected to the rover computer. It is wired through a USB-UART
+adapter to the **RUTX11 router's USB port**, and the router's Serial Utilities ("Over IP": UDP,
+Client mode, raw mode) read the UART at 460800 8N1 and send the raw CRSF bytes as UDP datagrams to
+`192.168.1.201:10111`. On the rover, `rover_udp_driver`'s receiver (from `rover_transport`),
+running as node `rover_crsf_udp_receiver`, owns the socket and publishes each datagram; this node
+subscribes to them and decodes CRSF in-process.
+The launch file loads both as components (`rover_udp_driver`'s
+`rover::transport::udp::UdpReceiverNode` and `rover_crsf_teleop::RoverCrsfTeleopNode`) into one
 single-threaded container, `rover_crsf_container`, with intra-process communication, so the ~250
-`rc/raw` messages a second never cross the Zenoh router. Inside the container, Ctrl-C does not run
-the lifecycle shutdown, so the final stop command comes from twist_mux's timeout instead; the
+`rc/raw_udp` messages a second never cross the Zenoh router. Inside the container, Ctrl-C does not
+run the lifecycle shutdown, so the final stop command comes from twist_mux's timeout instead; the
 standalone `rover_crsf_teleop_node` executable still sends it.
 
 ```
-ELRS receiver ──UART @460800──▶ rover_crsf_serial_bridge ──rc/raw (UInt8MultiArray)──▶ rover_crsf_teleop_node
-                                                                              │
-                                        teleop_elrs_cmd_vel_stamped ◀─────────┤
-                                        hardware_interface/sw_* (Trigger) ◀───┤
-                                        rc/channels, rc/link (echo) ◀─────────┘
+ELRS receiver ──UART 460800──▶ USB-UART ──USB──▶ RUTX11 (Serial Utilities: Over IP, UDP)
+                                                    │  192.168.1.1 ──▶ 192.168.1.201:10111
+                                                    ▼
+                                 rover_crsf_udp_receiver   (source_ip 192.168.1.1)
+                                                    │  rc/raw_udp (udp_msgs/UdpPacket)
+                                                    ▼
+                                 rover_crsf_teleop_node ──▶ teleop_elrs_cmd_vel_stamped
+                                                        ──▶ hardware_interface/sw_* (Trigger)
+                                                        ──▶ rc/channels, rc/link (echo)
 ```
 
 Decoding in this node rather than in a separate receiver process means the decode runs on the
@@ -29,15 +37,36 @@ executor thread — the same thread as the control timer — so `TeleopUseCase` 
 single-threaded invariant with no locking, and RC input no longer crosses a DDS hop to reach the
 code that acts on it.
 
-**Baud rate.** ASIO supports 460800 natively, which is what the A1's receiver is flashed for.
-CRSF's own default of 420000 is *not* in ASIO's table, so a receiver reflashed to 420000 could not
-be opened by `rover_crsf_serial_bridge` at all. Keep it at 460800.
+**Datagrams are not frames.** Where the router cuts the byte stream into datagrams depends on its
+serial timeout, not on CRSF framing. That is fine: the CRSF parser is a byte-stream parser and
+carries a partial frame across datagrams. A datagram lost on the wire costs at most one frame
+(4 ms at 250 Hz); the parser resynchronises on the next sync byte, and sustained loss is the RC
+link failsafe's job.
+
+**Only the router may talk to this port.** CRSF carries no authentication, and this input sits at
+`twist_mux` priority 110, above every other velocity source. Anything able to reach UDP 10111 —
+a host on the wired LAN, a client of the 192.168.77 AP — could otherwise drive the rover. So the
+receiver gets `source_ip: 192.168.1.1` and drops every other sender's datagrams inside the socket,
+before they are published. The filter has to live there: `UdpPacket.address` carries the *bound*
+address, not the sender's, so this node cannot tell senders apart. As a second layer,
+`scripts/rutx11_elrs_udp_forwarding.sh apply` drops AP clients' datagrams to the port at the
+router (the AP shares the router's `lan` zone, so nothing else stops them there). WireGuard peers
+are already rejected by the router's `VPN-reject-everything-else` rule. What none of this stops is
+a host that forges 192.168.1.1 as its source address; only a separate network segment would.
+
+**Baud rate.** 460800 is what the A1's receiver is flashed for, and it is set **on the router**
+(Serial Utilities accept any integer from 300 to 4000000). Nothing on the rover computer opens the
+UART any more, so the old ASIO baud-table limit (no 420000) no longer applies.
+
+**The router is in the RC path.** A router reboot, a firmware update, a Serial Utilities reload or
+a pulled RPi–router cable looks exactly like a lost RC link: a zero burst, then `twist_mux` falls
+through to its next source. The E-Stop is not triggered — the same as any other RC link loss.
 
 ## Interfaces
 
 | Direction | Name | Type |
 |---|---|---|
-| sub | `rc/raw` | `std_msgs/UInt8MultiArray` (reliable, depth 100) — raw CRSF bytes from `rover_crsf_serial_bridge` |
+| sub | `rc/raw_udp` | `udp_msgs/UdpPacket` (reliable, depth 100) — raw CRSF bytes, one datagram per message, from `rover_crsf_udp_receiver` |
 | sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` (reliable, volatile, depth 1) — E-Stop state that gates RC calibration |
 | pub | `teleop_elrs_cmd_vel_stamped` | `geometry_msgs/TwistStamped`, frame `base_link` |
 | pub | `rc/channels` | `rover_msgs/RcChannels` (best effort) — echo, for tuning only |
@@ -80,8 +109,9 @@ deactivated. Channel N is `channels[N-1]`.
   high = reset; latch-reset channel low = reset latch. Their resting position is learned over
   `switch_settle_frames` ticks at startup and never fires.
 - **Diagnostics** (hardware ID `RC Receiver`) never report ERROR — RC teleop is optional.
-  `RC serial link` covers the byte stream (is `rover_crsf_serial_bridge` alive?), `RC link` the RC signal
-  (is the transmitter in range?), and they fail for different reasons.
+  `RC UDP link` covers the byte stream (are datagrams arriving from the router at all, and do they
+  decode?), `RC link` the RC signal (is the transmitter in range?), and they fail for different
+  reasons.
 
 ## RC calibration
 
@@ -151,21 +181,26 @@ That is deliberate: the sweep moved the switches while nothing was watching, so 
 are re-armed and re-learn where they rest, instead of reading the first frame afterwards as a
 real edge and firing an E-Stop call the operator never asked for.
 
-### Known limitation: the serial bridge does not reconnect
+### Router setup
 
-`rover_serial_driver` closes the port on any read error and never reopens it, and its `on_configure`
-fails outright if the device is absent. So an unplugged receiver means no RC until the bridge is
-cycled:
+The router side is configured by
+[`scripts/rutx11_elrs_udp_forwarding.sh`](scripts/rutx11_elrs_udp_forwarding.sh) (uci over SSH,
+idempotent). Before relying on it, check on the router that RutOS has a driver for your USB-UART
+adapter's chip (FTDI and CP210x are the safest bets; Teltonika does not publish a list):
 
 ```bash
-ros2 lifecycle set /rover/rover_crsf_serial_bridge cleanup
-ros2 lifecycle set /rover/rover_crsf_serial_bridge configure
-ros2 lifecycle set /rover/rover_crsf_serial_bridge activate
+ssh root@192.168.1.1 'dmesg | tail; ls /dev/ttyUSB*'
 ```
 
-This is not a regression — the receiver package this replaced caught the error and then ran blind
-forever, invisibly — and the failsafe handles the consequence safely. The `RC serial link`
-diagnostic makes it visible; automatic recovery belongs in a supervisor, not here.
+and on the rover that CRSF actually arrives (`0xC8` sync bytes, ~250 frames/s with the TX on):
+
+```bash
+sudo tcpdump -ni eth1 udp port 10111 -X
+```
+
+Unlike the serial bridge this replaced, nothing here needs cycling after an unplug: RutOS owns the
+USB device, and the UDP receiver just waits for datagrams. The `RC UDP link` diagnostic shows when
+none are arriving.
 
 All parameters, with the reasoning behind their defaults, are documented in
 [`config/rover_crsf_teleop.yaml`](config/rover_crsf_teleop.yaml). The link failsafe values are
@@ -206,8 +241,8 @@ test does not link the node.
 ## Launch
 
 ```bash
-ros2 launch rover_crsf_teleop rover_crsf_teleop.launch.py   # serial bridge + teleop, one container
-ros2 lifecycle get /rover/rover_crsf_serial_bridge
+ros2 launch rover_crsf_teleop rover_crsf_teleop.launch.py   # UDP receiver + teleop, one container
+ros2 lifecycle get /rover/rover_crsf_udp_receiver
 ros2 lifecycle get /rover/rover_crsf_teleop_node
 ```
 
@@ -219,10 +254,12 @@ colcon test --packages-select rover_crsf_teleop && colcon test-result --all --ve
 
 `test/unit/` covers the domain (including the CRSF decoder, against byte vectors captured from
 the implementation it replaces) and the application with fake ports; `test/integration/` drives
-the lifecycle node with **encoded CRSF bytes** over real topics and services, so it exercises the
-wire format and the parser as well as the teleop rules; `test/e2e/` starts the installed node
-from a launch description with no serial bridge, which is also the test that it degrades rather
-than failing when the receiver is absent.
+the lifecycle node with **encoded CRSF bytes** in `UdpPacket`s over real topics and services -
+including frames split across datagrams - so it exercises the wire format and the parser as well
+as the teleop rules; `test/e2e/` starts the installed node and `rover_udp_driver`'s receiver on
+loopback and sends CRSF through a real UDP socket: no input reaches active and publishes nothing,
+CRSF from a foreign source address is dropped, CRSF from the accepted source drives
+`teleop_elrs_cmd_vel_stamped`.
 
 ## Attribution
 

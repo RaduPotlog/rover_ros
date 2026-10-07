@@ -6,7 +6,7 @@
   <description>
     Shared transport primitives for the rover: the byte-stream / byte-publisher domain
     ports, the inbound and outbound byte bridges, and the ASIO io_service thread pool that
-    rover_serial_driver and rover_udp_driver run their sockets on. Carries no ROS
+    rover_udp_driver runs its sockets on. Carries no ROS
     dependency. Forked from transport_drivers' io_context (v1.2.0); see README.md.
   </description>
   <maintainer email="potlogradu@gmail.com">radupotlog</maintainer>

@@ -2,7 +2,7 @@
   "system": "RoverPlatform",
   "version": "V-001",
   "date": "2026-09-27",
-  "provenance": "Reverse-engineered from src/rover_ros (master 35aeb3e). Every 'source' is path:line relative to src/rover_ros/.",
+  "provenance": "Reverse-engineered from src/rover_ros (master 35aeb3e); RC input path updated for the ELRS-over-RUTX11 UDP change (2026-10-07). Every 'source' is path:line relative to src/rover_ros/.",
   "composites": [
     {"name": "DriveControl",        "label": "Drive & Control",      "members": ["rover_hardware_interface", "rover_controller", "rover_description"]},
     {"name": "CommandArbitration",  "label": "Command Arbitration",  "members": ["rover_twist_mux", "rover_crsf_teleop"]},
@@ -25,12 +25,12 @@
     {"name": "rover_localization",       "prefix": "LOC",  "language": "YAML",   "lifecycle": "plain",        "executables": "rover_ekf_node; rover_ekf_global_node (GPS); rover_navsat_transform_node (GPS)", "behaviour_model": ""},
     {"name": "rover_gps_heading",        "prefix": "GPSH", "language": "C++",    "lifecycle": "plain",        "executables": "rover_gps_heading_node", "behaviour_model": ""},
     {"name": "rover_bringup",            "prefix": "BRG",  "language": "Python launch", "lifecycle": "none",  "executables": "rover_bringup.launch.py; rover_web_bridges.launch.py (foxglove_bridge, rosbridge)", "behaviour_model": ""},
-    {"name": "rover_transport",          "prefix": "TRN",  "language": "C++",    "lifecycle": "lifecycle",    "executables": "rover_serial_bridge_node; UdpReceiverNode; UdpSenderNode; rover_modbus_driver (library)", "behaviour_model": ""},
+    {"name": "rover_transport",          "prefix": "TRN",  "language": "C++",    "lifecycle": "lifecycle",    "executables": "UdpReceiverNode; UdpSenderNode; rover_modbus_driver (library)", "behaviour_model": ""},
     {"name": "rover_msgs",               "prefix": "MSG",  "language": "IDL",    "lifecycle": "none",         "executables": "(interface package: 29 msg, 13 srv)", "behaviour_model": ""}
   ],
   "actors": [
     {"name": "OperatorStation", "description": "Drive UI (rover_drive_interface) and Foxglove Studio on the operator PC, over the LAN/Wi-Fi websocket."},
-    {"name": "RcTransmitter",   "description": "ExpressLRS RC transmitter + receiver on the rover UART."},
+    {"name": "RcTransmitter",   "description": "ExpressLRS RC transmitter + receiver. The receiver UART is on the RUTX11 router (USB-UART adapter), which forwards the CRSF bytes over UDP."},
     {"name": "Orchestrator",    "description": "rover_orchestrator container: driving modes (rover_drive_mode, the only writer of the web-teleop and Nav 2 mux inputs), Nav 2, mission manager."},
     {"name": "SensorPayload",   "description": "rover_sensors container: GNSS (RUTX11) and RS16 lidar."},
     {"name": "SafetyPlc",       "description": "Safety controller PLC: SR latch, contactor, HW E-stop button (Modbus TCP)."},
@@ -61,8 +61,8 @@
     {"name": "Transform",         "elements": [{"name": "x", "units": "m"}, {"name": "y", "units": "m"}, {"name": "yaw", "units": "rad"}]}
   ],
   "connections": [
-    {"src": "RcTransmitter", "dst": "rover_transport", "port": "crsf_uart", "interface": "ByteStream", "kind": "HwBus", "bus": "UART /dev/ttyUSB0", "address": "460800 baud", "rate": "250 Hz frames", "source": "rover_crsf_teleop/config/rover_crsf_teleop.yaml:18-19"},
-    {"src": "rover_transport", "dst": "rover_crsf_teleop", "port": "rc_raw", "interface": "ByteStream", "kind": "RosTopic", "topic": "rc/raw", "msgType": "std_msgs/UInt8MultiArray", "qos": "reliable, depth 100", "rate": "~250 Hz", "source": "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:110"},
+    {"src": "RcTransmitter", "dst": "rover_transport", "port": "crsf_udp", "interface": "ByteStream", "kind": "HwBus", "bus": "UDP via RUTX11 Serial Utilities Over IP (receiver UART 460800 8N1 on the router USB-UART)", "address": "192.168.1.201:10111, source 192.168.1.1 only", "rate": "250 Hz frames", "source": "rover_crsf_teleop/config/rover_crsf_teleop.yaml:4-24,195"},
+    {"src": "rover_transport", "dst": "rover_crsf_teleop", "port": "rc_raw_udp", "interface": "ByteStream", "kind": "RosTopic", "topic": "rc/raw_udp", "msgType": "udp_msgs/UdpPacket", "qos": "reliable, depth 100", "rate": "one per datagram, ~250 Hz", "source": "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:28,121"},
     {"src": "rover_crsf_teleop", "dst": "rover_twist_mux", "port": "teleop_elrs_cmd_vel_stamped", "interface": "TwistStamped", "kind": "RosTopic", "topic": "teleop_elrs_cmd_vel_stamped", "msgType": "geometry_msgs/TwistStamped", "qos": "reliable, depth 10", "rate": "50 Hz", "source": "rover_twist_mux/config/rover_twist_mux.yaml:21-24"},
     {"src": "rover_crsf_teleop", "dst": "rover_hardware_interface", "port": "e_stop_services", "interface": "TriggerService", "kind": "RosService", "topic": "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset", "msgType": "std_srvs/Trigger", "qos": "services", "rate": "on switch edge", "source": "rover_hardware_interface/src/rover_system/rover_system.cpp:130-143"},
     {"src": "OperatorStation", "dst": "rover_bringup", "port": "foxglove_ws_in", "interface": "ByteStream", "kind": "HwBus", "bus": "Websocket (LAN/Wi-Fi)", "address": "TCP 8765 (foxglove_bridge), 9090 (rosbridge)", "rate": "10 Hz UI stream", "source": "rover_bringup/launch/rover_web_bridges.launch.py:54-198"},

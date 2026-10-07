@@ -34,7 +34,8 @@
 namespace rover::transport::udp
 {
 
-// Binds a UDP socket and republishes every datagram on `udp_read`.
+// Binds a UDP socket and republishes every datagram on `udp_read` - only those from `source_ip`,
+// if that parameter is set.
 class UdpReceiverNode final : public rclcpp_lifecycle::LifecycleNode
 {
 

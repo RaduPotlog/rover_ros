@@ -165,6 +165,16 @@ TEST_F(UdpNodesLifecycleTest, ReceiverWithoutAPortFailsToConfigure)
     EXPECT_EQ(node->configure().id(), State::PRIMARY_STATE_UNCONFIGURED);
 }
 
+TEST_F(UdpNodesLifecycleTest, ReceiverWithAnUnusableSourceIpFailsToConfigure)
+{
+    for (const char * source_ip : {"not-an-ip", "::1"}) {
+        auto options = endpointOptions(kIp, testPort(7));
+        options.append_parameter_override("source_ip", source_ip);
+        auto node = std::make_shared<UdpReceiverNode>(options);
+        EXPECT_EQ(node->configure().id(), State::PRIMARY_STATE_UNCONFIGURED) << source_ip;
+    }
+}
+
 TEST_F(UdpNodesLifecycleTest, ActiveReceiverPublishesDatagramsOnUdpRead)
 {
     const int port = testPort(2);
