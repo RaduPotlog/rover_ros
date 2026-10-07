@@ -25,7 +25,8 @@ namespace rover::transport
 {
 
 // Bytes off the wire -> the publisher. This is the whole of the "receive" direction that
-// the serial bridge and the UDP receiver had duplicated between them.
+// the serial bridge and the UDP receiver had duplicated between them (upstream; only the UDP
+// receiver remains).
 //
 // Holds references, not ownership: the node owns both the stream and the publisher and
 // outlives this object.

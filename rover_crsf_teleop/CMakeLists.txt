@@ -14,7 +14,7 @@ set(PACKAGE_DEPENDENCIES
     rclcpp_components
     rclcpp_lifecycle
     std_srvs
-    std_msgs
+    udp_msgs
     geometry_msgs
     rover_msgs
     yaml-cpp
@@ -55,9 +55,9 @@ set_target_properties(${PROJECT_NAME}_core PROPERTIES POSITION_INDEPENDENT_CODE 
 # translation units (domain <-> rover_msgs, health level -> diagnostic level). No node here, so
 # the adapter tests below can link this without dragging the whole lifecycle node in with them.
 #
-# No rover_serial_driver / rover_io_context / asio anywhere in this package - the UART belongs to
-# rover_serial_driver's rover_serial_bridge_node, which the launch file starts, so this package
-# links none of its code.
+# No rover_udp_driver / rover_io_context / asio anywhere in this package - the socket belongs to
+# rover_udp_driver's receiver node (rover_crsf_udp_receiver), which the launch file starts, so
+# this package links none of its code; it only consumes the udp_msgs/UdpPacket it publishes.
 add_library(${PROJECT_NAME}_adapters STATIC
             src/infrastructure/rc_message_conversions.cpp
             src/infrastructure/ros2_velocity_command_publisher.cpp
@@ -73,7 +73,7 @@ target_link_libraries(${PROJECT_NAME}_adapters PUBLIC
     ${rclcpp_TARGETS}
     ${rclcpp_lifecycle_TARGETS}
     ${std_srvs_TARGETS}
-    ${std_msgs_TARGETS}
+    ${udp_msgs_TARGETS}
     ${geometry_msgs_TARGETS}
     ${rover_msgs_TARGETS}
     yaml-cpp
@@ -89,7 +89,7 @@ target_link_libraries(${PROJECT_NAME}_ros PUBLIC ${PROJECT_NAME}_adapters)
 set_target_properties(${PROJECT_NAME}_ros PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # The same node as an rclcpp_components plugin (rover_crsf_teleop::RoverCrsfTeleopNode), which
-# the launch file loads into one container with the serial bridge. The registration source must
+# the launch file loads into one container with the UDP receiver. The registration source must
 # be compiled into this SHARED library itself - see the file. Plural macro: it registers without
 # generating an executable, which would clash with the hand-written main below.
 add_library(${PROJECT_NAME}_component SHARED src/infrastructure/rover_crsf_teleop_component.cpp)

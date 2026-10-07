@@ -3,15 +3,15 @@
   "prefix": "CRSF",
   "document": "ROVER-A1-ROVER_CRSF_TELEOP-SWRS-V-001",
   "title": "rover_crsf_teleop Software Requirements Specification",
-  "scope": "rover_crsf_teleop provides line-of-sight RC teleoperation over an ExpressLRS/CRSF receiver. A lifecycle component (RoverCrsfTeleopNode) decodes the raw CRSF byte stream published by rover_serial_driver's serial bridge (UART /dev/ttyUSB0 at 460800 baud, both in one single-threaded container), maps two stick channels to TwistStamped commands on the highest-priority twist_mux input (teleop_elrs_cmd_vel_stamped) at 50 Hz, maps two switch channels onto the hardware interface's software E-Stop set/reset and latch-reset services, applies an RC-link failsafe (zero burst then silence), and offers an E-Stop-interlocked per-channel stick calibration with persistence.",
+  "scope": "rover_crsf_teleop provides line-of-sight RC teleoperation over an ExpressLRS/CRSF receiver. The receiver is wired through a USB-UART adapter to the RUTX11 router, whose Serial Utilities (Over IP: UDP client, raw mode, 460800 8N1) forward the raw CRSF bytes as UDP datagrams to 192.168.1.201:10111. A lifecycle component (RoverCrsfTeleopNode) decodes that byte stream as published by rover_udp_driver's UdpReceiverNode (rover_crsf_udp_receiver, accepting datagrams from the router, 192.168.1.1, only; both in one single-threaded container), maps two stick channels to TwistStamped commands on the highest-priority twist_mux input (teleop_elrs_cmd_vel_stamped) at 50 Hz, maps two switch channels onto the hardware interface's software E-Stop set/reset and latch-reset services, applies an RC-link failsafe (zero burst then silence), and offers an E-Stop-interlocked per-channel stick calibration with persistence.",
   "requirements": [
     {
       "id": "SWR-CRSF-001",
       "category": "Interface",
-      "text": "The rover_crsf_teleop shall subscribe the raw CRSF byte stream as std_msgs/UInt8MultiArray on serial_topic (rc/raw) with QoS depth 100, reliable, from the moment it is configured.",
-      "rationale": "A dropped byte chunk desynchronises the parser until the next sync byte, so the transport must not drop it; decoding while inactive means link health is known the moment teleop is activated.",
+      "text": "The rover_crsf_teleop shall subscribe the raw CRSF byte stream as udp_msgs/UdpPacket datagrams on udp_topic (rc/raw_udp) with QoS depth 100, reliable, from the moment it is configured, and shall feed each datagram's data to the stream CRSF parser without assuming that datagram boundaries coincide with CRSF frame boundaries.",
+      "rationale": "A dropped byte chunk desynchronises the parser until the next sync byte, so the ROS hop must not drop it; decoding while inactive means link health is known the moment teleop is activated. The router cuts datagrams on its serial timeout, not on CRSF frames, so a frame can span two datagrams.",
       "verification": "Inspection, Test",
-      "acceptance": "Code review shows QoS(100) (reliable) created in on_configure; the integration test drives the node with encoded CRSF bytes on rc/raw.",
+      "acceptance": "Code review shows QoS(100) (reliable) created in on_configure; the integration tests drive the node with encoded CRSF bytes as UdpPacket datagrams on rc/raw_udp, including frames split across datagrams (FramesSplitAcrossDatagramsAreDecoded).",
       "priority": "Must",
       "status": "As-Built",
       "parents": [
@@ -19,8 +19,9 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:490-507",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:21-25"
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:493-527",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:198",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:26-30"
       ],
       "implementation": "Implemented",
       "verified_by": [
@@ -70,7 +71,7 @@
       "derived_rationale": "",
       "evidence": [
         "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:40-41",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:420-421",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:423-424",
         "rover_crsf_teleop/src/infrastructure/ros2_velocity_command_publisher.cpp:26-48",
         "rover_twist_mux/config/rover_twist_mux.yaml:21-24"
       ],
@@ -95,7 +96,7 @@
       "derived_rationale": "",
       "evidence": [
         "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:44",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:788",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:809",
         "rover_crsf_teleop/src/application/teleop_use_case.cpp:96-103"
       ],
       "implementation": "Implemented",
@@ -120,8 +121,8 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:108-116",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:65",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:113-121",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:70",
         "rover_crsf_teleop/src/domain/stick_mapping.cpp:26-31",
         "rover_crsf_teleop/src/domain/stick_mapping.cpp:50-54"
       ],
@@ -143,7 +144,7 @@
       "parents": [],
       "derived_rationale": "Operator-handling refinement with no system-level parent.",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:123-124",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:128-129",
         "rover_crsf_teleop/src/domain/stick_mapping.cpp:43-46"
       ],
       "implementation": "Implemented",
@@ -166,7 +167,7 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:126-133",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:131-138",
         "rover_crsf_teleop/src/domain/rim_speed_limit.cpp:25-35",
         "rover_crsf_teleop/src/application/teleop_use_case.cpp:99"
       ],
@@ -191,7 +192,7 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:152-158",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:153-159",
         "rover_crsf_teleop/src/application/teleop_config_validation.cpp:117-139"
       ],
       "implementation": "Deviation",
@@ -213,7 +214,7 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:135-139",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:140-144",
         "rover_crsf_teleop/src/application/teleop_use_case.cpp:126-147"
       ],
       "implementation": "Implemented",
@@ -238,7 +239,7 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:176-180",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:181-185",
         "rover_crsf_teleop/src/domain/link_monitor.cpp:64-105",
         "rover_crsf_teleop/include/rover_crsf_teleop/domain/link_monitor.hpp:109"
       ],
@@ -246,7 +247,7 @@
       "verified_by": [
         "rover_crsf_teleop/test/unit/test_link_monitor.cpp"
       ],
-      "comments": "Config marks these as INITIAL VALUES to be tuned on the rover (rover_crsf_teleop.yaml:172-175)."
+      "comments": "Config marks these as INITIAL VALUES to be tuned on the rover (rover_crsf_teleop.yaml:177-180)."
     },
     {
       "id": "SWR-CRSF-011",
@@ -264,14 +265,14 @@
       "evidence": [
         "rover_crsf_teleop/src/application/teleop_use_case.cpp:91-94",
         "rover_crsf_teleop/src/application/teleop_use_case.cpp:101",
-        "rover_crsf_teleop/README.md:72-77"
+        "rover_crsf_teleop/README.md:101-106"
       ],
       "implementation": "Implemented",
       "verified_by": [
         "rover_crsf_teleop/test/unit/test_teleop_use_case.cpp",
         "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
       ],
-      "comments": "SYS-SR-012 timeout is [TBD per SYS-SR-012]. Worst-case detection is 200 ms for lost frames but up to 1000 ms when only link statistics stop. Link loss does not stop the rover if a lower-priority source is still commanding (by design of SYS-SR-005 arbitration)."
+      "comments": "SYS-SR-012 timeout is [TBD per SYS-SR-012]. Worst-case detection is 200 ms for lost frames but up to 1000 ms when only link statistics stop. Link loss does not stop the rover if a lower-priority source is still commanding (by design of SYS-SR-005 arbitration). Silence on the UDP path (RUTX11 reboot or reload, pulled receiver, adapter or RPi-router cable, stopped UDP receiver) stops the frames in the same way, so it is handled as RC link loss: zero burst and fall-through, not an E-Stop (rover_crsf_teleop_node.cpp:64-68; README.md:61-63)."
     },
     {
       "id": "SWR-CRSF-012",
@@ -288,7 +289,7 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:141-145",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:146-150",
         "rover_crsf_teleop/src/application/teleop_use_case.cpp:176-193",
         "rover_crsf_teleop/src/infrastructure/ros2_trigger_safety_switch.cpp:40-44"
       ],
@@ -313,9 +314,9 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:152-155",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:157-160",
         "rover_crsf_teleop/include/rover_crsf_teleop/domain/switch_debouncer.hpp:23",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:685-690"
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:706-711"
       ],
       "implementation": "Implemented",
       "verified_by": [
@@ -359,39 +360,39 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:366-372",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:773-822",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:123",
-        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:119-127"
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:369-375",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:794-843",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:124",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:130-138"
       ],
       "implementation": "Implemented",
       "verified_by": [
         "rover_crsf_teleop/test/e2e/test_teleop_launch.py",
         "rover_crsf_teleop/test/integration/test_teleop_node.cpp"
       ],
-      "comments": "Inside the component container Ctrl-C does not run the shutdown transition, so the final stop comes from the twist_mux timeout instead (launch docstring lines 30-34)."
+      "comments": "Inside the component container Ctrl-C does not run the shutdown transition, so the final stop comes from the twist_mux timeout instead (launch docstring lines 32-36)."
     },
     {
       "id": "SWR-CRSF-016",
       "category": "Build",
-      "text": "The rover_crsf_teleop shall, in rover_crsf_teleop.launch.py, load the serial bridge (device serial_device /dev/ttyUSB0, serial_baudrate 460800, read from the teleop config) and the teleop node into one single-threaded component container with intra-process communication, and shall not start the serial bridge when use_sim is true.",
-      "rationale": "Keeps the ~250 rc/raw messages per second off the Zenoh router and preserves the node's single-threaded invariant; there is no receiver in simulation.",
+      "text": "The rover_crsf_teleop shall, in rover_crsf_teleop.launch.py, load rover_udp_driver's UdpReceiverNode as rover_crsf_udp_receiver (ip udp_bind_ip 192.168.1.201, port udp_port 10111, source_ip udp_source_ip 192.168.1.1, all read from the teleop config; udp_read remapped to rc/raw_udp; autostart) and the teleop node into one single-threaded component container (rover_crsf_container) with intra-process communication, and shall not start the UDP receiver when use_sim is true.",
+      "rationale": "Keeps the ~250 rc/raw_udp datagrams per second off the Zenoh router and preserves the node's single-threaded invariant; there is no receiver in simulation, and the simulation machine does not own 192.168.1.201.",
       "verification": "Test, Inspection",
-      "acceptance": "Launch-structure test: both components share one component_container (not _mt) and the bridge publishes where the teleop node subscribes.",
+      "acceptance": "Launch-structure tests: both components share one component_container (not _mt), the receiver is started only when use_sim is false, the receiver publishes where the teleop node subscribes, and its ip, port and source_ip come from the teleop config.",
       "priority": "Should",
       "status": "As-Built",
       "parents": [],
       "derived_rationale": "Deployment/performance constraint of the RC input chain; no system-level parent.",
       "evidence": [
-        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:53-77",
-        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:97-142",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:18-19"
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:56-89",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:92-155",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:4-30"
       ],
       "implementation": "Implemented",
       "verified_by": [
         "rover_crsf_teleop/test/test_launch_structure.py"
       ],
-      "comments": "Known limitation (README.md:153-167): the serial bridge never reopens the port after a read error; recovery needs a manual lifecycle cycle."
+      "comments": "The router side (Serial Utilities Over IP: UDP client to 192.168.1.201:10111, 460800 8N1, raw mode) is configured once in the RutOS WebUI, as documented in rover_crsf_teleop/scripts/rutx11_elrs_udp_forwarding.sh:28-33; the script does not apply it. Unlike the removed serial bridge, nothing needs cycling after an unplug: the receiver keeps its socket and waits for datagrams (README.md:201-203). A receive error on the socket still stops the receiver without re-arming (SWR-TRN-008, Gap)."
     },
     {
       "id": "SWR-CRSF-017",
@@ -432,10 +433,10 @@
         "rover_crsf_teleop/src/domain/safety_io_flags.cpp:20-25",
         "rover_crsf_teleop/src/application/calibration_use_case.cpp:102-128",
         "rover_crsf_teleop/src/application/calibration_use_case.cpp:155-158",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:433-441",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:773-783",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:80",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:98-103"
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:436-444",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:794-804",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:85",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:103-108"
       ],
       "implementation": "Implemented",
       "verified_by": [
@@ -443,7 +444,7 @@
         "rover_crsf_teleop/test/unit/test_calibration_use_case.cpp",
         "rover_crsf_teleop/test/unit/test_safety_io_flags.cpp"
       ],
-      "comments": "Doc drift: rover_crsf_teleop.yaml:85-97 still says the gate reads hardware_interface/gpio_state and that 'any' stop (incl. software button) counts; the code reads safety_status and requires HW button AND latch AND contactor open (README.md:104-110 is correct)."
+      "comments": "Doc drift: rover_crsf_teleop.yaml:90-102 still says the gate reads hardware_interface/gpio_state and that 'any' stop (incl. software button) counts; the code reads safety_status and requires HW button AND latch AND contactor open (README.md:134-140 is correct)."
     },
     {
       "id": "SWR-CRSF-019",
@@ -458,9 +459,9 @@
       "derived_rationale": "Maintenance function of the RC input; no system-level parent.",
       "evidence": [
         "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:47-52",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:523-528",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:693-727",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:75-83"
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:544-549",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:714-748",
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:80-88"
       ],
       "implementation": "Implemented",
       "verified_by": [
@@ -481,9 +482,9 @@
       "parents": [],
       "derived_rationale": "Observability output only; no system-level parent.",
       "evidence": [
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:27-35",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:482-488",
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:756-758"
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:32-40",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:485-491",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:777-779"
       ],
       "implementation": "Implemented",
       "verified_by": [
@@ -494,10 +495,10 @@
     {
       "id": "SWR-CRSF-021",
       "category": "Diagnostics",
-      "text": "The rover_crsf_teleop shall publish diagnostics under hardware ID 'RC Receiver' with the tasks 'RC link', 'E-Stop requests', 'RC channels rate', 'RC serial link' and 'RC calibration', reporting at most WARN (never ERROR); 'RC channels rate' shall warn when the decoded frame rate deviates by more than rc_channels_rate_tolerance (0.2) from rc_channels_expected_hz (250.0 Hz).",
-      "rationale": "RC teleop is optional, so its faults are warnings; separate tasks distinguish a dead byte stream from an out-of-range transmitter or a refused E-Stop request.",
+      "text": "The rover_crsf_teleop shall publish diagnostics under hardware ID 'RC Receiver' with the tasks 'RC link', 'E-Stop requests', 'RC channels rate', 'RC UDP link' and 'RC calibration', reporting at most WARN (never ERROR); 'RC channels rate' shall warn when the decoded frame rate deviates by more than rc_channels_rate_tolerance (0.2) from rc_channels_expected_hz (250.0 Hz), and 'RC UDP link' shall warn before the first datagram and when no datagram has arrived for more than 1000 ms.",
+      "rationale": "RC teleop is optional, so its faults are warnings; separate tasks distinguish a dead datagram stream (router, cable or UDP receiver) from an out-of-range transmitter or a refused E-Stop request.",
       "verification": "Test",
-      "acceptance": "With no frames the 'RC channels rate' task is WARN; the 'RC link' task follows link loss; a refused or unavailable E-Stop request makes 'E-Stop requests' WARN; no task ever reports ERROR.",
+      "acceptance": "With no frames the 'RC channels rate' task is WARN; with no datagrams the 'RC UDP link' task is WARN ('No datagrams yet') and turns OK once datagrams arrive and decode; the 'RC link' task follows link loss; a refused or unavailable E-Stop request makes 'E-Stop requests' WARN; no task ever reports ERROR.",
       "priority": "Should",
       "status": "As-Built",
       "parents": [
@@ -505,10 +506,12 @@
       ],
       "derived_rationale": "",
       "evidence": [
-        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:94-99",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:95-100",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:68",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:1006-1055",
         "rover_crsf_teleop/src/infrastructure/teleop_diagnostics_conversions.cpp:57-59",
         "rover_crsf_teleop/src/infrastructure/teleop_diagnostics_conversions.cpp:101-119",
-        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:182-193"
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:185-196"
       ],
       "implementation": "Implemented",
       "verified_by": [
@@ -516,6 +519,36 @@
         "rover_crsf_teleop/test/unit/test_teleop_diagnostics_conversions.cpp"
       ],
       "comments": "SYS-SR-022 asks for induced faults to be ERROR; the RC receiver is not in the SYS-SR-022 component list, so WARN-only is a deliberate design choice."
+    },
+    {
+      "id": "SWR-CRSF-022",
+      "category": "Safety",
+      "text": "The rover_crsf_teleop shall accept RC input only from the configured router address: rover_crsf_teleop.launch.py shall pass udp_source_ip from the teleop config to the UDP receiver as source_ip, so that datagrams from any other sender are dropped before they are published on rc/raw_udp, and the shipped configuration shall set udp_source_ip to the RUTX11 address (192.168.1.1). A blank udp_source_ip shall keep the router address; only an explicit empty string shall accept any sender, and then the launch file and the teleop node shall each log a warning.",
+      "rationale": "CRSF frames carry no authentication and the ELRS input is twist_mux priority 110, above every other velocity source. Without the filter any host that can reach 192.168.1.201:10111 (a host on the wired LAN, a client of the 192.168.77 AP) could command motion or send E-Stop reset and latch-reset switch edges. UdpPacket.address is the bound address, not the sender, so the teleop node cannot filter itself.",
+      "verification": "Test, Inspection",
+      "acceptance": "test_receiver_only_accepts_the_router_by_default: the shipped config yields bind 192.168.1.201, port 10111, source 192.168.1.1; test_receiver_publishes_where_the_teleop_listens: source_ip is taken from the config; e2e test_b_ignores_rc_from_a_foreign_source: deflected-stick CRSF sent from a foreign address for 4 s produces no command on teleop_elrs_cmd_vel_stamped, while test_c_drives_from_rc_over_udp (from the router address) does; test_a_blank_source_ip_keeps_the_router yields 192.168.1.1 for a blank value and test_an_explicit_empty_source_ip_accepts_any yields an empty filter for \"\".",
+      "priority": "Must",
+      "status": "As-Built",
+      "parents": [
+        "SYS-SR-005",
+        "SYS-SR-008"
+      ],
+      "derived_rationale": "",
+      "evidence": [
+        "rover_crsf_teleop/config/rover_crsf_teleop.yaml:16-24",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:56-89",
+        "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:110-126",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:502-504",
+        "rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp:510-516",
+        "rover_crsf_teleop/README.md:46-55",
+        "rover_twist_mux/config/rover_twist_mux.yaml:21-24"
+      ],
+      "implementation": "Implemented",
+      "verified_by": [
+        "rover_crsf_teleop/test/test_launch_structure.py",
+        "rover_crsf_teleop/test/e2e/test_teleop_launch.py"
+      ],
+      "comments": "The drop itself is implemented by rover_transport (SWR-TRN-023). Tests: test_launch_structure.py:97-128, test_teleop_launch.py:202-224. An explicit empty udp_source_ip accepts any sender; the config allows that only on a bench (rover_crsf_teleop.yaml:16-21). The filter matches the IP address only: a host that forges 192.168.1.1 as its source is not stopped; only a separate network segment would close that (TBD). Outside rover_ros, the router adds a second layer: a firewall rule dropping datagrams from the 192.168.77 AP to the RC port, applied by rover_crsf_teleop/scripts/rutx11_elrs_udp_forwarding.sh:114-128, and the router's VPN-reject-everything-else rule for WireGuard peers (rutx11_elrs_udp_forwarding.sh:38-45)."
     }
   ]
 }

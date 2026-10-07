@@ -129,6 +129,8 @@ The ELRS RC teleop node (`rover_crsf_teleop_node`) calls the same services from 
 
 **RC link failsafe.** The link counts as lost when no frame arrives within `channel_timeout_ms` (200 ms), when link statistics are older than `link_stats_timeout_ms` (1000 ms), or when uplink link quality drops below `link_quality_lost_below` (30 %, recovers at 50 %). The node then publishes zeros for `zero_burst_duration_ms` (300 ms) and goes silent. The rover stops and `twist_mux` falls through to its next input. **A lost RC link does not trip the E-Stop.**
 
+The receiver's CRSF reaches the controller through the RUTX11 router over UDP, so a router reboot, a Serial Utilities reload or a pulled controller–router cable is handled the same way: a lost RC link, not an E-Stop. CRSF carries no authentication; `rover_crsf_udp_receiver` therefore accepts datagrams from the router's address (`192.168.1.1`) only, and the router drops AP clients' datagrams to the RC port. Neither stops a LAN host that forges the router's address.
+
 Source: `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/README.md`. More in [Teleop and LEDs](software/teleop-and-leds.md).
 
 ### Battery-driven E-Stop and shutdown

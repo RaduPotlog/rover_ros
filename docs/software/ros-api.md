@@ -340,23 +340,24 @@ More: [rover_led README](https://github.com/RaduPotlog/rover_ros/blob/master/rov
 
 ## RC teleop (`rover_crsf_teleop`)
 
-`rover_crsf_container` holds the serial bridge and the teleop node, with intra-process
-communication.
+`rover_crsf_container` holds the UDP receiver and the teleop node, with intra-process
+communication. The ELRS receiver is on the RUTX11's USB port; the router forwards its CRSF bytes
+over UDP.
 
-### `rover_crsf_serial_bridge` (`rover_serial_driver`)
+### `rover_crsf_udp_receiver` (`rover_udp_driver`, lifecycle)
 
 | Direction | Name | Type | Description |
 |-----------|------|------|-------------|
-| pub | `rc/raw` | `std_msgs/UInt8MultiArray` | Raw CRSF bytes from the receiver UART. |
-| sub | `rc/raw_write` | `std_msgs/UInt8MultiArray` | Not used. |
+| pub | `rc/raw_udp` | `udp_msgs/UdpPacket` | One CRSF datagram from the router per message. `address`/`src_port` are the bound endpoint. |
 
-Device `/dev/ttyUSB0` at `460800` baud (read from `serial_device` / `serial_baudrate` in the teleop config).
+Binds `192.168.1.201:10111` and accepts datagrams from `192.168.1.1` only (`source_ip`); all
+three come from `udp_bind_ip` / `udp_port` / `udp_source_ip` in the teleop config. Hardware only.
 
 ### `rover_crsf_teleop_node` (lifecycle)
 
 | Direction | Name | Type | Description |
 |-----------|------|------|-------------|
-| sub | `rc/raw` | `std_msgs/UInt8MultiArray` | CRSF bytes. Reliable, depth 100. |
+| sub | `rc/raw_udp` | `udp_msgs/UdpPacket` | CRSF bytes, one datagram per message. Reliable, depth 100. |
 | sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` | E-Stop evidence for the calibration interlock. |
 | pub | `teleop_elrs_cmd_vel_stamped` | `geometry_msgs/TwistStamped` | Stick command, frame `base_link`. |
 | pub | `rc/channels` | `rover_msgs/RcChannels` | Echo of the channel values. Best effort. |
@@ -556,7 +557,6 @@ More: [rover_msgs README](https://github.com/RaduPotlog/rover_ros/blob/master/ro
 | `rover_diag_manager` | `system_diag.launch.py` | `namespace`, `log_level`, `system_diag_config_path`, `diagnostic_aggregator_config_path` |
 | `rover_gazebo` | `simulation.launch.py` | `namespace`, `use_rviz`, `gz_gui`, `log_level` (see [Simulation](simulation.md)) |
 | `rover_world` | `rover_world.launch.py` | `gz_world`, `gz_gui`, `gz_headless_mode`, `gz_log_level` |
-| `rover_serial_driver` | `rover_serial_driver.launch.py` | `params_file` |
 
 Source: the launch files listed.
 

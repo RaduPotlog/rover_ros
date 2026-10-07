@@ -61,10 +61,11 @@ std::vector<int64_t> channelDefaults(const int value)
     return std::vector<int64_t>(RcFrame::kChannelCount, static_cast<int64_t>(value));
 }
 
-// Beyond this with no bytes at all, the serial bridge is presumed dead rather than merely quiet.
-// A receiver that is powered but out of range still sends LINK_STATISTICS, so silence on the
-// byte stream means the bridge or the USB link, not the RC link.
-constexpr auto kSerialSilenceTimeout = 1000ms;
+// Beyond this with no datagrams at all, the path from the receiver is presumed dead rather than
+// merely quiet. A receiver that is powered but out of range still sends LINK_STATISTICS, so
+// silence here means the router, its USB adapter, the cable or the UDP receiver node - not the
+// RC link.
+constexpr auto kUdpSilenceTimeout = 1000ms;
 
 }  // namespace
 
@@ -95,7 +96,7 @@ RoverCrsfTeleopNode::RoverCrsfTeleopNode(
     diagnostic_updater_->add("RC link", this, &RoverCrsfTeleopNode::diagnoseRcLink);
     diagnostic_updater_->add("E-Stop requests", this, &RoverCrsfTeleopNode::diagnoseSafetyRequests);
     diagnostic_updater_->add("RC channels rate", this, &RoverCrsfTeleopNode::diagnoseChannelsRate);
-    diagnostic_updater_->add("RC serial link", this, &RoverCrsfTeleopNode::diagnoseSerialLink);
+    diagnostic_updater_->add("RC UDP link", this, &RoverCrsfTeleopNode::diagnoseUdpLink);
     diagnostic_updater_->add("RC calibration", this, &RoverCrsfTeleopNode::diagnoseCalibration);
 
     // Self-driven rather than launch_ros ComposableLifecycleNode autostart, which misses the
@@ -184,15 +185,17 @@ void RoverCrsfTeleopNode::declareParameters()
     declare_parameter<int>("link_quality_lost_below", link_defaults.lq_lost_below);
     declare_parameter<int>("link_quality_recovered_at", link_defaults.lq_recovered_at);
 
-    // The UART is opened by rover_serial_driver's rover_serial_bridge_node, which the launch file starts.
-    // These two are read by the LAUNCH FILE and handed to that node; this node declares them so
-    // they live in one config file and are introspectable with `ros2 param get`.
-    declare_parameter<std::string>("serial_device", "/dev/ttyUSB0");
-    declare_parameter<int>("serial_baudrate", 460800);
+    // The socket is opened by rover_udp_driver's receiver node (rover_crsf_udp_receiver), which
+    // the launch file starts. These three are read by the LAUNCH FILE and handed to that node;
+    // this node declares them so they live in one config file, are introspectable with
+    // `ros2 param get`, and show up in the "RC UDP link" diagnostic.
+    declare_parameter<std::string>("udp_bind_ip", "192.168.1.201");
+    declare_parameter<int>("udp_port", 10111);
+    declare_parameter<std::string>("udp_source_ip", "192.168.1.1");
 
-    // Topic carrying raw bytes from rover_serial_bridge_node (its `serial_read`, remapped by the launch
-    // file). Must match that remap.
-    declare_parameter<std::string>("serial_topic", "rc/raw");
+    // Topic carrying the datagrams from rover_crsf_udp_receiver (its `udp_read`, remapped by the
+    // launch file). Must match that remap.
+    declare_parameter<std::string>("udp_topic", "rc/raw_udp");
 
     // Echo decoded frames on rc/channels and rc/link. Nothing on the rover consumes them.
     declare_parameter<bool>("publish_rc_topics", true);
@@ -473,9 +476,9 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
 
     // A cleanup -> configure cycle must not decode a half-frame left over from before.
     parser_.reset();
-    last_serial_message_.reset();
+    last_datagram_.reset();
     last_decoded_frame_.reset();
-    serial_bytes_received_ = 0;
+    bytes_received_ = 0;
     decoded_frames_ = 0;
     decoded_link_stats_ = 0;
 
@@ -487,19 +490,36 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
         rc_link_publisher_ = create_publisher<rover_msgs::msg::RcLinkStatus>(kRcLinkTopic, echo_qos);
     }
 
-    // Matches rover_serial_bridge_node's publisher (rclcpp::QoS{100}, reliable). Reliable is right here:
-    // unlike a decoded RC frame, a dropped BYTE chunk desynchronises the parser until the next
-    // sync byte, so the transport must not be the thing dropping it.
+    // Matches rover_crsf_udp_receiver's publisher (rclcpp::QoS{100}, reliable). Reliable is right
+    // here: unlike a decoded RC frame, a dropped BYTE chunk desynchronises the parser until the
+    // next sync byte, so the ROS hop must not be the thing dropping it. (The network hop can drop
+    // a datagram; the parser resynchronises on the next sync byte and loses at most a frame.)
+    //
+    // Datagram boundaries are whatever the router's serial timeout made them - not CRSF frame
+    // boundaries - which is fine: the parser is a byte-stream parser and carries partial frames
+    // across calls.
+    //
+    // Datagrams from anywhere but udp_source_ip never get here: the receiver drops them in the
+    // socket (its `source_ip` parameter), because UdpPacket.address is the bound address, not
+    // the sender.
     //
     // Subscribed in configure, not activate: input is recorded even while inactive, so the link
     // is already known healthy (or not) the moment teleop is activated.
-    const std::string serial_topic = get_parameter("serial_topic").as_string();
+    const std::string udp_topic = get_parameter("udp_topic").as_string();
 
-    serial_subscriber_ = create_subscription<std_msgs::msg::UInt8MultiArray>(
-        serial_topic, rclcpp::QoS(100),
-        [this](const std_msgs::msg::UInt8MultiArray & msg) {
-            last_serial_message_ = std::chrono::steady_clock::now();
-            serial_bytes_received_ += msg.data.size();
+    if (get_parameter("udp_source_ip").as_string().empty()) {
+        // Not refused: a bench setup may want it. But this input outranks every other velocity
+        // source, so say it out loud.
+        RCLCPP_WARN(
+            get_logger(),
+            "udp_source_ip is empty: RC from ANY sender reaching the UDP port can drive the rover.");
+    }
+
+    udp_subscriber_ = create_subscription<udp_msgs::msg::UdpPacket>(
+        udp_topic, rclcpp::QoS(100),
+        [this](const udp_msgs::msg::UdpPacket & msg) {
+            last_datagram_ = std::chrono::steady_clock::now();
+            bytes_received_ += msg.data.size();
 
             // Decodes on the executor thread and calls onRcChannels / onLinkStatistics below,
             // synchronously, before returning.
@@ -507,9 +527,10 @@ RoverCrsfTeleopNode::CallbackReturn RoverCrsfTeleopNode::on_configure(const rclc
         });
 
     RCLCPP_INFO(
-        get_logger(), "Decoding CRSF from '%s' (rover_serial_bridge_node opens %s at %ld baud).",
-        serial_topic.c_str(), get_parameter("serial_device").as_string().c_str(),
-        static_cast<long>(get_parameter("serial_baudrate").as_int()));
+        get_logger(), "Decoding CRSF from '%s' (rover_crsf_udp_receiver binds %s:%ld, accepts %s).",
+        udp_topic.c_str(), get_parameter("udp_bind_ip").as_string().c_str(),
+        static_cast<long>(get_parameter("udp_port").as_int()),
+        get_parameter("udp_source_ip").as_string().c_str());
 
     return CallbackReturn::SUCCESS;
 }
@@ -527,7 +548,7 @@ void RoverCrsfTeleopNode::createCalibrationInterfaces()
     calibration_state_publisher_ =
         create_publisher<rover_msgs::msg::RcCalibrationState>(kCalibrationStateTopic, state_qos);
 
-    // Every handler returns immediately. Frames are decoded in the rc/raw subscription callback
+    // Every handler returns immediately. Frames are decoded in the rc/raw_udp subscription callback
     // on this same single-threaded executor, so a handler that waited for samples would stop the
     // frames it was waiting for and deadlock the node.
     calibration_start_service_ = create_service<StartCalibration>(
@@ -845,7 +866,7 @@ void RoverCrsfTeleopNode::releaseResources()
     calibration_apply_service_.reset();
 
     control_timer_.reset();
-    serial_subscriber_.reset();
+    udp_subscriber_.reset();
     rc_channels_publisher_.reset();
     rc_link_publisher_.reset();
     parser_.reset();
@@ -982,38 +1003,43 @@ void RoverCrsfTeleopNode::diagnoseCalibration(diagnostic_updater::DiagnosticStat
         "Calibration in progress: teleop is held off. " + snapshot.message);
 }
 
-void RoverCrsfTeleopNode::diagnoseSerialLink(diagnostic_updater::DiagnosticStatusWrapper & status)
+void RoverCrsfTeleopNode::diagnoseUdpLink(diagnostic_updater::DiagnosticStatusWrapper & status)
 {
     // Distinct from "RC link": that one judges whether the RC signal is good enough to drive on;
-    // this one judges whether bytes are reaching us from rover_serial_bridge_node at all. They fail for
-    // different reasons - a receiver out of range versus an unplugged dongle or a bridge stuck
-    // in `unconfigured` - and the operator needs to tell them apart.
-    status.add("Topic", get_parameter("serial_topic").as_string());
-    status.add("Device (opened by rover_serial_bridge_node)", get_parameter("serial_device").as_string());
-    status.add("Baud rate", get_parameter("serial_baudrate").as_int());
-    status.add("Bytes received", static_cast<int>(serial_bytes_received_));
-    status.add("CRSF frames decoded", static_cast<int>(decoded_frames_));
-    status.add("Link stats decoded", static_cast<int>(decoded_link_stats_));
+    // this one judges whether bytes are reaching us from the router at all. They fail for
+    // different reasons - a receiver out of range versus a rebooting router, a pulled cable or a
+    // UDP receiver stuck in `unconfigured` - and the operator needs to tell them apart.
+    status.add("Topic", get_parameter("udp_topic").as_string());
+    // Configured values from this node's parameters - the launch file hands the same ones to
+    // rover_crsf_udp_receiver, but this node cannot see what that node actually bound.
+    status.add(
+        "Configured endpoint (rover_crsf_udp_receiver)",
+        get_parameter("udp_bind_ip").as_string() + ":" +
+        std::to_string(get_parameter("udp_port").as_int()));
+    status.add("Configured accepted source", get_parameter("udp_source_ip").as_string());
+    status.add("Bytes received", bytes_received_);
+    status.add("CRSF frames decoded", decoded_frames_);
+    status.add("Link stats decoded", decoded_link_stats_);
     status.add("Bytes buffered", static_cast<int>(parser_.bufferedBytes()));
 
-    if (!last_serial_message_.has_value()) {
+    if (!last_datagram_.has_value()) {
         // WARN, never ERROR: RC teleop is optional, and the rover must not be held back because
         // nobody plugged the receiver in.
         status.summary(
             diagnostic_msgs::msg::DiagnosticStatus::WARN,
-            "No bytes yet - is rover_serial_bridge_node running and active?");
+            "No datagrams yet - is the RUTX11 forwarding the receiver, and rover_crsf_udp_receiver active?");
         return;
     }
 
     const SteadyTime now = std::chrono::steady_clock::now();
     const auto silence =
-        std::chrono::duration_cast<std::chrono::milliseconds>(now - *last_serial_message_);
-    status.add("Age of last byte chunk (ms)", static_cast<int>(silence.count()));
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - *last_datagram_);
+    status.add("Age of last datagram (ms)", static_cast<int>(silence.count()));
 
-    if (silence > kSerialSilenceTimeout) {
+    if (silence > kUdpSilenceTimeout) {
         status.summary(
             diagnostic_msgs::msg::DiagnosticStatus::WARN,
-            "Byte stream silent for " + std::to_string(silence.count()) + " ms.");
+            "No datagrams for " + std::to_string(silence.count()) + " ms.");
         return;
     }
 
@@ -1021,7 +1047,7 @@ void RoverCrsfTeleopNode::diagnoseSerialLink(diagnostic_updater::DiagnosticStatu
         // Bytes but no frames means the stream is not CRSF, or the baud rate is wrong.
         status.summary(
             diagnostic_msgs::msg::DiagnosticStatus::WARN,
-            "Receiving bytes but decoding no CRSF frames - check the baud rate.");
+            "Receiving bytes but decoding no CRSF frames - check the router's serial baud rate.");
         return;
     }
 

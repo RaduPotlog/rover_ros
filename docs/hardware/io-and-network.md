@@ -1,6 +1,6 @@
 # IO and network
 
-This page covers the user aux IO on the safety PLC, the Modbus TCP link that carries it, the platform network, and the USB devices on the ROS controller.
+This page covers the user aux IO on the safety PLC, the Modbus TCP link that carries it, the platform network, and the USB devices on the ROS controller and the router.
 
 ROS names on this page are relative to the robot namespace `rover`. For example, `hardware_interface/aux_io_state` is `/rover/hardware_interface/aux_io_state`.
 
@@ -121,11 +121,12 @@ The platform has two IP networks. The safety PLC sits on a dedicated Ethernet li
 | ROS controller | ETH0 (PLC link) | `192.168.88.10/24` | none | `rover_arch/rover_a1_arch.drawio` |
 | Safety PLC | ETH0 | `192.168.88.11/24` | 502/TCP Modbus | `rover_a1_macro.urdf.xacro`, drawio |
 | ROS controller | ETH1 (router LAN) | `192.168.1.201/24` | 4444/UDP BMS telemetry in | `rover_battery/config/rover_battery.yaml`, drawio |
+| ROS controller | same | `192.168.1.201` | 10111/UDP ELRS CRSF in, from `192.168.1.1` only | `rover_crsf_teleop/config/rover_crsf_teleop.yaml` |
 | ROS controller | same | `192.168.1.201` | 7447/TCP Zenoh router | `rover_scripts/setup_rover_pc.sh` |
 | ROS controller | web bridge | bind address not set in rover_ros (upstream default) | 8765/TCP Foxglove bridge (`rover_foxglove_bridge`) | `rover_bringup/README.md` |
 | ROS controller | web bridge | bind address not set in rover_ros (upstream default) | 9090/TCP rosbridge (`rover_rosbridge_websocket`) | `rover_bringup/launch/rover_web_bridges.launch.py` |
 | ROS controller | WLAN0 | `192.168.77.203/24` | none | drawio |
-| RUTX11 router | LAN | `192.168.1.1/24` | none | drawio |
+| RUTX11 router | LAN | `192.168.1.1/24` | sends ELRS CRSF (Serial Utilities, Over IP UDP) to `192.168.1.201:10111` | drawio, `rover_crsf_teleop/scripts/rutx11_elrs_udp_forwarding.sh` |
 | RUTX11 router | Wi-Fi AP | `192.168.77.1/24` | none | drawio |
 | ESP32 BMS bridge / rear LED controller | Wi-Fi | `192.168.77.201` | 3333/UDP LED channel 2 (rear panel) in; 3003 shutdown endpoint (optional, not configured) | `rover_led/config/rover_a1_udp_led_channel_2.yaml`, `rover_safety/config/shutdown_hosts.yaml` |
 | Front LED controller | Wi-Fi | `192.168.77.202` | 3334/UDP LED channel 1 (front panel) in | `rover_led/config/rover_a1_udp_led_channel_1.yaml` |
@@ -138,9 +139,9 @@ The ROS controller addresses `192.168.88.10` and `192.168.77.203`, and the route
 |--------|------------|----------|--------|
 | Phidgets MOT0110 IMU | USB, opened directly (not through the VINT hub) | Data interval 8 ms, Madgwick filter, magnetometer off, ENU world frame | `rover_description/urdf/common/imu.urdf.xacro`, `rover_hardware_interface/src/rover_sensors/phidget_imu_sensor.cpp` |
 | Phidgets VINT hub | USB | DCC1000 boards on hub ports 0 (FL), 1 (FR), 4 (RL), 5 (RR); any hub serial number (`-1`) | `rover_hardware_interface/src/rover_driver/rover_a1_driver.cpp` |
-| ExpressLRS (CRSF) receiver | USB serial, `/dev/ttyUSB0` | 460800 baud | `rover_crsf_teleop/config/rover_crsf_teleop.yaml` |
+| ExpressLRS (CRSF) receiver | USB-UART adapter on the **RUTX11** USB port, not the ROS controller | 460800 8N1, set in the router's Serial Utilities | `rover_crsf_teleop/README.md`, `rover_crsf_teleop/scripts/rutx11_elrs_udp_forwarding.sh` |
 
-!!! warning "ELRS baud rate"
-    Keep the receiver at 460800 baud. The serial driver cannot open the CRSF default of 420000. `/dev/ttyUSB0` can move to another device when a second USB serial adapter is plugged in. A stable `/dev/serial/by-id/` path is safer.
+!!! warning "ELRS adapter on the router"
+    Teltonika does not publish which USB-UART chips RutOS supports. Check `ls /dev/ttyUSB*` on the router after plugging the adapter in; FTDI and CP210x adapters are the safest choice. The receiver stays at 460800 baud.
 
 USB vendor/product ids and udev rules are **TBD**: the repository has none. The lidar and GNSS receiver are part of the sensor payload, documented in the `rover_sensors` repository.

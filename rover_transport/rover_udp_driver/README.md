@@ -16,11 +16,18 @@ Lifecycle nodes bridging UDP to ROS 2.
 Parameters: `ip`, `port`, `autostart` (default `false`; `true` configures and activates
 the node as soon as the executor spins, one attempt, no retry - launch_ros'
 `ComposableLifecycleNode` autostart misses the namespace and never reaches a component).
+The receiver also takes `source_ip` (default empty = any source): when set, datagrams from
+any other address are dropped inside the socket, never published, and logged at 1, 2, 4, 8,
+... rejections. Use it when what arrives on the port can move the rover.
+
+`UdpPacket.address` / `src_port` carry the **bound** endpoint (the `ip`/`port` parameters),
+as upstream did - not the sender. Filter with `source_ip`, not on `address`.
 
 `rover::transport::udp::UdpReceiverNode` and `UdpSenderNode` are also registered as
 `rclcpp_components` (`rover_udp_driver_components`). The in-tree consumers load them into
 their own container, intra-process: `rover_battery` (a receiver, `udp_read` ->
-`rover_battery_udp_data`) and `rover_led` (two senders, `udp_write` ->
+`rover_battery_udp_data`), `rover_crsf_teleop` (a receiver, `udp_read` -> `rc/raw_udp`,
+`source_ip` = the RUTX11, hardware only) and `rover_led` (two senders, `udp_write` ->
 `udp_write/led_channel_{1,2}`, hardware only).
 
 ## Layers
@@ -41,6 +48,10 @@ their own container, intra-process: `rover_battery` (a receiver, `udp_read` ->
   datagram length, handed it to the callback, grew it back, then re-armed with a lambda
   that shrank it *again before dispatching* - so a following datagram could land in a
   two-byte buffer. Length is now passed alongside the buffer instead.
+- **The bound address is no longer overwritten by the sender's.** Upstream passed
+  `host_endpoint_` as the sender-endpoint out-parameter of `receive_from()` /
+  `async_receive_from()`, so the first datagram replaced the bound address with the
+  sender's. Reads now land in a separate `sender_endpoint_`, which also feeds `source_ip`.
 - `bind()` is no longer a separate public step a caller must remember: a `RECEIVER` socket
   binds inside `open()`.
 - `send()` / `receive()` return 0 on error. Upstream returned `-1` from a `std::size_t`
@@ -64,9 +75,8 @@ Evan Flynn). Relayouted into this workspace's Clean Architecture layout, renamed
 **Upstream is no longer merged - this is a hard fork.** Upstream has no release for ROS 2
 `lyrical`, which is why it was vendored in the first place; port fixes by hand.
 
-Topic names (`serial_read`, `serial_write`, `udp_read`, `udp_write`) and parameter names
-(`device_name`, `baud_rate`, `flow_control`, `parity`, `stop_bits`, `ip`, `port`) are
-**unchanged from upstream**, so upstream documentation still describes the wire interface.
+Topic names (`udp_read`, `udp_write`) and parameter names (`ip`, `port`) are
+**unchanged from upstream** (`source_ip` is an addition), so upstream documentation still describes the wire interface.
 
 > The exact upstream commit is not recoverable from this tree - it carried no VCS metadata
 > and no vcs manifest entry; every `package.xml` read `1.2.0`. Resolve the sha of the

@@ -19,7 +19,7 @@ This page lists the main hardware blocks of the Rover A1 platform, how they conn
 | 11 | Battery pack | LiFePO4, 40 Ah, 24 V system (pack model and nominal voltage **TBD**) | Main power source | Through the BMS to the power board |
 | 12 | LED panels (2×) | SK9822, 2 rows × 20 LEDs each | Front and rear bumper status lights | Wired to its LED controller |
 | 13 | Front LED controller | **TBD** | Drives the front LED panel | Wi-Fi, UDP `192.168.77.202:3334` |
-| 14 | RC receiver | ExpressLRS (CRSF), model **TBD** | Radio teleop and software E-Stop switches | USB serial `/dev/ttyUSB0`, 460800 baud |
+| 14 | RC receiver | ExpressLRS (CRSF), model **TBD** | Radio teleop and software E-Stop switches | USB-UART adapter on the RUTX11 USB port, 460800 baud; forwarded over UDP to `192.168.1.201:10111` |
 | 15 | Router | RUTX11 Wi-Fi / GSM / GPS router | Platform LAN and Wi-Fi access point | Ethernet to the ROS controller, Wi-Fi to the LED/BMS controllers |
 | 16 | Power board and Power Guard | **TBD** | 24 V distribution. The Power Guard feeds the motor drivers | 24 V |
 
@@ -94,7 +94,7 @@ flowchart LR
     HUB --> DRV["4x DCC1000"]
     M["Motor encoders"] --> DRV
     IMU["IMU MOT0110"] -->|USB| PC
-    ELRS["ELRS receiver"] -->|"USB serial"| PC
+    ELRS["ELRS receiver"] -->|"USB-UART"| RT
     BMS["Daly BMS"] -->|BLE| ESP["ESP32 BMS bridge + rear LED"]
     ESP -->|"UDP via Wi-Fi"| RT["RUTX11 router"]
     RT <-->|Ethernet| PC
