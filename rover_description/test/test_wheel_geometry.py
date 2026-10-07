@@ -87,3 +87,13 @@ def test_urdf_wheel_placement_matches_convention(wheel_type):
         if link.get('name').endswith('_wheel_link'):
             radius = float(link.find('collision/geometry/cylinder').get('radius'))
             assert radius == pytest.approx(wheel['tyre_radius']), link.get('name')
+
+    # The tyre sits inboard of its joint on both sides, so the collision cylinders (the contact
+    # patches) are closer together than wheel_separation.
+    links = {link.get('name'): link for link in root.findall('link')}
+    for prefix, (_, sy) in WHEEL_QUADRANTS.items():
+        offset_y = float(
+            links[f'{prefix}_wheel_link'].find('collision/origin').get('xyz').split()[1])
+        assert offset_y == pytest.approx(sy * wheel['tyre_y_offset']), f'{prefix} tread offset'
+        tread_y = origins[f'body_to_{prefix}_wheel_base_joint'][1] + offset_y
+        assert abs(tread_y) < half_y, f'{prefix} tread is not inboard'

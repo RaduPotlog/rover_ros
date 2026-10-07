@@ -1,5 +1,5 @@
 {
-  "provenance": "Values read from src/rover_ros (master 35aeb3e). 'source' is path:line relative to src/rover_ros/. Never edit a value here without re-reading its source.",
+  "provenance": "Values read from src/rover_ros (master 35aeb3e); the rover_description wheel and body geometry and the rover_controller wheel_separation re-read on 2026-10-07 after the SolidWorks re-export. 'source' is path:line relative to src/rover_ros/. Never edit a value here without re-reading its source.",
   "parameters": [
     {
       "component": "rover_controller",
@@ -32,23 +32,23 @@
     {
       "component": "rover_controller",
       "name": "wheel_separation",
-      "value": 0.615,
+      "value": 0.617,
       "unit": "m",
-      "source": "rover_controller/config/wheel_01_controller.yaml:170"
+      "source": "rover_controller/config/wheel_01_controller.yaml:244"
     },
     {
       "component": "rover_controller",
       "name": "wheel_radius",
       "value": 0.1651,
       "unit": "m",
-      "source": "rover_controller/config/wheel_01_controller.yaml:171"
+      "source": "rover_controller/config/wheel_01_controller.yaml:245"
     },
     {
       "component": "rover_controller",
       "name": "wheel_separation_multiplier",
       "value": 1.659,
       "unit": "1",
-      "source": "rover_controller/config/wheel_01_controller.yaml:175"
+      "source": "rover_controller/config/wheel_01_controller.yaml:249"
     },
     {
       "component": "rover_controller",
@@ -90,21 +90,49 @@
       "name": "wheelbase",
       "value": 0.503,
       "unit": "m",
-      "source": "rover_description/config/wheel_01.yaml:9"
+      "source": "rover_description/config/wheel_01.yaml:21"
     },
     {
       "component": "rover_description",
       "name": "wheel_width",
       "value": 0.108,
       "unit": "m",
-      "source": "rover_description/config/wheel_01.yaml:2"
+      "source": "rover_description/config/wheel_01.yaml:7"
     },
     {
       "component": "rover_description",
       "name": "wheel_mass",
-      "value": 2.5,
+      "value": 5.0741,
       "unit": "kg",
-      "source": "rover_description/config/wheel_01.yaml:3"
+      "source": "rover_description/config/wheel_01.yaml:10"
+    },
+    {
+      "component": "rover_description",
+      "name": "tyre_radius",
+      "value": 0.1699,
+      "unit": "m",
+      "source": "rover_description/config/wheel_01.yaml:6"
+    },
+    {
+      "component": "rover_description",
+      "name": "tyre_y_offset",
+      "value": -0.00171,
+      "unit": "m",
+      "source": "rover_description/config/wheel_01.yaml:17"
+    },
+    {
+      "component": "rover_description",
+      "name": "wheel_mount_point_z",
+      "value": 0.037363,
+      "unit": "m",
+      "source": "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:43"
+    },
+    {
+      "component": "rover_description",
+      "name": "body_mass",
+      "value": 36.9775262386666,
+      "unit": "kg",
+      "source": "rover_description/urdf/rover_a1/base.urdf.xacro:76"
     },
     {
       "component": "rover_description",

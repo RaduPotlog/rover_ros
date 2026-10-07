@@ -18,15 +18,15 @@ A value marked **derived** is computed from those files, and the formula is give
 | Track (wheel centre to wheel centre) | 0.617 m | See the warning below |
 | Ground clearance | 0.113 m | **Derived**: lowest point of `base.stl` above the ground; not measured |
 | Height of `base_link` above ground | 0.1325 m | **Derived**: `tyre_radius` − `wheel_mount_point_z` (0.1699 − 0.037363) |
-| Mass (CAD, with batteries, without payload) | 54.35 kg | SolidWorks mass properties; requirement ≤ 60 kg (SYS-SR-001) |
-| Centre of mass height | 0.270 m above ground | CAD |
-| Yaw moment of inertia | 6.12 kg·m² | CAD, about the centre of mass |
-| Static sideways tip-over angle | about 49° | **Derived**: atan(0.3085 / 0.270), level ground, no payload, no dynamics |
+| Mass (CAD, with batteries, without payload) | 57.27 kg | SolidWorks mass properties (2026-10-07), equal to the URDF total; requirement ≤ 60 kg (SYS-SR-001) |
+| Centre of mass height | 0.215 m above ground | CAD (2026-10-07), in the URDF frame: 0.0825 m above `body_link` + 0.1325 m |
+| Yaw moment of inertia | 6.17 kg·m² | CAD (2026-10-07), about the centre of mass |
+| Static sideways tip-over angle | about 55° | **Derived**: atan(0.3068 / 0.215) with the tyre contact half-track, level ground, no payload, no dynamics |
 | Payload | **TBD** | SYS-SR-027 |
 | Maximum slope | **TBD** | SYS-SR-028 |
 | Operating temperature | **TBD** | SYS-SR-029 |
 | Ingress protection (IP rating) | **TBD** | SYS-SR-029 |
-| Nav 2 footprint | 0.913 × 0.803 m | Measured wheel outline + 0.04 m; it lives in the navigation config outside rover_ros |
+| Nav 2 footprint | 0.923 × 0.802 m | CAD tyre outline + 0.04 m; it lives in the navigation config outside rover_ros |
 
 !!! warning "Source conflict: track width"
     The URDF and the drive controller use `wheel_separation: 0.617` m. The comment in
@@ -35,6 +35,8 @@ A value marked **derived** is computed from those files, and the formula is give
 
 Sources: `rover_description/config/wheel_01.yaml`,
 `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro` (`wheel_mount_point_z`),
+the SolidWorks mass properties of ROVER_1000_WATT_VARIANT (2026-10-07 export: mass, centre of
+mass, inertia),
 `rover_description/meshes/` (dimensions computed by `docs/tools/render_meshes.py`),
 `rover_platform_mbse/system/ROVER-A1-ROVER_ROS_SYS-SR-V-002.xlsx` (sheets *Requirements*
 and *Mass Properties*), `rover_platform_mbse/data/sys_sr_compliance.json` (Nav 2 footprint).

@@ -33,7 +33,7 @@
       "id": "SYS-SR-001",
       "allocation": "HW",
       "verdict": "Not SW",
-      "summary": "Mass is a hardware property (CAD 54.35 kg, see the xlsx Mass Properties sheet). The URDF model carries 43.45 kg (SWR-DESC-012, Deviation): the simulation/model mass does not match the CAD."
+      "summary": "Mass is a hardware property. The URDF carries the CAD assembly mass, 57.27 kg (SolidWorks re-export 2026-10-07, batteries included; SWR-DESC-012). The xlsx Mass Properties sheet still holds the 2026-09-25 snapshot (54.35 kg). Not weighed."
     },
     {
       "id": "SYS-SR-002",
@@ -183,7 +183,7 @@
       "id": "SYS-SR-026",
       "allocation": "HW",
       "verdict": "Not SW",
-      "summary": "Dimensions. The measured footprint is 0.913 x 0.803 m (Nav 2 footprint, outside rover_ros); limit TBD."
+      "summary": "Dimensions. The footprint is 0.923 x 0.802 m (CAD tyre outline + 0.04 m; Nav 2 footprint, outside rover_ros); limit TBD."
     },
     {
       "id": "SYS-SR-027",
@@ -195,7 +195,7 @@
       "id": "SYS-SR-028",
       "allocation": "HW",
       "verdict": "Not SW",
-      "summary": "Slope/terrain; TBD. Tip-over check needs track 0.615 m (URDF) and CoM height 0.270 m (CAD): atan(0.3075/0.270) = 48.7 deg sideways."
+      "summary": "Slope/terrain; TBD. Static sideways tip-over: tyre contact half-track 0.3068 m (URDF) and CoM height 0.215 m above the ground (CAD 2026-10-07 in the URDF frame): atan(0.3068/0.215) = 55.0 deg. The xlsx Mass Properties sheet gives a CoM height of 0.270 m from an older snapshot with a different origin."
     },
     {
       "id": "SYS-SR-029",
@@ -247,7 +247,7 @@
     },
     {
       "ref": "SYS-SR-001",
-      "question": "The URDF inertials total 43.45 kg against 54.35 kg in CAD. Update the URDF masses from the CAD?"
+      "question": "The URDF now matches the CAD (57.27 kg, 2026-10-07). The xlsx Mass Properties sheet (54.35 kg, CoM height 0.270 m, 2026-09-25) predates it. Re-take the sheet from the current CAD?"
     },
     {
       "ref": "SYS-SR-020",

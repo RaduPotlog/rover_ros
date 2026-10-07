@@ -49,7 +49,7 @@ The manual uses the value the code runs with. The other source should be correct
 
 | Topic | Value used by the code | Other value | Files |
 |---|---|---|---|
-| Track width | 0.617 m | 0.615 m "measured" | `rover_description/config/wheel_01.yaml`, `rover_controller/config/wheel_01_controller.yaml` (comment), `rover_platform_mbse/data/*` |
+| Track width | 0.617 m (CAD wheel joints; the tyre contact patches are 0.6136 m apart) | 0.615 m "measured" | `rover_description/config/wheel_01.yaml`, `rover_controller/config/wheel_01_controller.yaml` (comment) |
 | Effective track (track × multiplier) | 0.617 × 1.659 = 1.0236 m | 1.020 m (controller comment); 1.0204 m (`effective_track_width` in `rover_crsf_teleop/config/rover_crsf_teleop.yaml`) | `rover_controller/config/wheel_01_controller.yaml` |
 | `motor_current_limit` | 15.0 A | 10 A in the URDF comment and in the `utils.hpp` comment | `rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro` |
 | Maximum angular speed | 1.5 rad/s | "1.7 m/s2" (SYS-SR-004 answer; also a unit error) | `wheel_01_controller.yaml`, `rover_platform_mbse/system/*.xlsx` |
@@ -58,7 +58,7 @@ The manual uses the value the code runs with. The other source should be correct
 | Motor power switching | One contactor with an auxiliary contact | Four relays K1–K4 on QX 0.0, no auxiliary contact (schematic) | `rover_arch/SAFETY_CHAIN.md`, `rover_arch/rover_a1_arch.drawio` |
 | IMU hub port | -1 (any) is used when opening the device | 0 in the URDF, default 2 in the parameters | `rover_hardware_interface/src/phidget_imu_sensor.cpp` |
 | SYS-SR-001 mass limit | — | The requirement text says ≤ 60 kg *excluding* payload; the Open Questions sheet answers that payload *is* included | `rover_platform_mbse/system/ROVER-A1-ROVER_ROS_SYS-SR-V-002.xlsx` |
-| MBSE baseline | Current values above | 43.45 kg URDF mass, 100 Hz control, 2.5 kg wheels, 0.615 m track | `rover_platform_mbse/data/platform_parameters.json` (baseline 35aeb3e) |
+| MBSE baseline | Current values above | 100 Hz control and other non-CAD values (the CAD geometry and masses were re-read 2026-10-07) | `rover_platform_mbse/data/platform_parameters.json` (baseline 35aeb3e) |
 
 ## Behaviour worth reviewing
 

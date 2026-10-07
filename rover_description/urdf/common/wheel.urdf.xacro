@@ -10,24 +10,28 @@
       <xacro:property name="x" value="${mount_point_x}" />
       <xacro:property name="y" value="${mount_point_y}" />
       <xacro:property name="inertia_y_offset" value="${config['inertia_y_offset']}" />
+      <xacro:property name="tyre_y_offset" value="${config['tyre_y_offset']}" />
     </xacro:if>
 
     <xacro:if value="${prefix == 'fr'}">
       <xacro:property name="x" value="${mount_point_x}" />
       <xacro:property name="y" value="-${mount_point_y}" />
       <xacro:property name="inertia_y_offset" value="${-config['inertia_y_offset']}" />
+      <xacro:property name="tyre_y_offset" value="${-config['tyre_y_offset']}" />
     </xacro:if>
     
     <xacro:if value="${prefix == 'rl'}">
       <xacro:property name="x" value="-${mount_point_x}" />
       <xacro:property name="y" value="${mount_point_y}" />
       <xacro:property name="inertia_y_offset" value="${config['inertia_y_offset']}" />
+      <xacro:property name="tyre_y_offset" value="${config['tyre_y_offset']}" />
     </xacro:if>
     
     <xacro:if value="${prefix == 'rr'}">
       <xacro:property name="x" value="-${mount_point_x}" />
       <xacro:property name="y" value="-${mount_point_y}" />
       <xacro:property name="inertia_y_offset" value="${-config['inertia_y_offset']}" />
+      <xacro:property name="tyre_y_offset" value="${-config['tyre_y_offset']}" />
     </xacro:if>
 
     <joint name="body_to_${prefix}_wheel_base_joint" type="fixed">
@@ -61,7 +65,7 @@
       </visual>
 
       <collision>
-        <origin xyz="0.0 0.0 0.0" rpy="-${pi/2} 0.0 0.0" />
+        <origin xyz="0.0 ${tyre_y_offset} 0.0" rpy="-${pi/2} 0.0 0.0" />
         <geometry>
           <cylinder radius="${config['tyre_radius']}" length="${config['wheel_width']}" />
         </geometry>
