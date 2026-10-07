@@ -65,12 +65,17 @@
         </collision>
       </xacro:if>
 
-      <!-- From the SolidWorks export (base_link row of solidworks_exported/.../urdf/*.csv). -->
+      <!-- From the SolidWorks export (base_link row of solidworks_exported/.../urdf/*.csv),
+           except the mass. The exporter ignores user-overridden part masses and weighs the 4
+           DCC1000 motor controllers at their 1060 Alloy material mass (141.9 g) instead of
+           the 78.8 g override (an ASSUMPTION in the CAD, not weighed). Mass = exported
+           37.2298 - 4 x 0.06306 = 36.9775 kg, matching the CAD assembly (57.274 kg total).
+           CoM and inertia are left as exported (error well below 1 %). -->
       <inertial>
-        <origin xyz="0.0246948542048735 0.00173673823842259 0.103380099372497" rpy="0 0 0" />
-        <mass value="35.6474447622668" />
-        <inertia ixx="0.319501966637767" ixy="-0.000816646517455797" ixz="4.83728654778507E-06"
-                 iyy="0.310232207152549" iyz="-5.04256505510483E-05" izz="0.559515096198424" />
+        <origin xyz="0.0160214617664491 -0.000470435452859783 0.107817531003205" rpy="0 0 0" />
+        <mass value="36.9775262386666" />
+        <inertia ixx="0.327697897335902" ixy="-0.000815380156152649" ixz="3.69646892519238E-06"
+                 iyy="0.314462293606544" iyz="-5.45800544682604E-05" izz="0.57169437099185" />
       </inertial>
     </link>
 
