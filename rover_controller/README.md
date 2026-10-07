@@ -59,12 +59,14 @@ launch file then spawns no PIDs (see below).
 
 The joint-state and IMU broadcasters are spawned as before.
 
-controller_manager runs at 50 Hz, and each controller at its own `update_rate`: the
-wheel PIDs, `rover_drive_controller` and `rover_imu_broadcaster` at the manager's 50 Hz
-(also the EKF's rate), `rover_joint_state_broadcaster` at 25 Hz. The encoders report at
-most every 100 ms (10 Hz). Every rate must divide the manager's
-(`test/test_wheel_geometry.py`). The manager used to run at 100 Hz; with 10 Hz encoders
-that only re-ran the PIDs on stale feedback.
+controller_manager runs at 25 Hz, and each controller at its own `update_rate`: the
+wheel PIDs, `rover_drive_controller`, `rover_imu_broadcaster` and
+`rover_joint_state_broadcaster` all at the manager's 25 Hz (the EKF runs at 50 Hz). The
+encoders report at most every 100 ms (10 Hz). Every rate must divide the manager's
+(`test/test_wheel_geometry.py`). The manager used to run at 100 Hz, which only re-ran the PIDs
+on stale feedback, then at 50 Hz, where 22-24 % of the velocity commands were dropped because
+the driver's asynchronous call takes ~17 ms (median) to complete (the `command path`
+diagnostic; see the comment above the rates in `config/wheel_01_controller.yaml`).
 
 ## Drive-train tuning
 
@@ -76,7 +78,7 @@ to `~/rover_calibration/<tool>_<timestamp>/` (`summary.yaml`, raw samples).
 1. **Wheel-speed loop.** Run the step-response tool with the wheels off the ground
    first, then on the ground. Tune the PID gains until overshoot stays under 10 %
    and steady-state error under 3 %. The DCC1000 encoders report at most every
-   50 ms (20 Hz), while the PIDs run at 50 Hz, so each PID gets a new
+   100 ms (10 Hz), while the PIDs run at 25 Hz, so each PID gets a new
    measurement only every ~2.5 cycles. Keep the PID gains modest, and read measured
    dead times as accurate to about 50 ms. The driver logs each channel's actual
    encoder interval at startup.

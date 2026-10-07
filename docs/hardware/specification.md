@@ -76,7 +76,7 @@ Sources: `rover_description/config/wheel_01.yaml`, `rover_description/README.md`
 | Motor current limit | 15 A | Per motor controller; see the open items |
 | Encoder resolution | 1024 counts | Per motor revolution |
 | Motor controllers | 4 × Phidget DCC1000 | See [Components](components.md) |
-| Drive control rate | 50 Hz | `controller_manager` update rate |
+| Drive control rate | 25 Hz | `controller_manager` update rate |
 
 The linear and angular limits are applied independently. A full-speed turn while driving at
 full speed can ask the outer wheels for more than they can give; the reasoning is in the comment
@@ -108,7 +108,7 @@ Sources: `rover_controller/config/wheel_01_controller.yaml`,
 | Sensor | Model | Rate | Notes |
 |---|---|---|---|
 | IMU | Phidgets Spatial MOT0110 (USB) | 8 ms data interval (125 Hz), published at 50 Hz | Orientation filter (gain/zeta), magnetometer off (`use_mag: false`), ENU |
-| Wheel encoders | MT6835 magnetic encoders on the motors (5 V, 1024 lines per revolution as configured) | 10 Hz encoder updates (100 ms, the DCC1000's minimum), 20 Hz driver state, 50 Hz control loop | The sensor's propagation delay is under 10 µs; the 100 ms is the DCC1000's reporting interval. See [Components](components.md) |
+| Wheel encoders | MT6835 magnetic encoders on the motors (5 V, 1024 lines per revolution as configured) | 10 Hz encoder updates (100 ms, the DCC1000's minimum), 20 Hz driver state, 25 Hz control loop | The sensor's propagation delay is under 10 µs; the 100 ms is the DCC1000's reporting interval. See [Components](components.md) |
 | Battery telemetry | Daly BMS | **TBD** | |
 
 The lidar, GNSS and cameras are payload: they belong to the `rover_sensors` repository and are

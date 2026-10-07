@@ -179,7 +179,7 @@ The driving modes (MANUAL, ASSISTED, AUTOMATIC) and the lidar collision monitors
 
 | Stage | Value | Source |
 |---|---|---|
-| `controller_manager`, `read()` / `write()` | 50 Hz | `rover_controller/config/wheel_01_controller.yaml` |
+| `controller_manager`, `read()` / `write()` | 25 Hz | `rover_controller/config/wheel_01_controller.yaml` |
 | `safety_status` / `safety_command_echo` publish | 20 Hz | `driver_states_update_frequency`, URDF |
 | Modbus IO poll | 100 ms (10 Hz) | `safety_io_poll_period_ms`, URDF |
 | Watchdog heartbeat toggle | 200 ms (5 Hz) | `safety_wdg_kick_period_ms`, URDF |

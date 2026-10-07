@@ -103,7 +103,7 @@ More: [rover_hardware_interface README](https://github.com/RaduPotlog/rover_ros/
 
 ## Controllers
 
-`controller_manager` runs at `update_rate` 50 Hz. Its `/diagnostics` output is remapped to
+`controller_manager` runs at `update_rate` 25 Hz. Its `/diagnostics` output is remapped to
 `diagnostics`. The drive controller writes into four wheel PIDs, which write the hardware:
 
 ```mermaid
@@ -117,10 +117,10 @@ flowchart LR
 
 | Controller | Type | Rate |
 |------------|------|------|
-| `rover_drive_controller` | `diff_drive_controller/DiffDriveController` | 50 Hz |
-| `pid_controller_<wheel>_wheel_base_to_<wheel>_wheel_joint` (`fl`, `fr`, `rl`, `rr`) | `rover_controller/SeededPidController` (chainable, based on `pid_controller/PidController`) | 50 Hz |
+| `rover_drive_controller` | `diff_drive_controller/DiffDriveController` | 25 Hz |
+| `pid_controller_<wheel>_wheel_base_to_<wheel>_wheel_joint` (`fl`, `fr`, `rl`, `rr`) | `rover_controller/SeededPidController` (chainable, based on `pid_controller/PidController`) | 25 Hz |
 | `rover_joint_state_broadcaster` | `joint_state_broadcaster/JointStateBroadcaster` | 25 Hz |
-| `rover_imu_broadcaster` | `imu_sensor_broadcaster/IMUSensorBroadcaster` | 50 Hz |
+| `rover_imu_broadcaster` | `imu_sensor_broadcaster/IMUSensorBroadcaster` | 25 Hz |
 
 ### `rover_drive_controller`
 
