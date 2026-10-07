@@ -31,12 +31,11 @@ namespace rover::transport
 using ByteReceiveCallback =
     std::function<void (const std::vector<uint8_t> & buffer, std::size_t length)>;
 
-// A bidirectional byte stream: a UART or a UDP socket. Implemented in infrastructure by
-// AsioSerialPort (rover_serial_driver) and AsioUdpSocket (rover_udp_driver).
+// A bidirectional byte stream. Implemented in infrastructure by AsioUdpSocket
+// (rover_udp_driver); the UART implementation went with rover_serial_driver.
 //
-// Deliberately minimal. The blocking send/receive pair and send_break() are serial-only
-// and used by nothing but tests, so they stay concrete methods on AsioSerialPort rather
-// than widening this interface for one implementation.
+// Deliberately minimal. The blocking send/receive pair is used by nothing but tests, so it
+// stays a concrete method on AsioUdpSocket rather than widening this interface.
 class ByteStreamPort
 {
 
@@ -60,7 +59,7 @@ public:
 };
 
 // Where received bytes go. Implemented in infrastructure by the lifecycle publishers that
-// wrap them in UInt8MultiArray (serial) or UdpPacket (UDP).
+// wrap them in UdpPacket (rover_udp_driver).
 class BytePublisherPort
 {
 

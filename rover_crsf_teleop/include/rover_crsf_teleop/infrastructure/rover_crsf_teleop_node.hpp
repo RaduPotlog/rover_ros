@@ -27,8 +27,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
 
-#include <std_msgs/msg/u_int8_multi_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
+#include <udp_msgs/msg/udp_packet.hpp>
 
 #include <rover_msgs/msg/safety_status.hpp>
 #include <rover_msgs/msg/rc_calibration_state.hpp>
@@ -50,10 +50,11 @@ namespace rover_crsf_teleop
 // ROS adapter for TeleopUseCase: raw CRSF bytes in, teleop_elrs_cmd_vel_stamped and the hardware
 // interface's E-Stop services out.
 //
-// The UART itself belongs to rover_serial_driver's rover_serial_bridge_node node, which this package's launch
-// file starts; this node subscribes to the byte stream that node publishes and decodes CRSF
-// from it. Decoding here rather than in a separate process means the decode runs on the
-// executor thread - the same thread as the control timer - so TeleopUseCase keeps its
+// The receiver's UART is on the RUTX11 router, whose Serial Utilities forward the raw CRSF bytes
+// over UDP. rover_udp_driver's receiver node (rover_crsf_udp_receiver), which this package's
+// launch file starts, owns the socket and drops datagrams that did not come from the router (its
+// `source_ip`); this node subscribes to the datagrams it publishes and decodes CRSF from them.
+// Decoding here rather than in a separate process means the decode runs on the executor thread - the same thread as the control timer - so TeleopUseCase keeps its
 // single-threaded invariant with no locking at all.
 //
 // Lifecycle-managed, so a supervisor can take RC teleop off the command path (deactivate)
@@ -69,8 +70,9 @@ namespace rover_crsf_teleop
 // Diagnostics (hardware ID "RC Receiver"), published in every lifecycle state:
 //   - "RC link":          the LinkMonitor verdict that gates the command, with ages / LQ / switches
 //                         (WARN while waiting for the first frame and while the link is lost);
-//   - "RC serial link":   whether the byte stream from rover_serial_bridge_node is arriving and decoding
-//                         (WARN when it is silent - which is how a dead bridge becomes visible);
+//   - "RC UDP link":      whether datagrams from the router are arriving and decoding (WARN
+//                         when silent - which is how a dead router, cable or UDP receiver
+//                         becomes visible). Foreign-source rejections are logged by the receiver;
 //   - "E-Stop requests":  reachability and last outcome of the hardware interface E-Stop services;
 //   - "RC channels rate": decoded CRSF frame rate against rc_channels_expected_hz (WARN at
 //                         worst, also when no frames arrive);
@@ -162,7 +164,7 @@ private:
 
     void diagnoseChannelsRate(diagnostic_updater::DiagnosticStatusWrapper & status);
 
-    void diagnoseSerialLink(diagnostic_updater::DiagnosticStatusWrapper & status);
+    void diagnoseUdpLink(diagnostic_updater::DiagnosticStatusWrapper & status);
 
     void diagnoseCalibration(diagnostic_updater::DiagnosticStatusWrapper & status);
 
@@ -170,8 +172,9 @@ private:
     std::shared_ptr<Ros2VelocityCommandPublisher> velocity_publisher_;
     std::shared_ptr<Ros2TriggerSafetySwitch> safety_switch_;
 
-    // Raw CRSF bytes from rover_serial_bridge_node.
-    rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr serial_subscriber_;
+    // Raw CRSF bytes, one UDP datagram per message, from rover_crsf_udp_receiver.
+    rclcpp::Subscription<udp_msgs::msg::UdpPacket>::SharedPtr udp_subscriber_;
+
 
     crsf::CrsfParser parser_;
 
@@ -186,11 +189,11 @@ private:
     RateLimiter rc_channels_limiter_{0.0};
     RateLimiter rc_link_limiter_{0.0};
 
-    // For the "RC serial link" diagnostic: how the byte stream itself is doing, as distinct from
+    // For the "RC UDP link" diagnostic: how the byte stream itself is doing, as distinct from
     // whether the RC link carries a usable signal.
-    std::optional<SteadyTime> last_serial_message_;
+    std::optional<SteadyTime> last_datagram_;
     std::optional<SteadyTime> last_decoded_frame_;
-    std::uint64_t serial_bytes_received_{0};
+    std::uint64_t bytes_received_{0};
     std::uint64_t decoded_frames_{0};
     std::uint64_t decoded_link_stats_{0};
 

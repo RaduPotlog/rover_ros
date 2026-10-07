@@ -177,7 +177,7 @@
       "id": "SYS-SR-025",
       "allocation": "HW+SW",
       "verdict": "Blocked (TBD)",
-      "summary": "Links: ExpressLRS RC (UART) and LAN/Wi-Fi websocket (foxglove_bridge 8765, rosbridge 9090). Range and latency TBD and depend on the radio hardware."
+      "summary": "Links: ExpressLRS RC (receiver UART on the RUTX11 router, forwarded to the platform over UDP 10111) and LAN/Wi-Fi websocket (foxglove_bridge 8765, rosbridge 9090). Range and latency TBD and depend on the radio hardware."
     },
     {
       "id": "SYS-SR-026",

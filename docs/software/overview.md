@@ -50,7 +50,7 @@ flowchart LR
     IMU["Phidget IMU"]
     BMS["BMS bridge (UDP)"]
     LEDB["LED boards (UDP)"]
-    RC["ELRS receiver (UART)"]
+    RC["ELRS receiver (UDP via RUTX11)"]
   end
 
   subgraph CM["controller_manager process"]
@@ -144,7 +144,7 @@ Source: `rover_bringup/launch/rover_bringup.launch.py`, `rover_controller/launch
 | `rover_diag_manager` | Diagnostics | Computer health node and the diagnostic aggregator. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_diag_manager/README.md) |
 | `rover_msgs` | Interfaces | Custom messages and services. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_msgs/README.md) |
 | `rover_utils` | Utilities | Header-only C++ helpers and Python launch helpers. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_utils/README.md) |
-| `rover_transport` | Drivers | Fork of `transport_drivers`: serial, UDP and Modbus TCP drivers. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_transport/README.md) |
+| `rover_transport` | Drivers | UDP driver (a `transport_drivers` fork) and a Modbus TCP client library. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_transport/README.md) |
 | `rover_modbus` | Library | Vendored Modbus library for modern C++. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_modbus/README.md) |
 | `rover_arch` | Docs (not a ROS package) | Firmware architecture and the safety chain. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_arch/README.md) |
 | `rover_foxglove` | Tools (not a ROS package) | Foxglove dashboard layout for the `rover` namespace. | [README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_foxglove/README.md) |

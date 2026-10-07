@@ -16,7 +16,7 @@ callbacks, so the single most safety-relevant rule in these drivers had no test;
 is a plain flag driven from `on_activate` / `on_deactivate` and covered by
 `test/unit/test_byte_bridges.cpp`.
 
-`AsyncOpGuard` is why `AsioSerialPort::close()` and `AsioUdpSocket::close()` may be
+`AsyncOpGuard` is why `AsioUdpSocket::close()` may be
 followed straight away by destroying the receive callback's targets and the stream. ASIO's
 close waits neither for a handler already running on another io thread nor for one
 completed and still queued. The guard runs every handler it wraps on one strand and counts
@@ -36,7 +36,7 @@ package deliberately has no ROS dependency and the name would be a lie.
 ## Changes from upstream beyond the relayout
 
 - The `msg_converters/` directory is gone: the two live `UInt8MultiArray` converters moved
-  to `rover_serial_driver`, the two `UdpPacket` ones to `rover_udp_driver`. That is what
+  to `rover_serial_driver` (since removed), the two `UdpPacket` ones to `rover_udp_driver`. That is what
   removes the `std_msgs` / `udp_msgs` dependencies from this package.
 - `src/msg_converters/std_msgs.cpp` was deleted outright. It was unreferenced, one
   definition matched no declaration, and every body did

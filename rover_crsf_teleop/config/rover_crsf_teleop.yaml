@@ -1,28 +1,33 @@
 /**:
   ros__parameters:
 
-    # --- CRSF receiver serial link -----------------------------------------------------------
-    # The UART is owned by rover_serial_driver's rover_serial_bridge_node node, which this package's launch file
-    # starts; this node only decodes the bytes that node publishes. serial_device and
-    # serial_baudrate are read by the LAUNCH FILE and handed to the bridge, so changing them here
-    # changes what the bridge opens.
+    # --- CRSF receiver UDP link --------------------------------------------------------------
+    # The ELRS receiver is wired (USB-UART adapter) to the RUTX11 router's USB port, not to this
+    # computer. The router's Serial Utilities -> "Over IP" (UDP, Client mode, Raw mode on) reads
+    # the UART at 460800 8N1 - what the A1's receiver is flashed for - and sends the raw CRSF bytes
+    # as UDP datagrams to udp_bind_ip:udp_port. The baud rate is therefore set ON THE ROUTER
+    # (scripts/rutx11_elrs_udp_forwarding.sh), not here.
     #
-    # 460800 is what the A1's receiver is flashed for, and ASIO supports it natively
-    # (asio/impl/serial_port_base.ipp -> B460800), which is why no custom-baudrate ioctl is
-    # needed any more. CRSF's own default of 420000 is NOT in ASIO's table: if the receiver is
-    # ever reflashed to 420000, rover_serial_bridge_node will not be able to open it at all. Keep it at
-    # 460800.
+    # The socket is owned by rover_udp_driver's receiver node, rover_crsf_udp_receiver, which this
+    # package's launch file starts; this node only decodes the datagrams that node publishes.
+    # udp_bind_ip, udp_port and udp_source_ip are read by the LAUNCH FILE and handed to the
+    # receiver, so changing them here changes what it binds and accepts.
     #
-    # Prefer a stable path: `ls -l /dev/serial/by-id/`. ttyUSBn is assigned in enumeration order
-    # and moves the moment another USB serial device is plugged in.
-    serial_device: /dev/ttyUSB0
-    serial_baudrate: 460800
+    # udp_source_ip is a SAFETY setting. CRSF carries no authentication, and this input sits at
+    # twist_mux priority 110 - above every other velocity source. Anything that can reach this
+    # port (a wired LAN host, a client of the 192.168.77 AP) could otherwise drive the rover. The
+    # receiver drops every datagram not sent by this address inside the socket, before it is ever
+    # published. It does not stop a host forging this address; see the package README. Only empty
+    # it on a bench.
+    udp_bind_ip: 192.168.1.201
+    udp_port: 10111
+    udp_source_ip: 192.168.1.1
 
-    # Topic carrying raw bytes from rover_serial_bridge_node - its `serial_read`, remapped by the launch
-    # file. Must match that remap. Subscribed with reliable QoS, depth 100: a dropped byte chunk
-    # desynchronises the CRSF parser until the next sync byte, so the transport must not be what
-    # drops it.
-    serial_topic: rc/raw
+    # Topic carrying the datagrams from rover_crsf_udp_receiver - its `udp_read`, remapped by the
+    # launch file. Must match that remap. Subscribed with reliable QoS, depth 100: a dropped byte
+    # chunk desynchronises the CRSF parser until the next sync byte, so the ROS hop must not be
+    # what drops it.
+    udp_topic: rc/raw_udp
 
     # Echo decoded frames on rc/channels (rover_msgs/RcChannels) and rc/link
     # (rover_msgs/RcLinkStatus). Nothing on the rover consumes them - teleop decodes in-process -
@@ -179,7 +184,7 @@
 
     # Diagnostics: "RC channels rate" warns when decoded CRSF frames arrive more than
     # rc_channels_rate_tolerance (fraction) away from rc_channels_expected_hz, or when no frames
-    # arrive (WARN only - link loss is reported by "RC link", a dead byte stream by "RC serial
+    # arrive (WARN only - link loss is reported by "RC link", a dead byte stream by "RC UDP
     # link"). This counts frames decoded off the byte stream, not messages on a topic, so it
     # measures the receiver's real packet rate: set it to what `ros2 topic hz /rover/rc/channels`
     # reports with rc_topics_rate_hz at 0.0 (with the cap it reports the cap). Measured 2026-09-20 on the A1: ~243 Hz, i.e. the ELRS 250 Hz packet-rate mode, not

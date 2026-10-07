@@ -21,9 +21,11 @@
 #ifndef ROVER_UDP_DRIVER_INFRASTRUCTURE_ASIO_UDP_SOCKET_HPP_
 #define ROVER_UDP_DRIVER_INFRASTRUCTURE_ASIO_UDP_SOCKET_HPP_
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -72,6 +74,14 @@ public:
     std::string hostIp() const;
     std::uint16_t hostPort() const;
 
+    // RECEIVER only: deliver datagrams from this source address only, and count the rest in
+    // rejectedDatagrams(). An empty string accepts any source (the default). Throws
+    // std::invalid_argument if the address does not parse or is not IPv4. Must be called before
+    // asyncReceive(): the filter is read on the receive strand without a lock.
+    void setSourceFilter(const std::string & source_ip);
+
+    std::uint64_t rejectedDatagrams() const;
+
     // ByteStreamPort. For a RECEIVER, open() also binds.
     void open() override;
     void close() override;
@@ -98,15 +108,23 @@ private:
     asio::ip::udp::socket udp_socket_;
     asio::ip::udp::endpoint remote_endpoint_;
     asio::ip::udp::endpoint host_endpoint_;
+    // Where the last datagram came from. Upstream received into host_endpoint_ itself, so
+    // the first datagram overwrote the bound address with the sender's.
+    asio::ip::udp::endpoint sender_endpoint_;
+    std::optional<asio::ip::address> source_filter_;
+    std::atomic<std::uint64_t> rejected_datagrams_{0};
     SocketRole role_;
     ByteReceiveCallback callback_;
     static constexpr std::size_t kRecvBufferSize{2048};
     std::vector<uint8_t> recv_buffer_;
 };
 
+// `source_ip`, if not empty, restricts the receiver to datagrams from that address; see
+// AsioUdpSocket::setSourceFilter(). Throws std::invalid_argument if it does not parse.
 std::unique_ptr<ByteStreamPort> makeUdpReceiver(
     const IoContext & ctx,
-    const UdpEndpoint & endpoint);
+    const UdpEndpoint & endpoint,
+    const std::string & source_ip = "");
 
 std::unique_ptr<ByteStreamPort> makeUdpSender(
     const IoContext & ctx,

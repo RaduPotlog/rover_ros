@@ -10,23 +10,25 @@ ROS names on this page are relative to the robot namespace `rover`. For example,
 
 ### Hardware link
 
-The receiver connects to the ROS controller computer over a USB serial port. `rover_serial_bridge_node` (`rover_transport`) owns the port and publishes raw bytes on `rc/raw`; `rover_crsf_teleop_node` decodes CRSF from them. Both run as components in one container, `rover_crsf_container`.
+The receiver connects to the RUTX11 router's USB port through a USB-UART adapter, not to the ROS controller computer. The router's Serial Utilities ("Over IP", UDP, Client mode, raw mode) read the UART and send the raw CRSF bytes as UDP datagrams to the controller. `rover_crsf_udp_receiver` (`rover_udp_driver`, `rover_transport`) owns the socket and publishes each datagram on `rc/raw_udp`; `rover_crsf_teleop_node` decodes CRSF from them. Both run as components in one container, `rover_crsf_container`.
 
 ```mermaid
 flowchart LR
-  RX["ELRS receiver"] -->|"UART 460800 baud"| SB["rover_crsf_serial_bridge"]
-  SB -->|"rc/raw"| T["rover_crsf_teleop_node"]
+  RX["ELRS receiver"] -->|"UART 460800 baud"| R["RUTX11 Serial Utilities"]
+  R -->|"UDP 192.168.1.1 → 192.168.1.201:10111"| UR["rover_crsf_udp_receiver"]
+  UR -->|"rc/raw_udp"| T["rover_crsf_teleop_node"]
   T -->|"teleop_elrs_cmd_vel_stamped"| MUX["twist_mux (priority 110)"]
   T -->|"Trigger calls"| HI["hardware_interface/sw_*"]
 ```
 
 | Parameter | Value | Note |
 |---|---|---|
-| `serial_device` | `/dev/ttyUSB0` | Prefer a stable `/dev/serial/by-id/` path |
-| `serial_baudrate` | 460800 | What the A1's receiver is flashed for. Do not use 420000; the serial driver cannot open it. |
+| Router serial baud rate | 460800 8N1 | Set on the router. What the A1's receiver is flashed for. |
+| `udp_bind_ip` / `udp_port` | `192.168.1.201` / `10111` | Where the router sends the datagrams |
+| `udp_source_ip` | `192.168.1.1` | The receiver drops datagrams from any other source. CRSF is unauthenticated. |
 | Measured packet rate | ~243 Hz (ELRS 250 Hz mode) | `rc_channels_expected_hz` 250.0 |
 
-Source: `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/README.md`, `rover_crsf_teleop/launch/rover_crsf_teleop.launch.py`.
+Source: `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/README.md`, `rover_crsf_teleop/launch/rover_crsf_teleop.launch.py`, `rover_crsf_teleop/scripts/rutx11_elrs_udp_forwarding.sh`.
 
 ### Channel map
 
@@ -61,7 +63,7 @@ The link is healthy while all of these hold:
 
 When the link is lost, the node publishes a zero burst and goes silent. The rover stops and `twist_mux` falls through to the next input. **The E-Stop is not triggered**, and switch positions are ignored until the link returns. These values are marked as initial values to tune on the rover.
 
-Diagnostics use hardware id `RC Receiver` (`RC serial link`, `RC link`, `RC channels rate`, `RC calibration`) and never report ERROR, because RC teleop is optional.
+Diagnostics use hardware id `RC Receiver` (`RC UDP link`, `RC link`, `RC channels rate`, `RC calibration`) and never report ERROR, because RC teleop is optional.
 
 Source: `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/README.md`.
 
@@ -69,7 +71,7 @@ Source: `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/RE
 
 | Direction | Name | Type |
 |---|---|---|
-| sub | `rc/raw` | `std_msgs/UInt8MultiArray` |
+| sub | `rc/raw_udp` | `udp_msgs/UdpPacket` (from `rover_crsf_udp_receiver`) |
 | sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` (calibration gate) |
 | pub | `teleop_elrs_cmd_vel_stamped` | `geometry_msgs/TwistStamped`, frame `base_link` |
 | pub | `rc/channels` | `rover_msgs/RcChannels`, capped at `rc_topics_rate_hz` (25 Hz) |
@@ -124,14 +126,8 @@ Shipped defaults are the nominal CRSF endpoints: min 172, mid 992, max 1811 on a
 
 Source: `rover_crsf_teleop/README.md`, `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/src/infrastructure/rover_crsf_teleop_node.cpp`.
 
-!!! warning "Serial bridge does not reconnect"
-    If the receiver is unplugged, the serial bridge closes the port and does not reopen it. Cycle it by hand:
-
-    ```bash
-    ros2 lifecycle set /rover/rover_crsf_serial_bridge cleanup
-    ros2 lifecycle set /rover/rover_crsf_serial_bridge configure
-    ros2 lifecycle set /rover/rover_crsf_serial_bridge activate
-    ```
+!!! warning "The router is in the RC path"
+    A router reboot, a firmware update, a Serial Utilities reload or a pulled controller–router cable looks like a lost RC link: a zero burst, then `twist_mux` falls through to the next source. The E-Stop is not triggered. The `RC UDP link` diagnostic shows when no datagrams arrive. Nothing needs to be cycled afterwards.
 
 Details: [rover_crsf_teleop README](https://github.com/RaduPotlog/rover_ros/blob/master/rover_crsf_teleop/README.md).
 

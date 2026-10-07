@@ -69,6 +69,9 @@ void UdpReceiverNode::declareParameters()
     declare_parameter<bool>("autostart", false);
     declare_parameter<std::string>("ip", "");
     declare_parameter<int>("port", 0);
+    // If set, only datagrams from this address are published; the rest are dropped (and
+    // logged) by the socket. Empty accepts any source.
+    declare_parameter<std::string>("source_ip", "");
 }
 
 void UdpReceiverNode::scheduleAutostart()
@@ -117,8 +120,16 @@ UdpReceiverNode::CallbackReturn UdpReceiverNode::on_configure(
     publisher_ = create_publisher<UdpPacket>(kReadTopic, rclcpp::QoS(100));
 
     try {
-        socket_ = makeUdpReceiver(ctx_, *endpoint);
+        const std::string source_ip = get_parameter("source_ip").as_string();
+        socket_ = makeUdpReceiver(ctx_, *endpoint, source_ip);
         socket_->open();
+        if (source_ip.empty()) {
+            RCLCPP_WARN(
+                get_logger(), "source_ip is empty: accepting datagrams from ANY sender on %s:%u.",
+                endpoint->ip().c_str(), static_cast<unsigned>(endpoint->port()));
+        } else {
+            RCLCPP_INFO(get_logger(), "Accepting datagrams from %s only.", source_ip.c_str());
+        }
     } catch (const std::exception & ex) {
         RCLCPP_ERROR(
             get_logger(), "Error creating UDP receiver: %s:%u - %s",

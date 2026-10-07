@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // Integration test: RoverCrsfTeleopNode on real ROS topics and services. A helper node plays
-// rover_serial_driver's rover_serial_bridge_node (raw CRSF bytes on rc/raw at 50 Hz), the hardware interface (the
-// three E-Stop Trigger services) and twist_mux (subscribes to the cmd_vel output).
+// rover_udp_driver's receiver node (raw CRSF datagrams on rc/raw_udp at 50 Hz), the hardware
+// interface (the three E-Stop Trigger services) and twist_mux (subscribes to the cmd_vel output).
 //
 // Driving the node with encoded bytes rather than decoded messages means this test now covers
 // the wire format and the parser as well as the teleop rules.
@@ -38,7 +38,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
-#include <std_msgs/msg/u_int8_multi_array.hpp>
+#include <udp_msgs/msg/udp_packet.hpp>
 
 #include <rover_msgs/msg/safety_status.hpp>
 #include <rover_msgs/msg/rc_calibration_state.hpp>
@@ -121,8 +121,8 @@ public:
     explicit RoverHarness(const rclcpp::Node::SharedPtr & node)
     : node_(node)
     {
-        // Matches rover_serial_bridge_node's publisher QoS, which is what the node subscribes with.
-        serial_pub_ = node_->create_publisher<std_msgs::msg::UInt8MultiArray>("rc/raw", rclcpp::QoS(100));
+        // Matches rover_crsf_udp_receiver's publisher QoS, which is what the node subscribes with.
+        udp_pub_ = node_->create_publisher<udp_msgs::msg::UdpPacket>("rc/raw_udp", rclcpp::QoS(100));
 
         cmd_vel_sub_ = node_->create_subscription<Twist>(
             "teleop_elrs_cmd_vel_stamped", 10,
@@ -157,8 +157,16 @@ public:
                 return;
             }
 
-            publishBytes(encodeRcChannelsFrame(channels_));
-            publishBytes(encodeLinkStatisticsFrame(100));
+            for (const auto & frame : {encodeRcChannelsFrame(channels_), encodeLinkStatisticsFrame(100)}) {
+                if (!split_datagrams) {
+                    publishBytes(frame);
+                    continue;
+                }
+                // As the router's serial timeout can cut it: the frame straddles two datagrams.
+                const auto middle = frame.begin() + static_cast<long>(frame.size() / 2);
+                publishBytes(Bytes(frame.begin(), middle));
+                publishBytes(Bytes(middle, frame.end()));
+            }
         });
     }
 
@@ -209,15 +217,18 @@ public:
     // last sample stays where it was and only ages.
     void stopSafetyStatus() { gpio_state_.reset(); }
 
-    // Publishes an arbitrary byte chunk, so a test can split a frame across messages.
+    // Publishes an arbitrary byte chunk as one datagram, so a test can split a frame across
+    // datagrams. address / src_port are the bound endpoint, as rover_udp_driver fills them.
     void publishBytes(const Bytes & bytes)
     {
-        std_msgs::msg::UInt8MultiArray message;
+        udp_msgs::msg::UdpPacket message;
+        message.address = "192.168.1.201";
+        message.src_port = 10111;
         message.data = bytes;
-        serial_pub_->publish(message);
+        udp_pub_->publish(message);
     }
 
-    bool rcSubscribed() const { return serial_pub_->get_subscription_count() > 0; }
+    bool rcSubscribed() const { return udp_pub_->get_subscription_count() > 0; }
 
     bool cmdVelConnected() const { return cmd_vel_sub_->get_publisher_count() > 0; }
 
@@ -264,6 +275,8 @@ public:
     rclcpp::Client<SetRcCalibration>::SharedPtr applyCalibration() { return apply_client_; }
 
     bool feeding{false};
+    // Cut every frame into two datagrams.
+    bool split_datagrams{false};
     std::vector<Twist> received;
     int e_stop_set_calls{0};
     int e_stop_reset_calls{0};
@@ -283,7 +296,7 @@ private:
     }
 
     rclcpp::Node::SharedPtr node_;
-    rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr serial_pub_;
+    rclcpp::Publisher<udp_msgs::msg::UdpPacket>::SharedPtr udp_pub_;
     rclcpp::Publisher<SafetyStatus>::SharedPtr gpio_state_pub_;
     rclcpp::TimerBase::SharedPtr gpio_timer_;
     std::optional<SafetyStatus> gpio_state_;
@@ -395,6 +408,41 @@ TEST_F(TeleopNodeTest, DeflectedStickIsPublished)
 
     ASSERT_TRUE(waitForDeflectedCommand());
     EXPECT_EQ(harness_->received.back().header.frame_id, "base_link");
+}
+
+TEST_F(TeleopNodeTest, FramesSplitAcrossDatagramsAreDecoded)
+{
+    harness_->split_datagrams = true;
+    harness_->channels().channels[2] = kDefaultCrsfChannelMax;
+    harness_->feeding = true;
+
+    EXPECT_TRUE(waitForDeflectedCommand());
+}
+
+TEST_F(TeleopNodeTest, UdpLinkDiagnosticFollowsTheDatagrams)
+{
+    std::optional<std::uint8_t> level;
+    std::string message;
+    auto diagnostics_sub = helper_node_->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+        "/diagnostics", 10,
+        [&level, &message](const diagnostic_msgs::msg::DiagnosticArray & msg) {
+            for (const auto & status : msg.status) {
+                if (status.name == "rover_crsf_teleop_node: RC UDP link") {
+                    level = status.level;
+                    message = status.message;
+                }
+            }
+        });
+
+    ASSERT_TRUE(spinUntil([&level, &message]() {
+        return level == diagnostic_msgs::msg::DiagnosticStatus::WARN &&
+               message.find("No datagrams yet") != std::string::npos;
+    }));
+
+    harness_->feeding = true;
+    EXPECT_TRUE(spinUntil([&level]() {
+        return level == diagnostic_msgs::msg::DiagnosticStatus::OK;
+    }));
 }
 
 TEST_F(TeleopNodeTest, RcLinkDiagnosticFollowsTheLink)

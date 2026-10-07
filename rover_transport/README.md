@@ -8,9 +8,13 @@ relayouted into this workspace's Clean Architecture convention.
 |---------|------|
 | [`rover_asio_cmake_module`](rover_asio_cmake_module/) | `find_package(ASIO)` support. No code. |
 | [`rover_io_context`](rover_io_context/) | Shared ports, byte bridges and the ASIO thread pool. No ROS dependency. |
-| [`rover_serial_driver`](rover_serial_driver/) | UART <-> `serial_read` / `serial_write`. |
 | [`rover_udp_driver`](rover_udp_driver/) | UDP <-> `udp_read` / `udp_write`. |
 | [`rover_modbus_driver`](rover_modbus_driver/) | Synchronous Modbus TCP client. **Library only - no node, no topics.** |
+
+Upstream's serial driver was forked as `rover_serial_driver` and **removed in 2026-10**: its
+only consumer, the ELRS receiver, moved onto the RUTX11 router, which forwards the UART over
+UDP to `rover_udp_driver` (see `rover_crsf_teleop`). Recover it from git history if a UART
+consumer ever returns.
 
 Each package's README lists what changed from upstream. Several real defects were fixed
 along the way - two use-after-frees in the async send paths, a receiver that stopped on a
@@ -36,9 +40,8 @@ Evan Flynn). Relayouted into this workspace's Clean Architecture layout, renamed
 **Upstream is no longer merged - this is a hard fork.** Upstream has no release for ROS 2
 `lyrical`, which is why it was vendored in the first place; port fixes by hand.
 
-Topic names (`serial_read`, `serial_write`, `udp_read`, `udp_write`) and parameter names
-(`device_name`, `baud_rate`, `flow_control`, `parity`, `stop_bits`, `ip`, `port`) are
-**unchanged from upstream**, so upstream documentation still describes the wire interface.
+Topic names (`udp_read`, `udp_write`) and parameter names (`ip`, `port`) are
+**unchanged from upstream** (`rover_udp_driver`'s `source_ip` is an addition), so upstream documentation still describes the wire interface.
 
 > The exact upstream commit is not recoverable from this tree - it carried no VCS metadata
 > and no vcs manifest entry; every `package.xml` read `1.2.0`. Resolve the sha of the
