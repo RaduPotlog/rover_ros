@@ -102,7 +102,7 @@
     {
       "component": "rover_description",
       "name": "wheel_mass",
-      "value": 5.0741,
+      "value": 4.79607,
       "unit": "kg",
       "source": "rover_description/config/wheel_01.yaml:10"
     },
@@ -130,9 +130,9 @@
     {
       "component": "rover_description",
       "name": "body_mass",
-      "value": 36.9775262386666,
+      "value": 39.5373,
       "unit": "kg",
-      "source": "rover_description/urdf/rover_a1/base.urdf.xacro:76"
+      "source": "rover_description/urdf/rover_a1/base.urdf.xacro:78"
     },
     {
       "component": "rover_description",

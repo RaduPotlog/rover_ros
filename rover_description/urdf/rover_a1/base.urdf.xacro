@@ -65,17 +65,19 @@
         </collision>
       </xacro:if>
 
-      <!-- From the SolidWorks export (base_link row of solidworks_exported/.../urdf/*.csv),
-           except the mass. The exporter ignores user-overridden part masses and weighs the 4
-           DCC1000 motor controllers at their 1060 Alloy material mass (141.9 g) instead of
-           the 78.8 g override (an ASSUMPTION in the CAD, not weighed). Mass = exported
-           37.2298 - 4 x 0.06306 = 36.9775 kg, matching the CAD assembly (57.274 kg total).
-           CoM and inertia are left as exported (error well below 1 %). -->
+      <!-- Computed from the SolidWorks part mass properties of ROVER_1000_WATT_VARIANT
+           (2026-10-08): every part except the 4 WHEEL_CHUNK sub-assemblies, combined about
+           their joint CoM. The result matches the assembly's own mass properties (58.722 kg
+           total, yaw inertia 6.19 kg·m²) to 2e-6. This honours the CAD mass overrides, which
+           the sw2urdf exporter ignores: DCC1000 78.8 g (ASSUMPTION), RUTX11 456 g (distributor
+           spec), LiFePO4 5 kg (owner value). The exporter's body inertia (izz 0.57) is
+           also too small to add up to the assembly's 6.19 kg·m² yaw inertia, so it is not
+           used. -->
       <inertial>
-        <origin xyz="0.0160214617664491 -0.000470435452859783 0.107817531003205" rpy="0 0 0" />
-        <mass value="36.9775262386666" />
-        <inertia ixx="0.327697897335902" ixy="-0.000815380156152649" ixz="3.69646892519238E-06"
-                 iyy="0.314462293606544" iyz="-5.45800544682604E-05" izz="0.57169437099185" />
+        <origin xyz="0.014282 0.000997148 0.108927" rpy="0 0 0" />
+        <mass value="39.5373" />
+        <inertia ixx="1.52291" ixy="0.00251836" ixz="-0.0356428"
+                 iyy="2.29298" iyz="0.000836665" izz="3.03359" />
       </inertial>
     </link>
 

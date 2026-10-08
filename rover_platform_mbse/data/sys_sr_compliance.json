@@ -33,7 +33,7 @@
       "id": "SYS-SR-001",
       "allocation": "HW",
       "verdict": "Not SW",
-      "summary": "Mass is a hardware property. The URDF carries the CAD assembly mass, 57.27 kg (SolidWorks re-export 2026-10-07, batteries included; SWR-DESC-012). The xlsx Mass Properties sheet still holds the 2026-09-25 snapshot (54.35 kg). Not weighed."
+      "summary": "Mass is a hardware property. The URDF carries the CAD assembly mass, 58.72 kg (SolidWorks per-part mass properties with the mass overrides, 2026-10-08, batteries included; SWR-DESC-012): 1.28 kg under the limit. Battery 5 kg is an owner value, RUTX11 456 g a distributor spec, DCC1000 78.8 g an ASSUMPTION. The xlsx Mass Properties sheet still holds the 2026-09-25 snapshot (54.35 kg). Not weighed."
     },
     {
       "id": "SYS-SR-002",
@@ -195,7 +195,7 @@
       "id": "SYS-SR-028",
       "allocation": "HW",
       "verdict": "Not SW",
-      "summary": "Slope/terrain; TBD. Static sideways tip-over: tyre contact half-track 0.3068 m (URDF) and CoM height 0.215 m above the ground (CAD 2026-10-07 in the URDF frame): atan(0.3068/0.215) = 55.0 deg. The xlsx Mass Properties sheet gives a CoM height of 0.270 m from an older snapshot with a different origin."
+      "summary": "Slope/terrain; TBD. Static sideways tip-over: tyre contact half-track 0.3068 m (URDF) and CoM height 0.218 m above the ground (CAD 2026-10-08 in the URDF frame): atan(0.3068/0.218) = 54.6 deg. The xlsx Mass Properties sheet gives a CoM height of 0.270 m from an older snapshot with a different origin."
     },
     {
       "id": "SYS-SR-029",
@@ -247,7 +247,7 @@
     },
     {
       "ref": "SYS-SR-001",
-      "question": "The URDF now matches the CAD (57.27 kg, 2026-10-07). The xlsx Mass Properties sheet (54.35 kg, CoM height 0.270 m, 2026-09-25) predates it. Re-take the sheet from the current CAD?"
+      "question": "The URDF now matches the CAD (58.72 kg, 2026-10-08). The xlsx Mass Properties sheet (54.35 kg, CoM height 0.270 m, 2026-09-25) predates it. Re-take the sheet from the current CAD?"
     },
     {
       "ref": "SYS-SR-020",
