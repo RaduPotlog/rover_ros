@@ -33,7 +33,7 @@
       "id": "SYS-SR-001",
       "allocation": "HW",
       "verdict": "Not SW",
-      "summary": "Mass is a hardware property. The URDF carries the CAD assembly mass, 58.72 kg (SolidWorks per-part mass properties with the mass overrides, 2026-10-08, batteries included; SWR-DESC-012): 1.28 kg under the limit. Battery 5 kg is an owner value, RUTX11 456 g a distributor spec, DCC1000 78.8 g an ASSUMPTION. The xlsx Mass Properties sheet still holds the 2026-09-25 snapshot (54.35 kg). Not weighed."
+      "summary": "Mass is a hardware property. The URDF carries the CAD assembly mass, 58.67 kg (SolidWorks per-part mass properties with the mass overrides, 2026-10-08, batteries included; SWR-DESC-012): 1.33 kg under the limit. Battery 5 kg is an owner value, RUTX11 456 g a distributor spec, DCC1000 78.8 g an ASSUMPTION. The xlsx Mass Properties sheet still holds the 2026-09-25 snapshot (54.35 kg). Not weighed."
     },
     {
       "id": "SYS-SR-002",
@@ -247,7 +247,7 @@
     },
     {
       "ref": "SYS-SR-001",
-      "question": "The URDF now matches the CAD (58.72 kg, 2026-10-08). The xlsx Mass Properties sheet (54.35 kg, CoM height 0.270 m, 2026-09-25) predates it. Re-take the sheet from the current CAD?"
+      "question": "The URDF now matches the CAD (58.67 kg, 2026-10-08). The xlsx Mass Properties sheet (54.35 kg, CoM height 0.270 m, 2026-09-25) predates it. Re-take the sheet from the current CAD?"
     },
     {
       "ref": "SYS-SR-020",

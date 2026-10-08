@@ -66,18 +66,18 @@
       </xacro:if>
 
       <!-- Computed from the SolidWorks part mass properties of ROVER_1000_WATT_VARIANT
-           (2026-10-08): every part except the 4 WHEEL_CHUNK sub-assemblies, combined about
-           their joint CoM. The result matches the assembly's own mass properties (58.722 kg
-           total, yaw inertia 6.19 kg·m²) to 2e-6. This honours the CAD mass overrides, which
+           (2026-10-08, after the clash fixes): every part except the 4 WHEEL_CHUNK sub-assemblies, combined about
+           their joint CoM. The result matches the assembly's own mass properties (58.674 kg
+           total, yaw inertia 6.18 kg·m²) to 2e-6. This honours the CAD mass overrides, which
            the sw2urdf exporter ignores: DCC1000 78.8 g (ASSUMPTION), RUTX11 456 g (distributor
            spec), LiFePO4 5 kg (owner value). The exporter's body inertia (izz 0.57) is
-           also too small to add up to the assembly's 6.19 kg·m² yaw inertia, so it is not
+           also too small to add up to the assembly's 6.18 kg·m² yaw inertia, so it is not
            used. -->
       <inertial>
-        <origin xyz="0.014282 0.000997148 0.108927" rpy="0 0 0" />
-        <mass value="39.5373" />
-        <inertia ixx="1.52291" ixy="0.00251836" ixz="-0.0356428"
-                 iyy="2.29298" iyz="0.000836665" izz="3.03359" />
+        <origin xyz="0.0146114 0.000906667 0.108928" rpy="0 0 0" />
+        <mass value="39.5026" />
+        <inertia ixx="1.52214" ixy="0.00121013" ixz="-0.0357691"
+                 iyy="2.28896" iyz="0.000896478" izz="3.02892" />
       </inertial>
     </link>
 

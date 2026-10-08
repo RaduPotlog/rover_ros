@@ -616,8 +616,8 @@
       requirement <'SWR-DESC-011'> 'Functional: The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS ...' {
         doc /* The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS mount poses from the ROVER_{IMU,LIDAR,GPS}_LOCALIZATION_{X,Y,Z} and _ORIENTATION_{R,P,Y} environment variables, falling back to the defaults (IMU xyz (-0.09, 0.0, 0.2), rpy (3.14159, 0.0, 0.0); lidar and GPS all 0.0) for unset or non-finite values. */
       }
-      requirement <'SWR-DESC-012'> 'Parameter: The rover_description shall declare body_link inertial mass 39.5373 kg and each wheel l...' {
-        doc /* The rover_description shall declare body_link inertial mass 39.5373 kg and each wheel link mass 4.79607 kg (58.7216 kg in total). */
+      requirement <'SWR-DESC-012'> 'Parameter: The rover_description shall declare body_link inertial mass 39.5026 kg and each wheel l...' {
+        doc /* The rover_description shall declare body_link inertial mass 39.5026 kg and each wheel link mass 4.79294 kg (58.6744 kg in total). */
       }
       requirement <'SWR-DESC-013'> 'Interface: The rover_description shall start robot_state_publisher as node rover_state_publisher_n...' {
         doc /* The rover_description shall start robot_state_publisher as node rover_state_publisher_node in the requested namespace with the generated robot_description, frame_prefix "/" and use_sim_time equal to use_sim, when publish_robot_state is true (default). */
@@ -1132,21 +1132,22 @@
           in attribute temperature redefines temperature;
           in attribute voltage redefines voltage;
         }
-        connect battery_status to rover_safety.battery_status {
+        connect safety_command_echo to rover_safety.safety_command_echo {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "sensor_msgs/BatteryState";
-            qos = "depth 5";
-            rate = "per BMS packet (no fixed rate)";
-            source = "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:83-85";
-            topic = "rover_battery/battery_status";
+            msgType = "rover_msgs/SafetyCommandEcho";
+            qos = "reliable, volatile, KeepLast(1)";
+            rate = "20 Hz";
+            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
+            topic = "hardware_interface/safety_command_echo";
           }
         }
-        connect rover_safety.trip_e_stop to trip_e_stop {
-          @$::RoverPlatform::RoverPlatformProfile::RosService {
-            rate = "on battery verdict";
-            service = "hardware_interface/sw_user_e_stop_set";
-            source = "rover_safety/behavior_trees/rover_safety.xml:4-16";
-            srvType = "std_srvs/Trigger";
+        connect system_status to rover_safety.system_status {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "rover_msgs/SystemStatus";
+            qos = "depth 10";
+            rate = "5 Hz";
+            source = "rover_diag_manager/config/system_diag.yaml:7";
+            topic = "system_status";
           }
         }
         connect rover_driver_state to rover_safety.rover_driver_state {
@@ -1158,21 +1159,20 @@
             topic = "hardware_interface/rover_driver_state";
           }
         }
+        connect rover_safety.trip_e_stop to trip_e_stop {
+          @$::RoverPlatform::RoverPlatformProfile::RosService {
+            rate = "on battery verdict";
+            service = "hardware_interface/sw_user_e_stop_set";
+            source = "rover_safety/behavior_trees/rover_safety.xml:4-16";
+            srvType = "std_srvs/Trigger";
+          }
+        }
         connect rover_safety.led_set_animation to led_set_animation {
           @$::RoverPlatform::RoverPlatformProfile::RosService {
             rate = "on state change";
             service = "led/set_animation";
             source = "rover_safety/behavior_trees/rover_led_safety.xml:97-107";
             srvType = "rover_msgs/SetLedAnimation";
-          }
-        }
-        connect safety_command_echo to rover_safety.safety_command_echo {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/SafetyCommandEcho";
-            qos = "reliable, volatile, KeepLast(1)";
-            rate = "20 Hz";
-            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
-            topic = "hardware_interface/safety_command_echo";
           }
         }
         connect safety_status to rover_safety.safety_status {
@@ -1184,13 +1184,13 @@
             topic = "hardware_interface/safety_status";
           }
         }
-        connect system_status to rover_safety.system_status {
+        connect battery_status to rover_safety.battery_status {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/SystemStatus";
-            qos = "depth 10";
-            rate = "5 Hz";
-            source = "rover_diag_manager/config/system_diag.yaml:7";
-            topic = "system_status";
+            msgType = "sensor_msgs/BatteryState";
+            qos = "depth 5";
+            rate = "per BMS packet (no fixed rate)";
+            source = "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:83-85";
+            topic = "rover_battery/battery_status";
           }
         }
       }
@@ -1262,15 +1262,6 @@
             topic = "rover_battery/battery_status";
           }
         }
-        connect rover_battery.diagnostics to diagnostics {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "diagnostic_msgs/DiagnosticArray";
-            qos = "reliable";
-            rate = "1 Hz";
-            source = "rover_battery/src/infrastructure/rover_battery_node.cpp:41,73";
-            topic = "diagnostics";
-          }
-        }
         connect rover_battery_udp_data to rover_battery.rover_battery_udp_data {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "udp_msgs/UdpPacket";
@@ -1278,6 +1269,15 @@
             rate = "per packet";
             source = "rover_battery/launch/rover_battery.launch.py:69";
             topic = "rover_battery_udp_data";
+          }
+        }
+        connect rover_battery.diagnostics to diagnostics {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "diagnostic_msgs/DiagnosticArray";
+            qos = "reliable";
+            rate = "1 Hz";
+            source = "rover_battery/src/infrastructure/rover_battery_node.cpp:41,73";
+            topic = "diagnostics";
           }
         }
       }
@@ -1438,6 +1438,14 @@
         in port bms_udp: ~$::RoverPlatform::RoverPlatformInterfaces::ByteStream {
           in attribute length redefines length;
         }
+        connect rover_transport.led_udp to led_udp {
+          @$::RoverPlatform::RoverPlatformProfile::HwBus {
+            address = "192.168.77.202:3334 (ch1), 192.168.77.201:3333 (ch2)";
+            bus = "UDP";
+            rate = "50 Hz";
+            source = "rover_led/config/rover_a1_udp_led_channel_1.yaml:3-4";
+          }
+        }
         connect rover_transport.rc_raw_udp to rc_raw_udp {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "udp_msgs/UdpPacket";
@@ -1447,12 +1455,13 @@
             topic = "rc/raw_udp";
           }
         }
-        connect rover_bringup.ui_e_stop_services to ui_e_stop_services {
-          @$::RoverPlatform::RoverPlatformProfile::RosService {
-            rate = "on demand";
-            service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
-            source = "rover_bringup/launch/rover_web_bridges.launch.py:106-149";
-            srvType = "std_srvs/Trigger";
+        connect rover_bringup.teleop_foxglove_cmd_vel_stamped to teleop_foxglove_cmd_vel_stamped {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "geometry_msgs/TwistStamped";
+            qos = "reliable";
+            rate = "TBD";
+            source = "rover_twist_mux/config/rover_twist_mux.yaml:16-19";
+            topic = "teleop_foxglove_cmd_vel_stamped";
           }
         }
         connect rover_bringup.teleop_web_cmd_vel_stamped to teleop_web_cmd_vel_stamped {
@@ -1464,29 +1473,12 @@
             topic = "teleop_web_cmd_vel_stamped";
           }
         }
-        connect rover_bringup.foxglove_ws_out to foxglove_ws_out {
+        connect bms_udp to rover_transport.bms_udp {
           @$::RoverPlatform::RoverPlatformProfile::HwBus {
-            address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
-            bus = "Websocket (LAN/Wi-Fi)";
-            rate = "per topic";
-            source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
-          }
-        }
-        connect drive_mode to rover_bringup.drive_mode {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/DriveMode";
-            qos = "reliable, transient_local";
-            rate = "on change";
-            source = "rover_msgs/msg/DriveMode.msg:1";
-            topic = "drive_mode";
-          }
-        }
-        connect foxglove_ws_in to rover_bringup.foxglove_ws_in {
-          @$::RoverPlatform::RoverPlatformProfile::HwBus {
-            address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
-            bus = "Websocket (LAN/Wi-Fi)";
-            rate = "10 Hz UI stream";
-            source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
+            address = "192.168.1.201:4444 (392-byte payload)";
+            bus = "UDP";
+            rate = "BMS dependent";
+            source = "rover_battery/config/rover_battery.yaml:6-7";
           }
         }
         connect udp_write_led to rover_transport.udp_write_led {
@@ -1498,12 +1490,46 @@
             topic = "udp_write/led_channel_<n>";
           }
         }
-        connect bms_udp to rover_transport.bms_udp {
+        connect rover_bringup.ui_e_stop_services to ui_e_stop_services {
+          @$::RoverPlatform::RoverPlatformProfile::RosService {
+            rate = "on demand";
+            service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
+            source = "rover_bringup/launch/rover_web_bridges.launch.py:106-149";
+            srvType = "std_srvs/Trigger";
+          }
+        }
+        connect foxglove_ws_in to rover_bringup.foxglove_ws_in {
           @$::RoverPlatform::RoverPlatformProfile::HwBus {
-            address = "192.168.1.201:4444 (392-byte payload)";
-            bus = "UDP";
-            rate = "BMS dependent";
-            source = "rover_battery/config/rover_battery.yaml:6-7";
+            address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
+            bus = "Websocket (LAN/Wi-Fi)";
+            rate = "10 Hz UI stream";
+            source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
+          }
+        }
+        connect diagnostics_agg to rover_bringup.diagnostics_agg {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "diagnostic_msgs/DiagnosticArray";
+            qos = "reliable";
+            rate = "1 Hz";
+            source = "rover_diag_manager/config/diagnostic_aggregator.yaml:15";
+            topic = "diagnostics_agg";
+          }
+        }
+        connect drive_mode to rover_bringup.drive_mode {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "rover_msgs/DriveMode";
+            qos = "reliable, transient_local";
+            rate = "on change";
+            source = "rover_msgs/msg/DriveMode.msg:1";
+            topic = "drive_mode";
+          }
+        }
+        connect rover_bringup.foxglove_ws_out to foxglove_ws_out {
+          @$::RoverPlatform::RoverPlatformProfile::HwBus {
+            address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
+            bus = "Websocket (LAN/Wi-Fi)";
+            rate = "per topic";
+            source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
           }
         }
         connect crsf_udp to rover_transport.crsf_udp {
@@ -1521,32 +1547,6 @@
             rate = "per packet";
             source = "rover_battery/launch/rover_battery.launch.py:69";
             topic = "rover_battery_udp_data";
-          }
-        }
-        connect rover_transport.led_udp to led_udp {
-          @$::RoverPlatform::RoverPlatformProfile::HwBus {
-            address = "192.168.77.202:3334 (ch1), 192.168.77.201:3333 (ch2)";
-            bus = "UDP";
-            rate = "50 Hz";
-            source = "rover_led/config/rover_a1_udp_led_channel_1.yaml:3-4";
-          }
-        }
-        connect diagnostics_agg to rover_bringup.diagnostics_agg {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "diagnostic_msgs/DiagnosticArray";
-            qos = "reliable";
-            rate = "1 Hz";
-            source = "rover_diag_manager/config/diagnostic_aggregator.yaml:15";
-            topic = "diagnostics_agg";
-          }
-        }
-        connect rover_bringup.teleop_foxglove_cmd_vel_stamped to teleop_foxglove_cmd_vel_stamped {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "geometry_msgs/TwistStamped";
-            qos = "reliable";
-            rate = "TBD";
-            source = "rover_twist_mux/config/rover_twist_mux.yaml:16-19";
-            topic = "teleop_foxglove_cmd_vel_stamped";
           }
         }
       }
@@ -1668,22 +1668,13 @@
           in attribute altitude redefines altitude;
           in attribute longitude redefines longitude;
         }
-        connect gps_fix to rover_localization.gps_fix {
+        connect tf_static to rover_localization.tf_static {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "sensor_msgs/NavSatFix";
-            qos = "reliable, volatile, depth 10";
-            rate = "TBD (payload)";
-            source = "rover_localization/launch/rover_localization.launch.py:231-252";
-            topic = "gps/fix";
-          }
-        }
-        connect odometry_wheels to rover_localization.odometry_wheels {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "nav_msgs/Odometry";
-            qos = "reliable";
-            rate = "50 Hz";
-            source = "rover_controller/config/wheel_01_controller.yaml:45,159";
-            topic = "odometry/wheels";
+            msgType = "tf2_msgs/TFMessage";
+            qos = "reliable, transient local";
+            rate = "latched";
+            source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
+            topic = "/tf_static";
           }
         }
         connect rover_localization.odom to odom {
@@ -1695,15 +1686,6 @@
             topic = "odom (+ TF odom->base_footprint)";
           }
         }
-        connect gps_fix to rover_gps_heading.gps_fix {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "sensor_msgs/NavSatFix";
-            qos = "reliable, volatile, depth 10";
-            rate = "TBD (payload)";
-            source = "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:104-105";
-            topic = "gps/fix";
-          }
-        }
         connect imu_data to rover_localization.imu_data {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "sensor_msgs/Imu";
@@ -1711,6 +1693,24 @@
             rate = "50 Hz";
             source = "rover_controller/config/wheel_01_controller.yaml:150";
             topic = "imu/data";
+          }
+        }
+        connect gps_fix to rover_localization.gps_fix {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "sensor_msgs/NavSatFix";
+            qos = "reliable, volatile, depth 10";
+            rate = "TBD (payload)";
+            source = "rover_localization/launch/rover_localization.launch.py:231-252";
+            topic = "gps/fix";
+          }
+        }
+        connect gps_fix to rover_gps_heading.gps_fix {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "sensor_msgs/NavSatFix";
+            qos = "reliable, volatile, depth 10";
+            rate = "TBD (payload)";
+            source = "rover_gps_heading/src/infrastructure/rover_gps_heading_node.cpp:104-105";
+            topic = "gps/fix";
           }
         }
         connect rover_localization.odom to rover_gps_heading.odom {
@@ -1722,6 +1722,15 @@
             topic = "odom";
           }
         }
+        connect odometry_wheels to rover_localization.odometry_wheels {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "nav_msgs/Odometry";
+            qos = "reliable";
+            rate = "50 Hz";
+            source = "rover_controller/config/wheel_01_controller.yaml:45,159";
+            topic = "odometry/wheels";
+          }
+        }
         connect rover_gps_heading.gps_heading_imu to rover_localization.gps_heading_imu {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "sensor_msgs/Imu";
@@ -1729,15 +1738,6 @@
             rate = "per odom msg after alignment";
             source = "rover_gps_heading/src/infrastructure/ros2_heading_publisher.cpp:39";
             topic = "gps/heading_imu";
-          }
-        }
-        connect tf_static to rover_localization.tf_static {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "tf2_msgs/TFMessage";
-            qos = "reliable, transient local";
-            rate = "latched";
-            source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
-            topic = "/tf_static";
           }
         }
       }
@@ -1850,14 +1850,6 @@
         in port diagnostics: ~$::RoverPlatform::RoverPlatformInterfaces::Diagnostics {
           in attribute level redefines level;
         }
-        connect led_set_animation to rover_led.led_set_animation {
-          @$::RoverPlatform::RoverPlatformProfile::RosService {
-            rate = "on state change";
-            service = "led/set_animation";
-            source = "rover_safety/behavior_trees/rover_led_safety.xml:97-107";
-            srvType = "rover_msgs/SetLedAnimation";
-          }
-        }
         connect rover_led.udp_write_led to udp_write_led {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "udp_msgs/UdpPacket";
@@ -1876,6 +1868,23 @@
             topic = "system_status";
           }
         }
+        connect diagnostics_from_rover_battery to rover_diag_manager.diagnostics_from_rover_battery {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "diagnostic_msgs/DiagnosticArray";
+            qos = "reliable";
+            rate = "1 Hz";
+            source = "rover_battery/src/infrastructure/rover_battery_node.cpp:41,73";
+            topic = "diagnostics";
+          }
+        }
+        connect led_set_animation to rover_led.led_set_animation {
+          @$::RoverPlatform::RoverPlatformProfile::RosService {
+            rate = "on state change";
+            service = "led/set_animation";
+            source = "rover_safety/behavior_trees/rover_led_safety.xml:97-107";
+            srvType = "rover_msgs/SetLedAnimation";
+          }
+        }
         connect diagnostics to rover_diag_manager.diagnostics {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "diagnostic_msgs/DiagnosticArray";
@@ -1892,15 +1901,6 @@
             rate = "1 Hz";
             source = "rover_diag_manager/config/diagnostic_aggregator.yaml:15";
             topic = "diagnostics_agg";
-          }
-        }
-        connect diagnostics_from_rover_battery to rover_diag_manager.diagnostics_from_rover_battery {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "diagnostic_msgs/DiagnosticArray";
-            qos = "reliable";
-            rate = "1 Hz";
-            source = "rover_battery/src/infrastructure/rover_battery_node.cpp:41,73";
-            topic = "diagnostics";
           }
         }
       }
@@ -2023,11 +2023,11 @@
             'package' = "rover_description";
             swrsPrefix = "DESC";
           }
-          attribute body_mass : $::ScalarValues::Real default := 39.5373;
+          attribute body_mass : $::ScalarValues::Real default := 39.5026;
           attribute tyre_radius : $::ScalarValues::Real default := 0.1699;
           attribute tyre_y_offset : $::ScalarValues::Real default := -0.00171;
           attribute wheel_joint_velocity_limit : $::ScalarValues::Real default := 10.958;
-          attribute wheel_mass : $::ScalarValues::Real default := 4.79607;
+          attribute wheel_mass : $::ScalarValues::Real default := 4.79294;
           attribute wheel_mount_point_z : $::ScalarValues::Real default := 0.037363;
           attribute wheel_width : $::ScalarValues::Real default := 0.108;
           attribute wheelbase : $::ScalarValues::Real default := 0.503;
@@ -2050,7 +2050,7 @@
           satisfy $::RoverPlatform::SWRS_DESC::'Parameter: The rover_description shall set the E-Stop reset tolerances velocity_command_zero_toler...';
           satisfy $::RoverPlatform::SWRS_DESC::'Parameter: The rover_description shall declare, with use_sim false, a <ros2_control> sensor compon...';
           satisfy $::RoverPlatform::SWRS_DESC::'Functional: The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS ...';
-          satisfy $::RoverPlatform::SWRS_DESC::'Parameter: The rover_description shall declare body_link inertial mass 39.5373 kg and each wheel l...';
+          satisfy $::RoverPlatform::SWRS_DESC::'Parameter: The rover_description shall declare body_link inertial mass 39.5026 kg and each wheel l...';
           satisfy $::RoverPlatform::SWRS_DESC::'Interface: The rover_description shall start robot_state_publisher as node rover_state_publisher_n...';
           satisfy $::RoverPlatform::SWRS_DESC::'Functional: The rover_description shall, with use_sim true, provide Gazebo sensors on the IMU, lida...';
           satisfy $::RoverPlatform::SWRS_DESC::'Performance: The rover_description shall configure the simulated IMU update_rate at 100 Hz or faster.';
@@ -2196,22 +2196,30 @@
           in attribute linear_x redefines linear_x;
           in attribute stamp redefines stamp;
         }
-        connect rover_hardware_interface.safety_status to safety_status {
+        connect rover_hardware_interface.rover_driver_state to rover_driver_state {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/SafetyStatus";
-            qos = "reliable, volatile, KeepLast(1)";
+            msgType = "rover_msgs/RoverDriverState";
+            qos = "reliable, KeepLast(5)";
             rate = "20 Hz";
-            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
-            topic = "hardware_interface/safety_status";
+            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:148-150";
+            topic = "hardware_interface/rover_driver_state";
           }
         }
-        connect rover_controller.imu_data to imu_data {
+        connect cmd_vel to rover_controller.cmd_vel {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "sensor_msgs/Imu";
-            qos = "sensor data";
-            rate = "50 Hz";
-            source = "rover_controller/config/wheel_01_controller.yaml:150";
-            topic = "imu/data";
+            msgType = "geometry_msgs/TwistStamped";
+            qos = "reliable";
+            rate = "follows active source";
+            source = "rover_twist_mux/launch/rover_twist_mux.launch.py:110-117";
+            topic = "cmd_vel";
+          }
+        }
+        connect encoder_feedback to rover_hardware_interface.encoder_feedback {
+          @$::RoverPlatform::RoverPlatformProfile::HwBus {
+            address = "encoder 1024 CPR";
+            bus = "Phidget22 USB/VINT";
+            rate = "10 Hz";
+            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190,254";
           }
         }
         connect rover_hardware_interface.motor_command to motor_command {
@@ -2220,6 +2228,56 @@
             bus = "Phidget22 USB/VINT";
             rate = "100 Hz";
             source = "rover_hardware_interface/src/rover_driver/rover_a1_driver.cpp:73-80";
+          }
+        }
+        connect rover_description.tf_static to tf_static {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "tf2_msgs/TFMessage";
+            qos = "reliable, transient local";
+            rate = "latched";
+            source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
+            topic = "/tf_static";
+          }
+        }
+        connect rover_hardware_interface.wheel_state to rover_controller.wheel_state {
+          @$::RoverPlatform::RoverPlatformProfile::Ros2Control {
+            interfaces = "<joint>/position|velocity|effort state interfaces";
+            rate = "100 Hz (encoders refresh at 10 Hz)";
+            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:104-129";
+          }
+        }
+        connect rover_hardware_interface.modbus_coils to modbus_coils {
+          @$::RoverPlatform::RoverPlatformProfile::HwBus {
+            address = "192.168.88.11:502";
+            bus = "Modbus TCP FC5";
+            rate = "5 Hz watchdog kick + on demand";
+            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:148-170";
+          }
+        }
+        connect rover_controller.odometry_wheels to odometry_wheels {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "nav_msgs/Odometry";
+            qos = "reliable";
+            rate = "50 Hz";
+            source = "rover_controller/config/wheel_01_controller.yaml:45,159";
+            topic = "odometry/wheels";
+          }
+        }
+        connect ui_e_stop_services to rover_hardware_interface.ui_e_stop_services {
+          @$::RoverPlatform::RoverPlatformProfile::RosService {
+            rate = "on demand";
+            service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
+            source = "rover_bringup/launch/rover_web_bridges.launch.py:106-149";
+            srvType = "std_srvs/Trigger";
+          }
+        }
+        connect rover_hardware_interface.safety_status to safety_status {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "rover_msgs/SafetyStatus";
+            qos = "reliable, volatile, KeepLast(1)";
+            rate = "20 Hz";
+            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
+            topic = "hardware_interface/safety_status";
           }
         }
         connect rover_hardware_interface.safety_command_echo to safety_command_echo {
@@ -2231,12 +2289,28 @@
             topic = "hardware_interface/safety_command_echo";
           }
         }
-        connect rover_hardware_interface.modbus_coils to modbus_coils {
+        connect rover_description.robot_description to rover_controller.robot_description {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "std_msgs/String";
+            qos = "reliable, transient local";
+            rate = "latched";
+            source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
+            topic = "robot_description";
+          }
+        }
+        connect modbus_inputs to rover_hardware_interface.modbus_inputs {
           @$::RoverPlatform::RoverPlatformProfile::HwBus {
             address = "192.168.88.11:502";
-            bus = "Modbus TCP FC5";
-            rate = "5 Hz watchdog kick + on demand";
-            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:148-170";
+            bus = "Modbus TCP FC1/FC2";
+            rate = "10 Hz poll";
+            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178";
+          }
+        }
+        connect rover_hardware_interface.imu_state to rover_controller.imu_state {
+          @$::RoverPlatform::RoverPlatformProfile::Ros2Control {
+            interfaces = "imu/* state interfaces";
+            rate = "125 Hz sampling";
+            source = "rover_description/urdf/common/imu.urdf.xacro:98-104";
           }
         }
         connect trip_e_stop to rover_hardware_interface.trip_e_stop {
@@ -2255,69 +2329,13 @@
             srvType = "std_srvs/Trigger";
           }
         }
-        connect rover_hardware_interface.imu_state to rover_controller.imu_state {
-          @$::RoverPlatform::RoverPlatformProfile::Ros2Control {
-            interfaces = "imu/* state interfaces";
-            rate = "125 Hz sampling";
-            source = "rover_description/urdf/common/imu.urdf.xacro:98-104";
-          }
-        }
-        connect rover_hardware_interface.wheel_state to rover_controller.wheel_state {
-          @$::RoverPlatform::RoverPlatformProfile::Ros2Control {
-            interfaces = "<joint>/position|velocity|effort state interfaces";
-            rate = "100 Hz (encoders refresh at 10 Hz)";
-            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:104-129";
-          }
-        }
-        connect encoder_feedback to rover_hardware_interface.encoder_feedback {
-          @$::RoverPlatform::RoverPlatformProfile::HwBus {
-            address = "encoder 1024 CPR";
-            bus = "Phidget22 USB/VINT";
-            rate = "10 Hz";
-            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190,254";
-          }
-        }
-        connect modbus_inputs to rover_hardware_interface.modbus_inputs {
-          @$::RoverPlatform::RoverPlatformProfile::HwBus {
-            address = "192.168.88.11:502";
-            bus = "Modbus TCP FC1/FC2";
-            rate = "10 Hz poll";
-            source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178";
-          }
-        }
-        connect rover_hardware_interface.rover_driver_state to rover_driver_state {
+        connect rover_controller.imu_data to imu_data {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/RoverDriverState";
-            qos = "reliable, KeepLast(5)";
-            rate = "20 Hz";
-            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:148-150";
-            topic = "hardware_interface/rover_driver_state";
-          }
-        }
-        connect rover_description.robot_description to rover_controller.robot_description {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "std_msgs/String";
-            qos = "reliable, transient local";
-            rate = "latched";
-            source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
-            topic = "robot_description";
-          }
-        }
-        connect ui_e_stop_services to rover_hardware_interface.ui_e_stop_services {
-          @$::RoverPlatform::RoverPlatformProfile::RosService {
-            rate = "on demand";
-            service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
-            source = "rover_bringup/launch/rover_web_bridges.launch.py:106-149";
-            srvType = "std_srvs/Trigger";
-          }
-        }
-        connect rover_description.tf_static to tf_static {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "tf2_msgs/TFMessage";
-            qos = "reliable, transient local";
-            rate = "latched";
-            source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
-            topic = "/tf_static";
+            msgType = "sensor_msgs/Imu";
+            qos = "sensor data";
+            rate = "50 Hz";
+            source = "rover_controller/config/wheel_01_controller.yaml:150";
+            topic = "imu/data";
           }
         }
         connect rover_controller.wheel_velocity_command to rover_hardware_interface.wheel_velocity_command {
@@ -2325,24 +2343,6 @@
             interfaces = "<joint>/velocity command interfaces";
             rate = "100 Hz";
             source = "rover_controller/config/wheel_01_controller.yaml:13";
-          }
-        }
-        connect rover_controller.odometry_wheels to odometry_wheels {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "nav_msgs/Odometry";
-            qos = "reliable";
-            rate = "50 Hz";
-            source = "rover_controller/config/wheel_01_controller.yaml:45,159";
-            topic = "odometry/wheels";
-          }
-        }
-        connect rover_hardware_interface.diagnostics to diagnostics {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "diagnostic_msgs/DiagnosticArray";
-            qos = "reliable";
-            rate = "1 Hz";
-            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:188";
-            topic = "diagnostics";
           }
         }
         connect imu_raw to rover_hardware_interface.imu_raw {
@@ -2353,13 +2353,13 @@
             source = "rover_description/urdf/common/imu.urdf.xacro:101-104";
           }
         }
-        connect cmd_vel to rover_controller.cmd_vel {
+        connect rover_hardware_interface.diagnostics to diagnostics {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "geometry_msgs/TwistStamped";
+            msgType = "diagnostic_msgs/DiagnosticArray";
             qos = "reliable";
-            rate = "follows active source";
-            source = "rover_twist_mux/launch/rover_twist_mux.launch.py:110-117";
-            topic = "cmd_vel";
+            rate = "1 Hz";
+            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:188";
+            topic = "diagnostics";
           }
         }
       }
@@ -2507,31 +2507,12 @@
           out attribute linear_x redefines linear_x;
           out attribute stamp redefines stamp;
         }
-        connect safety_status to rover_twist_mux.safety_status {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/SafetyStatus";
-            qos = "reliable, volatile, KeepLast(1)";
-            rate = "20 Hz";
-            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
-            topic = "hardware_interface/safety_status";
-          }
-        }
-        connect rover_crsf_teleop.teleop_elrs_cmd_vel_stamped to rover_twist_mux.teleop_elrs_cmd_vel_stamped {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "geometry_msgs/TwistStamped";
-            qos = "reliable, depth 10";
-            rate = "50 Hz";
-            source = "rover_twist_mux/config/rover_twist_mux.yaml:21-24";
-            topic = "teleop_elrs_cmd_vel_stamped";
-          }
-        }
-        connect rover_twist_mux.motion_lock to motion_lock {
-          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "std_msgs/Bool";
-            qos = "reliable";
-            rate = "10 Hz";
-            source = "rover_twist_mux/config/rover_motion_lock.yaml:3";
-            topic = "motion_lock";
+        connect rover_crsf_teleop.e_stop_services to e_stop_services {
+          @$::RoverPlatform::RoverPlatformProfile::RosService {
+            rate = "on switch edge";
+            service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
+            source = "rover_hardware_interface/src/rover_system/rover_system.cpp:130-143";
+            srvType = "std_srvs/Trigger";
           }
         }
         connect rc_raw_udp to rover_crsf_teleop.rc_raw_udp {
@@ -2543,30 +2524,22 @@
             topic = "rc/raw_udp";
           }
         }
-        connect rover_crsf_teleop.e_stop_services to e_stop_services {
-          @$::RoverPlatform::RoverPlatformProfile::RosService {
-            rate = "on switch edge";
-            service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
-            source = "rover_hardware_interface/src/rover_system/rover_system.cpp:130-143";
-            srvType = "std_srvs/Trigger";
-          }
-        }
-        connect teleop_foxglove_cmd_vel_stamped to rover_twist_mux.teleop_foxglove_cmd_vel_stamped {
+        connect rover_twist_mux.cmd_vel to cmd_vel {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "geometry_msgs/TwistStamped";
             qos = "reliable";
-            rate = "TBD";
-            source = "rover_twist_mux/config/rover_twist_mux.yaml:16-19";
-            topic = "teleop_foxglove_cmd_vel_stamped";
+            rate = "follows active source";
+            source = "rover_twist_mux/launch/rover_twist_mux.launch.py:110-117";
+            topic = "cmd_vel";
           }
         }
-        connect safety_command_echo to rover_twist_mux.safety_command_echo {
+        connect rover_twist_mux.motion_lock to motion_lock {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "rover_msgs/SafetyCommandEcho";
-            qos = "reliable, volatile, KeepLast(1)";
-            rate = "20 Hz";
-            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
-            topic = "hardware_interface/safety_command_echo";
+            msgType = "std_msgs/Bool";
+            qos = "reliable";
+            rate = "10 Hz";
+            source = "rover_twist_mux/config/rover_motion_lock.yaml:3";
+            topic = "motion_lock";
           }
         }
         connect nav_cmd_vel_stamped to rover_twist_mux.nav_cmd_vel_stamped {
@@ -2587,6 +2560,33 @@
             topic = "hardware_interface/safety_status";
           }
         }
+        connect rover_crsf_teleop.teleop_elrs_cmd_vel_stamped to rover_twist_mux.teleop_elrs_cmd_vel_stamped {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "geometry_msgs/TwistStamped";
+            qos = "reliable, depth 10";
+            rate = "50 Hz";
+            source = "rover_twist_mux/config/rover_twist_mux.yaml:21-24";
+            topic = "teleop_elrs_cmd_vel_stamped";
+          }
+        }
+        connect safety_status to rover_twist_mux.safety_status {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "rover_msgs/SafetyStatus";
+            qos = "reliable, volatile, KeepLast(1)";
+            rate = "20 Hz";
+            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
+            topic = "hardware_interface/safety_status";
+          }
+        }
+        connect teleop_foxglove_cmd_vel_stamped to rover_twist_mux.teleop_foxglove_cmd_vel_stamped {
+          @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+            msgType = "geometry_msgs/TwistStamped";
+            qos = "reliable";
+            rate = "TBD";
+            source = "rover_twist_mux/config/rover_twist_mux.yaml:16-19";
+            topic = "teleop_foxglove_cmd_vel_stamped";
+          }
+        }
         connect teleop_driver_interface_cmd_vel_stamped to rover_twist_mux.teleop_driver_interface_cmd_vel_stamped {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
             msgType = "geometry_msgs/TwistStamped";
@@ -2596,13 +2596,13 @@
             topic = "teleop_driver_interface_cmd_vel_stamped";
           }
         }
-        connect rover_twist_mux.cmd_vel to cmd_vel {
+        connect safety_command_echo to rover_twist_mux.safety_command_echo {
           @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-            msgType = "geometry_msgs/TwistStamped";
-            qos = "reliable";
-            rate = "follows active source";
-            source = "rover_twist_mux/launch/rover_twist_mux.launch.py:110-117";
-            topic = "cmd_vel";
+            msgType = "rover_msgs/SafetyCommandEcho";
+            qos = "reliable, volatile, KeepLast(1)";
+            rate = "20 Hz";
+            source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
+            topic = "hardware_interface/safety_command_echo";
           }
         }
       }
@@ -2611,75 +2611,6 @@
           description = "Daly BMS read by an ESP32, forwarded over UDP.";
         }
         out port bms_udp: $::RoverPlatform::RoverPlatformInterfaces::ByteStream;
-      }
-      connect DriveMotors.encoder_feedback to DriveControl.encoder_feedback {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "encoder 1024 CPR";
-          bus = "Phidget22 USB/VINT";
-          rate = "10 Hz";
-          source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190,254";
-        }
-      }
-      connect DriveControl.rover_driver_state to Safety.rover_driver_state {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "rover_msgs/RoverDriverState";
-          qos = "reliable, KeepLast(5)";
-          rate = "20 Hz";
-          source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:148-150";
-          topic = "hardware_interface/rover_driver_state";
-        }
-      }
-      connect Power.diagnostics to HmiStatus.diagnostics_from_rover_battery {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "diagnostic_msgs/DiagnosticArray";
-          qos = "reliable";
-          rate = "1 Hz";
-          source = "rover_battery/src/infrastructure/rover_battery_node.cpp:41,73";
-          topic = "diagnostics";
-        }
-      }
-      connect HmiStatus.system_status to Safety.system_status {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "rover_msgs/SystemStatus";
-          qos = "depth 10";
-          rate = "5 Hz";
-          source = "rover_diag_manager/config/system_diag.yaml:7";
-          topic = "system_status";
-        }
-      }
-      connect PlatformServices.teleop_foxglove_cmd_vel_stamped to CommandArbitration.teleop_foxglove_cmd_vel_stamped {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "geometry_msgs/TwistStamped";
-          qos = "reliable";
-          rate = "TBD";
-          source = "rover_twist_mux/config/rover_twist_mux.yaml:16-19";
-          topic = "teleop_foxglove_cmd_vel_stamped";
-        }
-      }
-      connect Orchestrator.teleop_driver_interface_cmd_vel_stamped to CommandArbitration.teleop_driver_interface_cmd_vel_stamped {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "geometry_msgs/TwistStamped";
-          qos = "reliable";
-          rate = "10 Hz";
-          source = "rover_twist_mux/config/rover_twist_mux.yaml:10-15";
-          topic = "teleop_driver_interface_cmd_vel_stamped";
-        }
-      }
-      connect ImuSensor.imu_raw to DriveControl.imu_raw {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "hub port 0";
-          bus = "Phidget22 USB/VINT";
-          rate = "125 Hz";
-          source = "rover_description/urdf/common/imu.urdf.xacro:101-104";
-        }
-      }
-      connect PlatformServices.led_udp to LedPanels.led_udp {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "192.168.77.202:3334 (ch1), 192.168.77.201:3333 (ch2)";
-          bus = "UDP";
-          rate = "50 Hz";
-          source = "rover_led/config/rover_a1_udp_led_channel_1.yaml:3-4";
-        }
       }
       connect SensorPayload.gps_fix to Localization.gps_fix {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
@@ -2690,31 +2621,6 @@
           topic = "gps/fix";
         }
       }
-      connect DriveControl.modbus_coils to SafetyPlc.modbus_coils {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "192.168.88.11:502";
-          bus = "Modbus TCP FC5";
-          rate = "5 Hz watchdog kick + on demand";
-          source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:148-170";
-        }
-      }
-      connect PlatformServices.ui_e_stop_services to DriveControl.ui_e_stop_services {
-        @$::RoverPlatform::RoverPlatformProfile::RosService {
-          rate = "on demand";
-          service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
-          source = "rover_bringup/launch/rover_web_bridges.launch.py:106-149";
-          srvType = "std_srvs/Trigger";
-        }
-      }
-      connect PlatformServices.rc_raw_udp to CommandArbitration.rc_raw_udp {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "udp_msgs/UdpPacket";
-          qos = "reliable, depth 100";
-          rate = "one per datagram, ~250 Hz";
-          source = "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:28,121";
-          topic = "rc/raw_udp";
-        }
-      }
       connect DriveControl.motor_command to DriveMotors.motor_command {
         @$::RoverPlatform::RoverPlatformProfile::HwBus {
           address = "channels FL=0 FR=1 RL=4 RR=5";
@@ -2723,21 +2629,22 @@
           source = "rover_hardware_interface/src/rover_driver/rover_a1_driver.cpp:73-80";
         }
       }
-      connect OperatorStation.foxglove_ws_in to PlatformServices.foxglove_ws_in {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
-          bus = "Websocket (LAN/Wi-Fi)";
-          rate = "10 Hz UI stream";
-          source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
+      connect DriveControl.safety_command_echo to Safety.safety_command_echo {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "rover_msgs/SafetyCommandEcho";
+          qos = "reliable, volatile, KeepLast(1)";
+          rate = "20 Hz";
+          source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
+          topic = "hardware_interface/safety_command_echo";
         }
       }
-      connect Power.battery_status to Safety.battery_status {
+      connect DriveControl.tf_static to Localization.tf_static {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "sensor_msgs/BatteryState";
-          qos = "depth 5";
-          rate = "per BMS packet (no fixed rate)";
-          source = "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:83-85";
-          topic = "rover_battery/battery_status";
+          msgType = "tf2_msgs/TFMessage";
+          qos = "reliable, transient local";
+          rate = "latched";
+          source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
+          topic = "/tf_static";
         }
       }
       connect HmiStatus.diagnostics_agg to PlatformServices.diagnostics_agg {
@@ -2749,30 +2656,55 @@
           topic = "diagnostics_agg";
         }
       }
-      connect CommandArbitration.motion_lock to Orchestrator.motion_lock {
+      connect DriveControl.imu_data to Localization.imu_data {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "std_msgs/Bool";
-          qos = "reliable";
-          rate = "10 Hz";
-          source = "rover_twist_mux/config/rover_motion_lock.yaml:3";
-          topic = "motion_lock";
+          msgType = "sensor_msgs/Imu";
+          qos = "sensor data";
+          rate = "50 Hz";
+          source = "rover_controller/config/wheel_01_controller.yaml:150";
+          topic = "imu/data";
         }
       }
-      connect RcTransmitter.crsf_udp to PlatformServices.crsf_udp {
+      connect ImuSensor.imu_raw to DriveControl.imu_raw {
         @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "192.168.1.201:10111, source 192.168.1.1 only";
-          bus = "UDP via RUTX11 Serial Utilities Over IP (receiver UART 460800 8N1 on the router USB-UART)";
-          rate = "250 Hz frames";
-          source = "rover_crsf_teleop/config/rover_crsf_teleop.yaml:4-24,195";
+          address = "hub port 0";
+          bus = "Phidget22 USB/VINT";
+          rate = "125 Hz";
+          source = "rover_description/urdf/common/imu.urdf.xacro:101-104";
         }
       }
-      connect Orchestrator.drive_mode to PlatformServices.drive_mode {
+      connect Localization.odom to Orchestrator.odom {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "rover_msgs/DriveMode";
-          qos = "reliable, transient_local";
-          rate = "on change";
-          source = "rover_msgs/msg/DriveMode.msg:1";
-          topic = "drive_mode";
+          msgType = "nav_msgs/Odometry";
+          qos = "reliable";
+          rate = "50 Hz";
+          source = "rover_localization/config/rel_localization.yaml:4-15";
+          topic = "odom (+ TF odom->base_footprint)";
+        }
+      }
+      connect BmsBridge.bms_udp to PlatformServices.bms_udp {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "192.168.1.201:4444 (392-byte payload)";
+          bus = "UDP";
+          rate = "BMS dependent";
+          source = "rover_battery/config/rover_battery.yaml:6-7";
+        }
+      }
+      connect HmiStatus.system_status to Safety.system_status {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "rover_msgs/SystemStatus";
+          qos = "depth 10";
+          rate = "5 Hz";
+          source = "rover_diag_manager/config/system_diag.yaml:7";
+          topic = "system_status";
+        }
+      }
+      connect Safety.trip_e_stop to DriveControl.trip_e_stop {
+        @$::RoverPlatform::RoverPlatformProfile::RosService {
+          rate = "on battery verdict";
+          service = "hardware_interface/sw_user_e_stop_set";
+          source = "rover_safety/behavior_trees/rover_safety.xml:4-16";
+          srvType = "std_srvs/Trigger";
         }
       }
       connect DriveControl.safety_status to Safety.safety_status {
@@ -2782,6 +2714,84 @@
           rate = "20 Hz";
           source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
           topic = "hardware_interface/safety_status";
+        }
+      }
+      connect PlatformServices.teleop_foxglove_cmd_vel_stamped to CommandArbitration.teleop_foxglove_cmd_vel_stamped {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "geometry_msgs/TwistStamped";
+          qos = "reliable";
+          rate = "TBD";
+          source = "rover_twist_mux/config/rover_twist_mux.yaml:16-19";
+          topic = "teleop_foxglove_cmd_vel_stamped";
+        }
+      }
+      connect CommandArbitration.motion_lock to Orchestrator.motion_lock {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "std_msgs/Bool";
+          qos = "reliable";
+          rate = "10 Hz";
+          source = "rover_twist_mux/config/rover_motion_lock.yaml:3";
+          topic = "motion_lock";
+        }
+      }
+      connect PlatformServices.rc_raw_udp to CommandArbitration.rc_raw_udp {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "udp_msgs/UdpPacket";
+          qos = "reliable, depth 100";
+          rate = "one per datagram, ~250 Hz";
+          source = "rover_crsf_teleop/launch/rover_crsf_teleop.launch.py:28,121";
+          topic = "rc/raw_udp";
+        }
+      }
+      connect PlatformServices.led_udp to LedPanels.led_udp {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "192.168.77.202:3334 (ch1), 192.168.77.201:3333 (ch2)";
+          bus = "UDP";
+          rate = "50 Hz";
+          source = "rover_led/config/rover_a1_udp_led_channel_1.yaml:3-4";
+        }
+      }
+      connect CommandArbitration.e_stop_services to DriveControl.e_stop_services {
+        @$::RoverPlatform::RoverPlatformProfile::RosService {
+          rate = "on switch edge";
+          service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
+          source = "rover_hardware_interface/src/rover_system/rover_system.cpp:130-143";
+          srvType = "std_srvs/Trigger";
+        }
+      }
+      connect Power.battery_status to Safety.battery_status {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "sensor_msgs/BatteryState";
+          qos = "depth 5";
+          rate = "per BMS packet (no fixed rate)";
+          source = "rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp:83-85";
+          topic = "rover_battery/battery_status";
+        }
+      }
+      connect Power.diagnostics to HmiStatus.diagnostics_from_rover_battery {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "diagnostic_msgs/DiagnosticArray";
+          qos = "reliable";
+          rate = "1 Hz";
+          source = "rover_battery/src/infrastructure/rover_battery_node.cpp:41,73";
+          topic = "diagnostics";
+        }
+      }
+      connect DriveControl.odometry_wheels to Localization.odometry_wheels {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "nav_msgs/Odometry";
+          qos = "reliable";
+          rate = "50 Hz";
+          source = "rover_controller/config/wheel_01_controller.yaml:45,159";
+          topic = "odometry/wheels";
+        }
+      }
+      connect DriveMotors.encoder_feedback to DriveControl.encoder_feedback {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "encoder 1024 CPR";
+          bus = "Phidget22 USB/VINT";
+          rate = "10 Hz";
+          source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:190,254";
         }
       }
       connect DriveControl.safety_status to CommandArbitration.safety_status {
@@ -2802,22 +2812,38 @@
           topic = "udp_write/led_channel_<n>";
         }
       }
-      connect DriveControl.odometry_wheels to Localization.odometry_wheels {
+      connect DriveControl.rover_driver_state to Safety.rover_driver_state {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "nav_msgs/Odometry";
-          qos = "reliable";
-          rate = "50 Hz";
-          source = "rover_controller/config/wheel_01_controller.yaml:45,159";
-          topic = "odometry/wheels";
+          msgType = "rover_msgs/RoverDriverState";
+          qos = "reliable, KeepLast(5)";
+          rate = "20 Hz";
+          source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:148-150";
+          topic = "hardware_interface/rover_driver_state";
         }
       }
-      connect CommandArbitration.cmd_vel to DriveControl.cmd_vel {
+      connect Orchestrator.drive_mode to PlatformServices.drive_mode {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "geometry_msgs/TwistStamped";
-          qos = "reliable";
-          rate = "follows active source";
-          source = "rover_twist_mux/launch/rover_twist_mux.launch.py:110-117";
-          topic = "cmd_vel";
+          msgType = "rover_msgs/DriveMode";
+          qos = "reliable, transient_local";
+          rate = "on change";
+          source = "rover_msgs/msg/DriveMode.msg:1";
+          topic = "drive_mode";
+        }
+      }
+      connect PlatformServices.foxglove_ws_out to OperatorStation.foxglove_ws_out {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
+          bus = "Websocket (LAN/Wi-Fi)";
+          rate = "per topic";
+          source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
+        }
+      }
+      connect SafetyPlc.modbus_inputs to DriveControl.modbus_inputs {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "192.168.88.11:502";
+          bus = "Modbus TCP FC1/FC2";
+          rate = "10 Hz poll";
+          source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178";
         }
       }
       connect PlatformServices.rover_battery_udp_data to Power.rover_battery_udp_data {
@@ -2829,82 +2855,62 @@
           topic = "rover_battery_udp_data";
         }
       }
-      connect CommandArbitration.e_stop_services to DriveControl.e_stop_services {
-        @$::RoverPlatform::RoverPlatformProfile::RosService {
-          rate = "on switch edge";
-          service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
-          source = "rover_hardware_interface/src/rover_system/rover_system.cpp:130-143";
-          srvType = "std_srvs/Trigger";
+      connect RcTransmitter.crsf_udp to PlatformServices.crsf_udp {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "192.168.1.201:10111, source 192.168.1.1 only";
+          bus = "UDP via RUTX11 Serial Utilities Over IP (receiver UART 460800 8N1 on the router USB-UART)";
+          rate = "250 Hz frames";
+          source = "rover_crsf_teleop/config/rover_crsf_teleop.yaml:4-24,195";
         }
       }
-      connect DriveControl.tf_static to Localization.tf_static {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "tf2_msgs/TFMessage";
-          qos = "reliable, transient local";
-          rate = "latched";
-          source = "rover_description/launch/rover_load_urdf.launch.py:191-199";
-          topic = "/tf_static";
-        }
-      }
-      connect Localization.odom to Orchestrator.odom {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "nav_msgs/Odometry";
-          qos = "reliable";
-          rate = "50 Hz";
-          source = "rover_localization/config/rel_localization.yaml:4-15";
-          topic = "odom (+ TF odom->base_footprint)";
-        }
-      }
-      connect DriveControl.safety_command_echo to Safety.safety_command_echo {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "rover_msgs/SafetyCommandEcho";
-          qos = "reliable, volatile, KeepLast(1)";
-          rate = "20 Hz";
-          source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
-          topic = "hardware_interface/safety_command_echo";
-        }
-      }
-      connect DriveControl.imu_data to Localization.imu_data {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "sensor_msgs/Imu";
-          qos = "sensor data";
-          rate = "50 Hz";
-          source = "rover_controller/config/wheel_01_controller.yaml:150";
-          topic = "imu/data";
-        }
-      }
-      connect DriveControl.safety_command_echo to CommandArbitration.safety_command_echo {
-        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
-          msgType = "rover_msgs/SafetyCommandEcho";
-          qos = "reliable, volatile, KeepLast(1)";
-          rate = "20 Hz";
-          source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
-          topic = "hardware_interface/safety_command_echo";
-        }
-      }
-      connect Orchestrator.nav_cmd_vel_stamped to CommandArbitration.nav_cmd_vel_stamped {
+      connect Orchestrator.teleop_driver_interface_cmd_vel_stamped to CommandArbitration.teleop_driver_interface_cmd_vel_stamped {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
           msgType = "geometry_msgs/TwistStamped";
           qos = "reliable";
-          rate = "TBD (Nav 2 controller rate)";
-          source = "rover_twist_mux/config/rover_twist_mux.yaml:6-9";
-          topic = "nav_cmd_vel_stamped";
+          rate = "10 Hz";
+          source = "rover_twist_mux/config/rover_twist_mux.yaml:10-15";
+          topic = "teleop_driver_interface_cmd_vel_stamped";
         }
       }
-      connect PlatformServices.foxglove_ws_out to OperatorStation.foxglove_ws_out {
+      connect CommandArbitration.cmd_vel to DriveControl.cmd_vel {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "geometry_msgs/TwistStamped";
+          qos = "reliable";
+          rate = "follows active source";
+          source = "rover_twist_mux/launch/rover_twist_mux.launch.py:110-117";
+          topic = "cmd_vel";
+        }
+      }
+      connect OperatorStation.foxglove_ws_in to PlatformServices.foxglove_ws_in {
         @$::RoverPlatform::RoverPlatformProfile::HwBus {
           address = "TCP 8765 (foxglove_bridge), 9090 (rosbridge)";
           bus = "Websocket (LAN/Wi-Fi)";
-          rate = "per topic";
+          rate = "10 Hz UI stream";
           source = "rover_bringup/launch/rover_web_bridges.launch.py:54-198";
         }
       }
-      connect Safety.trip_e_stop to DriveControl.trip_e_stop {
+      connect Safety.led_set_animation to HmiStatus.led_set_animation {
         @$::RoverPlatform::RoverPlatformProfile::RosService {
-          rate = "on battery verdict";
-          service = "hardware_interface/sw_user_e_stop_set";
-          source = "rover_safety/behavior_trees/rover_safety.xml:4-16";
+          rate = "on state change";
+          service = "led/set_animation";
+          source = "rover_safety/behavior_trees/rover_led_safety.xml:97-107";
+          srvType = "rover_msgs/SetLedAnimation";
+        }
+      }
+      connect PlatformServices.ui_e_stop_services to DriveControl.ui_e_stop_services {
+        @$::RoverPlatform::RoverPlatformProfile::RosService {
+          rate = "on demand";
+          service = "hardware_interface/sw_user_e_stop_set|reset, sw_e_stop_latch_reset";
+          source = "rover_bringup/launch/rover_web_bridges.launch.py:106-149";
           srvType = "std_srvs/Trigger";
+        }
+      }
+      connect DriveControl.modbus_coils to SafetyPlc.modbus_coils {
+        @$::RoverPlatform::RoverPlatformProfile::HwBus {
+          address = "192.168.88.11:502";
+          bus = "Modbus TCP FC5";
+          rate = "5 Hz watchdog kick + on demand";
+          source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:148-170";
         }
       }
       connect PlatformServices.teleop_web_cmd_vel_stamped to Orchestrator.teleop_web_cmd_vel_stamped {
@@ -2916,30 +2922,6 @@
           topic = "teleop_web_cmd_vel_stamped";
         }
       }
-      connect SafetyPlc.modbus_inputs to DriveControl.modbus_inputs {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "192.168.88.11:502";
-          bus = "Modbus TCP FC1/FC2";
-          rate = "10 Hz poll";
-          source = "rover_description/urdf/rover_a1/rover_a1_macro.urdf.xacro:178";
-        }
-      }
-      connect Safety.led_set_animation to HmiStatus.led_set_animation {
-        @$::RoverPlatform::RoverPlatformProfile::RosService {
-          rate = "on state change";
-          service = "led/set_animation";
-          source = "rover_safety/behavior_trees/rover_led_safety.xml:97-107";
-          srvType = "rover_msgs/SetLedAnimation";
-        }
-      }
-      connect BmsBridge.bms_udp to PlatformServices.bms_udp {
-        @$::RoverPlatform::RoverPlatformProfile::HwBus {
-          address = "192.168.1.201:4444 (392-byte payload)";
-          bus = "UDP";
-          rate = "BMS dependent";
-          source = "rover_battery/config/rover_battery.yaml:6-7";
-        }
-      }
       connect DriveControl.diagnostics to HmiStatus.diagnostics {
         @$::RoverPlatform::RoverPlatformProfile::RosTopic {
           msgType = "diagnostic_msgs/DiagnosticArray";
@@ -2947,6 +2929,24 @@
           rate = "1 Hz";
           source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:188";
           topic = "diagnostics";
+        }
+      }
+      connect Orchestrator.nav_cmd_vel_stamped to CommandArbitration.nav_cmd_vel_stamped {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "geometry_msgs/TwistStamped";
+          qos = "reliable";
+          rate = "TBD (Nav 2 controller rate)";
+          source = "rover_twist_mux/config/rover_twist_mux.yaml:6-9";
+          topic = "nav_cmd_vel_stamped";
+        }
+      }
+      connect DriveControl.safety_command_echo to CommandArbitration.safety_command_echo {
+        @$::RoverPlatform::RoverPlatformProfile::RosTopic {
+          msgType = "rover_msgs/SafetyCommandEcho";
+          qos = "reliable, volatile, KeepLast(1)";
+          rate = "20 Hz";
+          source = "rover_hardware_interface/src/system_ros_interface/system_ros_interface.cpp:169-184";
+          topic = "hardware_interface/safety_command_echo";
         }
       }
     }
@@ -3013,27 +3013,27 @@
       }
       allocation def SoftwareToExecution specializes $::RoverPlatform::RoverPlatformAlloc::RoverPlatformAlloc {
         allocation 'SoftwareToExecution#1' allocate source.DriveControl.rover_hardware_interface to target.PlatformContainer;
-        allocation 'SoftwareToExecution#2' allocate source.DriveControl.rover_description to target.PlatformContainer;
-        allocation 'SoftwareToExecution#3' allocate source.DriveControl.rover_controller to target.PlatformContainer;
+        allocation 'SoftwareToExecution#2' allocate source.DriveControl.rover_controller to target.PlatformContainer;
+        allocation 'SoftwareToExecution#3' allocate source.DriveControl.rover_description to target.PlatformContainer;
         allocation 'SoftwareToExecution#4' allocate source.CommandArbitration.rover_twist_mux to target.PlatformContainer;
-        allocation 'SoftwareToExecution#5' allocate source.CommandArbitration.rover_crsf_teleop to target.PlatformContainer;
-        allocation 'SoftwareToExecution#6' allocate source.PlatformServices.rover_msgs to target.PlatformContainer;
-        allocation 'SoftwareToExecution#7' allocate source.Safety.rover_safety to target.PlatformContainer;
+        allocation 'SoftwareToExecution#5' allocate source.Safety.rover_safety to target.PlatformContainer;
+        allocation 'SoftwareToExecution#6' allocate source.Orchestrator to target.OrchestratorContainer;
+        allocation 'SoftwareToExecution#7' allocate source.PlatformServices.rover_bringup to target.PlatformContainer;
         allocation 'SoftwareToExecution#8' allocate source.Power.rover_battery to target.PlatformContainer;
-        allocation 'SoftwareToExecution#9' allocate source.LedPanels to target.LedControllers;
+        allocation 'SoftwareToExecution#9' allocate source.CommandArbitration.rover_crsf_teleop to target.PlatformContainer;
         allocation 'SoftwareToExecution#10' allocate source.HmiStatus.rover_led to target.PlatformContainer;
-        allocation 'SoftwareToExecution#11' allocate source.HmiStatus.rover_diag_manager to target.PlatformContainer;
-        allocation 'SoftwareToExecution#12' allocate source.Localization.rover_localization to target.PlatformContainer;
-        allocation 'SoftwareToExecution#13' allocate source.Localization.rover_gps_heading to target.PlatformContainer;
-        allocation 'SoftwareToExecution#14' allocate source.PlatformServices.rover_bringup to target.PlatformContainer;
-        allocation 'SoftwareToExecution#15' allocate source.PlatformServices.rover_transport to target.PlatformContainer;
-        allocation 'SoftwareToExecution#16' allocate source.BmsBridge to target.Esp32BmsBridge;
-        allocation 'SoftwareToExecution#17' allocate source.DriveMotors to target.PhidgetVintHub;
-        allocation 'SoftwareToExecution#18' allocate source.ImuSensor to target.PhidgetVintHub;
-        allocation 'SoftwareToExecution#19' allocate source.Orchestrator to target.OrchestratorContainer;
-        allocation 'SoftwareToExecution#20' allocate source.OperatorStation to target.OperatorPc;
-        allocation 'SoftwareToExecution#21' allocate source.RcTransmitter to target.ElrsReceiver;
-        allocation 'SoftwareToExecution#22' allocate source.SafetyPlc to target.SafetyPlcNode;
+        allocation 'SoftwareToExecution#11' allocate source.PlatformServices.rover_msgs to target.PlatformContainer;
+        allocation 'SoftwareToExecution#12' allocate source.RcTransmitter to target.ElrsReceiver;
+        allocation 'SoftwareToExecution#13' allocate source.HmiStatus.rover_diag_manager to target.PlatformContainer;
+        allocation 'SoftwareToExecution#14' allocate source.Localization.rover_localization to target.PlatformContainer;
+        allocation 'SoftwareToExecution#15' allocate source.SafetyPlc to target.SafetyPlcNode;
+        allocation 'SoftwareToExecution#16' allocate source.Localization.rover_gps_heading to target.PlatformContainer;
+        allocation 'SoftwareToExecution#17' allocate source.PlatformServices.rover_transport to target.PlatformContainer;
+        allocation 'SoftwareToExecution#18' allocate source.BmsBridge to target.Esp32BmsBridge;
+        allocation 'SoftwareToExecution#19' allocate source.DriveMotors to target.PhidgetVintHub;
+        allocation 'SoftwareToExecution#20' allocate source.ImuSensor to target.PhidgetVintHub;
+        allocation 'SoftwareToExecution#21' allocate source.LedPanels to target.LedControllers;
+        allocation 'SoftwareToExecution#22' allocate source.OperatorStation to target.OperatorPc;
         allocation 'SoftwareToExecution#23' allocate source.SensorPayload to target.SensorsContainer;
       }
     }

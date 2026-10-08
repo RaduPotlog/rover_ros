@@ -18,9 +18,9 @@ A value marked **derived** is computed from those files, and the formula is give
 | Track (wheel centre to wheel centre) | 0.617 m | See the warning below |
 | Ground clearance | 0.113 m | **Derived**: lowest point of `base.stl` above the ground; not measured |
 | Height of `base_link` above ground | 0.1325 m | **Derived**: `tyre_radius` − `wheel_mount_point_z` (0.1699 − 0.037363) |
-| Mass (CAD, with batteries, without payload) | 58.72 kg | SolidWorks mass properties (2026-10-08), equal to the URDF total; requirement ≤ 60 kg (SYS-SR-001). Battery 5 kg (owner value), RUTX11 456 g (distributor spec), DCC1000 78.8 g (ASSUMPTION); not weighed as a whole |
+| Mass (CAD, with batteries, without payload) | 58.67 kg | SolidWorks mass properties (2026-10-08), equal to the URDF total; requirement ≤ 60 kg (SYS-SR-001). Battery 5 kg (owner value), RUTX11 456 g (distributor spec), DCC1000 78.8 g (ASSUMPTION); not weighed as a whole |
 | Centre of mass height | 0.218 m above ground | CAD (2026-10-08), in the URDF frame: 0.0855 m above `body_link` + 0.1325 m |
-| Yaw moment of inertia | 6.19 kg·m² | CAD (2026-10-08), about the centre of mass |
+| Yaw moment of inertia | 6.18 kg·m² | CAD (2026-10-08), about the centre of mass |
 | Static sideways tip-over angle | about 55° | **Derived**: atan(0.3068 / 0.218) with the tyre contact half-track, level ground, no payload, no dynamics |
 | Payload | **TBD** | SYS-SR-027 |
 | Maximum slope | **TBD** | SYS-SR-028 |
@@ -49,7 +49,7 @@ and *Mass Properties*), `rover_platform_mbse/data/sys_sr_compliance.json` (Nav 2
 | Tyre radius (CAD geometry) | 0.1699 m |
 | Effective rolling radius (odometry) | 0.1651 m |
 | Wheel width | 0.108 m |
-| Wheel mass | 4.796 kg each |
+| Wheel mass | 4.793 kg each |
 | Wheel joint limits | 64.5 N·m, 10.958 rad/s |
 
 The odometry uses the effective radius, which is smaller than the CAD radius: the tyre deflects

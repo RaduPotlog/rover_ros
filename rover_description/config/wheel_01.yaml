@@ -6,11 +6,11 @@ wheel_radius: 0.1651
 tyre_radius: 0.1699
 wheel_width: 0.108
 # Mass, inertia and CoM of one WHEEL_CHUNK_1000_WATT_VARIANT (tyre + both flanges), computed from
-# the SolidWorks part mass properties (2026-10-08, the 8 mm flange now 6061 aluminium).
-mass: 4.79607
-inertia: { ixx: 0.036464, iyy: 0.065711, izz: 0.036463 }
+# the SolidWorks part mass properties (2026-10-08).
+mass: 4.79294
+inertia: { ixx: 0.036460, iyy: 0.065711, izz: 0.036460 }
 # CoM offset along the axle for the left wheels; the right wheels mirror it (inboard on both sides).
-inertia_y_offset: -0.0027055
+inertia_y_offset: -0.0026831
 # Tread centre along the axle for the left wheels, mirrored on the right: the tyre sits 1.71 mm
 # inboard of the CAD wheel joint (tread band of link_*.STL, SolidWorks export 2026-10-07). Offsets
 # the collision cylinder so the contact patches are 0.6136 m apart, not wheel_separation.
