@@ -1,0 +1,319 @@
+<?xml version="1.0"?>
+
+<!-- follow_me_world: rover_world.sdf (copied, unchanged) plus a walking person for follow-me
+     (rover_perception's fmoc + rover_orchestrator's rover_follow_me). Keeps the world name, so
+     rover_gazebo's bridges work as with rover_world.
+     ROVER_USE_CAMERA=true ros2 launch rover_gazebo simulation.launch.py gz_world:=<this file> -->
+
+<sdf version="1.6">
+  <world name="rover_world">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact" />
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu" />
+    <!-- Feeds the navsat sensor (simulated GNSS); needs <spherical_coordinates> below. -->
+    <plugin filename="gz-sim-navsat-system" name="gz::sim::systems::NavSat" />
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics" />
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster" />
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands" />
+
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>50.088384</latitude_deg>
+      <longitude_deg>19.939128</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
+    <model name="rover_world">
+      <static>true</static>
+      
+      <link name="map">
+        <light type="directional" name="sun">
+          <cast_shadows>true</cast_shadows>
+          <pose>0 0 10 0 0 0</pose>
+          <diffuse>0.8 0.8 0.8 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+          <attenuation>
+            <range>1000</range>
+            <constant>0.9</constant>
+            <linear>0.01</linear>
+            <quadratic>0.001</quadratic>
+          </attenuation>
+          <direction>-0.5 0.1 -0.9</direction>
+        </light>
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>25 25</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>25 25</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Static obstacles so the lidar, costmaps and SLAM have structure to work with.
+         Perimeter walls at +/-11 m, plus a few boxes and pillars around the spawn point
+         (0, -2). Heights span the RS16 slice (+/-0.25 m around the lidar). -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 11 0.5 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>22 0.2 1.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>22 0.2 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.5 0.5 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -11 0.5 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>22 0.2 1.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>22 0.2 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.5 0.5 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>11 0 0.5 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.2 22 1.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.2 22 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.5 0.5 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-11 0 0.5 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.2 22 1.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.2 22 1.0</size></box></geometry>
+          <material><ambient>0.5 0.5 0.55 1</ambient><diffuse>0.5 0.5 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box_1">
+      <static>true</static>
+      <pose>3 1 0.4 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 1.0 0.8</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 1.0 0.8</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box_2">
+      <static>true</static>
+      <pose>-3 3 0.4 0 0 0.5</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 0.8</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 0.8</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box_3">
+      <static>true</static>
+      <pose>5 -5 0.4 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.8 2.5 0.8</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.8 2.5 0.8</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box_4">
+      <static>true</static>
+      <pose>-5 -4 0.6 0 0 0.8</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.2 1.2 1.2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.2 1.2 1.2</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pillar_1">
+      <static>true</static>
+      <pose>0 5 0.75 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.4 0.4 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.4 0.4 1.5</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pillar_2">
+      <static>true</static>
+      <pose>-7 7 0.75 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.4 0.4 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.4 0.4 1.5</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pillar_3">
+      <static>true</static>
+      <pose>7 6 0.75 0 0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.4 0.4 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.4 0.4 1.5</size></box></geometry>
+          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 5 deg up-and-over ramp along y = -8, x from -3.99 to +3.99 (clear of box_3 and the
+         south wall). Each ramp is a 3.0 x 1.6 x 0.1 m slab pitched by 5 deg (0.0873 rad):
+         rise = 3.0 sin(5 deg) = 0.2615 m. Slab centre z = (L/2) sin - (t/2) cos = 0.0809 m puts
+         the low edge flush with the ground; centre x = +/-(1 + (L/2) cos - (t/2) sin) puts the
+         high edge on the platform edge at x = +/-1. -->
+    <model name="ramp_up">
+      <static>true</static>
+      <pose>-2.4899 -8 0.0809 0 -0.0873 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <material><ambient>0.3 0.5 0.3 1</ambient><diffuse>0.3 0.5 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="ramp_platform">
+      <static>true</static>
+      <pose>0 -8 0.13075 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>2.0 1.6 0.2615</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 1.6 0.2615</size></box></geometry>
+          <material><ambient>0.25 0.4 0.25 1</ambient><diffuse>0.25 0.4 0.25 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="ramp_down">
+      <static>true</static>
+      <pose>2.4899 -8 0.0809 0 0.0873 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.0 1.6 0.1</size></box></geometry>
+          <material><ambient>0.3 0.5 0.3 1</ambient><diffuse>0.3 0.5 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Follow-me: a person to follow. Stands 25 s at (1.5, -2), 1.5 m ahead of the
+         rover's spawn point (rover_gazebo spawns it at (0, -2): fmoc's acquire zone), then walks a loop at 0.6 m/s round the
+         open east half of the world (clear of box_1, box_3 and the pillars), and repeats.
+         The skin is Fuel's standard walking actor: the first start downloads it. -->
+    <actor name="person">
+      <skin>
+        <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walking">
+        <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <delay_start>0.0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walking">
+          <waypoint><time>0.00</time><pose>1.5 -2.0 1.0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>25.00</time><pose>1.5 -2.0 1.0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>26.00</time><pose>1.5 -2.0 1.0 0 0 -0.3805</pose></waypoint>
+          <waypoint><time>30.49</time><pose>4.0 -3.0 1.0 0 0 -0.3805</pose></waypoint>
+          <waypoint><time>31.49</time><pose>4.0 -3.0 1.0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>38.15</time><pose>8.0 -3.0 1.0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>39.15</time><pose>8.0 -3.0 1.0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>48.32</time><pose>8.0 2.5 1.0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>49.32</time><pose>8.0 2.5 1.0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>60.15</time><pose>1.5 2.5 1.0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>61.15</time><pose>1.5 2.5 1.0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>68.65</time><pose>1.5 -2.0 1.0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>69.65</time><pose>1.5 -2.0 1.0 0 0 0.0000</pose></waypoint>
+        </trajectory>
+      </script>
+    </actor>
+
+  </world>
+</sdf>

@@ -24,8 +24,8 @@
   gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS
 
-# Depth camera (RealSense D435i stand-in, ROVER_USE_CAMERA): the cloud rover_perception_bringup's
-# depth_image_proc publishes. Without the camera nothing is published on the gz side.
+# Depth camera (RealSense D435i stand-in, ROVER_USE_CAMERA): the cloud rover_sensors'
+# rover_realsense (depth_image_proc) publishes. Without the camera nothing is published on the gz side.
 - ros_topic_name: /<namespace>/camera/depth/points
   gz_topic_name: /<namespace>/camera/depth/points
   ros_type_name: sensor_msgs/msg/PointCloud2

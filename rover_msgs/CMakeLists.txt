@@ -43,6 +43,7 @@ rosidl_generate_interfaces(
     "msg/MapList.msg"
     "msg/LocalizationState.msg"
     "msg/DriveMode.msg"
+    "msg/TrackedPerson.msg"
 
     "srv/SetLedBrightness.srv"
     "srv/SetLedAnimation.srv"

@@ -9,6 +9,10 @@ it can also run on its own to open a world without a robot.
   walls (a 22 × 22 m square), with four boxes (0.8–1.2 m tall) and three 1.5 m pillars as
   static obstacles, so the lidar, costmaps and SLAM have structure to work with. It also
   sets `<spherical_coordinates>` for the simulated GNSS.
+- `world/follow_me_world.sdf` - the same world plus a walking person (Fuel's walking actor) for
+  follow-me: it stands 25 s at (1.5, -2), 1.5 m ahead of the spawned rover, then walks a loop
+  round the east half. Needs the depth camera (`ROVER_USE_CAMERA=true`). The first start
+  downloads the actor's mesh from Fuel (cached in `~/.gz/fuel` afterwards).
 
 ## Config Files
 
