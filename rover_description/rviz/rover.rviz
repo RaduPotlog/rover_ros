@@ -10,8 +10,7 @@ Panels:
         - /Robot1/RobotModel1
         - /Robot1/TF1/Frames1
         - /Robot1/Odometry1/Topic1
-        - /Imu1/Axes properties1
-        - /Imu1/Acceleration properties1
+        - /PointStamped1
       Splitter Ratio: 0.5
     Tree Height: 1059
   - Class: rviz_common/Selection
@@ -90,6 +89,10 @@ Visualization Manager:
               Show Axes: false
               Show Trail: false
               Value: true
+            camera_link:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
             fl_wheel_base_link:
               Alpha: 1
               Show Axes: false
@@ -153,37 +156,13 @@ Visualization Manager:
           Frame Timeout: 15
           Frames:
             All Enabled: true
-            base_footprint:
-              Value: true
-            base_link:
-              Value: true
-            body_link:
-              Value: true
-            fl_wheel_base_link:
-              Value: true
-            fl_wheel_link:
-              Value: true
-            fr_wheel_base_link:
-              Value: true
-            fr_wheel_link:
-              Value: true
-            gps_link:
-              Value: true
-            imu_link:
-              Value: true
-            lidar_link:
-              Value: true
-            odom:
-              Value: true
-            rl_wheel_base_link:
-              Value: true
-            rl_wheel_link:
-              Value: true
             rover/base_footprint:
               Value: true
             rover/base_link:
               Value: true
             rover/body_link:
+              Value: true
+            rover/camera_link:
               Value: true
             rover/fl_wheel_base_link:
               Value: true
@@ -199,8 +178,6 @@ Visualization Manager:
               Value: true
             rover/lidar_link:
               Value: true
-            rover/map:
-              Value: true
             rover/odom:
               Value: true
             rover/rl_wheel_base_link:
@@ -211,41 +188,36 @@ Visualization Manager:
               Value: true
             rover/rr_wheel_link:
               Value: true
-            rr_wheel_base_link:
-              Value: true
-            rr_wheel_link:
-              Value: true
           Marker Scale: 1
           Name: TF
           Show Arrows: true
           Show Axes: true
           Show Names: false
           Tree:
-            rover/map:
-              {}
             rover/odom:
-              rover/base_link:
-                rover/body_link:
-                  rover/base_footprint:
-                    {}
-                  rover/fl_wheel_base_link:
-                    rover/fl_wheel_link:
+              rover/base_footprint:
+                rover/base_link:
+                  rover/body_link:
+                    rover/camera_link:
                       {}
-                  rover/fr_wheel_base_link:
-                    rover/fr_wheel_link:
+                    rover/fl_wheel_base_link:
+                      rover/fl_wheel_link:
+                        {}
+                    rover/fr_wheel_base_link:
+                      rover/fr_wheel_link:
+                        {}
+                    rover/gps_link:
                       {}
-                  rover/gps_link:
-                    {}
-                  rover/imu_link:
-                    {}
-                  rover/lidar_link:
-                    {}
-                  rover/rl_wheel_base_link:
-                    rover/rl_wheel_link:
+                    rover/imu_link:
                       {}
-                  rover/rr_wheel_base_link:
-                    rover/rr_wheel_link:
+                    rover/lidar_link:
                       {}
+                    rover/rl_wheel_base_link:
+                      rover/rl_wheel_link:
+                        {}
+                    rover/rr_wheel_base_link:
+                      rover/rr_wheel_link:
+                        {}
           Update Interval: 0
           Value: true
         - Angle Tolerance: 0.10000000149011612
@@ -289,34 +261,6 @@ Visualization Manager:
           Value: false
       Enabled: true
       Name: Robot
-    - Acceleration properties:
-        Acc. vector alpha: 1
-        Acc. vector color: 255; 255; 0
-        Acc. vector scale: 0.10000000149011612
-        Derotate acceleration: true
-        Enable acceleration: false
-      Axes properties:
-        Axes scale: 0.699999988079071
-        Enable axes: true
-      Box properties:
-        Box alpha: 1
-        Box color: 255; 0; 0
-        Enable box: false
-        x_scale: 1
-        y_scale: 1
-        z_scale: 1
-      Class: rviz_imu_plugin/Imu
-      Enabled: false
-      Name: Imu
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /rover/imu/data
-      Value: false
-      fixed_frame_orientation: true
     - Alpha: 0.699999988079071
       Binary representation: false
       Binary threshold: 100
@@ -383,9 +327,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 68
+      Max Intensity: 0
       Min Color: 0; 0; 0
-      Min Intensity: 1
+      Min Intensity: 0
       Name: PointCloud2
       Position Transformer: XYZ
       Selectable: true
@@ -436,6 +380,36 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/PointStamped
+      Color: 204; 41; 204
+      Enabled: true
+      History Length: 1
+      Name: PointStamped
+      Radius: 0.20000000298023224
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /rover/follow_me/target_pose
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        Value: true
+        acquire_zone: true
+        clusters: true
+        target: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /rover/tracked_person/markers
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -482,7 +456,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 11.74656867980957
+      Distance: 16.34969711303711
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -497,10 +471,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5197961330413818
+      Pitch: 0.3797960579395294
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.0581793785095215
+      Yaw: 1.4681793451309204
     Saved: ~
 Window Geometry:
   Displays:
@@ -518,5 +492,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 2548
-  X: 0
-  Y: 0
+  X: -32
+  Y: -32
