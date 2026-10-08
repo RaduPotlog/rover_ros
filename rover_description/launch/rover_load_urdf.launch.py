@@ -153,6 +153,10 @@ def generate_launch_description():
     camera_rot_p = _env_float("ROVER_CAMERA_ORIENTATION_P", "0.0")
     camera_rot_y = _env_float("ROVER_CAMERA_ORIENTATION_Y", "0.0")
 
+    # With use_sim, ROVER_USE_CAMERA also puts a Gazebo depth camera on camera_link (the same
+    # variable starts the RealSense driver on the rover).
+    use_camera = os.environ.get("ROVER_USE_CAMERA", "").strip().lower() in ("true", "1", "yes", "on")
+
     urdf_file = PythonExpression(["'", robot_model, ".urdf.xacro'"])
     robot_description_content = Command(
         [
@@ -183,6 +187,8 @@ def generate_launch_description():
             f"'{camera_pos_x} {camera_pos_y} {camera_pos_z}'",
             " camera_rpy:=",
             f"'{camera_rot_r} {camera_rot_p} {camera_rot_y}'",
+            " use_camera:=",
+            "true" if use_camera else "false",
             " namespace:=",
             namespace,
         ]

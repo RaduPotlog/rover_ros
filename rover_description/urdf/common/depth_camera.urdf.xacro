@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro
+    name="depth_camera"
+    params="use_sim:=false
+            reference_frame:=''
+            namespace:=''">
+
+    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
+
+    <!-- Gazebo depth camera: stands in for the RealSense D435i depth stream that
+         rover_perception_bringup turns into camera/depth/points (424x240 at 15 Hz, 87 deg
+         horizontal FOV). Gazebo publishes the depth image on <ns>camera/depth and its cloud on
+         <ns>camera/depth/points; the bridge maps the cloud to the same ROS topic. Only the cloud
+         is bridged: it is what the depth costmap source and rover_fmoc use.
+         The cloud is in the sensor frame, x forward (not the optical frame), stamped with
+         reference_frame, which is the x-forward camera_link. -->
+    <xacro:if value="${use_sim}">
+      <gazebo reference="${reference_frame}">
+        <sensor name="${ns}depth_camera" type="depth_camera">
+          <topic>${ns}camera/depth</topic>
+          <update_rate>15</update_rate>
+          <!-- Frames carry the namespace prefix (robot_state_publisher frame_prefix). -->
+          <gz_frame_id>${ns}${reference_frame}</gz_frame_id>
+          <camera>
+            <horizontal_fov>1.5184</horizontal_fov>
+            <image>
+              <width>424</width>
+              <height>240</height>
+              <format>R_FLOAT32</format>
+            </image>
+            <clip>
+              <near>0.3</near>
+              <far>6.0</far>
+            </clip>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.005</stddev>
+            </noise>
+          </camera>
+          <always_on>1</always_on>
+          <visualize>false</visualize>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+
+</robot>

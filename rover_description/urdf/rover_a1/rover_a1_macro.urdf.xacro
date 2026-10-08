@@ -15,6 +15,7 @@
             gps_rpy:='0.0 0.0 0.0'
             camera_xyz:='0.25 0.0 0.2'
             camera_rpy:='0.0 0.0 0.0'
+            use_camera:=false
             namespace:=''">
 
     <xacro:if value="${use_sim}">
@@ -29,6 +30,14 @@
            the rover sees itself and the costmaps mark obstacles inside the footprint. -->
       <xacro:if value="${[float(v) for v in str(lidar_xyz).split()] == [0.0, 0.0, 0.0]}">
         <xacro:property name="lidar_xyz" value="0.0 0.0 0.68" />
+      </xacro:if>
+      <!-- Likewise the Gazebo camera (use_camera only, so other simulations keep camera_link
+           where it was): the assumed real mount (0.25 0 0.2, rover_load_urdf) is inside the body
+           mesh (x up to 0.413, top z = 0.30), where it would see only the body. Keep a
+           ROVER_CAMERA_* mount when one is set, else put it just ahead of the front face, above
+           the body top. -->
+      <xacro:if value="${use_camera and [float(v) for v in str(camera_xyz).split()] == [0.25, 0.0, 0.2]}">
+        <xacro:property name="camera_xyz" value="0.43 0.0 0.32" />
       </xacro:if>
     </xacro:if>
 
@@ -58,6 +67,8 @@
     <xacro:include filename="$(find rover_description)/urdf/common/lidar.urdf.xacro" ns="lidar" />
     <!-- GPS macros -->
     <xacro:include filename="$(find rover_description)/urdf/common/gps.urdf.xacro" ns="gps" />
+    <!-- Depth camera macros -->
+    <xacro:include filename="$(find rover_description)/urdf/common/depth_camera.urdf.xacro" ns="depth_camera" />
     <!-- Gazebo system macros -->
     <xacro:include filename="$(find rover_description)/urdf/common/gazebo_system.urdf.xacro" ns="gazebo_system" />
     
@@ -326,6 +337,9 @@
     <xacro:lidar.lidar use_sim="${use_sim}" reference_frame="lidar_link" namespace="${namespace}" />
     <!-- Instantiate GPS -->
     <xacro:gps.gps use_sim="${use_sim}" reference_frame="gps_link" namespace="${namespace}" />
+    <!-- Instantiate the depth camera (Gazebo only, and only with ROVER_USE_CAMERA) -->
+    <xacro:depth_camera.depth_camera
+      use_sim="${use_sim and use_camera}" reference_frame="camera_link" namespace="${namespace}" />
 
     <xacro:if value="${use_sim}">
       <!-- Instantiate Battery -->

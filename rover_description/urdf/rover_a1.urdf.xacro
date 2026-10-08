@@ -10,6 +10,8 @@
   <xacro:arg name="gps_rpy" default="0.0 0.0 0.0" />
   <xacro:arg name="camera_xyz" default="0.25 0.0 0.2" />
   <xacro:arg name="camera_rpy" default="0.0 0.0 0.0" />
+  <!-- With use_sim: a Gazebo depth camera on camera_link (ROVER_USE_CAMERA, see rover_load_urdf). -->
+  <xacro:arg name="use_camera" default="false" />
   <xacro:arg name="wheel_config_file" default="$(find rover_description)/config/wheel_01.yaml" />
   <xacro:arg name="battery_config_file" default="$(find rover_description)/config/battery.yaml" />
   <!-- Only used by the gz_ros2_control plugin (use_sim:=true); the caller must supply it. -->
@@ -27,6 +29,7 @@
     gps_rpy="$(arg gps_rpy)"
     camera_xyz="$(arg camera_xyz)"
     camera_rpy="$(arg camera_rpy)"
+    use_camera="$(arg use_camera)"
     wheel_config_file="$(arg wheel_config_file)"
     battery_config_file="$(arg battery_config_file)"
     controller_config_file="$(arg controller_config_file)"

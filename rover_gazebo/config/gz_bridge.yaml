@@ -24,6 +24,14 @@
   gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS
 
+# Depth camera (RealSense D435i stand-in, ROVER_USE_CAMERA): the cloud rover_perception_bringup's
+# depth_image_proc publishes. Without the camera nothing is published on the gz side.
+- ros_topic_name: /<namespace>/camera/depth/points
+  gz_topic_name: /<namespace>/camera/depth/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
+
 # GNSS (RUTX11 stand-in): the fix the rover_gps driver publishes.
 - ros_topic_name: /<namespace>/gps/fix
   gz_topic_name: /<namespace>/gps/fix
