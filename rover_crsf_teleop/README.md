@@ -80,7 +80,7 @@ through to its next source. The E-Stop is not triggered — the same as any othe
 
 `rc/channels` and `rc/link` are observability echoes — nothing on the rover consumes them, and
 they can be turned off with `publish_rc_topics`. Each is capped at `rc_topics_rate_hz` (25 Hz in
-the shipped config, 0 = every decoded frame), so the Cockpit RC page doesn't pull ~250 messages/s
+the shipped config, 0 = every decoded frame), so an RC page doesn't pull ~250 messages/s
 through the Zenoh router; the "RC channels rate" diagnostic still counts every frame. They are plain (not lifecycle) publishers on
 purpose, so they keep publishing when the node is deactivated to investigate why it was
 deactivated. Channel N is `channels[N-1]`.

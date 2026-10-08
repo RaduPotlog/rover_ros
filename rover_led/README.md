@@ -22,7 +22,7 @@ led/set_animation ──► rover_led_controller ──led/channel_<n>_frame─�
 | srv | `led/set_animation` | `rover_msgs/SetLedAnimation` |
 | srv | `led/stop_animation` | `rover_msgs/StopLedAnimation`: clears an animation (and its queued copies) from its layer on every segment; fails if it isn't playing |
 | pub | `led/channel_<n>_frame` | `sensor_msgs/Image` (`rgba8`) at `controller_frequency`: `height` = the panel's serpentine `rows` (1 for a straight strip), `data` in wire order (LED 0 first) |
-| pub | `led/channel_<n>_preview` | the same image at `preview_publish_rate`, best effort, depth 1: for UIs (the Cockpit LED page), so they don't pull the 50 Hz frame through the Zenoh router |
+| pub | `led/channel_<n>_preview` | the same image at `preview_publish_rate`, best effort, depth 1: for UIs (an LED page), so they don't pull the 50 Hz frame through the Zenoh router |
 | pub | `led/animations` | `rover_msgs/LedAnimationCatalog`, latched, once after loading |
 | pub | `led/state` | `rover_msgs/LedState` (what every layer of every segment plays), latched, at `state_publish_rate` |
 | pub | `diagnostics` | hardware id `Bumper Led`: `Led controller status` + render rate |

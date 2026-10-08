@@ -73,7 +73,7 @@ def test_receiver_and_teleop_share_one_single_threaded_container(
     assert container['executable'] == 'component_container'
     assert container['name'] == 'rover_crsf_container'
 
-    # Node names are unchanged from the standalone processes: the Cockpit RC page and the
+    # Node names are unchanged from the standalone processes: RC UI clients and the
     # diagnostic aggregator key on them.
     assert set(nodes) == {'rover_crsf_udp_receiver', 'rover_crsf_teleop_node'}
     assert [node for node, _ in nodes.values()] == container['composable_node_descriptions']

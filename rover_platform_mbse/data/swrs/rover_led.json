@@ -174,7 +174,7 @@
       "id": "SWR-LED-008",
       "category": "Interface",
       "text": "The rover_led shall publish each panel frame additionally on led/channel_<n>_preview (sensor_msgs/Image, best effort, depth 1) at preview_publish_rate, default 5.0 Hz, and shall create no preview topics when preview_publish_rate is 0.",
-      "rationale": "UIs (Cockpit LED page) get a low-rate copy so the 50 Hz frames do not cross the Zenoh router.",
+      "rationale": "UIs (LED page) get a low-rate copy so the 50 Hz frames do not cross the Zenoh router.",
       "verification": "Test",
       "acceptance": "With the default parameter the preview topics are published at 5 Hz and carry the same image as the full-rate frame of the same tick; with preview_publish_rate=0 no led/channel_<n>_preview topic exists.",
       "priority": "Could",

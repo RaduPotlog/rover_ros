@@ -85,8 +85,8 @@ def generate_launch_description():
         description="Specify the path to the diagnostic aggregator analyzers configuration file.",
     )
 
-    # Aggregates every node's diagnostics into diagnostics_agg, the topic the Cockpit
-    # ROS 2 diagnostics page subscribes to. Relative remaps keep it inside the namespace.
+    # Aggregates every node's diagnostics into diagnostics_agg, the topic the drive UI
+    # diagnostics page subscribes to. Relative remaps keep it inside the namespace.
     diagnostic_aggregator_node = Node(
         package="diagnostic_aggregator",
         executable="aggregator_node",

@@ -3,7 +3,7 @@
   "prefix": "DIAG",
   "document": "ROVER-A1-ROVER_DIAG_MANAGER-SWRS-V-001",
   "title": "rover_diag_manager Software Requirements Specification",
-  "scope": "rover_diag_manager provides the platform's computer-health monitor (rover_diag_manager_node: CPU usage, CPU temperature, RAM and root-disk usage, published as rover_msgs/SystemStatus and as an 'OS status' diagnostic) and the configuration/launch of the diagnostic_aggregator node that groups every rover node's /diagnostics statuses into the diagnostics_agg tree shown by the Cockpit diagnostics page. It does not itself produce the drive, battery, E-stop or sensor diagnostics; those come from the owning packages and are only grouped here.",
+  "scope": "rover_diag_manager provides the platform's computer-health monitor (rover_diag_manager_node: CPU usage, CPU temperature, RAM and root-disk usage, published as rover_msgs/SystemStatus and as an 'OS status' diagnostic) and the configuration/launch of the diagnostic_aggregator node that groups every rover node's /diagnostics statuses into the diagnostics_agg tree shown by the drive UI diagnostics page. It does not itself produce the drive, battery, E-stop or sensor diagnostics; those come from the owning packages and are only grouped here.",
   "requirements": [
     {
       "id": "SWR-DIAG-001",
@@ -184,7 +184,7 @@
       "id": "SWR-DIAG-009",
       "category": "Interface",
       "text": "The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover_diagnostic_aggregator that subscribes to the namespaced diagnostics topic and publishes diagnostics_agg and diagnostics_toplevel_state inside the launch namespace (ROVER_NAMESPACE).",
-      "rationale": "The Cockpit diagnostics page consumes diagnostics_agg; relative remaps keep multi-robot namespaces isolated.",
+      "rationale": "The drive UI diagnostics page consumes diagnostics_agg; relative remaps keep multi-robot namespaces isolated.",
       "verification": "Inspection, Demonstration",
       "acceptance": "After `ros2 launch rover_diag_manager system_diag.launch.py`, `ros2 topic list` shows <ns>/diagnostics_agg and <ns>/diagnostics_toplevel_state published by rover_diagnostic_aggregator.",
       "priority": "Should",

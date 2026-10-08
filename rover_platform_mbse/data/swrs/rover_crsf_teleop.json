@@ -474,7 +474,7 @@
       "id": "SWR-CRSF-020",
       "category": "Interface",
       "text": "The rover_crsf_teleop shall, when publish_rc_topics is true, echo decoded frames on rc/channels (rover_msgs/RcChannels) and rc/link (rover_msgs/RcLinkStatus) with QoS best-effort, volatile, depth 1, each capped at rc_topics_rate_hz (25 Hz; 0 = uncapped).",
-      "rationale": "Observability for tuning and the Cockpit RC page without pulling ~250 messages/s through the Zenoh router; nothing on the rover consumes them.",
+      "rationale": "Observability for tuning and RC UI pages without pulling ~250 messages/s through the Zenoh router; nothing on the rover consumes them.",
       "verification": "Inspection, Test",
       "acceptance": "'ros2 topic hz rc/channels' reads <= 25 Hz with the receiver at its full packet rate; the publishers are best-effort.",
       "priority": "Could",

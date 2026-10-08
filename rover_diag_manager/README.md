@@ -37,5 +37,5 @@ Plain (non-lifecycle) node: it owns no resource, only reads ephemeral OS counter
 - `system_diag.launch.py` - Loads the Rover's system diagnostic node and the
   `diagnostic_aggregator` node (`aggregator_node`, named `rover_diagnostic_aggregator`), which publishes
   `diagnostics_agg` and `diagnostics_toplevel_state` in the launch namespace. `diagnostics_agg` is
-  what the Cockpit ROS 2 diagnostics page (`rover_docker/rover_cockpit`) displays.
+  what the drive UI diagnostics page (`rover_drive_interface`) displays.
   Override the analyzers with `diagnostic_aggregator_config_path:=<file>`.

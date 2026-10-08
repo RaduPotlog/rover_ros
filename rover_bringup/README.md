@@ -69,13 +69,13 @@ launches it next to the bringup.
 
 | Node | Package | Notes |
 |------|---------|-------|
-| `rover_foxglove_bridge` | `foxglove_bridge` | Upstream `foxglove_bridge_launch.xml` defaults except `asset_uri_allowlist`, `topic_whitelist` and `sysinfo` (below), websocket port 8765. Used by Foxglove, the network monitor LED page and Cockpit diagnostics. |
+| `rover_foxglove_bridge` | `foxglove_bridge` | Upstream `foxglove_bridge_launch.xml` defaults except `asset_uri_allowlist`, `topic_whitelist` and `sysinfo` (below), websocket port 8765. Used by Foxglove, the network monitor LED page and the drive UI diagnostics. |
 | `rover_rosbridge_websocket` | `rosbridge_server` | Port 9090, for ros-mcp-server. |
 | `rosapi` | `rosapi` | Kept as `/rosapi`: rosbridge clients call `/rosapi/*`. |
 
 The bridges are not namespaced, so they see the whole graph (`/rover/...` topics included).
 
-`rover_foxglove_bridge` advertises only the topics the drive UI and the Cockpit subscribe to
+`rover_foxglove_bridge` advertises only the topics the drive UI and other UI clients subscribe to
 (`FOXGLOVE_TOPIC_WHITELIST` in the launch file: `/tf`, `/tf_static`, and names matched under any
 namespace), because anything a browser subscribes to crosses the Zenoh router at full rate. When a
 UI starts using a new topic, add it there. `ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']"` on the

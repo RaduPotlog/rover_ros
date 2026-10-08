@@ -223,7 +223,7 @@
       "id": "SWR-BRG-012",
       "category": "Interface",
       "text": "The rover_bringup shall start foxglove_bridge as node rover_foxglove_bridge (WebSocket port 8765, upstream default) with sysinfo disabled and an asset URI allowlist accepting package:// URIs of the upstream mesh/image extensions in any letter case.",
-      "rationale": "Foxglove, the drive UI and the Cockpit diagnostics page connect through this bridge; upper-case mesh extensions must load.",
+      "rationale": "Foxglove, the drive UI and its diagnostics page connect through this bridge; upper-case mesh extensions must load.",
       "verification": "Inspection, Demonstration",
       "acceptance": "`ros2 launch rover_bringup rover_web_bridges.launch.py` creates node rover_foxglove_bridge listening on TCP 8765 and no /foxglove_bridge/sysinfo topic is published.",
       "priority": "Should",

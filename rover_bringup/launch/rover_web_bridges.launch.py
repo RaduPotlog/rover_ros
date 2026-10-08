@@ -41,8 +41,8 @@ FOXGLOVE_ASSET_URI_ALLOWLIST = (
     r"['^package://(?:[-\w%]+/)*[-\w%.]+\." + f"(?:{_ANY_CASE})" + r"$']"
 )
 
-# Topics the web UIs actually use (rover_drive_interface through nginx's /ws, the Cockpit
-# plugin through cockpit-bridge). Every other topic stays off the bridge: upstream's
+# Topics the web UIs actually use (rover_drive_interface through nginx's /ws, Foxglove
+# Studio and other UI clients). Every other topic stays off the bridge: upstream's
 # default ['.*'] advertises the whole graph, and anything a browser (or a stray Foxglove Studio)
 # subscribes to crosses the Zenoh router into this process at its full rate - the UIs throttle
 # only their redraws, never what the bridge sends. Names are relative to the rover namespace,
@@ -79,12 +79,12 @@ _NAMESPACED_UI_TOPICS = (
     "initialpose",
     # both UIs
     "diagnostics_agg",
-    # Cockpit: LED page (led/channel_<n>_preview, not the 50 Hz _frame the driver consumes)
+    # LED page (led/channel_<n>_preview, not the 50 Hz _frame the driver consumes)
     "led/animations",
     "led/state",
     "led/brightness",
     r"led/channel_\d+_preview",
-    # Cockpit: RC page
+    # RC page
     "rc/channels",
     "rc/link",
     "rc/calibration/state",
@@ -132,7 +132,7 @@ _NAMESPACED_UI_SERVICES = (
     # rover_drive_interface: relocalize (AMCL)
     "reinitialize_global_localization",
     "request_nomotion_update",
-    # Cockpit: RC page (calibration, and taking teleop off the command path during a sweep)
+    # RC page (calibration, and taking teleop off the command path during a sweep)
     "rc/calibration/start",
     "rc/calibration/sweep",
     "rc/calibration/finish",
@@ -140,7 +140,7 @@ _NAMESPACED_UI_SERVICES = (
     "rc/calibration/apply",
     "rover_crsf_teleop_node/change_state",
     "rover_crsf_teleop_node/get_state",
-    # Cockpit: LED page
+    # LED page
     "led/set_animation",
     "led/stop_animation",
     "led/set_brightness",

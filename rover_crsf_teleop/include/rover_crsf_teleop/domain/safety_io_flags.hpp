@@ -45,7 +45,7 @@ enum class EStopState
 //     remotely: the PLC latch is set-dominant, so while the button is down no
 //     sw_e_stop_latch_reset call can re-energise the contactor. A latch set by the software
 //     E-Stop (the RC switch, rover_safety, a service call) is NOT enough, because any of those
-//     sources - or Foxglove, the Cockpit, a shell - can clear it with one Trigger call while the
+//     sources - or Foxglove, the drive UI, a shell - can clear it with one Trigger call while the
 //     operator is mid-sweep. This used to be OR-ed with the latch, which let exactly that
 //     through: SW E-Stop on, latch set, physical button released, calibration allowed.
 //   * sw_e_stop_latch_status - the PLC has actually acted on it.
