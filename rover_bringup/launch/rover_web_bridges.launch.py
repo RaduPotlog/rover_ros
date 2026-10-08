@@ -88,6 +88,8 @@ _NAMESPACED_UI_TOPICS = (
     "rc/channels",
     "rc/link",
     "rc/calibration/state",
+    # Follow-me card (rover_follow_me)
+    "follow_me/status",
 )
 FOXGLOVE_TOPIC_WHITELIST = (
     "["
@@ -144,6 +146,9 @@ _NAMESPACED_UI_SERVICES = (
     "led/set_animation",
     "led/stop_animation",
     "led/set_brightness",
+    # Follow-me card (rover_follow_me)
+    "follow_me/start",
+    "follow_me/stop",
 )
 FOXGLOVE_SERVICE_WHITELIST = (
     "["

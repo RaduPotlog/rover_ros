@@ -63,6 +63,7 @@ def test_topics_the_drive_ui_publishes_are_advertised(patterns, topic):
     '/rover/hardware_interface/safety_status', '/rover/rover_battery/battery_status',
     '/rover/mission_state', '/rover/drive_mode',
     '/rover/led/channel_1_preview', '/rover/rc/channels', '/rover/rc/calibration/state',
+    '/rover/follow_me/status',
 ])
 def test_topics_the_uis_subscribe_to_are_advertised(patterns, topic):
     assert _allowed(patterns, topic)
@@ -99,6 +100,7 @@ def test_internal_topics_stay_off_the_bridge(patterns, topic):
     '/rover/rc/calibration/start', '/rover/rc/calibration/apply',
     '/rover/rover_crsf_teleop_node/change_state', '/rover/rover_crsf_teleop_node/get_state',
     '/rover/led/set_animation', '/rover/led/stop_animation', '/rover/led/set_brightness',
+    '/rover/follow_me/start', '/rover/follow_me/stop',
     # Unnamespaced rover.
     '/save_map', '/led/set_brightness',
 ])
