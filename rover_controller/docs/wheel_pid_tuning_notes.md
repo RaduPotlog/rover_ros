@@ -32,6 +32,19 @@ session can pick up without re-deriving anything. Gains from this session are al
 > readout stops at the stop command and misses the coast; capture the odometry pose after the rover
 > has stopped (watchdog script) before dividing.
 
+> **Ground campaign at `motor_acceleration` 2.0, phases 4-5 (2026-10-09, battery 47 %).** *Top speed:* +-0.95 m/s
+> is reached within 0.5 % on all wheels (t50 0.67 s, output 1.00-1.01x the reference). *Spin breakaway*
+> (3.5 s holds, IMU sign-corrected): every rate turns closed loop, down to 0.3 rad/s (IMU 0.28-0.29, t50
+> 2.7-2.9 s, output 3.0x the reference); output / reference falls to 1.6x at 1.0 rad/s, i.e. a roughly
+> constant breakaway effort. IMU / command 0.58-1.02 between 0.45 and 1.0 rad/s. Per-wheel end errors show
+> a diagonal pattern (+ spins: fl / rr -27..-46 %, fr / rl ahead; - spins mostly fr / rl behind) - a
+> diagonal pair unloading (chassis rocking on the floor or mass distribution), not a gain issue. The
+> `rover_nav_params.yaml` note that the rover stalls below ~1.0 rad/s (2026-09-26) no longer holds.
+> *Skid-steer calibration* (`wheel_odom_calibration` spin, 7 s holds, +-0.6 / 1.0 / 1.5 rad/s, 0 rejected):
+> `wheel_separation_multiplier` 1.644 (segments 1.616-1.723) against the shipped 1.659 - within the spread
+> and the 2026-10-06/07 range, **kept**. With 7 s holds spins reach 90-96 % of the command. *Nav 2 limits*
+> (velocity smoother, MPPI ax / az, behaviour server rotational_acc_lim) all match 1.4 / 1.3: unchanged.
+
 > **Ground campaign at `motor_acceleration` 2.0, phases 2-3 (2026-10-09, battery 45-50 %, 3.5 s holds,
 > +-0.2..0.8 m/s and +-0.6 / +-1.0 rad/s, alternating directions).** *Gains:* two shipped baselines agree:
 > straights t50 0.36-0.62 s, t90 1.9-2.1 s, peak overshoot <= 5.6 % (worst wheel 9.3 %, only at 0.2 m/s),
