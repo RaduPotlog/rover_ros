@@ -32,6 +32,24 @@ session can pick up without re-deriving anything. Gains from this session are al
 > readout stops at the stop command and misses the coast; capture the odometry pose after the rover
 > has stopped (watchdog script) before dividing.
 
+> **Ground campaign at `motor_acceleration` 2.0, phases 2-3 (2026-10-09, battery 45-50 %, 3.5 s holds,
+> +-0.2..0.8 m/s and +-0.6 / +-1.0 rad/s, alternating directions).** *Gains:* two shipped baselines agree:
+> straights t50 0.36-0.62 s, t90 1.9-2.1 s, peak overshoot <= 5.6 % (worst wheel 9.3 %, only at 0.2 m/s),
+> end error <= 1.7 %. Open loop all four wheels match within ~1 % (DC gain 0.63 / 0.86 / 0.93 / 0.965 at
+> 0.2 / 0.4 / 0.6 / 0.8 m/s), so no per-wheel feed-forward change (`fr` 0.96 is not worse closed loop).
+> Spins +-0.6 rad/s: open loop the wheels do not move at all; closed loop output ~2.0x the reference,
+> stick-slip, single wheels +41 % / -59 %. `i_clamp` 3.0 (live): straights unchanged, spin +-0.6 end error
+> better (+0.1 / -6.8 %) but overshoot worse (median 10-16 %, worst 46 %), +-1.0 overshoot 6-9 %: rejected,
+> as on 2026-10-06; the spin output only needed ~1.9 of integral. **Shipped gains kept.**
+> *Acceleration limits* (relaxed to 20 / 40, wheel odometry + IMU, two runs): the response is lag-limited,
+> not acceleration-limited - the 10-90 % rise is ~1.3-1.4 s at every step while the peak (0.2 s window)
+> grows with step size (1.2 / 1.9 / 2.5 m/s^2 at 0.4 / 0.6 / 0.8 m/s; spins 1.1-1.5 rad/s^2 at 1.0, 2.7-3.3
+> at 1.5 rad/s). The tool's "recommended" limits come from the slowest 10-90 % average (~0.2 m/s^2) and do
+> not apply. **1.4 m/s^2 / 1.3 rad/s^2 kept.** Spins at 1.5 rad/s reach 1.39-1.45 rad/s and IMU yaw rate
+> matches wheel odometry within 5 % (separation multiplier holds); at 1.0 rad/s they reach only 0.75-0.94 and
+> IMU / wheel yaw rate scatters 0.76-1.18 (slip). The IMU `linear_acceleration.x` stayed ~0 +- 0.06 m/s^2
+> during every acceleration, so the straight-line slip check was inconclusive (axis / frame to check).
+
 > **In-place turns are slow to start (2026-10-09, ground, shipped gains, 3.5 s holds).** Operators report
 > that spinning from the joystick / RC is sluggish and then overshoots. Spin +-1.0 rad/s (wheel reference
 > 3.1 rad/s): the reference reaches 90 % in 0.71-0.76 s (the 1.3 rad/s^2 limit), the wheels reach 50 %

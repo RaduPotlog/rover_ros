@@ -123,8 +123,8 @@
   # Re-checked at motor_acceleration 2.0 (2026-10-09, ground, 3.5 s holds, 4 wheels, closed loop): this
   # model (0.40 / 0.12) holds - end-of-hold error <= 1.4 % on the straight steps, peak overshoot <= 3.4 %,
   # spins 5-10 % under. The candidate 0.14 / 0.35 from an open-loop fit was no better (slower t90, spins
-  # 14 % under and 6.7 % over), so the model is unchanged. The acceleration limits below were measured
-  # at 1.0 and are not yet re-measured at 2.0.
+  # 14 % under and 6.7 % over), so the model is unchanged. The gains and the acceleration limits below
+  # were re-checked at 2.0 the same day (ground, docs/wheel_pid_tuning_notes.md) and kept.
   pid_controller_rl_wheel_base_to_rl_wheel_joint:
     ros__parameters:
 
