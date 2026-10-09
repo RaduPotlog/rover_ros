@@ -32,6 +32,16 @@ session can pick up without re-deriving anything. Gains from this session are al
 > readout stops at the stop command and misses the coast; capture the odometry pose after the rover
 > has stopped (watchdog script) before dividing.
 
+> **Integral model re-check at `motor_acceleration` 2.0 (2026-10-09, ground).** Shipped gains, 3.5 s holds,
+> +-0.4 / +-0.6 m/s and +-1.0 rad/s, median of the four wheels: end-of-hold error -1.4 .. +1.2 % and peak
+> overshoot <= 3.4 % on the straight steps, spins 5.5 / 9.7 % under, t90 ~2.0-2.4 s. A 2 s hold (first
+> baseline) is shorter than the rise and shows a false -13 % "steady-state" error. Open loop (p=i=d=0,
+> ff 1.0) gave DC gains 0.86-1.02 on straight steps and 0.2-0.45 on spins (skid-steer friction); a
+> delay + first-order fit was poor (RMSE 0.14-0.40 rad/s, lag 0.24-0.54 s depending on step), so open-loop
+> delay/lag fits do not transfer to this model. The 0.14 / 0.35 candidate was worse closed loop (spins
+> 5.4 / 13.7 % under, one 6.7 % overshoot, slower t90). Model left at 0.40 / 0.12. The acceleration limits
+> are not re-measured yet.
+
 > **Acceleration limits (2026-10-06, ground).** Measured with limits relaxed to 20 / 40: the controller
 > ramp (16 rad/s^2) was not the bottleneck, the wheels were (sustained 10-90 % slope 1.5-11 rad/s^2, best
 > 10.2 at 0.75 m/s). Shipped `linear.x` 1.4 m/s^2, `angular.z` 1.3 rad/s^2 (were 2.7 / 3.74). The
