@@ -32,6 +32,19 @@ session can pick up without re-deriving anything. Gains from this session are al
 > readout stops at the stop command and misses the coast; capture the odometry pose after the rover
 > has stopped (watchdog script) before dividing.
 
+> **In-place turns are slow to start (2026-10-09, ground, shipped gains, 3.5 s holds).** Operators report
+> that spinning from the joystick / RC is sluggish and then overshoots. Spin +-1.0 rad/s (wheel reference
+> 3.1 rad/s): the reference reaches 90 % in 0.71-0.76 s (the 1.3 rad/s^2 limit), the wheels reach 50 %
+> only after 0.9-1.8 s and 90 % after 2.2-3.0 s (straight +0.6 m/s: 0.47-0.54 s / 1.9-2.0 s). Peak
+> controller output is 1.5-1.9x the reference on spins against 1.05-1.12x on straights, i.e. a spin
+> needs ~0.6x the reference of extra drive (skid scrub) that only the clamped integral (2.1) supplies, and
+> it only starts after the integral model's ~0.5 s hold-off. After release the wheels drop below 10 % in
+> 0.65-0.81 s and then kick back 0.12-0.31 rad/s (straights: 1.2 s, no kick). The acceleration limit is
+> not the bottleneck. **Rejected:** `i` 2.0 (all wheels, live): spin time-to-50 % unchanged (1.33-1.49 s),
+> spins oscillate (peak +21..+36 %, end -9..-21 %, worst at +-0.6 rad/s), straights 90 % in 1.6 s but
+> overshoot 6.5 %. Gains cannot fix this; it needs a turn feed-forward (design pending), not a faster or
+> larger integral.
+
 > **Integral model re-check at `motor_acceleration` 2.0 (2026-10-09, ground).** Shipped gains, 3.5 s holds,
 > +-0.4 / +-0.6 m/s and +-1.0 rad/s, median of the four wheels: end-of-hold error -1.4 .. +1.2 % and peak
 > overshoot <= 3.4 % on the straight steps, spins 5.5 / 9.7 % under, t90 ~2.0-2.4 s. A 2 s hold (first
