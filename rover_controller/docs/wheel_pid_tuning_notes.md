@@ -55,6 +55,27 @@ session can pick up without re-deriving anything. Gains from this session are al
 > wheels break loose. Starting value for the turn feed-forward: ~1.8 rad/s per wheel, signed by the
 > wheel's turn component, faded in with the angular share of the command (design pending).
 
+> **Turn feed-forward lane runs (2026-10-11, ground, battery 49-46 %, same 6 s schedule).** Implemented
+> as the `turn_feedforward` wheel-loop option (`72cee8a`): `turn_side * sign(w) * turn_feedforward`,
+> ramped in to 0.3 rad/s, scaled by the turn's share of the wheel speed, fed from
+> `rover_drive_controller/cmd_vel_out` (25 Hz confirmed during the runs, peak |w| 1.00). One run each,
+> set live on all four wheels, restored to 0 after. Median of 4 wheels:
+>
+> | | off (A) | 1.0 (B) | 1.8 (C) |
+> |---|---|---|---|
+> | +-0.6 rad/s overshoot | 10.4 / 14.8 % | 7.6 / 9.0 % | 8.5 / 5.5 % |
+> | +-0.6 rad/s rise | 2.07 / 2.06 s | 1.90 / 1.96 s | 1.08 / 1.52 s |
+> | +-0.6 rad/s settled error | -3.9 / -6.9 % | -0.6 / -2.0 % | -1.3 / -1.1 % |
+> | +-1.0 rad/s overshoot | 4.2 / 4.2 % | 4.6 / 4.6 % | 7.0 / 8.6 % |
+> | spin dead time | 0.37-0.47 s | 0.31-0.37 s | 0.29-0.33 s |
+> | worst single wheel (spins) | 19.3 % | 10.7 % | 10.5 % |
+>
+> Straights unchanged in all three (overshoot <= 3.9 %, one 6.6 % wheel in B; settled <= 0.6 %); A
+> reproduces the 2026-10-10 baseline, so the option is inert at 0. At 1.8 the end-of-spin output equals
+> reference + feed-forward (integral ~0), confirming the ~1.8 scrub offset, but +-1.0 rad/s spins
+> over-drive. **Shipped 1.0**: better at 0.6 rad/s, no change elsewhere. B vs C is within the ~4-point
+> spin variance; repeat both before moving towards 1.8 (or try 1.4).
+
 > **Ground campaign at `motor_acceleration` 2.0, phases 4-5 (2026-10-09, battery 47 %).** *Top speed:* +-0.95 m/s
 > is reached within 0.5 % on all wheels (t50 0.67 s, output 1.00-1.01x the reference). *Spin breakaway*
 > (3.5 s holds, IMU sign-corrected): every rate turns closed loop, down to 0.3 rad/s (IMU 0.28-0.29, t50

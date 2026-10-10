@@ -103,8 +103,12 @@
   #             of its 2.1 clamp before the wheels break loose. The body command comes from
   #             rover_drive_controller's ~/cmd_vel_out (publish_limited_velocity); a command older
   #             than turn_command_timeout (0.2 s) gives none. Never past u_clamp (full duty).
-  #             turn_track_width = wheel_separation * wheel_separation_multiplier. Shipped at 0.0
-  #             (off) until the lane test picks a value (start ~1.8).
+  #             turn_track_width = wheel_separation * wheel_separation_multiplier.
+  #             Lane runs 2026-10-11 (ground, 6 s holds, one run each at 0 / 1.0 / 1.8): 1.0 cut the
+  #             +-0.6 rad/s spin overshoot from 10-15 % to 8-9 % (worst wheel 19 -> 11 %), dead time
+  #             0.37-0.47 -> 0.31 s, settled error -4..-7 -> -1..-2 %, +-1.0 rad/s and straights
+  #             unchanged. 1.8 (~ the open-loop scrub) rose fastest at 0.6 rad/s (1.1-1.5 s vs 2.1 s)
+  #             but over-drove +-1.0 rad/s spins (4 -> 7-9 %); one run each, spins vary ~4 points.
   #
   # Ground tune 2026-10-02 (motor_acceleration 10.0, 26.6 V, wheel_step_response runs): dead time
   # 0.17-0.22 s. The old 0.25 / 0.15 s model (fitted at ramp 1-2) was now slower than the plant
@@ -151,8 +155,8 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
-      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
-      turn_feedforward: 0.0
+      # Turn feed-forward (1.0 from the 2026-10-11 lane runs; see the comment above).
+      turn_feedforward: 1.0
       turn_side: -1.0
       turn_feedforward_full_rate: 0.3
       turn_track_width: 1.0236
@@ -176,8 +180,8 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
-      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
-      turn_feedforward: 0.0
+      # Turn feed-forward (1.0 from the 2026-10-11 lane runs; see the comment above).
+      turn_feedforward: 1.0
       turn_side: 1.0
       turn_feedforward_full_rate: 0.3
       turn_track_width: 1.0236
@@ -201,8 +205,8 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
-      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
-      turn_feedforward: 0.0
+      # Turn feed-forward (1.0 from the 2026-10-11 lane runs; see the comment above).
+      turn_feedforward: 1.0
       turn_side: -1.0
       turn_feedforward_full_rate: 0.3
       turn_track_width: 1.0236
@@ -226,8 +230,8 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
-      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
-      turn_feedforward: 0.0
+      # Turn feed-forward (1.0 from the 2026-10-11 lane runs; see the comment above).
+      turn_feedforward: 1.0
       turn_side: 1.0
       turn_feedforward_full_rate: 0.3
       turn_track_width: 1.0236
