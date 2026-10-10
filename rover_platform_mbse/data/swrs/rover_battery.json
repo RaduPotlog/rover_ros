@@ -3,15 +3,15 @@
   "prefix": "BAT",
   "document": "ROVER-A1-ROVER_BATTERY-SWRS-V-001",
   "title": "rover_battery Software Requirements Specification",
-  "scope": "rover_battery decodes the Daly BMS telemetry that the ESP32 rover_led_bms_ble_controller forwards over UDP (392-byte payload, received by rover_udp_driver's UdpReceiverNode on 192.168.1.201:4444 in the same component container) and publishes the rover's battery state as sensor_msgs/BatteryState on rover_battery/battery_status and rover_msgs/ChargingStatus on rover_battery/charging_status, with a health classification from the BMS alarm bits, a data watchdog, and diagnostics. It is the battery input of rover_safety (battery E-Stop and shutdown policy, LED battery animations). State-of-charge thresholds live in the BMS configuration, not in this package.",
+  "scope": "rover_battery decodes the Daly BMS telemetry that the ESP32 rover_led_bms_ble_controller forwards over UDP (392-byte payload, received by rover_udp_driver's UdpReceiverNode on 192.168.1.201:4444 in the same component container) and publishes the rover's battery state as sensor_msgs/BatteryState on battery/battery_status and rover_msgs/ChargingStatus on battery/charging_status, with a health classification from the BMS alarm bits, a data watchdog, and diagnostics. It is the battery input of rover_safety (battery E-Stop and shutdown policy, LED battery animations). State-of-charge thresholds live in the BMS configuration, not in this package.",
   "requirements": [
     {
       "id": "SWR-BAT-001",
       "category": "Interface",
-      "text": "The rover_battery shall subscribe udp_msgs/UdpPacket on rover_battery_udp_data (depth 100), fed by the rover_udp_battery_receiver_node bound to ip 192.168.1.201, port 4444.",
+      "text": "The rover_battery shall subscribe udp_msgs/UdpPacket on battery_udp_data (depth 100), fed by the rover_udp_battery_receiver_node bound to ip 192.168.1.201, port 4444.",
       "rationale": "The ESP32 BMS bridge sends its telemetry as UDP datagrams; the receiver's udp_read is remapped to this topic.",
       "verification": "Inspection, Test",
-      "acceptance": "The launch-structure test finds the receiver and the battery node in one container with udp_read remapped to rover_battery_udp_data; the config has a section for each node.",
+      "acceptance": "The launch-structure test finds the receiver and the battery node in one container with udp_read remapped to battery_udp_data; the config has a section for each node.",
       "priority": "Must",
       "status": "As-Built",
       "parents": [
@@ -57,10 +57,10 @@
     {
       "id": "SWR-BAT-003",
       "category": "Interface",
-      "text": "The rover_battery shall publish sensor_msgs/BatteryState on rover_battery/battery_status (depth 5, reliable, volatile) once for every valid BMS frame received.",
+      "text": "The rover_battery shall publish sensor_msgs/BatteryState on battery/battery_status (depth 5, reliable, volatile) once for every valid BMS frame received.",
       "rationale": "Primary battery interface of the platform, consumed by rover_safety's battery policy and LED node.",
       "verification": "Test",
-      "acceptance": "Each valid packet injected on rover_battery_udp_data produces exactly one BatteryState message.",
+      "acceptance": "Each valid packet injected on battery_udp_data produces exactly one BatteryState message.",
       "priority": "Must",
       "status": "As-Built",
       "parents": [
@@ -155,7 +155,7 @@
     {
       "id": "SWR-BAT-007",
       "category": "Interface",
-      "text": "The rover_battery shall publish rover_msgs/ChargingStatus on rover_battery/charging_status (depth 5) with every battery state, with charging = (BMS status 1), current and current_battery = pack current, and charger_type WIRED while charging, UNKNOWN otherwise.",
+      "text": "The rover_battery shall publish rover_msgs/ChargingStatus on battery/charging_status (depth 5) with every battery state, with charging = (BMS status 1), current and current_battery = pack current, and charger_type WIRED while charging, UNKNOWN otherwise.",
       "rationale": "Separate charging indication for consumers that do not parse BatteryState.",
       "verification": "Test",
       "acceptance": "Unit test: status 1 -> charging=true, WIRED; other status -> charging=false, UNKNOWN.",
@@ -279,10 +279,10 @@
     {
       "id": "SWR-BAT-012",
       "category": "Performance",
-      "text": "The rover_battery shall publish rover_battery/battery_status at 1 Hz or faster regardless of the BMS packet timing, republishing the latest reading on a fixed-rate timer, and shall enter the watchdog state (SWR-BAT-008) when the latest reading is older than [TBD] s.",
+      "text": "The rover_battery shall publish battery/battery_status at 1 Hz or faster regardless of the BMS packet timing, republishing the latest reading on a fixed-rate timer, and shall enter the watchdog state (SWR-BAT-008) when the latest reading is older than [TBD] s.",
       "rationale": "SYS-SR-016 requires >= 1 Hz; today the topic is published only per UDP packet and the only periodic output is the watchdog state every 10000 ms, so the rate is not guaranteed by this package.",
       "verification": "Test",
-      "acceptance": "'ros2 topic hz rover_battery/battery_status' reports >= 1 Hz with the BMS bridge sending at its nominal rate and with it silent (then carrying the watchdog state).",
+      "acceptance": "'ros2 topic hz battery/battery_status' reports >= 1 Hz with the BMS bridge sending at its nominal rate and with it silent (then carrying the watchdog state).",
       "priority": "Must",
       "status": "Proposed",
       "parents": [

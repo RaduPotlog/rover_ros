@@ -8,7 +8,7 @@
     {
       "id": "SWR-SAF-001",
       "category": "Interface",
-      "text": "The rover_safety shall, in rover_safety_node, subscribe rover_battery/battery_status (sensor_msgs/BatteryState, KeepLast(1), reliable), hardware_interface/safety_command_echo (rover_msgs/SafetyCommandEcho, KeepLast(1), reliable, volatile), system_status (rover_msgs/SystemStatus, KeepLast(1), reliable) and hardware_interface/rover_driver_state (rover_msgs/RoverDriverState, depth 10), and act as a client of hardware_interface/sw_user_e_stop_set (std_srvs/Trigger).",
+      "text": "The rover_safety shall, in rover_safety_node, subscribe battery/battery_status (sensor_msgs/BatteryState, KeepLast(1), reliable), hardware_interface/safety_command_echo (rover_msgs/SafetyCommandEcho, KeepLast(1), reliable, volatile), system_status (rover_msgs/SystemStatus, KeepLast(1), reliable) and hardware_interface/driver_state (rover_msgs/RoverDriverState, depth 10), and act as a client of hardware_interface/sw_user_e_stop_set (std_srvs/Trigger).",
       "rationale": "Only the latest reading matters for the safety decision; QoS must be compatible with the volatile publishers.",
       "verification": "Inspection",
       "acceptance": "'ros2 node info rover_safety_node' lists exactly these subscriptions and the service client; QoS matches with their publishers (no incompatible-QoS events).",
@@ -267,7 +267,7 @@
     {
       "id": "SWR-SAF-012",
       "category": "Safety",
-      "text": "The rover_safety shall, in rover_safety_node, evaluate motor-driver temperature from hardware_interface/rover_driver_state and trip the software E-Stop above a driver temperature limit of [TBD] degC.",
+      "text": "The rover_safety shall, in rover_safety_node, evaluate motor-driver temperature from hardware_interface/driver_state and trip the software E-Stop above a driver temperature limit of [TBD] degC.",
       "rationale": "The driver-state subscription exists but its callback is a TODO; driver overheating is currently not supervised by software.",
       "verification": "Test",
       "acceptance": "A RoverDriverState with a driver temperature above the limit causes a sw_user_e_stop_set call within one tick.",
@@ -288,7 +288,7 @@
     {
       "id": "SWR-SAF-013",
       "category": "Interface",
-      "text": "The rover_safety shall, in rover_led_safety_node, subscribe rover_battery/battery_status (depth 10), hardware_interface/safety_status (KeepLast(1), reliable, volatile) and joy (sensor_msgs/Joy, depth 10), tick the RoverLedSafety tree at timer_frequency (10.0 Hz) once e_stop_state and battery_status have been received, and request animations via led/set_animation (rover_msgs/SetLedAnimation) only when the selected animation changes.",
+      "text": "The rover_safety shall, in rover_led_safety_node, subscribe battery/battery_status (depth 10), hardware_interface/safety_status (KeepLast(1), reliable, volatile) and joy (sensor_msgs/Joy, depth 10), tick the RoverLedSafety tree at timer_frequency (10.0 Hz) once e_stop_state and battery_status have been received, and request animations via led/set_animation (rover_msgs/SetLedAnimation) only when the selected animation changes.",
       "rationale": "LED state follows the safety inputs; deduplication avoids flooding rover_led.",
       "verification": "Test",
       "acceptance": "Integration test with a fake LED controller: each idle animation is requested once, then E_STOP once when the button is pressed.",

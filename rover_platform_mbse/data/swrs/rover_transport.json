@@ -76,7 +76,7 @@
         "rover_transport/rover_udp_driver/test/unit/test_udp_packet_conversions.cpp",
         "rover_crsf_teleop/test/e2e/test_teleop_launch.py"
       ],
-      "comments": "Rover use: rover_udp_battery_receiver_node on 192.168.1.201:4444, with udp_read remapped to rover_battery_udp_data, intra-process; rover_crsf_udp_receiver on 192.168.1.201:10111 with source_ip 192.168.1.1 (SWR-TRN-023), udp_read remapped to rc/raw_udp, intra-process in rover_crsf_container, hardware only. UdpPacket.address and src_port are filled with the local bound endpoint, not the datagram's sender (ros2_udp_packet_publisher.cpp:52-55; rover_udp_driver/README.md:23-24), so a consumer cannot filter on them. Zero-length datagrams are not published (inbound_byte_bridge.cpp:37-39)."
+      "comments": "Rover use: rover_udp_battery_receiver_node on 192.168.1.201:4444, with udp_read remapped to battery_udp_data, intra-process; rover_crsf_udp_receiver on 192.168.1.201:10111 with source_ip 192.168.1.1 (SWR-TRN-023), udp_read remapped to rc/raw_udp, intra-process in rover_crsf_container, hardware only. UdpPacket.address and src_port are filled with the local bound endpoint, not the datagram's sender (ros2_udp_packet_publisher.cpp:52-55; rover_udp_driver/README.md:23-24), so a consumer cannot filter on them. Zero-length datagrams are not published (inbound_byte_bridge.cpp:37-39)."
     },
     {
       "id": "SWR-TRN-007",

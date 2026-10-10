@@ -539,7 +539,7 @@
     {
       "id": "SWR-HWI-021",
       "category": "Diagnostics",
-      "text": "The rover_hardware_interface shall publish rover_msgs/RoverDriverState on hardware_interface/rover_driver_state at driver_states_update_frequency (20 Hz) with QoS reliable, volatile, KeepLast(5), reporting per driver current, temperature, fault flags, data time-outs and comm_error, where comm_error is set when no Phidget telemetry callback arrived within driver_comm_timeout_ms (300 ms).",
+      "text": "The rover_hardware_interface shall publish rover_msgs/RoverDriverState on hardware_interface/driver_state at driver_states_update_frequency (20 Hz) with QoS reliable, volatile, KeepLast(5), reporting per driver current, temperature, fault flags, data time-outs and comm_error, where comm_error is set when no Phidget telemetry callback arrived within driver_comm_timeout_ms (300 ms).",
       "rationale": "Drive-motor health for operators and rover_safety (SYS-SR-022).",
       "verification": "Test",
       "acceptance": "ros2 topic hz reads 20 Hz +/- 10 %; unplugging one DCC1000 USB sets that driver comm_error true within 300 ms plus one publish period.",
