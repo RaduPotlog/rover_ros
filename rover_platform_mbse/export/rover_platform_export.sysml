@@ -427,7 +427,7 @@
       requirement <'SWR-BRG-007'> 'Functional: The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set fro...' {
         doc /* The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set from the use_gps argument (default $ROVER_SYSTEM_USE_GPS, else false). */
       }
-      requirement <'SWR-BRG-008'> 'Parameter: The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), log_leve...' {
+      requirement <'SWR-BRG-008'> 'Parameter: The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), l...' {
         doc /* The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO) and common_dir_path (default empty) to every included launch file. */
       }
       requirement <'SWR-BRG-009'> 'Build: The rover_bringup shall declare run dependencies on rover_controller, rover_localizatio...' {
@@ -902,7 +902,7 @@
       requirement <'SWR-LOC-008'> 'Diagnostics: The rover_localization shall enable print_diagnostics on every EKF and remap all locali...' {
         doc /* The rover_localization shall enable print_diagnostics on every EKF and remap all localization nodes' /diagnostics to the namespaced diagnostics topic. */
       }
-      requirement <'SWR-LOC-009'> 'Functional: The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/y...' {
+      requirement <'SWR-LOC-009'> 'Functional: The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of t...' {
         doc /* The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/yes/on in any case and use_ekf is true, additionally start rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node and load the _with_gps configuration. */
       }
       requirement <'SWR-LOC-010'> 'Functional: The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with...' {
@@ -1384,7 +1384,7 @@
           satisfy $::RoverPlatform::SWRS_BRG::'Lifecycle: The rover_bringup shall start rover_battery, rover_led, rover_safety, rover_localizatio...';
           satisfy $::RoverPlatform::SWRS_BRG::'Safety: The rover_bringup shall start rover_safety in the second stage unless the launch argume...';
           satisfy $::RoverPlatform::SWRS_BRG::'Functional: The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set fro...';
-          satisfy $::RoverPlatform::SWRS_BRG::'Parameter: The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), log_leve...';
+          satisfy $::RoverPlatform::SWRS_BRG::'Parameter: The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), l...';
           satisfy $::RoverPlatform::SWRS_BRG::'Build: The rover_bringup shall declare run dependencies on rover_controller, rover_localizatio...';
           satisfy $::RoverPlatform::SWRS_BRG::'Build: The rover_bringup shall run on the ROS 2 distribution fixed in SYS-SR-020 with rmw_zeno...';
           satisfy $::RoverPlatform::SWRS_BRG::'Lifecycle: The rover_bringup shall be started automatically at power-up and bring the platform to ...';
@@ -1608,7 +1608,7 @@
           satisfy $::RoverPlatform::SWRS_LOC::'Interface: The rover_localization shall make rover_ekf_node the only broadcaster of the odom -> ba...';
           satisfy $::RoverPlatform::SWRS_LOC::'Interface: The rover_localization shall expose the robot_localization services of rover_ekf_node a...';
           satisfy $::RoverPlatform::SWRS_LOC::'Diagnostics: The rover_localization shall enable print_diagnostics on every EKF and remap all locali...';
-          satisfy $::RoverPlatform::SWRS_LOC::'Functional: The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/y...';
+          satisfy $::RoverPlatform::SWRS_LOC::'Functional: The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of t...';
           satisfy $::RoverPlatform::SWRS_LOC::'Functional: The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with...';
           satisfy $::RoverPlatform::SWRS_LOC::'Parameter: The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when...';
           satisfy $::RoverPlatform::SWRS_LOC::'Interface: The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s st...';
