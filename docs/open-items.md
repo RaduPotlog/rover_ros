@@ -15,7 +15,7 @@ source file first, then the manual page, then remove the item here.
 | Operating temperature range | Specification | SYS-SR-029 |
 | Ingress protection (IP) rating | Specification | SYS-SR-029 |
 | Dimension limit (L × W × H) | Specification | SYS-SR-026 |
-| Measured mass (scale) | Specification; the 54.35 kg is CAD | SYS-SR-001 |
+| Measured mass (scale) | Specification; the 58.67 kg is CAD | SYS-SR-001 |
 | Measured stopping distance from 1.0 m/s | [Safety](safety.md) | SYS-SR-014 |
 | Photos of the real rover | [Overview](index.md) gallery | |
 | Location of the hardware E-Stop and reset buttons on the chassis | Safety | SYS-SR-006 |

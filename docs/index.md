@@ -15,7 +15,7 @@ chain, IO and the ROS 2 software in the
 
 <div class="grid cards" markdown>
 
--   :material-weight-kilogram: **54 kg**
+-   :material-weight-kilogram: **59 kg**
 
     Mass with batteries (CAD), limit 60 kg
 

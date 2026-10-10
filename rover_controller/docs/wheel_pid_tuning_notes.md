@@ -32,6 +32,60 @@ session can pick up without re-deriving anything. Gains from this session are al
 > readout stops at the stop command and misses the coast; capture the odometry pose after the rover
 > has stopped (watchdog script) before dividing.
 
+> **Ground campaign at `motor_acceleration` 2.0, phases 4-5 (2026-10-09, battery 47 %).** *Top speed:* +-0.95 m/s
+> is reached within 0.5 % on all wheels (t50 0.67 s, output 1.00-1.01x the reference). *Spin breakaway*
+> (3.5 s holds, IMU sign-corrected): every rate turns closed loop, down to 0.3 rad/s (IMU 0.28-0.29, t50
+> 2.7-2.9 s, output 3.0x the reference); output / reference falls to 1.6x at 1.0 rad/s, i.e. a roughly
+> constant breakaway effort. IMU / command 0.58-1.02 between 0.45 and 1.0 rad/s. Per-wheel end errors show
+> a diagonal pattern (+ spins: fl / rr -27..-46 %, fr / rl ahead; - spins mostly fr / rl behind) - a
+> diagonal pair unloading (chassis rocking on the floor or mass distribution), not a gain issue. The
+> `rover_nav_params.yaml` note that the rover stalls below ~1.0 rad/s (2026-09-26) no longer holds.
+> *Skid-steer calibration* (`wheel_odom_calibration` spin, 7 s holds, +-0.6 / 1.0 / 1.5 rad/s, 0 rejected):
+> `wheel_separation_multiplier` 1.644 (segments 1.616-1.723) against the shipped 1.659 - within the spread
+> and the 2026-10-06/07 range, **kept**. With 7 s holds spins reach 90-96 % of the command. *Nav 2 limits*
+> (velocity smoother, MPPI ax / az, behaviour server rotational_acc_lim) all match 1.4 / 1.3: unchanged.
+
+> **Ground campaign at `motor_acceleration` 2.0, phases 2-3 (2026-10-09, battery 45-50 %, 3.5 s holds,
+> +-0.2..0.8 m/s and +-0.6 / +-1.0 rad/s, alternating directions).** *Gains:* two shipped baselines agree:
+> straights t50 0.36-0.62 s, t90 1.9-2.1 s, peak overshoot <= 5.6 % (worst wheel 9.3 %, only at 0.2 m/s),
+> end error <= 1.7 %. Open loop all four wheels match within ~1 % (DC gain 0.63 / 0.86 / 0.93 / 0.965 at
+> 0.2 / 0.4 / 0.6 / 0.8 m/s), so no per-wheel feed-forward change (`fr` 0.96 is not worse closed loop).
+> Spins +-0.6 rad/s: open loop the wheels do not move at all; closed loop output ~2.0x the reference,
+> stick-slip, single wheels +41 % / -59 %. `i_clamp` 3.0 (live): straights unchanged, spin +-0.6 end error
+> better (+0.1 / -6.8 %) but overshoot worse (median 10-16 %, worst 46 %), +-1.0 overshoot 6-9 %: rejected,
+> as on 2026-10-06; the spin output only needed ~1.9 of integral. **Shipped gains kept.**
+> *Acceleration limits* (relaxed to 20 / 40, wheel odometry + IMU, two runs): the response is lag-limited,
+> not acceleration-limited - the 10-90 % rise is ~1.3-1.4 s at every step while the peak (0.2 s window)
+> grows with step size (1.2 / 1.9 / 2.5 m/s^2 at 0.4 / 0.6 / 0.8 m/s; spins 1.1-1.5 rad/s^2 at 1.0, 2.7-3.3
+> at 1.5 rad/s). The tool's "recommended" limits come from the slowest 10-90 % average (~0.2 m/s^2) and do
+> not apply. **1.4 m/s^2 / 1.3 rad/s^2 kept.** Spins at 1.5 rad/s reach 1.39-1.45 rad/s and IMU yaw rate
+> matches wheel odometry within 5 % (separation multiplier holds); at 1.0 rad/s they reach only 0.75-0.94 and
+> IMU / wheel yaw rate scatters 0.76-1.18 (slip). The IMU `linear_acceleration.x` stayed ~0 +- 0.06 m/s^2
+> during every acceleration, so the straight-line slip check was inconclusive (axis / frame to check).
+
+> **In-place turns are slow to start (2026-10-09, ground, shipped gains, 3.5 s holds).** Operators report
+> that spinning from the joystick / RC is sluggish and then overshoots. Spin +-1.0 rad/s (wheel reference
+> 3.1 rad/s): the reference reaches 90 % in 0.71-0.76 s (the 1.3 rad/s^2 limit), the wheels reach 50 %
+> only after 0.9-1.8 s and 90 % after 2.2-3.0 s (straight +0.6 m/s: 0.47-0.54 s / 1.9-2.0 s). Peak
+> controller output is 1.5-1.9x the reference on spins against 1.05-1.12x on straights, i.e. a spin
+> needs ~0.6x the reference of extra drive (skid scrub) that only the clamped integral (2.1) supplies, and
+> it only starts after the integral model's ~0.5 s hold-off. After release the wheels drop below 10 % in
+> 0.65-0.81 s and then kick back 0.12-0.31 rad/s (straights: 1.2 s, no kick). The acceleration limit is
+> not the bottleneck. **Rejected:** `i` 2.0 (all wheels, live): spin time-to-50 % unchanged (1.33-1.49 s),
+> spins oscillate (peak +21..+36 %, end -9..-21 %, worst at +-0.6 rad/s), straights 90 % in 1.6 s but
+> overshoot 6.5 %. Gains cannot fix this; it needs a turn feed-forward (design pending), not a faster or
+> larger integral.
+
+> **Integral model re-check at `motor_acceleration` 2.0 (2026-10-09, ground).** Shipped gains, 3.5 s holds,
+> +-0.4 / +-0.6 m/s and +-1.0 rad/s, median of the four wheels: end-of-hold error -1.4 .. +1.2 % and peak
+> overshoot <= 3.4 % on the straight steps, spins 5.5 / 9.7 % under, t90 ~2.0-2.4 s. A 2 s hold (first
+> baseline) is shorter than the rise and shows a false -13 % "steady-state" error. Open loop (p=i=d=0,
+> ff 1.0) gave DC gains 0.86-1.02 on straight steps and 0.2-0.45 on spins (skid-steer friction); a
+> delay + first-order fit was poor (RMSE 0.14-0.40 rad/s, lag 0.24-0.54 s depending on step), so open-loop
+> delay/lag fits do not transfer to this model. The 0.14 / 0.35 candidate was worse closed loop (spins
+> 5.4 / 13.7 % under, one 6.7 % overshoot, slower t90). Model left at 0.40 / 0.12. The acceleration limits
+> are not re-measured yet.
+
 > **Acceleration limits (2026-10-06, ground).** Measured with limits relaxed to 20 / 40: the controller
 > ramp (16 rad/s^2) was not the bottleneck, the wheels were (sustained 10-90 % slope 1.5-11 rad/s^2, best
 > 10.2 at 0.75 m/s). Shipped `linear.x` 1.4 m/s^2, `angular.z` 1.3 rad/s^2 (were 2.7 / 3.74). The
