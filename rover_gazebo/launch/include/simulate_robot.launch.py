@@ -79,7 +79,7 @@ def generate_launch_description():
     publish_global_tf = LaunchConfiguration("publish_global_tf")
     declare_publish_global_tf_arg = DeclareLaunchArgument(
         "publish_global_tf",
-        default_value=EnvironmentVariable("ROVER_PLATFORM_GPS_MAP_TF", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_GPS_MAP_TF", default_value="false"),
         description="Let rover_ekf_global_node broadcast map -> odom (GPS fusion only).",
     )
 

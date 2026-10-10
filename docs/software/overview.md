@@ -192,7 +192,7 @@ export ROVER_ROS_BUILD_TYPE=hardware     # real rover
 | `ROVER_ROS_BUILD_TYPE` | `rover_metapackage`, `vcs import` | `hardware` builds `rover_bringup`; `simulation` builds `rover_gazebo`. |
 | `ROVER_SYSTEM_NAMESPACE` | all launch files | Default `namespace` argument. The rover uses `rover`. |
 | `ROVER_SYSTEM_USE_GPS` | `rover_bringup`, `rover_gazebo` | `true` adds GPS fusion (dual EKF). Default `false`. |
-| `ROVER_PLATFORM_GPS_MAP_TF` | `rover_localization`, `rover_gazebo` | `true` lets the global EKF broadcast `map → odom`. Default `false`. |
+| `ROVER_SYSTEM_GPS_MAP_TF` | `rover_localization`, `rover_gazebo` | `true` lets the global EKF broadcast `map → odom`. Default `false`. |
 | `RMW_IMPLEMENTATION` | all nodes | `rmw_zenoh_cpp` (set by the setup script). |
 | `ZENOH_CONFIG_OVERRIDE` | all nodes | Client mode to `tcp/<rover-ip>:7447` (set by the setup script). |
 

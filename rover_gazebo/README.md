@@ -63,7 +63,7 @@ rover's router would join the simulated nodes to the real rover.
 |----------|---------|-------------|
 | `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace of the robot's nodes and topics. |
 | `use_gps` | `$ROVER_SYSTEM_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF + navsat_transform). |
-| `publish_global_tf` | `$ROVER_PLATFORM_GPS_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
+| `publish_global_tf` | `$ROVER_SYSTEM_GPS_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
 | `use_rviz` | `True` | Start RViz (`simulation.launch.py`). |
 | `gz_gui` | `config/teleop.config` | Gazebo GUI layout; `{namespace}` in the file is replaced with `namespace`. |
 | `gz_headless_mode` | `False` | Run Gazebo server-only with headless rendering (`rover_world`). |

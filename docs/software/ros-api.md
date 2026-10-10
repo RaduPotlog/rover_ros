@@ -433,7 +433,7 @@ More: [rover_crsf_teleop README](https://github.com/RaduPotlog/rover_ros/blob/ma
 | sub | `odometry/wheels`, `imu/data` | as above | |
 | sub | `odometry/gps` | `nav_msgs/Odometry` | GPS position (X, Y) from navsat_transform. |
 | pub | `odometry/global` | `nav_msgs/Odometry` | Filtered pose in `rover/map`. |
-| pub | `/tf` | `tf2_msgs/TFMessage` | `rover/map` → `rover/odom`, only with `publish_global_tf:=true` (`ROVER_PLATFORM_GPS_MAP_TF`). |
+| pub | `/tf` | `tf2_msgs/TFMessage` | `rover/map` → `rover/odom`, only with `publish_global_tf:=true` (`ROVER_SYSTEM_GPS_MAP_TF`). |
 | srv | `localization/global/set_pose`, `localization/global/enable`, `localization/global/toggle` | `robot_localization` services | |
 
 ### `rover_navsat_transform_node` (GPS mode)

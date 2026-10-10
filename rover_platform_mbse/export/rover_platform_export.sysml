@@ -909,7 +909,7 @@
         doc /* The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with world_frame map, fusing the same wheel vx/vy and IMU yaw rate as rover_ekf_node plus X/Y only from odometry/gps, and publish its estimate on odometry/global. */
       }
       requirement <'SWR-LOC-011'> 'Parameter: The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when...' {
-        doc /* The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_PLATFORM_GPS_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf. */
+        doc /* The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_SYSTEM_GPS_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf. */
       }
       requirement <'SWR-LOC-012'> 'Interface: The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s st...' {
         doc /* The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s start delay, magnetic_declination_radians 0.0, yaw_offset 0.0 and zero_altitude true, subscribing gps/fix, gps/heading_imu and odometry/global and publishing odometry/gps and gps/filtered, with the datum service at localization/datum. */

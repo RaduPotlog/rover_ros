@@ -36,7 +36,7 @@
 #   ROVER_WS                  workspace root (default: found from this script, else
 #                             ~/ros2_ws/rover_a1)
 #   ROVER_SYSTEM_NAMESPACE    robot namespace (default: rover, as in docker-compose)
-#   ROVER_SYSTEM_USE_GPS, ROVER_PLATFORM_GPS_MAP_TF
+#   ROVER_SYSTEM_USE_GPS, ROVER_SYSTEM_GPS_MAP_TF
 #                             passed through to the simulation
 
 _rover_sim_is_sourced() { [ "${BASH_SOURCE[0]}" != "$0" ]; }

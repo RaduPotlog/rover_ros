@@ -94,7 +94,7 @@ Source: `rover_gazebo/scripts/rover_sim.sh`, `rover_scripts/README.md`.
 | `gz_gui` | `rover_gazebo/config/teleop.config` | Gazebo GUI layout; `{namespace}` in it is replaced. |
 | `log_level` | `INFO` | Logging level. |
 | `use_gps` | `$ROVER_SYSTEM_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF, navsat_transform, GPS heading). |
-| `publish_global_tf` | `$ROVER_PLATFORM_GPS_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
+| `publish_global_tf` | `$ROVER_SYSTEM_GPS_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
 | `x`, `y`, `z`, `roll`, `pitch`, `yaw` | `0.0`, `-2.0`, `0.2`, `0.0`, `0.0`, `0.0` | Spawn pose. |
 | `add_world_transform` | `False` | Publish a static `world` → `odom` at the spawn pose. |
 | `gz_bridge_config_path` | `rover_gazebo/config/gz_bridge.yaml` | Bridge configuration. |

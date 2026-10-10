@@ -205,10 +205,10 @@
     {
       "id": "SWR-LOC-011",
       "category": "Parameter",
-      "text": "The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_PLATFORM_GPS_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf.",
+      "text": "The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_SYSTEM_GPS_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf.",
       "rationale": "Only one node may own map -> odom; by default AMCL or SLAM owns it.",
       "verification": "Inspection, Demonstration",
-      "acceptance": "In GPS mode with the variable unset, tf2_monitor shows no map -> odom from rover_ekf_global_node while odometry/global is still published; with ROVER_PLATFORM_GPS_MAP_TF=true it does.",
+      "acceptance": "In GPS mode with the variable unset, tf2_monitor shows no map -> odom from rover_ekf_global_node while odometry/global is still published; with ROVER_SYSTEM_GPS_MAP_TF=true it does.",
       "priority": "Should",
       "status": "As-Built",
       "parents": ["SYS-SR-021"],
@@ -220,7 +220,7 @@
       ],
       "implementation": "Implemented",
       "verified_by": [],
-      "comments": "Nothing prevents AMCL/SLAM and ROVER_PLATFORM_GPS_MAP_TF=true running together; README only warns."
+      "comments": "Nothing prevents AMCL/SLAM and ROVER_SYSTEM_GPS_MAP_TF=true running together; README only warns."
     },
     {
       "id": "SWR-LOC-012",

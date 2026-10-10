@@ -81,12 +81,12 @@ def generate_launch_description():
         choices=["True", "true", "False", "false"],
     )
 
-    # Like fuse_gps, the default usually comes from a balena variable (ROVER_PLATFORM_GPS_MAP_TF),
+    # Like fuse_gps, the default usually comes from a balena variable (ROVER_SYSTEM_GPS_MAP_TF),
     # so any of true/1/yes/on (any case) counts as true; anything else, empty included, is false.
     publish_global_tf = LaunchConfiguration("publish_global_tf")
     declare_publish_global_tf_arg = DeclareLaunchArgument(
         "publish_global_tf",
-        default_value=EnvironmentVariable("ROVER_PLATFORM_GPS_MAP_TF", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_GPS_MAP_TF", default_value="false"),
         description=(
             "Let rover_ekf_global_node broadcast map -> odom (GPS fusion only). Off by default: "
             "SLAM or AMCL owns map -> odom; odometry/global is still published."
