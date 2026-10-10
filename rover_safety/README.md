@@ -81,7 +81,7 @@ ros2 run rover_safety shutdown_ros_controller.sh --reason "Maintenance"
 ros2 run rover_safety shutdown_ros_controller.sh --dry-run   # print what it would do
 ```
 
-It trips the E-Stop (`/$ROVER_NAMESPACE/hardware_interface/sw_user_e_stop_set`, skipped with
+It trips the E-Stop (`/$ROVER_SYSTEM_NAMESPACE/hardware_interface/sw_user_e_stop_set`, skipped with
 `--no-e-stop`; a failure does not stop the power-off). Then it uses the first power-off method that
 works:
 
@@ -204,7 +204,7 @@ periodic input is reported stale on diagnostics.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace of both nodes. |
+| `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace of both nodes. |
 | `use_sim` | `False` | Skip `rover_safety_node` in simulation. |
 | `log_level` | `INFO` | Logging level. |
 | `led_bt_project_path` | `behavior_trees/RoverLedSafetyBT.btproj` | LED safety tree project. |

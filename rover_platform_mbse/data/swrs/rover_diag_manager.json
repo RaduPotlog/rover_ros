@@ -183,7 +183,7 @@
     {
       "id": "SWR-DIAG-009",
       "category": "Interface",
-      "text": "The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover_diagnostic_aggregator that subscribes to the namespaced diagnostics topic and publishes diagnostics_agg and diagnostics_toplevel_state inside the launch namespace (ROVER_NAMESPACE).",
+      "text": "The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover_diagnostic_aggregator that subscribes to the namespaced diagnostics topic and publishes diagnostics_agg and diagnostics_toplevel_state inside the launch namespace (ROVER_SYSTEM_NAMESPACE).",
       "rationale": "The drive UI diagnostics page consumes diagnostics_agg; relative remaps keep multi-robot namespaces isolated.",
       "verification": "Inspection, Demonstration",
       "acceptance": "After `ros2 launch rover_diag_manager system_diag.launch.py`, `ros2 topic list` shows <ns>/diagnostics_agg and <ns>/diagnostics_toplevel_state published by rover_diagnostic_aggregator.",
@@ -256,7 +256,7 @@
     {
       "id": "SWR-DIAG-013",
       "category": "Parameter",
-      "text": "The rover_diag_manager launch file shall accept the arguments log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO), namespace (default $ROVER_NAMESPACE or empty), system_diag_config_path (default config/system_diag.yaml) and diagnostic_aggregator_config_path (default config/diagnostic_aggregator.yaml).",
+      "text": "The rover_diag_manager launch file shall accept the arguments log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO), namespace (default $ROVER_SYSTEM_NAMESPACE or empty), system_diag_config_path (default config/system_diag.yaml) and diagnostic_aggregator_config_path (default config/diagnostic_aggregator.yaml).",
       "rationale": "Allows per-deployment override of configuration without rebuilding.",
       "verification": "Inspection",
       "acceptance": "`ros2 launch rover_diag_manager system_diag.launch.py --show-args` lists the four arguments with these defaults.",

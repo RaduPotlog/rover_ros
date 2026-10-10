@@ -10,7 +10,7 @@ package only consumes `gps/fix`, so any GNSS receiver that publishes a reliable 
 works; `navsat_transform_node` needs it reliable too. A receiver with its own true heading (dual
 antenna) can skip this node and feed its heading to `navsat_transform_node` directly.
 
-`rover_localization` starts `rover_gps_heading_node` in GPS mode (`ROVER_USE_GPS=true`) and
+`rover_localization` starts `rover_gps_heading_node` in GPS mode (`ROVER_SYSTEM_USE_GPS=true`) and
 loads its parameters from `config/rel_localization_with_gps.yaml`.
 
 ## Interfaces (`rover_gps_heading_node`)

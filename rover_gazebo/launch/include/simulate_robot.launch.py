@@ -61,7 +61,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     declare_namespace_arg = DeclareLaunchArgument(
         "namespace",
-        default_value=EnvironmentVariable("ROVER_NAMESPACE", default_value=""),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_NAMESPACE", default_value=""),
         description="Add namespace to all launched nodes.",
     )
 
@@ -69,7 +69,7 @@ def generate_launch_description():
     use_gps = LaunchConfiguration("use_gps")
     declare_use_gps_arg = DeclareLaunchArgument(
         "use_gps",
-        default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_USE_GPS", default_value="false"),
         description=(
             "Fuse the simulated GNSS (gps/fix): starts rover_gps_heading_node, "
             "rover_navsat_transform_node and rover_ekf_global_node, as on the rover."
@@ -79,7 +79,7 @@ def generate_launch_description():
     publish_global_tf = LaunchConfiguration("publish_global_tf")
     declare_publish_global_tf_arg = DeclareLaunchArgument(
         "publish_global_tf",
-        default_value=EnvironmentVariable("ROVER_GPS_PUBLISH_MAP_TF", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_PLATFORM_GPS_MAP_TF", default_value="false"),
         description="Let rover_ekf_global_node broadcast map -> odom (GPS fusion only).",
     )
 

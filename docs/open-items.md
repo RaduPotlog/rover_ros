@@ -79,4 +79,4 @@ These come from reading the code while writing the manual. They are not document
   `rover_bringup/launch/rover_web_bridges.launch.py` leaves out, among them its joystick topic
   `teleop_foxglove_cmd_vel_stamped`. The whitelist is deliberate: the web joystick goes through
   `teleop_web_cmd_vel_stamped` and `rover_drive_mode`. The layout should follow, or those panels
-  stay empty unless `ROVER_FOXGLOVE_TOPIC_WHITELIST` is opened.
+  stay empty unless `ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST` is opened.

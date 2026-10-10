@@ -21,7 +21,7 @@
     <xacro:if value="${use_sim}">
       <xacro:property name="imu_xyz" value="-0.09 0.0 0.2" />
       <xacro:property name="imu_rpy" value="0.0 0.0 0.0" />
-      <!-- Keep the ROVER_LIDAR_* mount when one is set; with the all-zero default the
+      <!-- Keep the ROVER_SYSTEM_MOUNT_LIDAR_* mount when one is set; with the all-zero default the
            gpu_lidar would sit inside the body mesh, so lift it above. Its lowest ring
            (-15 deg) must clear the far corner of the front arch's top (z = 0.555 at
            x 0.251, y +/-0.253, 0.356 m out), which needs >= 0.555 + 0.356 * tan(15 deg)
@@ -34,7 +34,7 @@
       <!-- Likewise the Gazebo camera (use_camera only, so other simulations keep camera_link
            where it was): the assumed real mount (0.25 0 0.2, rover_load_urdf) is inside the body
            mesh (x up to 0.413, top z = 0.30), where it would see only the body. Keep a
-           ROVER_CAMERA_* mount when one is set, else put it just ahead of the front face, above
+           ROVER_SYSTEM_MOUNT_CAMERA_* mount when one is set, else put it just ahead of the front face, above
            the body top. -->
       <xacro:if value="${use_camera and [float(v) for v in str(camera_xyz).split()] == [0.25, 0.0, 0.2]}">
         <xacro:property name="camera_xyz" value="0.43 0.0 0.32" />
@@ -337,7 +337,7 @@
     <xacro:lidar.lidar use_sim="${use_sim}" reference_frame="lidar_link" namespace="${namespace}" />
     <!-- Instantiate GPS -->
     <xacro:gps.gps use_sim="${use_sim}" reference_frame="gps_link" namespace="${namespace}" />
-    <!-- Instantiate the depth camera (Gazebo only, and only with ROVER_USE_CAMERA) -->
+    <!-- Instantiate the depth camera (Gazebo only, and only with ROVER_SYSTEM_USE_CAMERA) -->
     <xacro:depth_camera.depth_camera
       use_sim="${use_sim and use_camera}" reference_frame="camera_link" namespace="${namespace}" />
 

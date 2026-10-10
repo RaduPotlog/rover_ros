@@ -33,7 +33,7 @@ Mechatronics Academy's Rover A1 ROS2.
 **Localization**
 
 - [`rover_localization`](rover_localization/README.md) - `robot_localization` EKFs fusing
-  wheel odometry and IMU, optionally GPS (`ROVER_USE_GPS`).
+  wheel odometry and IMU, optionally GPS (`ROVER_SYSTEM_USE_GPS`).
 - [`rover_gps_heading`](rover_gps_heading/README.md) - ENU heading from GNSS course for
   `navsat_transform_node`.
 
@@ -95,7 +95,7 @@ Or by hand:
 
 ```bash
 export ROS_DISTRO=lyrical
-export ROVER_NAMESPACE=rover
+export ROVER_SYSTEM_NAMESPACE=rover
 ```
 
 #### Real rover:

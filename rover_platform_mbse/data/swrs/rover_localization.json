@@ -3,7 +3,7 @@
   "prefix": "LOC",
   "document": "ROVER-A1-ROVER_LOCALIZATION-SWRS-V-001",
   "title": "rover_localization Software Requirements Specification",
-  "scope": "rover_localization is a configuration-and-launch package (no own source code) that runs robot_localization filters for the rover. In the default mode it starts rover_ekf_node, which fuses wheel-odometry body velocities and IMU yaw rate into the continuous odom -> base_footprint estimate. With GPS fusion enabled (ROVER_USE_GPS) it also starts rover_ekf_global_node (map-frame filter adding GPS X/Y), rover_navsat_transform_node and rover_gps_heading_node (package rover_gps_heading). The GPS driver itself belongs to the sensor payload (rover_sensors, outside this boundary).",
+  "scope": "rover_localization is a configuration-and-launch package (no own source code) that runs robot_localization filters for the rover. In the default mode it starts rover_ekf_node, which fuses wheel-odometry body velocities and IMU yaw rate into the continuous odom -> base_footprint estimate. With GPS fusion enabled (ROVER_SYSTEM_USE_GPS) it also starts rover_ekf_global_node (map-frame filter adding GPS X/Y), rover_navsat_transform_node and rover_gps_heading_node (package rover_gps_heading). The GPS driver itself belongs to the sensor payload (rover_sensors, outside this boundary).",
   "requirements": [
     {
       "id": "SWR-LOC-001",
@@ -162,10 +162,10 @@
     {
       "id": "SWR-LOC-009",
       "category": "Functional",
-      "text": "The rover_localization shall, when fuse_gps (default $ROVER_USE_GPS) is one of true/1/yes/on in any case and use_ekf is true, additionally start rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node and load the _with_gps configuration.",
+      "text": "The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/yes/on in any case and use_ekf is true, additionally start rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node and load the _with_gps configuration.",
       "rationale": "Optional absolute positioning for outdoor operation without changing the continuous odom frame.",
       "verification": "Demonstration",
-      "acceptance": "With ROVER_USE_GPS=true and use_ekf:=True, `ros2 node list` contains the three additional nodes; with ROVER_USE_GPS unset only rover_ekf_node runs.",
+      "acceptance": "With ROVER_SYSTEM_USE_GPS=true and use_ekf:=True, `ros2 node list` contains the three additional nodes; with ROVER_SYSTEM_USE_GPS unset only rover_ekf_node runs.",
       "priority": "Should",
       "status": "As-Built",
       "parents": ["SYS-SR-021"],
@@ -205,10 +205,10 @@
     {
       "id": "SWR-LOC-011",
       "category": "Parameter",
-      "text": "The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_GPS_PUBLISH_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf.",
+      "text": "The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_PLATFORM_GPS_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf.",
       "rationale": "Only one node may own map -> odom; by default AMCL or SLAM owns it.",
       "verification": "Inspection, Demonstration",
-      "acceptance": "In GPS mode with the variable unset, tf2_monitor shows no map -> odom from rover_ekf_global_node while odometry/global is still published; with ROVER_GPS_PUBLISH_MAP_TF=true it does.",
+      "acceptance": "In GPS mode with the variable unset, tf2_monitor shows no map -> odom from rover_ekf_global_node while odometry/global is still published; with ROVER_PLATFORM_GPS_MAP_TF=true it does.",
       "priority": "Should",
       "status": "As-Built",
       "parents": ["SYS-SR-021"],
@@ -220,7 +220,7 @@
       ],
       "implementation": "Implemented",
       "verified_by": [],
-      "comments": "Nothing prevents AMCL/SLAM and ROVER_GPS_PUBLISH_MAP_TF=true running together; README only warns."
+      "comments": "Nothing prevents AMCL/SLAM and ROVER_PLATFORM_GPS_MAP_TF=true running together; README only warns."
     },
     {
       "id": "SWR-LOC-012",
@@ -263,7 +263,7 @@
     {
       "id": "SWR-LOC-014",
       "category": "Parameter",
-      "text": "The rover_localization launch file shall accept the arguments use_ekf (default False), fuse_gps, publish_global_tf, namespace (default $ROVER_NAMESPACE), localization_mode (rel|enu, default rel), localization_config_path, common_dir_path (default empty), use_sim (default False, sets use_sim_time) and log_level (default INFO).",
+      "text": "The rover_localization launch file shall accept the arguments use_ekf (default False), fuse_gps, publish_global_tf, namespace (default $ROVER_SYSTEM_NAMESPACE), localization_mode (rel|enu, default rel), localization_config_path, common_dir_path (default empty), use_sim (default False, sets use_sim_time) and log_level (default INFO).",
       "rationale": "Single entry point used by rover_bringup and rover_gazebo.",
       "verification": "Inspection",
       "acceptance": "`ros2 launch rover_localization rover_localization.launch.py --show-args` lists these arguments with these defaults.",

@@ -79,18 +79,19 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     declare_namespace_arg = DeclareLaunchArgument(
         "namespace",
-        default_value=EnvironmentVariable("ROVER_NAMESPACE", default_value=""),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_NAMESPACE", default_value=""),
         description="Add namespace to all launched nodes.",
     )
 
-    # ROVER_USE_GPS (balenaCloud variable, normalized to true/false by the platform start.sh)
+    # ROVER_SYSTEM_USE_GPS (balenaCloud variable, normalized to true/false by the platform
+    # start.sh)
     # selects the localization: false = wheels + IMU; true = wheels + IMU + GPS (dual EKF).
     # The GPS and lidar drivers are not started here: they are the sensor payload
     # (rover_sensors repo, rover-a1-sensors container) and only publish gps/fix, scan, ...
     use_gps = LaunchConfiguration("use_gps")
     declare_use_gps_arg = DeclareLaunchArgument(
         "use_gps",
-        default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_USE_GPS", default_value="false"),
         description="Fuse the RUTX11 GPS into localization (true/false).",
     )
 

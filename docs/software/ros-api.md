@@ -5,7 +5,7 @@ one node or component. The names here were checked against the launch files, con
 sources in `rover_ros`.
 
 !!! note "Namespace"
-    Every platform node runs in the robot namespace, `rover` by default (`ROVER_NAMESPACE`). Names
+    Every platform node runs in the robot namespace, `rover` by default (`ROVER_SYSTEM_NAMESPACE`). Names
     in the tables are relative to it: `cmd_vel` is `/rover/cmd_vel`. TF frames carry the same
     prefix (`rover/base_link`). The exceptions are `/tf`, `/tf_static`, `/clock` and the web
     bridges, which are not namespaced.
@@ -405,7 +405,7 @@ More: [rover_crsf_teleop README](https://github.com/RaduPotlog/rover_ros/blob/ma
 ## Localization (`rover_localization`)
 
 `robot_localization` EKFs at 50 Hz in 2D mode. Without GPS only `rover_ekf_node` runs. With
-`use_gps:=true` (`ROVER_USE_GPS=true`) the other three nodes start too.
+`use_gps:=true` (`ROVER_SYSTEM_USE_GPS=true`) the other three nodes start too.
 
 ### `rover_ekf_node`
 
@@ -425,7 +425,7 @@ More: [rover_crsf_teleop README](https://github.com/RaduPotlog/rover_ros/blob/ma
 | sub | `odometry/wheels`, `imu/data` | as above | |
 | sub | `odometry/gps` | `nav_msgs/Odometry` | GPS position (X, Y) from navsat_transform. |
 | pub | `odometry/global` | `nav_msgs/Odometry` | Filtered pose in `rover/map`. |
-| pub | `/tf` | `tf2_msgs/TFMessage` | `rover/map` → `rover/odom`, only with `publish_global_tf:=true` (`ROVER_GPS_PUBLISH_MAP_TF`). |
+| pub | `/tf` | `tf2_msgs/TFMessage` | `rover/map` → `rover/odom`, only with `publish_global_tf:=true` (`ROVER_PLATFORM_GPS_MAP_TF`). |
 | srv | `localization/global/set_pose`, `localization/global/enable`, `localization/global/toggle` | `robot_localization` services | |
 
 ### `rover_navsat_transform_node` (GPS mode)
@@ -510,8 +510,8 @@ The Foxglove bridge allow-lists `/tf`, `/tf_static` and these namespaced topics,
 `rover_battery/charging_status`, `diagnostics_agg`, `led/animations`, `led/state`,
 `led/brightness`, `led/channel_<n>_preview`, `rc/channels`, `rc/link`, `rc/calibration/state`.
 Allow-listed services include the E-Stop and aux-output services, `led/set_animation`,
-`led/stop_animation`, `led/set_brightness` and `rc/calibration/*`. Set `ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']"` or
-`ROVER_FOXGLOVE_SERVICE_WHITELIST="['.*']"` to open it up for debugging.
+`led/stop_animation`, `led/set_brightness` and `rc/calibration/*`. Set `ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST="['.*']"` or
+`ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST="['.*']"` to open it up for debugging.
 
 Source: `rover_bringup/launch/rover_web_bridges.launch.py`, `rover_bringup/README.md` (port 8765).
 
@@ -561,7 +561,7 @@ More: [rover_msgs README](https://github.com/RaduPotlog/rover_ros/blob/master/ro
 | Package | Launch file | Key arguments |
 |---------|-------------|---------------|
 | `rover_bringup` | `rover_bringup.launch.py` | `namespace`, `log_level`, `use_gps`, `common_dir_path`, `disable_manager`, `exit_on_wrong_hw`, `controllers_ready_timeout` |
-| `rover_bringup` | `rover_web_bridges.launch.py` | none (environment `ROVER_FOXGLOVE_*_WHITELIST`) |
+| `rover_bringup` | `rover_web_bridges.launch.py` | none (environment `ROVER_PLATFORM_FOXGLOVE_*_WHITELIST`) |
 | `rover_controller` | `rover_controller.launch.py` | `namespace`, `use_sim`, `robot_model`, `wheel_type`, `controller_config_path`, `extra_controller_config_path`, `common_dir_path`, `log_level` (default `DEBUG`) |
 | `rover_description` | `rover_load_urdf.launch.py` | `controller_config_path` (required), `namespace`, `robot_model`, `use_sim`, `wheel_type`, `wheel_config_path`, `publish_robot_state` |
 | `rover_description` | `rover_rviz.launch.py` | `rviz_config`, `namespace`, `use_sim` |
@@ -596,8 +596,8 @@ flowchart TB
 ```
 
 `base_footprint` is the root of the URDF, on the ground plane. `base_link` coincides with
-`body_link`. The IMU, lidar and GNSS mount poses come from the `ROVER_IMU_*`, `ROVER_LIDAR_*` and
-`ROVER_GPS_*` environment variables. The IMU default is `-0.09 0.0 0.2` m with roll `3.14159`
+`body_link`. The IMU, lidar and GNSS mount poses come from the `ROVER_SYSTEM_MOUNT_IMU_*`, `ROVER_SYSTEM_MOUNT_LIDAR_*` and
+`ROVER_SYSTEM_MOUNT_GPS_*` environment variables. The IMU default is `-0.09 0.0 0.2` m with roll `3.14159`
 rad; lidar and GNSS default to the `body_link` origin. In simulation an optional static
 `world` → `rover/odom` transform is added (`add_world_transform:=True`).
 

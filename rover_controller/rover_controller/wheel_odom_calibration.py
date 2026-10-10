@@ -57,8 +57,8 @@ class WheelOdomCalibration(DriveSession):
         self.declare_parameter('wheel_radius', 0.1651)
         self.declare_parameter('wheel_separation', 0.617)
         # imu/data is in imu_link, which rover_description mounts upside down (roll pi,
-        # ROVER_IMU_ORIENTATION_R), so its z rate is minus the body yaw rate. With +1 every spin
-        # segment came out non-physical and was rejected (rover, 2026-09-29).
+        # ROVER_SYSTEM_MOUNT_IMU_ROLL), so its z rate is minus the body yaw rate. With +1 every
+        # spin segment came out non-physical and was rejected (rover, 2026-09-29).
         self.declare_parameter('imu_yaw_sign', -1.0)
         self.wheels = []   # (t, left rim m/s, right rim m/s)
         self.gyro = []     # (t, yaw rate)

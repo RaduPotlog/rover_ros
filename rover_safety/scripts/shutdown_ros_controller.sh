@@ -30,7 +30,7 @@ readonly BALENA_HOST_DBUS_SOCKET="/host/run/dbus/system_bus_socket"
 readonly UNAVAILABLE=100
 
 reason="${ROVER_SHUTDOWN_REASON:-Manual shutdown request}"
-namespace="${ROVER_NAMESPACE:-}"
+namespace="${ROVER_SYSTEM_NAMESPACE:-}"
 trip_e_stop=true
 dry_run=false
 
@@ -45,7 +45,7 @@ Trips the rover E-Stop, then powers off this computer with the first available m
 
 Options:
   --reason TEXT      Reason written to the log (default: \$ROVER_SHUTDOWN_REASON or "Manual shutdown request").
-  --namespace NS     ROS namespace of the E-Stop service (default: \$ROVER_NAMESPACE).
+  --namespace NS     ROS namespace of the E-Stop service (default: \$ROVER_SYSTEM_NAMESPACE).
   --no-e-stop        Do not call ${E_STOP_SERVICE}.
   --dry-run          Print what would be done without doing it.
   -h, --help         Show this help.

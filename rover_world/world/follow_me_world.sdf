@@ -3,7 +3,7 @@
 <!-- follow_me_world: rover_world.sdf (copied, unchanged) plus a walking person for follow-me
      (rover_perception's fmoc + rover_orchestrator's rover_follow_me). Keeps the world name, so
      rover_gazebo's bridges work as with rover_world.
-     ROVER_USE_CAMERA=true ros2 launch rover_gazebo simulation.launch.py gz_world:=<this file> -->
+     ROVER_SYSTEM_USE_CAMERA=true ros2 launch rover_gazebo simulation.launch.py gz_world:=<this file> -->
 
 <sdf version="1.6">
   <world name="rover_world">

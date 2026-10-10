@@ -13,9 +13,9 @@ package does, and how to build and start it.
 | Middleware (RMW) | `rmw_zenoh_cpp`, ROS domain `0` |
 | Zenoh router | Runs in its own container, `rover-a1-zenoh-router`, on TCP port `7447` |
 | Platform container | `rover-a1-platform`. Its image is built from `rover_docker/rovera1_app` (separate repository) |
-| Device management | balenaCloud. Device variables such as `ROVER_USE_GPS` reach the launch files as environment variables; the container's `start.sh` normalizes them |
+| Device management | balenaCloud. Device variables such as `ROVER_SYSTEM_USE_GPS` reach the launch files as environment variables; the container's `start.sh` normalizes them |
 | Rover LAN address | `192.168.1.201` (default target of the PC setup script) |
-| Robot namespace | `rover` (`ROVER_NAMESPACE`) |
+| Robot namespace | `rover` (`ROVER_SYSTEM_NAMESPACE`) |
 | Controller computer (CPU, OS) | **TBD** |
 
 Source: `README.md`, `rover_scripts/setup_rover_pc.sh`, `rover_scripts/README.md`,
@@ -181,7 +181,7 @@ Or set the variables by hand:
 
 ```bash
 export ROS_DISTRO=lyrical
-export ROVER_NAMESPACE=rover
+export ROVER_SYSTEM_NAMESPACE=rover
 export ROVER_ROS_BUILD_TYPE=hardware     # real rover
 # export ROVER_ROS_BUILD_TYPE=simulation # Gazebo
 ```
@@ -190,9 +190,9 @@ export ROVER_ROS_BUILD_TYPE=hardware     # real rover
 |----------|---------|--------|
 | `ROS_DISTRO` | build | ROS 2 distribution (`lyrical`). |
 | `ROVER_ROS_BUILD_TYPE` | `rover_metapackage`, `vcs import` | `hardware` builds `rover_bringup`; `simulation` builds `rover_gazebo`. |
-| `ROVER_NAMESPACE` | all launch files | Default `namespace` argument. The rover uses `rover`. |
-| `ROVER_USE_GPS` | `rover_bringup`, `rover_gazebo` | `true` adds GPS fusion (dual EKF). Default `false`. |
-| `ROVER_GPS_PUBLISH_MAP_TF` | `rover_localization`, `rover_gazebo` | `true` lets the global EKF broadcast `map → odom`. Default `false`. |
+| `ROVER_SYSTEM_NAMESPACE` | all launch files | Default `namespace` argument. The rover uses `rover`. |
+| `ROVER_SYSTEM_USE_GPS` | `rover_bringup`, `rover_gazebo` | `true` adds GPS fusion (dual EKF). Default `false`. |
+| `ROVER_PLATFORM_GPS_MAP_TF` | `rover_localization`, `rover_gazebo` | `true` lets the global EKF broadcast `map → odom`. Default `false`. |
 | `RMW_IMPLEMENTATION` | all nodes | `rmw_zenoh_cpp` (set by the setup script). |
 | `ZENOH_CONFIG_OVERRIDE` | all nodes | Client mode to `tcp/<rover-ip>:7447` (set by the setup script). |
 
@@ -265,9 +265,9 @@ Source: `README.md`.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace of every node. |
+| `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace of every node. |
 | `log_level` | `INFO` | `DEBUG`, `INFO`, `WARN`, `ERROR` or `FATAL`, passed to every package. |
-| `use_gps` | `$ROVER_USE_GPS`, else `false` | `true`: wheels + IMU + GPS (dual EKF). `false`: wheels + IMU. |
+| `use_gps` | `$ROVER_SYSTEM_USE_GPS`, else `false` | `true`: wheels + IMU + GPS (dual EKF). `false`: wheels + IMU. |
 | `common_dir_path` | empty | Directory with per-package config overrides (`<dir>/<package>/config/...`). |
 | `disable_manager` | `False` | `True` skips `rover_safety`. |
 | `exit_on_wrong_hw` | `false` | Exit instead of idling when `ROBOT_HW_CONFIG_CORRECT` is not `true`. |

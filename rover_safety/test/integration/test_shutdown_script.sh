@@ -80,7 +80,7 @@ run_script --reason
 
 # Default: trips the namespaced E-Stop, then D-Bus power-off
 reset_stubs
-EXTRA_ENV="ROVER_NAMESPACE=/rover/" run_script --reason "unit test"
+EXTRA_ENV="ROVER_SYSTEM_NAMESPACE=/rover/" run_script --reason "unit test"
 [ "${rc}" -eq 0 ] || fail "default run exit code ${rc}: ${output}"
 grep -q "^ros2 service call /rover/hardware_interface/sw_user_e_stop_set std_srvs/srv/Trigger" "${CALLS}" \
   || fail "E-Stop not called on the namespaced service: $(cat "${CALLS}")"

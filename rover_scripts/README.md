@@ -8,7 +8,7 @@ colcon ignores it.
 Writes the **rover-pc setup** block into `~/.bashrc`. The block sets up:
 - ROS 2 (`/opt/ros/<distro>/setup.bash`);
 - the rover_a1 workspace overlay (sourced only once it is built);
-- `ROVER_ROS_BUILD_TYPE` and `ROVER_NAMESPACE`;
+- `ROVER_ROS_BUILD_TYPE` and `ROVER_SYSTEM_NAMESPACE`;
 - the Zenoh settings that put this PC on the rover's ROS graph;
 - `~/.local/bin` and `~/balena/bin` on PATH, and `QT_QPA_PLATFORM=xcb`.
 

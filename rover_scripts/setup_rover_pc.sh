@@ -57,7 +57,7 @@ Writes the "rover-pc setup" block into ~/.bashrc (replacing an existing one in p
 
   --workspace PATH     rover_a1 colcon workspace       (default: $DEFAULT_WS)
   --rover-ip IP        rover LAN address (Zenoh router) (default: $ROVER_IP)
-  --namespace NAME     ROVER_NAMESPACE                  (default: $NAMESPACE)
+  --namespace NAME     ROVER_SYSTEM_NAMESPACE           (default: $NAMESPACE)
   --distro NAME        ROS 2 distro under /opt/ros      (default: $DISTRO)
   --build-type TYPE    hardware | simulation            (default: $BUILD_TYPE)
   --domain-id N        ROS_DOMAIN_ID                    (default: $DOMAIN_ID)
@@ -109,7 +109,7 @@ $START_MARKER
 source /opt/ros/$DISTRO/setup.bash
 [ -f $WORKSPACE/install/setup.bash ] && source $WORKSPACE/install/setup.bash
 export ROVER_ROS_BUILD_TYPE=$BUILD_TYPE
-export ROVER_NAMESPACE=$NAMESPACE
+export ROVER_SYSTEM_NAMESPACE=$NAMESPACE
 
 # Rover A1 ROS 2 graph: Zenoh RMW, domain $DOMAIN_ID (the rover uses the default, 0).
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp

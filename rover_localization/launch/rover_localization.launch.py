@@ -30,12 +30,12 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     
-    # Not restricted with `choices`: the value usually comes straight from the ROVER_USE_GPS
+    # Not restricted with `choices`: the value usually comes straight from the ROVER_SYSTEM_USE_GPS
     # balena variable, so any of true/1/yes/on (any case) enables GPS fusion.
     fuse_gps = LaunchConfiguration("fuse_gps")
     declare_fuse_gps_arg = DeclareLaunchArgument(
         "fuse_gps",
-        default_value=EnvironmentVariable("ROVER_USE_GPS", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_USE_GPS", default_value="false"),
         description=(
             "Fuse GPS: adds rover_gps_heading_node, rover_ekf_global_node (map -> odom) and "
             "rover_navsat_transform_node, and loads the _with_gps config. The GPS driver "
@@ -69,7 +69,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     declare_namespace_arg = DeclareLaunchArgument(
         "namespace",
-        default_value=EnvironmentVariable("ROVER_NAMESPACE", default_value=""),
+        default_value=EnvironmentVariable("ROVER_SYSTEM_NAMESPACE", default_value=""),
         description="Add namespace to all launched nodes.",
     )
 
@@ -81,12 +81,12 @@ def generate_launch_description():
         choices=["True", "true", "False", "false"],
     )
 
-    # Like fuse_gps, the default usually comes from a balena variable (ROVER_GPS_PUBLISH_MAP_TF),
+    # Like fuse_gps, the default usually comes from a balena variable (ROVER_PLATFORM_GPS_MAP_TF),
     # so any of true/1/yes/on (any case) counts as true; anything else, empty included, is false.
     publish_global_tf = LaunchConfiguration("publish_global_tf")
     declare_publish_global_tf_arg = DeclareLaunchArgument(
         "publish_global_tf",
-        default_value=EnvironmentVariable("ROVER_GPS_PUBLISH_MAP_TF", default_value="false"),
+        default_value=EnvironmentVariable("ROVER_PLATFORM_GPS_MAP_TF", default_value="false"),
         description=(
             "Let rover_ekf_global_node broadcast map -> odom (GPS fusion only). Off by default: "
             "SLAM or AMCL owns map -> odom; odometry/global is still published."

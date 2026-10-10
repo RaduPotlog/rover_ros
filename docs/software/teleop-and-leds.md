@@ -151,7 +151,7 @@ The layout contains:
 Source: `rover_foxglove/rover_a1_foxglove_dashboard_rover_namespace.json`, `rover_bringup/README.md`.
 
 !!! warning "Topic whitelist"
-    `rover_foxglove_bridge` advertises only the topics in `FOXGLOVE_TOPIC_WHITELIST` in `rover_bringup/launch/rover_web_bridges.launch.py`. Several topics the layout uses are not on it, among them `teleop_foxglove_cmd_vel_stamped`, `joint_states`, `robot_description`, `system_status`, `diagnostics`, `led/channel_<n>_frame`, `gps/fix` and `hardware_interface/rover_driver_state`. Those panels may stay empty. For a full Foxglove session, set `ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']"` (and `ROVER_FOXGLOVE_SERVICE_WHITELIST="['.*']"` if needed) on the platform service. Every topic a client subscribes to then crosses the Zenoh router at full rate.
+    `rover_foxglove_bridge` advertises only the topics in `FOXGLOVE_TOPIC_WHITELIST` in `rover_bringup/launch/rover_web_bridges.launch.py`. Several topics the layout uses are not on it, among them `teleop_foxglove_cmd_vel_stamped`, `joint_states`, `robot_description`, `system_status`, `diagnostics`, `led/channel_<n>_frame`, `gps/fix` and `hardware_interface/rover_driver_state`. Those panels may stay empty. For a full Foxglove session, set `ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST="['.*']"` (and `ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST="['.*']"` if needed) on the platform service. Every topic a client subscribes to then crosses the Zenoh router at full rate.
 
 ## LED panels
 

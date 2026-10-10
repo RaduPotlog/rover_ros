@@ -61,9 +61,9 @@ rover's router would join the simulated nodes to the real rover.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace of the robot's nodes and topics. |
-| `use_gps` | `$ROVER_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF + navsat_transform). |
-| `publish_global_tf` | `$ROVER_GPS_PUBLISH_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
+| `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace of the robot's nodes and topics. |
+| `use_gps` | `$ROVER_SYSTEM_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF + navsat_transform). |
+| `publish_global_tf` | `$ROVER_PLATFORM_GPS_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
 | `use_rviz` | `True` | Start RViz (`simulation.launch.py`). |
 | `gz_gui` | `config/teleop.config` | Gazebo GUI layout; `{namespace}` in the file is replaced with `namespace`. |
 | `gz_headless_mode` | `False` | Run Gazebo server-only with headless rendering (`rover_world`). |
@@ -86,9 +86,9 @@ Frames carry the namespace prefix, like `robot_state_publisher`'s TF.
 In simulation only, `body_link` gets a box collision over the `base.stl` bounds, so the body
 collides with obstacles. The hardware URDF keeps visual-only geometry.
 
-The lidar uses the `ROVER_LIDAR_*` mount pose; with none set it sits 0.68 m above `body_link`,
+The lidar uses the `ROVER_SYSTEM_MOUNT_LIDAR_*` mount pose; with none set it sits 0.68 m above `body_link`,
 high enough that its lowest ring (-15°) clears the body and the front arch. A custom mount lower
-than about 0.65 m makes the rover see itself (0.62 m was verified to hit the arch). The GNSS uses `ROVER_GPS_*`. The world's `<spherical_coordinates>` sets
+than about 0.65 m makes the rover see itself (0.62 m was verified to hit the arch). The GNSS uses `ROVER_SYSTEM_MOUNT_GPS_*`. The world's `<spherical_coordinates>` sets
 the datum (50.088384 N, 19.939128 E).
 
 ## Config Files
@@ -109,7 +109,7 @@ the datum (50.088384 N, 19.939128 E).
 
 `scripts/rover_sim.sh` (installed as `lib/rover_gazebo/rover_sim.sh`) runs the simulation from a
 fresh terminal, whatever `~/.bashrc` set up for the rover. It sets
-`ROVER_ROS_BUILD_TYPE=simulation` and `ROVER_NAMESPACE` (default `rover`), drops
+`ROVER_ROS_BUILD_TYPE=simulation` and `ROVER_SYSTEM_NAMESPACE` (default `rover`), drops
 `ZENOH_CONFIG_OVERRIDE`, and starts a zenoh router bound to `127.0.0.1:7447`, which it stops on
 exit. It also checks that the apt packages are installed. Run as-is, it starts the simulation;
 sourced, it only prepares the current shell, e.g. for a second terminal:
@@ -117,7 +117,7 @@ sourced, it only prepares the current shell, e.g. for a second terminal:
 ```bash
 # terminal 1: simulation (--build builds the workspace first; extra args go to the launch file)
 ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh --build
-ROVER_USE_GPS=true ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh use_rviz:=False
+ROVER_SYSTEM_USE_GPS=true ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh use_rviz:=False
 
 # terminal 2: orchestrator / ros2 CLI on the same local middleware
 source ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh
@@ -130,11 +130,11 @@ Manually, with the environment already set up:
 
 ```bash
 ros2 launch rover_gazebo simulation.launch.py
-ROVER_NAMESPACE=rover ROVER_USE_GPS=true ros2 launch rover_gazebo simulation.launch.py use_rviz:=False
+ROVER_SYSTEM_NAMESPACE=rover ROVER_SYSTEM_USE_GPS=true ros2 launch rover_gazebo simulation.launch.py use_rviz:=False
 
 # then the orchestrator, e.g.
 ros2 launch rover_navigation bringup.launch.py use_sim_time:=True localization_source:=slam
 ```
 
-With `ROVER_USE_GPS=true`, `gps/heading_imu` (and so `odometry/gps` / `odometry/global`) only
+With `ROVER_SYSTEM_USE_GPS=true`, `gps/heading_imu` (and so `odometry/gps` / `odometry/global`) only
 appears after the rover has driven straight for a few metres, exactly as on the rover.

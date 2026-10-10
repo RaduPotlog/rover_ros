@@ -28,14 +28,16 @@
 #
 # Examples:
 #   rover_sim.sh --build
-#   ROVER_USE_GPS=true rover_sim.sh use_rviz:=False gz_headless_mode:=True
+#   ROVER_SYSTEM_USE_GPS=true rover_sim.sh use_rviz:=False gz_headless_mode:=True
 #   source rover_sim.sh && ros2 launch rover_navigation bringup.launch.py \
 #     use_sim_time:=True localization_source:=slam
 #
 # Environment (all optional):
-#   ROVER_WS          workspace root (default: found from this script, else ~/ros2_ws/rover_a1)
-#   ROVER_NAMESPACE   robot namespace (default: rover, as in docker-compose)
-#   ROVER_USE_GPS, ROVER_GPS_PUBLISH_MAP_TF   passed through to the simulation
+#   ROVER_WS                  workspace root (default: found from this script, else
+#                             ~/ros2_ws/rover_a1)
+#   ROVER_SYSTEM_NAMESPACE    robot namespace (default: rover, as in docker-compose)
+#   ROVER_SYSTEM_USE_GPS, ROVER_PLATFORM_GPS_MAP_TF
+#                             passed through to the simulation
 
 _rover_sim_is_sourced() { [ "${BASH_SOURCE[0]}" != "$0" ]; }
 
@@ -62,7 +64,7 @@ _rover_sim_setup_env() {
     export ROVER_WS
 
     export ROVER_ROS_BUILD_TYPE=simulation
-    export ROVER_NAMESPACE="${ROVER_NAMESPACE:-rover}"
+    export ROVER_SYSTEM_NAMESPACE="${ROVER_SYSTEM_NAMESPACE:-rover}"
 
     unset ZENOH_CONFIG_OVERRIDE ROS_AUTOMATIC_DISCOVERY_RANGE ROS_STATIC_PEERS
     export RMW_IMPLEMENTATION=rmw_zenoh_cpp
@@ -95,7 +97,7 @@ if _rover_sim_is_sourced; then
     if ! _rover_sim_router_running; then
         echo "rover_sim: no zenoh router on :7447 yet - start the simulation with rover_sim.sh first." >&2
     fi
-    echo "rover_sim: shell ready (RMW=$RMW_IMPLEMENTATION, namespace=$ROVER_NAMESPACE, ws=$ROVER_WS)."
+    echo "rover_sim: shell ready (RMW=$RMW_IMPLEMENTATION, namespace=$ROVER_SYSTEM_NAMESPACE, ws=$ROVER_WS)."
     return 0
 fi
 
@@ -169,5 +171,5 @@ else
     echo "rover_sim: zenoh router started (pid $ROUTER_PID, localhost:7447)."
 fi
 
-echo "rover_sim: namespace=$ROVER_NAMESPACE use_gps=${ROVER_USE_GPS:-false} ws=$ROVER_WS"
+echo "rover_sim: namespace=$ROVER_SYSTEM_NAMESPACE use_gps=${ROVER_SYSTEM_USE_GPS:-false} ws=$ROVER_WS"
 ros2 launch rover_gazebo simulation.launch.py "${LAUNCH_ARGS[@]}"

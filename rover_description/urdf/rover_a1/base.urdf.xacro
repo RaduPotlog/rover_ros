@@ -108,8 +108,8 @@
 
     <!-- RealSense D435i. camera_link is the driver's TF root (REP-103, x forward): the realsense
          node publishes camera_link -> optical frames itself. Mount pose is an ASSUMPTION until
-         measured on the rover; override with ROVER_CAMERA_LOCALIZATION_* / ROVER_CAMERA_ORIENTATION_*.
-         The frame always exists so the TF tree does not change when ROVER_USE_CAMERA toggles. -->
+         measured on the rover; override with ROVER_SYSTEM_MOUNT_CAMERA_*.
+         The frame always exists so the TF tree does not change when ROVER_SYSTEM_USE_CAMERA toggles. -->
     <joint name="body_to_camera_joint" type="fixed">
       <origin xyz="${camera_xyz}" rpy="${camera_rpy}" />
       <parent link="body_link" />

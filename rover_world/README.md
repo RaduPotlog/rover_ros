@@ -11,7 +11,7 @@ it can also run on its own to open a world without a robot.
   sets `<spherical_coordinates>` for the simulated GNSS.
 - `world/follow_me_world.sdf` - the same world plus a walking person (Fuel's walking actor) for
   follow-me: it stands 25 s at (1.5, -2), 1.5 m ahead of the spawned rover, then walks a loop
-  round the east half. Needs the depth camera (`ROVER_USE_CAMERA=true`). The first start
+  round the east half. Needs the depth camera (`ROVER_SYSTEM_USE_CAMERA=true`). The first start
   downloads the actor's mesh from Fuel (cached in `~/.gz/fuel` afterwards).
 
 ## Config Files

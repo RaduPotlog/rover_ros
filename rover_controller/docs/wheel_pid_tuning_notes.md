@@ -259,7 +259,7 @@ of 10 % as "not proven" and repeat the run. Runs 10/11 differ by one clamp step 
 cd /root/ros2_ws/rover_a1
 source /opt/ros/lyrical/setup.bash
 source install/setup.bash
-export ROVER_NAMESPACE=rover
+export ROVER_SYSTEM_NAMESPACE=rover
 ros2 launch rover_bringup rover_bringup.launch.py
 ```
 

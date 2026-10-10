@@ -36,7 +36,7 @@
       "text": "The rover_description shall define the frame tree base_footprint -> base_link -> body_link with imu_link, lidar_link, gps_link and the four <prefix>_wheel_base_link / <prefix>_wheel_link frames as children of body_link, using REP-103 axes (+x forward, +y left, +z up) and prefixing every frame with \"<namespace>/\" when a namespace is set.",
       "rationale": "SYS-SR-021 requires REP-103 conventions and REP-105 frames; base_footprint is the ground projection the odometry filters publish odom -> base_footprint to.",
       "verification": "Test, Inspection",
-      "acceptance": "ros2 run tf2_tools view_frames shows base_footprint as the root of the robot tree with the listed children; frame names carry the namespace prefix when ROVER_NAMESPACE is set.",
+      "acceptance": "ros2 run tf2_tools view_frames shows base_footprint as the root of the robot tree with the listed children; frame names carry the namespace prefix when ROVER_SYSTEM_NAMESPACE is set.",
       "priority": "Must",
       "status": "As-Built",
       "parents": [
@@ -247,10 +247,10 @@
     {
       "id": "SWR-DESC-011",
       "category": "Functional",
-      "text": "The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS mount poses from the ROVER_{IMU,LIDAR,GPS}_LOCALIZATION_{X,Y,Z} and _ORIENTATION_{R,P,Y} environment variables, falling back to the defaults (IMU xyz (-0.09, 0.0, 0.2), rpy (3.14159, 0.0, 0.0); lidar and GPS all 0.0) for unset or non-finite values.",
+      "text": "The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS mount poses from the ROVER_SYSTEM_MOUNT_{IMU,LIDAR,GPS}_{X,Y,Z} and _{ROLL,PITCH,YAW} environment variables, falling back to the defaults (IMU xyz (-0.09, 0.0, 0.2), rpy (3.14159, 0.0, 0.0); lidar and GPS all 0.0) for unset or non-finite values.",
       "rationale": "Sensor extrinsics are per-rover (balena device variables); a malformed value must not break xacro and take robot_state_publisher down (SYS-SR-021 frames).",
       "verification": "Test",
-      "acceptance": "With ROVER_IMU_LOCALIZATION_X=abc the launch prints a warning and body_to_imu_joint x is -0.09; with a finite value the joint origin uses it.",
+      "acceptance": "With ROVER_SYSTEM_MOUNT_IMU_X=abc the launch prints a warning and body_to_imu_joint x is -0.09; with a finite value the joint origin uses it.",
       "priority": "Should",
       "status": "As-Built",
       "parents": [

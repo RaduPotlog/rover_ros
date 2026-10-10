@@ -53,12 +53,12 @@ if [[ $# -ne 1 ]]; then
 fi
 
 PKG_DIR="$1"
-ROVER_SYSTEM_DIR="${PKG_DIR}/src/rover_system"
-ROVER_SYSTEM_FILE="${ROVER_SYSTEM_DIR}/rover_system.cpp"
+RT_CHECK_SYSTEM_DIR="${PKG_DIR}/src/rover_system"
+RT_CHECK_SYSTEM_FILE="${RT_CHECK_SYSTEM_DIR}/rover_system.cpp"
 CONTROL_LOOP_USE_CASE_FILE="${PKG_DIR}/src/application/rover_control_loop_use_case.cpp"
 
-if [[ ! -f "${ROVER_SYSTEM_FILE}" ]]; then
-    echo "check_rt_path_purity: ${ROVER_SYSTEM_FILE} not found" >&2
+if [[ ! -f "${RT_CHECK_SYSTEM_FILE}" ]]; then
+    echo "check_rt_path_purity: ${RT_CHECK_SYSTEM_FILE} not found" >&2
     exit 1
 fi
 
@@ -70,10 +70,10 @@ fi
 # Every hardware_interface::SystemInterface implementation lives directly under
 # src/rover_system/ as <variant>_system.cpp - rover_system.cpp itself (the generic base) plus one
 # file per concrete rover variant (e.g. rover_a1_system.cpp).
-mapfile -t SYSTEM_FILES < <(find "${ROVER_SYSTEM_DIR}" -maxdepth 1 -type f -name '*_system.cpp' | sort)
+mapfile -t SYSTEM_FILES < <(find "${RT_CHECK_SYSTEM_DIR}" -maxdepth 1 -type f -name '*_system.cpp' | sort)
 
 if [[ ${#SYSTEM_FILES[@]} -eq 0 ]]; then
-    echo "check_rt_path_purity: no *_system.cpp files found under ${ROVER_SYSTEM_DIR}" >&2
+    echo "check_rt_path_purity: no *_system.cpp files found under ${RT_CHECK_SYSTEM_DIR}" >&2
     exit 1
 fi
 
@@ -137,11 +137,11 @@ check_body() {
     done
 }
 
-read_body=$(extract_body "${ROVER_SYSTEM_FILE}" 'return_type RoverSystem::read')
-write_body=$(extract_body "${ROVER_SYSTEM_FILE}" 'return_type RoverSystem::write')
+read_body=$(extract_body "${RT_CHECK_SYSTEM_FILE}" 'return_type RoverSystem::read')
+write_body=$(extract_body "${RT_CHECK_SYSTEM_FILE}" 'return_type RoverSystem::write')
 
 if [[ -z "${read_body}" || -z "${write_body}" ]]; then
-    echo "check_rt_path_purity: could not locate read()/write() in ${ROVER_SYSTEM_FILE}" >&2
+    echo "check_rt_path_purity: could not locate read()/write() in ${RT_CHECK_SYSTEM_FILE}" >&2
     exit 1
 fi
 
@@ -161,7 +161,7 @@ RT_REACHABLE_OVERRIDE_PATTERNS=(
 )
 
 for system_file in "${SYSTEM_FILES[@]}"; do
-    if [[ "${system_file}" == "${ROVER_SYSTEM_FILE}" ]]; then
+    if [[ "${system_file}" == "${RT_CHECK_SYSTEM_FILE}" ]]; then
         continue  # read()/write() already scanned above.
     fi
 

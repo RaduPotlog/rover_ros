@@ -50,7 +50,8 @@ FOXGLOVE_ASSET_URI_ALLOWLIST = (
 # topics it only PUBLISHES: the UIs' foxglove client builds a publisher's message encoder from
 # the schema of the server channel with the same name, and waits for that channel forever if the
 # bridge never advertises it (manual driving silently sent nothing on 2026-09-26).
-# ROVER_FOXGLOVE_TOPIC_WHITELIST="['.*']" on the platform service opens it up for debugging.
+# ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST="['.*']" on the platform service opens it up for
+# debugging.
 _ABSOLUTE_UI_TOPICS = ("/tf", "/tf_static")
 _NAMESPACED_UI_TOPICS = (
     # rover_drive_interface: map view
@@ -108,7 +109,8 @@ FOXGLOVE_TOPIC_WHITELIST = (
 # Names are relative to the rover namespace, which may be one segment or none: tighter than the
 # topic patterns because nodes often have private services with the same leaf name
 # (<ns>/slam_toolbox/save_map vs the indoor manager's <ns>/save_map).
-# ROVER_FOXGLOVE_SERVICE_WHITELIST="['.*']" on the platform service opens it up for debugging.
+# ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST="['.*']" on the platform service opens it up for
+# debugging.
 _ABSOLUTE_UI_SERVICES = (
     # rover_drive_interface: link latency probe
     "/rosapi/get_time",
@@ -180,9 +182,10 @@ def generate_launch_description():
                 launch_arguments={
                     "asset_uri_allowlist": FOXGLOVE_ASSET_URI_ALLOWLIST,
                     # Empty counts as unset: docker-compose.yml declares the variable blank.
-                    "topic_whitelist": os.environ.get("ROVER_FOXGLOVE_TOPIC_WHITELIST")
+                    "topic_whitelist": os.environ.get("ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST")
                     or FOXGLOVE_TOPIC_WHITELIST,
-                    "service_whitelist": os.environ.get("ROVER_FOXGLOVE_SERVICE_WHITELIST")
+                    "service_whitelist": os.environ.get(
+                        "ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST")
                     or FOXGLOVE_SERVICE_WHITELIST,
                     # No UI reads /foxglove_bridge/sysinfo, which otherwise publishes every 500 ms.
                     "sysinfo": "false",

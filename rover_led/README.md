@@ -164,7 +164,7 @@ ros2 topic echo /rover/led/state
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace of all nodes. |
+| `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace of all nodes. |
 | `robot_model` | `$ROBOT_MODEL_NAME`, else `rover_a1` | Selects `config/<robot_model>_*.yaml`. |
 | `animations_config_path` | `config/<robot_model>_animations.yaml` | Animation catalog. |
 | `common_dir_path` | empty | If set, the default animations file is read from `<common_dir_path>/rover_led/config/`. |

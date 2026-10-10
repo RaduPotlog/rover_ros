@@ -57,7 +57,7 @@ Install the Gazebo packages and build with `ROVER_ROS_BUILD_TYPE=simulation` (se
 ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh --build
 
 # Start with GPS fusion and without RViz
-ROVER_USE_GPS=true ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh use_rviz:=False
+ROVER_SYSTEM_USE_GPS=true ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh use_rviz:=False
 
 # Second terminal: a shell on the same local middleware, for ros2 CLI or the orchestrator
 source ~/ros2_ws/rover_a1/src/rover_ros/rover_gazebo/scripts/rover_sim.sh
@@ -66,7 +66,7 @@ ros2 topic echo /rover/odom
 
 `rover_sim.sh` does this before it launches `rover_gazebo simulation.launch.py`:
 
-1. Sets `ROVER_ROS_BUILD_TYPE=simulation` and `ROVER_NAMESPACE` (default `rover`).
+1. Sets `ROVER_ROS_BUILD_TYPE=simulation` and `ROVER_SYSTEM_NAMESPACE` (default `rover`).
 2. Sets `RMW_IMPLEMENTATION=rmw_zenoh_cpp` and removes `ZENOH_CONFIG_OVERRIDE`,
    `ROS_AUTOMATIC_DISCOVERY_RANGE` and `ROS_STATIC_PEERS`.
 3. Sources `/opt/ros/<distro>` and the workspace overlay, and stops the `ros2` CLI daemon.
@@ -89,12 +89,12 @@ Source: `rover_gazebo/scripts/rover_sim.sh`, `rover_scripts/README.md`.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace of the robot's nodes and topics. |
+| `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace of the robot's nodes and topics. |
 | `use_rviz` | `True` | Start RViz. |
 | `gz_gui` | `rover_gazebo/config/teleop.config` | Gazebo GUI layout; `{namespace}` in it is replaced. |
 | `log_level` | `INFO` | Logging level. |
-| `use_gps` | `$ROVER_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF, navsat_transform, GPS heading). |
-| `publish_global_tf` | `$ROVER_GPS_PUBLISH_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
+| `use_gps` | `$ROVER_SYSTEM_USE_GPS`, else `false` | Fuse the simulated GNSS (dual EKF, navsat_transform, GPS heading). |
+| `publish_global_tf` | `$ROVER_PLATFORM_GPS_MAP_TF`, else `false` | `rover_ekf_global_node` broadcasts `map → odom`. |
 | `x`, `y`, `z`, `roll`, `pitch`, `yaw` | `0.0`, `-2.0`, `0.2`, `0.0`, `0.0`, `0.0` | Spawn pose. |
 | `add_world_transform` | `False` | Publish a static `world` → `odom` at the spawn pose. |
 | `gz_bridge_config_path` | `rover_gazebo/config/gz_bridge.yaml` | Bridge configuration. |
@@ -158,8 +158,8 @@ Source: `rover_gazebo/scripts/sim_safety_plc.py`, `rover_gazebo/scripts/sim_safe
 | Wheel PID integral reference | `integral_reference_delay` `0.15` s, `integral_reference_time_constant` `0.08` s | Both `0.0` (`sim_wheel_pid.yaml`): the model stands for the real motors' dead time, which Gazebo doesn't have, so the integral works on the plain error |
 | Drive `wheel_radius` | `0.1651` m (tuned rolling radius) | `0.1699` m (CAD tyre radius of the simulated wheel cylinders) |
 | Body collision | Visual mesh only | Two boxes over the body and front arch, so the body hits obstacles |
-| IMU mount | `ROVER_IMU_*` variables, default `-0.09 0.0 0.2` m, roll `3.14159` rad | Fixed at `-0.09 0.0 0.2` m, rpy `0 0 0` |
-| Lidar mount | `ROVER_LIDAR_*` variables (lidar driver in `rover_sensors`) | `ROVER_LIDAR_*` if set, else `0.68` m above `body_link` |
+| IMU mount | `ROVER_SYSTEM_MOUNT_IMU_*` variables, default `-0.09 0.0 0.2` m, roll `3.14159` rad | Fixed at `-0.09 0.0 0.2` m, rpy `0 0 0` |
+| Lidar mount | `ROVER_SYSTEM_MOUNT_LIDAR_*` variables (lidar driver in `rover_sensors`) | `ROVER_SYSTEM_MOUNT_LIDAR_*` if set, else `0.68` m above `body_link` |
 | GNSS and lidar drivers | Sensor payload container (`rover_sensors`) | Gazebo sensors through the bridge |
 | Time | System clock | `use_sim_time`, `/clock` from Gazebo |
 | Middleware | Zenoh router in the rover's router container | Local Zenoh router on `127.0.0.1:7447` |

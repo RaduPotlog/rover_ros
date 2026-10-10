@@ -425,10 +425,10 @@
         doc /* The rover_bringup shall start rover_safety in the second stage unless the launch argument disable_manager is True (default False). */
       }
       requirement <'SWR-BRG-007'> 'Functional: The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set fro...' {
-        doc /* The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set from the use_gps argument (default $ROVER_USE_GPS, else false). */
+        doc /* The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set from the use_gps argument (default $ROVER_SYSTEM_USE_GPS, else false). */
       }
-      requirement <'SWR-BRG-008'> 'Parameter: The rover_bringup shall pass namespace (default $ROVER_NAMESPACE, else empty), log_leve...' {
-        doc /* The rover_bringup shall pass namespace (default $ROVER_NAMESPACE, else empty), log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO) and common_dir_path (default empty) to every included launch file. */
+      requirement <'SWR-BRG-008'> 'Parameter: The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), log_leve...' {
+        doc /* The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO) and common_dir_path (default empty) to every included launch file. */
       }
       requirement <'SWR-BRG-009'> 'Build: The rover_bringup shall declare run dependencies on rover_controller, rover_localizatio...' {
         doc /* The rover_bringup shall declare run dependencies on rover_controller, rover_localization, rover_diag_manager, rover_twist_mux, rover_crsf_teleop, rover_battery, rover_utils, rover_safety, rover_led, rover_udp_driver, foxglove_bridge, rosbridge_server and rmw_zenoh_cpp for the hardware build type (ROVER_ROS_BUILD_TYPE == hardware). */
@@ -443,7 +443,7 @@
         doc /* The rover_bringup shall start foxglove_bridge as node rover_foxglove_bridge (WebSocket port 8765, upstream default) with sysinfo disabled and an asset URI allowlist accepting package:// URIs of the upstream mesh/image extensions in any letter case. */
       }
       requirement <'SWR-BRG-013'> 'Performance: The rover_bringup shall restrict foxglove_bridge to the whitelisted topics (/tf, /tf_st...' {
-        doc /* The rover_bringup shall restrict foxglove_bridge to the whitelisted topics (/tf, /tf_static and the listed UI topics under any namespace) and to the whitelisted services, unless ROVER_FOXGLOVE_TOPIC_WHITELIST or ROVER_FOXGLOVE_SERVICE_WHITELIST is set non-empty. */
+        doc /* The rover_bringup shall restrict foxglove_bridge to the whitelisted topics (/tf, /tf_static and the listed UI topics under any namespace) and to the whitelisted services, unless ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST or ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST is set non-empty. */
       }
       requirement <'SWR-BRG-014'> 'Interface: The rover_bringup shall start rosbridge_websocket as node rover_rosbridge_websocket (po...' {
         doc /* The rover_bringup shall start rosbridge_websocket as node rover_rosbridge_websocket (port 9090, upstream default) and rosapi_node as /rosapi. */
@@ -614,7 +614,7 @@
         doc /* The rover_description shall declare, with use_sim false, a sensor component "/rover_imu" using plugin rover_hardware_interface/PhidgetImuSensor with data_interval_ms 8, callback_delta_epsilon_ms 1, Madgwick gain 0.00304 and zeta 0.00151, use_mag false, stateless false, remove_gravity_vector false and world_frame enu, exporting the 10 orientation / angular_velocity / linear_acceleration state interfaces. */
       }
       requirement <'SWR-DESC-011'> 'Functional: The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS ...' {
-        doc /* The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS mount poses from the ROVER_{IMU,LIDAR,GPS}_LOCALIZATION_{X,Y,Z} and _ORIENTATION_{R,P,Y} environment variables, falling back to the defaults (IMU xyz (-0.09, 0.0, 0.2), rpy (3.14159, 0.0, 0.0); lidar and GPS all 0.0) for unset or non-finite values. */
+        doc /* The rover_description shall, in rover_load_urdf.launch.py, take the IMU, lidar and GPS mount poses from the ROVER_SYSTEM_MOUNT_{IMU,LIDAR,GPS}_{X,Y,Z} and _{ROLL,PITCH,YAW} environment variables, falling back to the defaults (IMU xyz (-0.09, 0.0, 0.2), rpy (3.14159, 0.0, 0.0); lidar and GPS all 0.0) for unset or non-finite values. */
       }
       requirement <'SWR-DESC-012'> 'Parameter: The rover_description shall declare body_link inertial mass 39.5026 kg and each wheel l...' {
         doc /* The rover_description shall declare body_link inertial mass 39.5026 kg and each wheel link mass 4.79294 kg (58.6744 kg in total). */
@@ -658,7 +658,7 @@
         doc /* The rover_diag_manager shall read CPU temperature from /sys/class/thermal/thermal_zone0/temp (millidegrees, converted to degC with 2 decimals), RAM usage as (total - available)/total from /proc/meminfo, and disk usage as (capacity - available)/capacity of the root filesystem '/', and shall report a metric as unknown (NaN on system_status) when it cannot be read or its total is not positive. */
       }
       requirement <'SWR-DIAG-009'> 'Interface: The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover...' {
-        doc /* The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover_diagnostic_aggregator that subscribes to the namespaced diagnostics topic and publishes diagnostics_agg and diagnostics_toplevel_state inside the launch namespace (ROVER_NAMESPACE). */
+        doc /* The rover_diag_manager shall launch a diagnostic_aggregator aggregator_node named rover_diagnostic_aggregator that subscribes to the namespaced diagnostics topic and publishes diagnostics_agg and diagnostics_toplevel_state inside the launch namespace (ROVER_SYSTEM_NAMESPACE). */
       }
       requirement <'SWR-DIAG-010'> 'Performance: The rover_diag_manager shall configure the diagnostic aggregator to publish diagnostics...' {
         doc /* The rover_diag_manager shall configure the diagnostic aggregator to publish diagnostics_agg at 1.0 Hz under the root path 'Rover'. */
@@ -670,7 +670,7 @@
         doc /* The rover_diag_manager shall configure the diagnostic aggregator so that the drive, battery, E-stop (safety) and sensor (GPS, lidar, IMU) groups report ERROR or STALE when an expected component's diagnostics are missing, rather than silently omitting them. */
       }
       requirement <'SWR-DIAG-013'> 'Parameter: The rover_diag_manager launch file shall accept the arguments log_level (DEBUG/INFO/WAR...' {
-        doc /* The rover_diag_manager launch file shall accept the arguments log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO), namespace (default $ROVER_NAMESPACE or empty), system_diag_config_path (default config/system_diag.yaml) and diagnostic_aggregator_config_path (default config/diagnostic_aggregator.yaml). */
+        doc /* The rover_diag_manager launch file shall accept the arguments log_level (DEBUG/INFO/WARN/ERROR/FATAL, default INFO), namespace (default $ROVER_SYSTEM_NAMESPACE or empty), system_diag_config_path (default config/system_diag.yaml) and diagnostic_aggregator_config_path (default config/diagnostic_aggregator.yaml). */
       }
       requirement <'SWR-DIAG-014'> 'Lifecycle: The rover_diag_manager shall run rover_diag_manager_node as a plain (non-lifecycle) nod...' {
         doc /* The rover_diag_manager shall run rover_diag_manager_node as a plain (non-lifecycle) node that starts sampling on construction, exits with code 1 and a FATAL log if construction fails (for example on an out-of-range parameter), and stops its timer on context shutdown. */
@@ -902,14 +902,14 @@
       requirement <'SWR-LOC-008'> 'Diagnostics: The rover_localization shall enable print_diagnostics on every EKF and remap all locali...' {
         doc /* The rover_localization shall enable print_diagnostics on every EKF and remap all localization nodes' /diagnostics to the namespaced diagnostics topic. */
       }
-      requirement <'SWR-LOC-009'> 'Functional: The rover_localization shall, when fuse_gps (default $ROVER_USE_GPS) is one of true/1/y...' {
-        doc /* The rover_localization shall, when fuse_gps (default $ROVER_USE_GPS) is one of true/1/yes/on in any case and use_ekf is true, additionally start rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node and load the _with_gps configuration. */
+      requirement <'SWR-LOC-009'> 'Functional: The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/y...' {
+        doc /* The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/yes/on in any case and use_ekf is true, additionally start rover_ekf_global_node, rover_navsat_transform_node and rover_gps_heading_node and load the _with_gps configuration. */
       }
       requirement <'SWR-LOC-010'> 'Functional: The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with...' {
         doc /* The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with world_frame map, fusing the same wheel vx/vy and IMU yaw rate as rover_ekf_node plus X/Y only from odometry/gps, and publish its estimate on odometry/global. */
       }
       requirement <'SWR-LOC-011'> 'Parameter: The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when...' {
-        doc /* The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_GPS_PUBLISH_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf. */
+        doc /* The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when publish_global_tf (default $ROVER_PLATFORM_GPS_MAP_TF) is one of true/1/yes/on, overriding the config's publish_tf. */
       }
       requirement <'SWR-LOC-012'> 'Interface: The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s st...' {
         doc /* The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s start delay, magnetic_declination_radians 0.0, yaw_offset 0.0 and zero_altitude true, subscribing gps/fix, gps/heading_imu and odometry/global and publishing odometry/gps and gps/filtered, with the datum service at localization/datum. */
@@ -918,7 +918,7 @@
         doc /* The rover_localization shall pass to rover_gps_heading_node publish_heading true, heading_frame_id /base_link, min_heading_std_rad 0.05 and the alignment parameters min_segment_length_m 3.0, min_speed_m_s 0.3, max_yaw_rate_rad_s 0.1, max_yaw_change_rad 0.1, max_horizontal_std_m 5.0, max_fix_gap_s 2.5, max_odometry_age_s 0.5, required_segments 3 and max_offset_std_rad 0.1. */
       }
       requirement <'SWR-LOC-014'> 'Parameter: The rover_localization launch file shall accept the arguments use_ekf (default False), ...' {
-        doc /* The rover_localization launch file shall accept the arguments use_ekf (default False), fuse_gps, publish_global_tf, namespace (default $ROVER_NAMESPACE), localization_mode (rel|enu, default rel), localization_config_path, common_dir_path (default empty), use_sim (default False, sets use_sim_time) and log_level (default INFO). */
+        doc /* The rover_localization launch file shall accept the arguments use_ekf (default False), fuse_gps, publish_global_tf, namespace (default $ROVER_SYSTEM_NAMESPACE), localization_mode (rel|enu, default rel), localization_config_path, common_dir_path (default empty), use_sim (default False, sets use_sim_time) and log_level (default INFO). */
       }
       requirement <'SWR-LOC-015'> 'Parameter: The rover_localization shall ship a valid configuration file for every value accepted b...' {
         doc /* The rover_localization shall ship a valid configuration file for every value accepted by the localization_mode argument, including enu. */
@@ -1384,7 +1384,7 @@
           satisfy $::RoverPlatform::SWRS_BRG::'Lifecycle: The rover_bringup shall start rover_battery, rover_led, rover_safety, rover_localizatio...';
           satisfy $::RoverPlatform::SWRS_BRG::'Safety: The rover_bringup shall start rover_safety in the second stage unless the launch argume...';
           satisfy $::RoverPlatform::SWRS_BRG::'Functional: The rover_bringup shall start rover_localization with use_ekf True and fuse_gps set fro...';
-          satisfy $::RoverPlatform::SWRS_BRG::'Parameter: The rover_bringup shall pass namespace (default $ROVER_NAMESPACE, else empty), log_leve...';
+          satisfy $::RoverPlatform::SWRS_BRG::'Parameter: The rover_bringup shall pass namespace (default $ROVER_SYSTEM_NAMESPACE, else empty), log_leve...';
           satisfy $::RoverPlatform::SWRS_BRG::'Build: The rover_bringup shall declare run dependencies on rover_controller, rover_localizatio...';
           satisfy $::RoverPlatform::SWRS_BRG::'Build: The rover_bringup shall run on the ROS 2 distribution fixed in SYS-SR-020 with rmw_zeno...';
           satisfy $::RoverPlatform::SWRS_BRG::'Lifecycle: The rover_bringup shall be started automatically at power-up and bring the platform to ...';
@@ -1608,7 +1608,7 @@
           satisfy $::RoverPlatform::SWRS_LOC::'Interface: The rover_localization shall make rover_ekf_node the only broadcaster of the odom -> ba...';
           satisfy $::RoverPlatform::SWRS_LOC::'Interface: The rover_localization shall expose the robot_localization services of rover_ekf_node a...';
           satisfy $::RoverPlatform::SWRS_LOC::'Diagnostics: The rover_localization shall enable print_diagnostics on every EKF and remap all locali...';
-          satisfy $::RoverPlatform::SWRS_LOC::'Functional: The rover_localization shall, when fuse_gps (default $ROVER_USE_GPS) is one of true/1/y...';
+          satisfy $::RoverPlatform::SWRS_LOC::'Functional: The rover_localization shall, when fuse_gps (default $ROVER_SYSTEM_USE_GPS) is one of true/1/y...';
           satisfy $::RoverPlatform::SWRS_LOC::'Functional: The rover_localization shall configure rover_ekf_global_node at 50.0 Hz in 2D mode with...';
           satisfy $::RoverPlatform::SWRS_LOC::'Parameter: The rover_localization shall broadcast map -> odom from rover_ekf_global_node only when...';
           satisfy $::RoverPlatform::SWRS_LOC::'Interface: The rover_localization shall run rover_navsat_transform_node at 10.0 Hz with a 3.0 s st...';

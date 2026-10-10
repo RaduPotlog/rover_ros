@@ -96,7 +96,7 @@ filters publish `odom → base_footprint`, so in 2D mode `odom` stays on the gro
   | Argument | Default | Description |
   |----------|---------|-------------|
   | `controller_config_path` | (required) | Controller config embedded in the URDF. |
-  | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace and TF frame prefix. |
+  | `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace and TF frame prefix. |
   | `robot_model` | `$ROBOT_MODEL_NAME`, else `rover_a1` | Robot model. |
   | `use_sim` | `False` | Build the simulation variant (`gz_ros2_control`). |
   | `wheel_type` | `wheel_01` | `wheel_01` or `custom`; selects `config/<wheel_type>.yaml`. |
@@ -109,5 +109,5 @@ filters publish `odom → base_footprint`, so in 2D mode `odom` stays on the gro
   | Argument | Default | Description |
   |----------|---------|-------------|
   | `rviz_config` | `rviz/rover.rviz` | RViz config file. |
-  | `namespace` | `$ROVER_NAMESPACE`, else empty | Namespace used in the config. |
+  | `namespace` | `$ROVER_SYSTEM_NAMESPACE`, else empty | Namespace used in the config. |
   | `use_sim` | `False` | Use simulation time. |
