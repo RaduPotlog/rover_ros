@@ -209,7 +209,7 @@ TEST_F(SafetyNodeShutdownTest, FatalBatteryTemperatureShutsDown)
 
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
     auto battery_pub = hardware_node_->create_publisher<sensor_msgs::msg::BatteryState>(
-        "rover_battery/battery_status", qos);
+        "battery/battery_status", qos);
     auto gpio_pub = hardware_node_->create_publisher<rover_msgs::msg::SafetyCommandEcho>(
         "hardware_interface/safety_command_echo",
         rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());

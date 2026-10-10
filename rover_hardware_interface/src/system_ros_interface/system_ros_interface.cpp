@@ -155,7 +155,7 @@ SystemROSInterface::SystemROSInterface(const std::string & node_name, const rclc
     // sensor stream is; depth 5 gives a late-joining subscriber (e.g. a UI reconnecting) a couple
     // of cycles of buffered history without holding an unbounded backlog.
     driver_state_publisher_ = node_->create_publisher<RoverDriverStateMsg>(
-        "hardware_interface/rover_driver_state",
+        "hardware_interface/driver_state",
         rclcpp::QoS(rclcpp::KeepLast(5)).reliable().durability_volatile());
     realtime_driver_state_publisher_ = std::make_unique<realtime_tools::RealtimePublisher<RoverDriverStateMsg>>(driver_state_publisher_);
 

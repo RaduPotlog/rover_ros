@@ -153,7 +153,7 @@ Source: `rover_gazebo/scripts/sim_safety_plc.py`, `rover_gazebo/scripts/sim_safe
 | Hardware plugin | `rover_hardware_interface/RoverA1System` and `PhidgetImuSensor` | `gz_ros2_control/GazeboSimSystem`; the IMU interfaces are part of it |
 | Safety PLC and E-Stop | Modbus TCP to the PLC; `hardware_interface/*` services; hardware E-Stop button and relay | `sim_safety_plc` models the latch, HW button and SW E-Stop, and serves the three `hardware_interface/sw_*` E-Stop services. The latch starts clear. There is no watchdog, motor-driver-fault coil or welded-contactor check. `aux_output_*/set`, `aux_io_state` and `rover_driver_state` do not exist |
 | Nodes not started | | `rover_safety`, `rover_led`, `rover_battery`, `rover_crsf_teleop`, `rover_diag_manager`. The web bridges are not part of the simulation launch |
-| Battery | BMS over UDP to `rover_battery`, `rover_battery/battery_status` | Gazebo `LinearBatteryPlugin` (below). Not bridged to ROS: no battery topic |
+| Battery | BMS over UDP to `rover_battery`, `battery/battery_status` | Gazebo `LinearBatteryPlugin` (below). Not bridged to ROS: no battery topic |
 | Wheel PID gains | `d` `0.04` | `d` `0.0` (`sim_wheel_pid.yaml`): Gazebo wheels have no encoder or motor lag, and the D term made the loop oscillate |
 | Wheel PID integral reference | `integral_reference_delay` `0.15` s, `integral_reference_time_constant` `0.08` s | Both `0.0` (`sim_wheel_pid.yaml`): the model stands for the real motors' dead time, which Gazebo doesn't have, so the integral works on the plain error |
 | Drive `wheel_radius` | `0.1651` m (tuned rolling radius) | `0.1699` m (CAD tyre radius of the simulated wheel cylinders) |

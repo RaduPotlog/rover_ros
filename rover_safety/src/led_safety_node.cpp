@@ -99,7 +99,7 @@ void LedSafetyNode::init()
     using namespace std::placeholders;
 
     battery_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<BatteryStateMsg>(
-        "rover_battery/battery_status", 10,
+        "battery/battery_status", 10,
         std::bind(&LedSafetyNode::batteryCallback, this, _1));
     
     gpio_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<GpioMsg>(
@@ -316,7 +316,7 @@ void LedSafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper &
     infrastructure::fillSafetyInputsStatus(
         configured_,
         {
-            {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
+            {"battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
             {"hardware_interface/safety_status", infrastructure::ageSeconds(last_gpio_stamp_, now), timeout},
         },
         status);

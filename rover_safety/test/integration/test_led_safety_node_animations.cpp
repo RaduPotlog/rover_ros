@@ -68,7 +68,7 @@ protected:
                 }
                 response->success = true;
             });
-        battery_pub_ = helper_node_->create_publisher<BatteryStateMsg>("rover_battery/battery_status", 10);
+        battery_pub_ = helper_node_->create_publisher<BatteryStateMsg>("battery/battery_status", 10);
         safety_pub_ = helper_node_->create_publisher<SafetyStatusMsg>(
             "hardware_interface/safety_status",
             rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());

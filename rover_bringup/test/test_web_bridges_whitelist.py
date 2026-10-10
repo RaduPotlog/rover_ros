@@ -60,7 +60,7 @@ def test_topics_the_drive_ui_publishes_are_advertised(patterns, topic):
 @pytest.mark.parametrize('topic', [
     '/tf', '/tf_static', '/rover/map', '/rover/scan', '/rover/plan',
     '/rover/global_costmap/costmap', '/rover/diagnostics_agg', '/rover/motion_lock',
-    '/rover/hardware_interface/safety_status', '/rover/rover_battery/battery_status',
+    '/rover/hardware_interface/safety_status', '/rover/battery/battery_status',
     '/rover/mission_state', '/rover/drive_mode',
     '/rover/led/channel_1_preview', '/rover/rc/channels', '/rover/rc/calibration/state',
     '/rover/follow_me/status',

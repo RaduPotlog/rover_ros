@@ -110,7 +110,12 @@ def generate_launch_description():
             },
         ],
         namespace=namespace,
-        remappings=[("/diagnostics", "diagnostics")],
+        # Topic names carry no rover_ prefix, so the lifecycle transition_event topic is remapped
+        # off the node name (the node keeps it).
+        remappings=[
+            ("/diagnostics", "diagnostics"),
+            ("~/transition_event", "led_safety_node/transition_event"),
+        ],
         arguments=[
             "--ros-args",
             "--log-level",
@@ -133,7 +138,10 @@ def generate_launch_description():
             },
         ],
         namespace=namespace,
-        remappings=[("/diagnostics", "diagnostics")],
+        remappings=[
+            ("/diagnostics", "diagnostics"),
+            ("~/transition_event", "safety_node/transition_event"),
+        ],
         arguments=[
             "--ros-args",
             "--log-level",

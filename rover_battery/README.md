@@ -6,9 +6,9 @@ Decodes BMS telemetry received over UDP and publishes the rover's battery state.
 
 | Direction | Name | Type |
 |-----------|------|------|
-| in  | `rover_battery_udp_data` | `udp_msgs/UdpPacket` (from `rover_udp_driver`, 392-byte BMS payload sent by the ESP32 `rover_led_bms_ble_controller`) |
-| out | `rover_battery/battery_status` | `sensor_msgs/BatteryState` — used by `rover_safety` |
-| out | `rover_battery/charging_status` | `rover_msgs/ChargingStatus` |
+| in  | `battery_udp_data` | `udp_msgs/UdpPacket` (from `rover_udp_driver`, 392-byte BMS payload sent by the ESP32 `rover_led_bms_ble_controller`) |
+| out | `battery/battery_status` | `sensor_msgs/BatteryState` — used by `rover_safety` |
+| out | `battery/charging_status` | `rover_msgs/ChargingStatus` |
 | out | `diagnostics` | hardware id `RoverBattery`, tasks `Battery errors`, `Battery status` (voltage, current, SoC, charge, design capacity, temperature, charge state, health, cell min / max) |
 
 If no packet arrives within `watchdog_timeout_ms`, the node publishes a state with
@@ -54,7 +54,7 @@ Only a valid 392-byte frame resets the watchdog. The firmware sends an all-zero 
 has no BMS data (BLE down, or no BMS reply during a poll cycle); the node logs and ignores it, as
 it does wrong-size packets, so a lost BMS ends in the watchdog state after `watchdog_timeout_ms`.
 
-`rover_battery/battery_status` follows `sensor_msgs/BatteryState`:
+`battery/battery_status` follows `sensor_msgs/BatteryState`:
 
 - `temperature` is the hottest sensor (`tempMax`), so `rover_safety` thresholds see a single hot cell;
 

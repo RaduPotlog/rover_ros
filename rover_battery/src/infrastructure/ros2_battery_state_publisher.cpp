@@ -80,9 +80,9 @@ Ros2BatteryStatePublisher::Ros2BatteryStatePublisher(
 : logger_(node.get_logger())
 , clock_(node.get_clock())
 {
-    battery_pub_ = node.create_publisher<BatteryStateMsg>("rover_battery/battery_status", 5);
+    battery_pub_ = node.create_publisher<BatteryStateMsg>("battery/battery_status", 5);
     charging_status_pub_ =
-        node.create_publisher<ChargingStatusMsg>("rover_battery/charging_status", 5);
+        node.create_publisher<ChargingStatusMsg>("battery/charging_status", 5);
 
     diagnostic_updater->add("Battery errors", this, &Ros2BatteryStatePublisher::diagnoseErrors);
     diagnostic_updater->add("Battery status", this, &Ros2BatteryStatePublisher::diagnoseStatus);
@@ -178,7 +178,7 @@ void Ros2BatteryStatePublisher::diagnoseStatus(
     status.add("Power supply status", charging_status_.charging ? "connected" : "disconnected");
     status.add("Load current (A)", charging_status_.current);
 
-    // Values exactly as published on rover_battery/battery_status.
+    // Values exactly as published on battery/battery_status.
     status.add("Present", battery_state_.present ? "true" : "false");
     status.add("Charge state", chargeStateText(battery_state_.power_supply_status));
     status.add("Health", healthText(battery_state_.power_supply_health));

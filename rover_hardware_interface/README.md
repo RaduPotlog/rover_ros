@@ -31,7 +31,7 @@ Reference datasheets: `docs/DCC1000_reference.pdf` (motor controller),
 
 | Direction | Name | Type |
 |-----------|------|------|
-| pub | `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` |
+| pub | `hardware_interface/driver_state` | `rover_msgs/RoverDriverState` |
 | pub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` - plant state: HW E-Stop button, contactor feedback, latch, link health |
 | pub | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` - read-backs of the coils *we* drive; diagnostic, may only ever inhibit |
 | pub | `hardware_interface/aux_io_state` | `rover_msgs/AuxIoState` - general-purpose aux IO (PLC DIO06..11 inputs, DIO00..05 output read-backs). Not safety |

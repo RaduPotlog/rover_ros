@@ -342,7 +342,7 @@
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="evDdDYNgidsfCP_32xag-24" value="/rover_battery/battery_status" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=16;rotation=-90;fontStyle=1;fontFamily=Verdana;" parent="Lid6-kvnfnF_2-U29srs-112" vertex="1" connectable="0">
+        <mxCell id="evDdDYNgidsfCP_32xag-24" value="/battery/battery_status" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=16;rotation=-90;fontStyle=1;fontFamily=Verdana;" parent="Lid6-kvnfnF_2-U29srs-112" vertex="1" connectable="0">
           <mxGeometry x="0.7414" y="2" relative="1" as="geometry">
             <mxPoint x="-15" y="3" as="offset" />
           </mxGeometry>
@@ -401,7 +401,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="evDdDYNgidsfCP_32xag-17" value="/hardware_interface/rover_driver_state" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=15;rotation=-90;fontStyle=1;fontFamily=Verdana;" parent="Lid6-kvnfnF_2-U29srs-120" vertex="1" connectable="0">
+        <mxCell id="evDdDYNgidsfCP_32xag-17" value="/hardware_interface/driver_state" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=15;rotation=-90;fontStyle=1;fontFamily=Verdana;" parent="Lid6-kvnfnF_2-U29srs-120" vertex="1" connectable="0">
           <mxGeometry x="0.6667" y="5" relative="1" as="geometry">
             <mxPoint x="-15" y="45" as="offset" />
           </mxGeometry>

@@ -151,7 +151,7 @@ The layout contains:
 Source: `rover_foxglove/rover_a1_foxglove_dashboard_rover_namespace.json`, `rover_bringup/README.md`.
 
 !!! warning "Topic whitelist"
-    `rover_foxglove_bridge` advertises only the topics in `FOXGLOVE_TOPIC_WHITELIST` in `rover_bringup/launch/rover_web_bridges.launch.py`. Several topics the layout uses are not on it, among them `teleop_foxglove_cmd_vel_stamped`, `joint_states`, `robot_description`, `system_status`, `diagnostics`, `led/channel_<n>_frame`, `gps/fix` and `hardware_interface/rover_driver_state`. Those panels may stay empty. For a full Foxglove session, set `ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST="['.*']"` (and `ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST="['.*']"` if needed) on the platform service. Every topic a client subscribes to then crosses the Zenoh router at full rate.
+    `rover_foxglove_bridge` advertises only the topics in `FOXGLOVE_TOPIC_WHITELIST` in `rover_bringup/launch/rover_web_bridges.launch.py`. Several topics the layout uses are not on it, among them `teleop_foxglove_cmd_vel_stamped`, `joint_states`, `robot_description`, `system_status`, `diagnostics`, `led/channel_<n>_frame`, `gps/fix` and `hardware_interface/driver_state`. Those panels may stay empty. For a full Foxglove session, set `ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST="['.*']"` (and `ROVER_PLATFORM_FOXGLOVE_SERVICE_WHITELIST="['.*']"` if needed) on the platform service. Every topic a client subscribes to then crosses the Zenoh router at full rate.
 
 ## LED panels
 
@@ -234,8 +234,8 @@ Source: `rover_led/config/rover_a1_animations.yaml`, `rover_msgs/msg/LedAnimatio
 | Channel | Input | Result |
 |---|---|---|
 | State | `hardware_interface/safety_status` (`hw_e_stop_user_button`), `joy` dead-man button | `E_STOP`, else `MANUAL_ACTION`, else `READY` |
-| Error | `rover_battery/battery_status` | `ERROR` when status is `UNKNOWN` or charging while `OVERHEAT`, else `NO_ERROR` |
-| Battery | `rover_battery/battery_status` | Charging: `CHARGER_INSERTED`, then `CHARGING_BATTERY` or `BATTERY_CHARGED`. Discharging: `CRITICAL_BATTERY` below 10 %, `LOW_BATTERY` below 40 % (every 30 s), else `BATTERY_NOMINAL` |
+| Error | `battery/battery_status` | `ERROR` when status is `UNKNOWN` or charging while `OVERHEAT`, else `NO_ERROR` |
+| Battery | `battery/battery_status` | Charging: `CHARGER_INSERTED`, then `CHARGING_BATTERY` or `BATTERY_CHARGED`. Discharging: `CRITICAL_BATTERY` below 10 %, `LOW_BATTERY` below 40 % (every 30 s), else `BATTERY_NOMINAL` |
 
 The tree requests an animation only when it changes. The node is an indicator only and is not part of the E-Stop chain. It also runs in simulation.
 

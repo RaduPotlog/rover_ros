@@ -28,8 +28,8 @@ namespace rover_battery::infrastructure
 {
 
 /**
- * @brief Publishes battery reports on rover_battery/battery_status and
- *        rover_battery/charging_status, and feeds the "Battery errors" / "Battery status"
+ * @brief Publishes battery reports on battery/battery_status and
+ *        battery/charging_status, and feeds the "Battery errors" / "Battery status"
  *        diagnostic tasks.
  */
 class Ros2BatteryStatePublisher : public domain::BatteryStatePublisherPort

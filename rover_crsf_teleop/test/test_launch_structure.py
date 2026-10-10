@@ -105,6 +105,14 @@ def test_receiver_publishes_where_the_teleop_listens(teleop_launch, monkeypatch,
     assert parameters['source_ip'] == '10.0.0.1'
 
 
+def test_transition_event_topics_drop_the_rover_prefix(teleop_launch, monkeypatch, tmp_path):
+    # Topic names carry no rover_ prefix; the nodes keep theirs.
+    _, nodes, _ = _setup(teleop_launch, monkeypatch, tmp_path, 'False')
+    for name in ('rover_crsf_udp_receiver', 'rover_crsf_teleop_node'):
+        topic = name.removeprefix('rover_') + '/transition_event'
+        assert ('~/transition_event', topic) in nodes[name][1]['remappings']
+
+
 def test_receiver_only_accepts_the_router_by_default(teleop_launch, monkeypatch, tmp_path):
     """The shipped config must keep the source filter: CRSF is unauthenticated."""
     config = Path(__file__).resolve().parents[1] / 'config' / 'rover_crsf_teleop.yaml'

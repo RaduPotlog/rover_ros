@@ -14,8 +14,8 @@ Both are `nav2::LifecycleNode`s that configure and activate themselves (`autosta
 
 | Direction | Name | Type |
 |-----------|------|------|
-| sub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` (latest-state QoS) |
-| sub | `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` |
+| sub | `battery/battery_status` | `sensor_msgs/BatteryState` (latest-state QoS) |
+| sub | `hardware_interface/driver_state` | `rover_msgs/RoverDriverState` |
 | sub | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` (`sw_e_stop_user_button` → `sw_e_stop_state`) |
 | sub | `system_status` | `rover_msgs/SystemStatus` (from `rover_diag_manager`, CPU temperature) |
 | client | `hardware_interface/sw_user_e_stop_set` | `std_srvs/Trigger` (called from the trees) |
@@ -114,7 +114,7 @@ answer 200 and power off. Unreachable hosts are skipped. The file ships with no 
 
 | Direction | Name | Type |
 |-----------|------|------|
-| sub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` |
+| sub | `battery/battery_status` | `sensor_msgs/BatteryState` |
 | sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` (`hw_e_stop_user_button` → `e_stop_state`) |
 | sub | `joy` | `sensor_msgs/Joy` (dead-man button → `drive_state`) |
 | client | `led/set_animation` | `rover_msgs/SetLedAnimation` (called from the tree) |

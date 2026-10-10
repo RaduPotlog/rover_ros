@@ -12,6 +12,13 @@ sources in `rover_ros`.
 
 Message types are shortened: `rover_msgs/SafetyStatus` means `rover_msgs/msg/SafetyStatus`.
 
+Topic names carry no `rover_` prefix, even where the node name does. A lifecycle node's
+`transition_event` topic is therefore remapped off its node name: `rover_safety_node` publishes
+`safety_node/transition_event`. This applies to `rover_safety_node`, `rover_led_safety_node`,
+`rover_led_driver`, `rover_crsf_teleop_node`, `rover_crsf_udp_receiver`,
+`rover_udp_battery_receiver_node` and `rover_udp_led_channel_<n>_sender_node`. Node names and
+their lifecycle services (`rover_safety_node/change_state`) keep the prefix.
+
 ## Hardware interface
 
 `rover_hardware_interface` provides two ros2_control plugins that run inside the
@@ -35,7 +42,7 @@ hardware only.
 
 | Name | Type | Description |
 |------|------|-------------|
-| `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` | Motor driver state per wheel (`rear_left`, `rear_right`, `front_left`, `front_right`). Reliable, volatile, depth 5. |
+| `hardware_interface/driver_state` | `rover_msgs/RoverDriverState` | Motor driver state per wheel (`rear_left`, `rear_right`, `front_left`, `front_right`). Reliable, volatile, depth 5. |
 | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` | Plant state of the safety chain: HW E-Stop button, contactor feedback, latch, latch cause, link health. Reliable, volatile, depth 1. |
 | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` | Read-back of the coils software drives (SW E-Stop, driver-fault stop, latch reset, watchdog heartbeat). Diagnostic only. Reliable, volatile, depth 1. |
 | `hardware_interface/aux_io_state` | `rover_msgs/AuxIoState` | General-purpose aux IO on the PLC (DIO06..11 inputs, DIO00..05 output read-back). Not safety. Reliable, volatile, depth 1. |
@@ -256,8 +263,8 @@ retry a failed configure every `configure_retry_period` (5.0 s).
 
 | Direction | Name | Type | Description |
 |-----------|------|------|-------------|
-| sub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` | Battery health and temperature. |
-| sub | `hardware_interface/rover_driver_state` | `rover_msgs/RoverDriverState` | Motor driver state. |
+| sub | `battery/battery_status` | `sensor_msgs/BatteryState` | Battery health and temperature. |
+| sub | `hardware_interface/driver_state` | `rover_msgs/RoverDriverState` | Motor driver state. |
 | sub | `hardware_interface/safety_command_echo` | `rover_msgs/SafetyCommandEcho` | SW E-Stop echo. |
 | sub | `system_status` | `rover_msgs/SystemStatus` | Computer status from `rover_diag_manager_node`. |
 | client | `hardware_interface/sw_user_e_stop_set` | `std_srvs/Trigger` | Trips the E-Stop on an unsafe battery and before shutdown. |
@@ -277,7 +284,7 @@ retry a failed configure every `configure_retry_period` (5.0 s).
 
 | Direction | Name | Type | Description |
 |-----------|------|------|-------------|
-| sub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` | Battery state for the battery animations. |
+| sub | `battery/battery_status` | `sensor_msgs/BatteryState` | Battery state for the battery animations. |
 | sub | `hardware_interface/safety_status` | `rover_msgs/SafetyStatus` | HW E-Stop button for the E-Stop animation. |
 | sub | `joy` | `sensor_msgs/Joy` | Dead-man button. Nothing on the platform publishes it. |
 | client | `led/set_animation` | `rover_msgs/SetLedAnimation` | Requests animations from `rover_led_controller`. |
@@ -296,10 +303,10 @@ More: [rover_safety README](https://github.com/RaduPotlog/rover_ros/blob/master/
 
 | Node | Direction | Name | Type | Description |
 |------|-----------|------|------|-------------|
-| `rover_udp_battery_receiver_node` | pub | `rover_battery_udp_data` | `udp_msgs/UdpPacket` | Raw BMS packets received on `192.168.1.201:4444`. |
-| `rover_battery_node` | sub | `rover_battery_udp_data` | `udp_msgs/UdpPacket` | 392-byte BMS frame. |
-| `rover_battery_node` | pub | `rover_battery/battery_status` | `sensor_msgs/BatteryState` | Voltage, current, SoC, charge, hottest temperature, cell voltages. Depth 5. |
-| `rover_battery_node` | pub | `rover_battery/charging_status` | `rover_msgs/ChargingStatus` | Charging flag, currents, charger type. Depth 5. |
+| `rover_udp_battery_receiver_node` | pub | `battery_udp_data` | `udp_msgs/UdpPacket` | Raw BMS packets received on `192.168.1.201:4444`. |
+| `rover_battery_node` | sub | `battery_udp_data` | `udp_msgs/UdpPacket` | 392-byte BMS frame. |
+| `rover_battery_node` | pub | `battery/battery_status` | `sensor_msgs/BatteryState` | Voltage, current, SoC, charge, hottest temperature, cell voltages. Depth 5. |
+| `rover_battery_node` | pub | `battery/charging_status` | `rover_msgs/ChargingStatus` | Charging flag, currents, charger type. Depth 5. |
 | `rover_battery_node` | pub | `diagnostics` | `diagnostic_msgs/DiagnosticArray` | Hardware id `RoverBattery`. |
 
 | Parameter | Value | Description |
@@ -507,8 +514,8 @@ graph.
 
 The Foxglove bridge allow-lists `/tf`, `/tf_static` and these namespaced topics, among others:
 `hardware_interface/safety_status`, `hardware_interface/safety_command_echo`,
-`hardware_interface/aux_io_state`, `motion_lock`, `rover_battery/battery_status`,
-`rover_battery/charging_status`, `diagnostics_agg`, `led/animations`, `led/state`,
+`hardware_interface/aux_io_state`, `motion_lock`, `battery/battery_status`,
+`battery/charging_status`, `diagnostics_agg`, `led/animations`, `led/state`,
 `led/brightness`, `led/channel_<n>_preview`, `rc/channels`, `rc/link`, `rc/calibration/state`.
 Allow-listed services include the E-Stop and aux-output services, `led/set_animation`,
 `led/stop_animation`, `led/set_brightness` and `rc/calibration/*`. Set `ROVER_PLATFORM_FOXGLOVE_TOPIC_WHITELIST="['.*']"` or

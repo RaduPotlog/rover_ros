@@ -26,7 +26,7 @@ as upstream did - not the sender. Filter with `source_ip`, not on `address`.
 `rover::transport::udp::UdpReceiverNode` and `UdpSenderNode` are also registered as
 `rclcpp_components` (`rover_udp_driver_components`). The in-tree consumers load them into
 their own container, intra-process: `rover_battery` (a receiver, `udp_read` ->
-`rover_battery_udp_data`), `rover_crsf_teleop` (a receiver, `udp_read` -> `rc/raw_udp`,
+`battery_udp_data`), `rover_crsf_teleop` (a receiver, `udp_read` -> `rc/raw_udp`,
 `source_ip` = the RUTX11, hardware only) and `rover_led` (two senders, `udp_write` ->
 `udp_write/led_channel_{1,2}`, hardware only).
 

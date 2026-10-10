@@ -134,7 +134,7 @@ TEST_F(SystemROSInterfaceTest, PublishesDriverStateAfterUpdate)
     RoverDriverStateMsg received;
     std::atomic_bool got_msg{false};
     auto subscription = client_node->create_subscription<RoverDriverStateMsg>(
-        "hardware_interface/rover_driver_state", rclcpp::QoS(rclcpp::KeepLast(5)).reliable(),
+        "hardware_interface/driver_state", rclcpp::QoS(rclcpp::KeepLast(5)).reliable(),
         [&](const RoverDriverStateMsg::SharedPtr msg) {
             received = *msg;
             got_msg = true;

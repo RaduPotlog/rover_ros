@@ -135,7 +135,7 @@ Source: `rover_crsf_teleop/config/rover_crsf_teleop.yaml`, `rover_crsf_teleop/RE
 
 ### Battery-driven E-Stop and shutdown
 
-`rover_safety_node` (package `rover_safety`) watches `rover_battery/battery_status` and acts through a behavior tree at 10 Hz:
+`rover_safety_node` (package `rover_safety`) watches `battery/battery_status` and acts through a behavior tree at 10 Hz:
 
 | Battery reading | Action |
 |---|---|

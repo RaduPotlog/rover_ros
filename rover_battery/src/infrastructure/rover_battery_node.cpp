@@ -51,7 +51,7 @@ RoverBatteryNode::RoverBatteryNode(
 
     identity_.serial_number = declare_parameter(
         "serial_number", defaults.serial_number,
-        describe("Serial number reported on rover_battery/battery_status."));
+        describe("Serial number reported on battery/battery_status."));
 
     auto timeout_descriptor = describe(
         "Publish a watchdog-expired battery state if no BMS packet arrives within this time [ms].");
@@ -82,7 +82,7 @@ void RoverBatteryNode::init()
         std::bind(&RoverBatteryNode::batteryUdpDataSubscriberTimeoutCallback, this));
 
     battery_subscriber_ = create_subscription<udp_msgs::msg::UdpPacket>(
-        "rover_battery_udp_data", 100,
+        "battery_udp_data", 100,
         std::bind(&RoverBatteryNode::batteryUdpDataCallback, this, _1));
 }
 

@@ -74,6 +74,16 @@ def test_one_container_holds_driver_controller_and_both_senders(led_launch):
         assert {'use_intra_process_comms': True} in kwargs['extra_arguments']
 
 
+def test_transition_event_topics_drop_the_rover_prefix(led_launch):
+    # Topic names carry no rover_ prefix; the nodes keep theirs.
+    _, captured = led_launch
+    for name in ('rover_led_driver', 'rover_udp_led_channel_1_sender_node',
+                 'rover_udp_led_channel_2_sender_node'):
+        _, _, kwargs = captured['nodes'][name]
+        topic = name.removeprefix('rover_') + '/transition_event'
+        assert ('~/transition_event', topic) in kwargs['remappings']
+
+
 @pytest.mark.parametrize('channel', [1, 2])
 @pytest.mark.parametrize('use_sim', ['False', 'True'])
 def test_udp_sender_feeds_its_channel_on_hardware_only(led_launch, channel, use_sim):
@@ -85,7 +95,10 @@ def test_udp_sender_feeds_its_channel_on_hardware_only(led_launch, channel, use_
     # The sender only transmits while active; its own `autostart` parameter takes it there
     # (launch_ros' ComposableLifecycleNode autostart never reaches a namespaced component).
     assert {'autostart': True} in kwargs['parameters']
-    assert kwargs['remappings'] == [('udp_write', f'udp_write/led_channel_{channel}')]
+    assert kwargs['remappings'] == [
+        ('udp_write', f'udp_write/led_channel_{channel}'),
+        ('~/transition_event', f'udp_led_channel_{channel}_sender_node/transition_event'),
+    ]
 
     context = LaunchContext()
     context.launch_configurations.update(robot_model='rover_a1', use_sim=use_sim)

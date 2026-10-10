@@ -124,10 +124,10 @@ void SafetyNode::init()
     const auto latest_state_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
 
     battery_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<BatteryStateMsg>(
-        "rover_battery/battery_status", latest_state_qos,
+        "battery/battery_status", latest_state_qos,
         std::bind(&SafetyNode::batteryStateSubscriberCallback, this, _1));
     driver_state_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<RoverDriverStateMsg>(
-        "hardware_interface/rover_driver_state", 10,
+        "hardware_interface/driver_state", 10,
         std::bind(&SafetyNode::driverStateSubscriberCallback, this, _1));
     io_state_sub_ = rclcpp_lifecycle::LifecycleNode::create_subscription<IOStateMsg>(
         "hardware_interface/safety_command_echo",
@@ -408,7 +408,7 @@ void SafetyNode::diagnoseInputs(diagnostic_updater::DiagnosticStatusWrapper & st
     infrastructure::fillSafetyInputsStatus(
         configured_,
         {
-            {"rover_battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
+            {"battery/battery_status", infrastructure::ageSeconds(last_battery_stamp_, now), timeout},
             {"system_status", infrastructure::ageSeconds(last_system_status_stamp_, now), timeout},
             {"hardware_interface/safety_command_echo", infrastructure::ageSeconds(last_gpio_stamp_, now), timeout},
         },

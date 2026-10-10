@@ -67,7 +67,10 @@ def test_receiver_and_battery_node_share_one_container(battery_launch):
     # A lifecycle node activated by its own `autostart` parameter: launch_ros'
     # ComposableLifecycleNode autostart never reaches a namespaced component.
     assert {'autostart': True} in receiver['parameters']
-    assert receiver['remappings'] == [('udp_read', 'rover_battery_udp_data')]
+    assert receiver['remappings'] == [
+        ('udp_read', 'battery_udp_data'),
+        ('~/transition_event', 'udp_battery_receiver_node/transition_event'),
+    ]
 
     _, _, battery = nodes['rover_battery_node']
     assert battery['plugin'] == 'rover_battery::RoverBatteryNode'

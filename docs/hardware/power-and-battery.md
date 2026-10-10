@@ -2,7 +2,7 @@
 
 The A1 runs from a 24 V LiFePO4 pack with a Daly BMS. This page covers the pack, the telemetry chain into ROS 2, the battery thresholds that trip the E-Stop or change the LEDs, and how the ROS controller shuts down.
 
-ROS names on this page are relative to the robot namespace `rover`. For example, `rover_battery/battery_status` is `/rover/rover_battery/battery_status`.
+ROS names on this page are relative to the robot namespace `rover`. For example, `battery/battery_status` is `/rover/battery/battery_status`.
 
 ## Battery
 
@@ -44,9 +44,9 @@ The ESP32 bridge (firmware `rover_led_bms_ble_controller`, outside this reposito
 flowchart LR
     BMS["Daly BMS"] -->|BLE| ESP["ESP32 bridge"]
     ESP -->|"UDP, 392 B"| RX["rover_udp_battery_receiver_node"]
-    RX -->|rover_battery_udp_data| BN["rover_battery_node"]
-    BN --> T1["rover_battery/battery_status"]
-    BN --> T2["rover_battery/charging_status"]
+    RX -->|battery_udp_data| BN["rover_battery_node"]
+    BN --> T1["battery/battery_status"]
+    BN --> T2["battery/charging_status"]
     BN --> T3["diagnostics"]
 ```
 
@@ -59,8 +59,8 @@ flowchart LR
 
 | Topic | Type | QoS | Content |
 |-------|------|-----|---------|
-| `rover_battery/battery_status` | `sensor_msgs/BatteryState` | depth 5 | Voltage, current, SoC, residual charge (Ah), hottest temperature sensor, cell voltages (V), status, health |
-| `rover_battery/charging_status` | `rover_msgs/ChargingStatus` | depth 5 | `charging` (BMS status 1), pack current, charger type `WIRED` while charging |
+| `battery/battery_status` | `sensor_msgs/BatteryState` | depth 5 | Voltage, current, SoC, residual charge (Ah), hottest temperature sensor, cell voltages (V), status, health |
+| `battery/charging_status` | `rover_msgs/ChargingStatus` | depth 5 | `charging` (BMS status 1), pack current, charger type `WIRED` while charging |
 | `diagnostics` | `diagnostic_msgs/DiagnosticArray` | default | Hardware id `RoverBattery`: tasks `Battery errors`, `Battery status` |
 
 Source: `rover_battery/src/infrastructure/ros2_battery_state_publisher.cpp`, `rover_battery/src/domain/battery_classifier.cpp`.
@@ -89,7 +89,7 @@ More detail: [rover_battery README](https://github.com/RaduPotlog/rover_ros/blob
 
 ### Safety reactions (`rover_safety_node`)
 
-`rover_safety_node` reads `rover_battery/battery_status` and decides a verdict every tick (10 Hz). It runs on hardware only, not with `use_sim:=True`.
+`rover_safety_node` reads `battery/battery_status` and decides a verdict every tick (10 Hz). It runs on hardware only, not with `use_sim:=True`.
 
 | Battery reading | Verdict | Effect |
 |-----------------|---------|--------|

@@ -66,7 +66,12 @@ def generate_launch_description():
         name="rover_udp_battery_receiver_node",
         namespace=namespace,
         parameters=[rover_battery_config_path, {"autostart": True}],
-        remappings=[("udp_read", "rover_battery_udp_data")],
+        # Topic names carry no rover_ prefix, so the lifecycle transition_event topic is remapped
+        # off the node name (the node keeps it).
+        remappings=[
+            ("udp_read", "battery_udp_data"),
+            ("~/transition_event", "udp_battery_receiver_node/transition_event"),
+        ],
         extra_arguments=[{"use_intra_process_comms": True}],
     )
 

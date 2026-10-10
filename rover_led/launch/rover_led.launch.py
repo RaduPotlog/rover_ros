@@ -116,7 +116,15 @@ def generate_launch_description():
                 ),
                 {"autostart": True},
             ],
-            remappings=[("udp_write", f"udp_write/led_channel_{channel}")],
+            # Topic names carry no rover_ prefix, so the lifecycle transition_event topic is
+            # remapped off the node name (the node keeps it).
+            remappings=[
+                ("udp_write", f"udp_write/led_channel_{channel}"),
+                (
+                    "~/transition_event",
+                    f"udp_led_channel_{channel}_sender_node/transition_event",
+                ),
+            ],
             extra_arguments=[
                 {"use_intra_process_comms": True},
             ],
@@ -135,7 +143,10 @@ def generate_launch_description():
                 plugin="rover_led::LedDriverNode",
                 name="rover_led_driver",
                 namespace=namespace,
-                remappings=[("/diagnostics", "diagnostics")],
+                remappings=[
+                    ("/diagnostics", "diagnostics"),
+                    ("~/transition_event", "led_driver/transition_event"),
+                ],
                 parameters=[driver_config_path],
                 extra_arguments=[
                     {"use_intra_process_comms": True},

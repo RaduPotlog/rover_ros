@@ -92,8 +92,8 @@ flowchart LR
   BAT["rover_battery_node"]
   LED["rover_led_controller + rover_led_driver"]
   BMS --> BAT
-  BAT -- rover_battery/battery_status --> SAF
-  BAT -- rover_battery/battery_status --> LSAF
+  BAT -- battery/battery_status --> SAF
+  BAT -- battery/battery_status --> LSAF
   SAF -- "sw_user_e_stop_set (srv)" --> HWI
   LSAF -- "led/set_animation (srv)" --> LED
   LED --> LEDB

@@ -118,7 +118,12 @@ def _launch_setup(context, *args, **kwargs):
             'source_ip': source_ip,
             'autostart': True,
         }],
-        remappings=[('udp_read', 'rc/raw_udp')],
+        # Topic names carry no rover_ prefix, so the lifecycle transition_event topic is remapped
+        # off the node name (the node keeps it).
+        remappings=[
+            ('udp_read', 'rc/raw_udp'),
+            ('~/transition_event', 'crsf_udp_receiver/transition_event'),
+        ],
         extra_arguments=[{'use_intra_process_comms': True}],
         # No receiver exists in simulation, and the sim machine does not own 192.168.1.201, so
         # starting a node that can only fail to bind is pure noise.
@@ -133,7 +138,10 @@ def _launch_setup(context, *args, **kwargs):
         name='rover_crsf_teleop_node',
         namespace=namespace,
         parameters=[config_path, {'autostart': True}],
-        remappings=[('/diagnostics', 'diagnostics')],
+        remappings=[
+            ('/diagnostics', 'diagnostics'),
+            ('~/transition_event', 'crsf_teleop_node/transition_event'),
+        ],
         extra_arguments=[{'use_intra_process_comms': True}],
     )
 
