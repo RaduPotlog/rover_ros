@@ -44,6 +44,16 @@ session can pick up without re-deriving anything. Gains from this session are al
 > integral pinned at `i_clamp` 2.1, and 1.5-1.7x at +-1.0. Spins vary ~4 points run to run (straights
 > ~1). The tool's suggested limits (0.50 m/s^2 / 0.97 rad/s^2) come from the spin rise and do not
 > apply (see phases 2-3). **Shipped gains kept**; spins still need the turn feed-forward (pending).
+> *Open loop, same schedule* (p = i = d = 0 live, `ff` unchanged, gains restored after; battery 53 %):
+> straights settle 11-14 % slow at +-0.4 m/s, 3-6 % at +-0.6, 0-3 % at +-0.8, the four wheels within
+> ~0.5 % of each other; overshoot 0-2.7 %, so the closed loop's 2-4 % comes from the integral through
+> the ~0.3 s dead time, as on lifted wheels. Spins: the wheels reach 0-12 % of the reference at
+> +-0.6 rad/s (wheel reference 1.86 rad/s, i.e. stalled) and ~45 % at +-1.0 (3.1 rad/s). Both fit a
+> **constant scrub offset of ~1.7 rad/s of wheel command, independent of the spin rate**, and the
+> closed-loop runs agree: the controller added 1.8-1.9 rad/s above the reference at both rates. So
+> the spin overshoot is all controller: the integral must build ~1.8 of its 2.1 clamp before the
+> wheels break loose. Starting value for the turn feed-forward: ~1.8 rad/s per wheel, signed by the
+> wheel's turn component, faded in with the angular share of the command (design pending).
 
 > **Ground campaign at `motor_acceleration` 2.0, phases 4-5 (2026-10-09, battery 47 %).** *Top speed:* +-0.95 m/s
 > is reached within 0.5 % on all wheels (t50 0.67 s, output 1.00-1.01x the reference). *Spin breakaway*
