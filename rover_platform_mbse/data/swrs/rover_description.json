@@ -134,7 +134,7 @@
     {
       "id": "SWR-DESC-006",
       "category": "Interface",
-      "text": "The rover_description shall declare, with use_sim false, a <ros2_control> system component named \"<namespace>/rover_system_node\" using plugin rover_hardware_interface/RoverA1System with the four wheel joints each exposing a velocity command interface and position, velocity and effort state interfaces, and with use_sim true the plugin gz_ros2_control/GazeboSimSystem with the same joints plus the IMU state interfaces.",
+      "text": "The rover_description shall declare, with use_sim false, a <ros2_control> system component named \"rover_system_node\" (no namespace prefix: its node is rover_system_node in the controller manager's namespace, e.g. /rover/rover_system_node) using plugin rover_hardware_interface/RoverA1System with the four wheel joints each exposing a velocity command interface and position, velocity and effort state interfaces, and with use_sim true the plugin gz_ros2_control/GazeboSimSystem with the same joints plus the IMU state interfaces.",
       "rationale": "SYS-SR-002 (4 joints, velocity mode, encoder feedback) and SYS-SR-020 (ros2_control hardware interface).",
       "verification": "Test, Inspection",
       "acceptance": "The generated URDF contains exactly one system component with 4 joints x (1 command + 3 state interfaces) and the plugin matching use_sim; RoverA1System on_init() accepts it.",
@@ -224,7 +224,7 @@
     {
       "id": "SWR-DESC-010",
       "category": "Parameter",
-      "text": "The rover_description shall declare, with use_sim false, a <ros2_control> sensor component \"<namespace>/rover_imu\" using plugin rover_hardware_interface/PhidgetImuSensor with data_interval_ms 8, callback_delta_epsilon_ms 1, Madgwick gain 0.00304 and zeta 0.00151, use_mag false, stateless false, remove_gravity_vector false and world_frame enu, exporting the 10 orientation / angular_velocity / linear_acceleration state interfaces.",
+      "text": "The rover_description shall declare, with use_sim false, a <ros2_control> sensor component \"rover_imu\" (no namespace prefix: its node is rover_imu in the controller manager's namespace, e.g. /rover/rover_imu) using plugin rover_hardware_interface/PhidgetImuSensor with data_interval_ms 8, callback_delta_epsilon_ms 1, Madgwick gain 0.00304 and zeta 0.00151, use_mag false, stateless false, remove_gravity_vector false and world_frame enu, exporting the 10 orientation / angular_velocity / linear_acceleration state interfaces.",
       "rationale": "SYS-SR-019 IMU at >= 100 Hz (8 ms = 125 Hz sampling). The magnetometer is disabled because it is uncalibrated near the motors.",
       "verification": "Inspection, Test",
       "acceptance": "The generated URDF contains the rover_imu component with these values; PhidgetImuSensor on_init() accepts it.",

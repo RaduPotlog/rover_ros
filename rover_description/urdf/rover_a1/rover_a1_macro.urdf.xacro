@@ -41,7 +41,6 @@
       </xacro:if>
     </xacro:if>
 
-    <xacro:property name="ns" value='${namespace + "/" if namespace else ""}' />
     <xacro:property name="wheel_config" value="${xacro.load_yaml(wheel_config_file)}" />
     <!-- wheelbase and wheel_separation are full centre-to-centre distances, so each
          mount point sits at half of them (REP-103: +x forward, +y left, +z up). -->
@@ -118,8 +117,9 @@
       mount_point_z="${wheel_mount_point_z}"
       prefix="rr" />
 
-    <!-- ROS2 Controller -->
-    <ros2_control name="${ns}rover_system_node" type="system">
+    <!-- ROS2 Controller. No namespace prefix in the name: ros2_control names the component's
+         node after it, inside the controller manager's namespace (/rover/rover_system_node). -->
+    <ros2_control name="rover_system_node" type="system">
       <!-- Joints -->
       <joint name="fl_wheel_base_to_fl_wheel_joint">
         <command_interface name="velocity" />

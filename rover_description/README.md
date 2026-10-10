@@ -25,7 +25,9 @@ rviz/rover.rviz                       RViz layout
 ## ros2_control components
 
 With `use_sim:=false` the URDF declares two hardware components. Each one runs its own node
-inside `controller_manager`, named after the component:
+inside `controller_manager`, named after the component in the controller manager's namespace
+(`/rover/rover_system_node`, `/rover/rover_imu`). The names carry no namespace prefix: a
+`rover/` prefix would make the node `/rover/rover_rover_system_node`.
 
 | Component (`<ros2_control name>`) | Type | Plugin | Exports |
 |-----------------------------------|------|--------|---------|
@@ -35,7 +37,8 @@ inside `controller_manager`, named after the component:
 The hardware parameters (Modbus address, timeouts, gear ratio, encoder resolution, …) are the
 `<param>` tags in `urdf/rover_a1/rover_a1_macro.urdf.xacro` and `urdf/common/imu.urdf.xacro`. With
 `use_sim:=true`, the system uses `gz_ros2_control/GazeboSimSystem` and carries the IMU interfaces
-(fed by the Gazebo IMU sensor), and `rover_imu` has no hardware.
+(fed by the Gazebo IMU sensor), and `rover_imu` has no hardware. gz_ros2_control doesn't pass its
+namespace on to the component node, so in simulation it is `/rover_system_node`.
 
 ## Frame Conventions
 

@@ -15,7 +15,8 @@ Message types are shortened: `rover_msgs/SafetyStatus` means `rover_msgs/msg/Saf
 ## Hardware interface
 
 `rover_hardware_interface` provides two ros2_control plugins that run inside the
-`controller_manager` process (`ros2_control_node`):
+`controller_manager` process (`ros2_control_node`). Each component gets its own node,
+named after it: `/rover/rover_system_node` and `/rover/rover_imu`.
 
 | `<ros2_control>` component | Plugin | Hardware |
 |----------------------------|--------|----------|

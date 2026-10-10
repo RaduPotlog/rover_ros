@@ -93,9 +93,10 @@
     </xacro:if>
 
     <!-- ROS2 controller. Hardware only: in simulation the IMU interfaces live in the
-         GazeboSimSystem block, and an empty <ros2_control> would have no <hardware>. -->
+         GazeboSimSystem block, and an empty <ros2_control> would have no <hardware>.
+         Unprefixed name, like rover_system_node: the node is /<namespace>/rover_imu. -->
     <xacro:unless value="${use_sim}">
-    <ros2_control name="${ns}rover_imu" type="sensor">
+    <ros2_control name="rover_imu" type="sensor">
         <hardware>
           <!-- Hardware IMU sensor interface  -->
           <plugin>rover_hardware_interface/PhidgetImuSensor</plugin>
