@@ -142,6 +142,9 @@ def generate_launch_description():
             "namespace": namespace,
             "use_sim": "False",
             "common_dir_path": common_dir_path,
+            # Drops the GPS analyzer group when GPS is off (the Lidar one follows
+            # ROVER_SYSTEM_USE_LIDAR in that launch file).
+            "use_gps": use_gps,
         }.items(),
     )
 

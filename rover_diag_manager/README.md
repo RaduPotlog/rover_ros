@@ -31,6 +31,10 @@ Plain (non-lifecycle) node: it owns no resource, only reads ephemeral OS counter
   the `"<node name>: "` prefix of each status. Statuses from nodes not listed land in `/Rover/Other`;
   add an analyzer when a new node publishes diagnostics. `rover_command_freshness_node`
   (rover_twist_mux, `Command freshness`) has no analyzer yet, so it shows up under `Other`.
+- `diagnostic_aggregator_gps.yaml`, `diagnostic_aggregator_lidar.yaml` - the `GPS` and `Lidar`
+  groups. `system_diag.launch.py` loads each only while that sensor is enabled (launch arguments
+  `use_gps` / `use_lidar`, default `ROVER_SYSTEM_USE_GPS` / `ROVER_SYSTEM_USE_LIDAR`): a disabled
+  sensor publishes no diagnostics, and its group would otherwise stay STALE.
 
 ## Launch Files
 

@@ -1,0 +1,8 @@
+# Loaded by system_diag.launch.py on top of diagnostic_aggregator.yaml only when the lidar is enabled
+# (ROVER_SYSTEM_USE_LIDAR=true), so a disabled sensor does not leave a STALE group behind.
+/**:
+  ros__parameters:
+    lidar:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: Lidar
+      find_and_remove_prefix: [ 'rover_rs16_lidar_node: ' ]

@@ -1,0 +1,10 @@
+# Loaded by system_diag.launch.py on top of diagnostic_aggregator.yaml only when GPS is enabled
+# (ROVER_SYSTEM_USE_GPS=true), so a disabled sensor does not leave a STALE group behind.
+/**:
+  ros__parameters:
+    gps:
+      type: diagnostic_aggregator/GenericAnalyzer
+      path: GPS
+      # rover_gps_node (sensor payload): GPS fix. rover_gps_heading_node (localization):
+      # Heading alignment. Grouped together so the diagnostics page shows both.
+      find_and_remove_prefix: [ 'rover_gps_node: ', 'rover_gps_heading_node: ' ]

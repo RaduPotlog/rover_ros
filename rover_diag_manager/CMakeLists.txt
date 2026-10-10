@@ -92,6 +92,10 @@ if(BUILD_TESTING)
   ament_add_gtest(test_system_diag_node test/integration/test_system_diag_node.cpp
                   TIMEOUT 60)
   target_link_libraries(test_system_diag_node ${PROJECT_NAME}_ros)
+
+  # The aggregator loads the GPS / Lidar groups only while that sensor is enabled.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_system_diag_launch test/test_system_diag_launch.py)
 endif()
 
 ament_export_dependencies(${PACKAGE_DEPENDENCIES})

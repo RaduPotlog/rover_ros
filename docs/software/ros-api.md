@@ -492,7 +492,7 @@ Parameters: `publish_frequency` `5.0` Hz; WARN thresholds `cpu_usage_warn_thresh
 | Direction | Name | Type | Description |
 |-----------|------|------|-------------|
 | sub | `diagnostics` | `diagnostic_msgs/DiagnosticArray` | All platform nodes. |
-| pub | `diagnostics_agg` | `diagnostic_msgs/DiagnosticArray` | Grouped under `/Rover/{Computer, Drive, Battery, Localization, GPS, Lidar, Lighting, Teleop, Motion, Safety}`. |
+| pub | `diagnostics_agg` | `diagnostic_msgs/DiagnosticArray` | Grouped under `/Rover/{Computer, Drive, Battery, Localization, GPS, Lidar, Lighting, Teleop, Motion, Safety}`; GPS and Lidar only while `ROVER_SYSTEM_USE_GPS` / `ROVER_SYSTEM_USE_LIDAR` is on. |
 | pub | `diagnostics_toplevel_state` | `diagnostic_msgs/DiagnosticStatus` | Overall state. |
 
 `pub_rate` is `1.0` Hz. Statuses from nodes not listed in the config go to `Other`.

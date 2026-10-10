@@ -220,7 +220,7 @@
     {
       "id": "SWR-DIAG-011",
       "category": "Diagnostics",
-      "text": "The rover_diag_manager shall group diagnostic statuses by node-name prefix into the aggregator paths Computer (rover_diag_manager_node), Drive (rover_hardware_controller, controller_manager), Battery (rover_battery_node), Localization (rover_ekf_node, rover_ekf_global_node, rover_navsat_transform_node), GPS (rover_gps_node, rover_gps_heading_node), Lidar (rover_rs16_lidar_node), Lighting (rover_led_driver, rover_led_controller), Teleop (rover_crsf_teleop_node), Motion (rover_motion_lock_node, rover_twist_mux_node) and Safety (rover_safety_node, rover_led_safety_node).",
+      "text": "The rover_diag_manager shall group diagnostic statuses by node-name prefix into the aggregator paths Computer (rover_diag_manager_node), Drive (rover_hardware_controller, controller_manager), Battery (rover_battery_node), Localization (rover_ekf_node, rover_ekf_global_node, rover_navsat_transform_node), GPS (rover_gps_node, rover_gps_heading_node; only with ROVER_SYSTEM_USE_GPS), Lidar (rover_rs16_lidar_node; only with ROVER_SYSTEM_USE_LIDAR), Lighting (rover_led_driver, rover_led_controller), Teleop (rover_crsf_teleop_node), Motion (rover_motion_lock_node, rover_twist_mux_node) and Safety (rover_safety_node, rover_led_safety_node).",
       "rationale": "SYS-SR-022 lists drive motors, battery, E-stop circuit and sensors; grouping gives the operator one place per subsystem.",
       "verification": "Inspection, Demonstration",
       "acceptance": "With the full bringup running, diagnostics_agg contains the 10 groups /Rover/Computer ... /Rover/Safety and each listed node's statuses appear under its group, not under /Rover/Other.",

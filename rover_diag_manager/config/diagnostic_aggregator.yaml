@@ -7,6 +7,10 @@
 # Statuses no analyzer claims still appear under the aggregator's automatic "Other"
 # group - add the node here when that happens.
 #
+# The GPS and Lidar groups are in diagnostic_aggregator_gps.yaml / _lidar.yaml and are loaded
+# only when that sensor is enabled (ROVER_SYSTEM_USE_GPS / ROVER_SYSTEM_USE_LIDAR, see
+# system_diag.launch.py): a disabled sensor would otherwise leave its group STALE forever.
+#
 # `/**:` rather than the node name: aggregator_node's parameters must reach it whatever
 # name the launch file gives it.
 /**:
@@ -29,16 +33,6 @@
       type: diagnostic_aggregator/GenericAnalyzer
       path: Localization
       find_and_remove_prefix: [ 'rover_ekf_node: ', 'rover_ekf_global_node: ', 'rover_navsat_transform_node: ' ]
-    gps:
-      type: diagnostic_aggregator/GenericAnalyzer
-      path: GPS
-      # rover_gps_node (sensor payload): GPS fix. rover_gps_heading_node (localization):
-      # Heading alignment. Grouped together so the diagnostics page shows both.
-      find_and_remove_prefix: [ 'rover_gps_node: ', 'rover_gps_heading_node: ' ]
-    lidar:
-      type: diagnostic_aggregator/GenericAnalyzer
-      path: Lidar
-      find_and_remove_prefix: [ 'rover_rs16_lidar_node: ' ]
     lighting:
       type: diagnostic_aggregator/GenericAnalyzer
       path: Lighting
