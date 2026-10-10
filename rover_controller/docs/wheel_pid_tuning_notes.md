@@ -32,6 +32,19 @@ session can pick up without re-deriving anything. Gains from this session are al
 > readout stops at the stop command and misses the coast; capture the odometry pose after the rover
 > has stopped (watchdog script) before dividing.
 
+> **Long-hold baseline (2026-10-10, ground, 10 m lane, battery 57 %, 25 Hz, `motor_acceleration` 2.0).**
+> Shipped gains, two identical runs: 6 s holds / 2.5 s rest, straights alternating +-0.4 / +-0.6 /
+> +-0.8 m/s (out and back, at most ~5 m from the start), then spins +-0.6 / +-1.0 rad/s. *Straights:*
+> median overshoot 1.8-4.2 % / 2.1-3.4 %, worst wheel 8.4 % (fr -0.40, run 1 only; 2.8 % in run 2) /
+> 4.3 %; settled error (mean of the last 2 s) <= 0.7 % on every wheel; rise 1.6-1.7 s, dead time
+> 0.22-0.30 s; output / reference 1.10-1.14 at 0.4 m/s, ~1.0 at 0.8 m/s (fr 0.93-0.99, its `ff` 0.96).
+> The 3.5 s holds' -1.4..+1.2 % end error was partly the slow rise. *Spins:* median overshoot 6.6-8.2 %
+> / 3.9-11.9 %, worst wheel 17.6 % (fl +0.6) / 14.7 %; settled -1.0..-5.3 % / -2.5..-7.2 % under,
+> per wheel -8..+11 %; output / reference 1.8-2.1x at +-0.6 rad/s with fr / rl at 2.09-2.10, i.e. the
+> integral pinned at `i_clamp` 2.1, and 1.5-1.7x at +-1.0. Spins vary ~4 points run to run (straights
+> ~1). The tool's suggested limits (0.50 m/s^2 / 0.97 rad/s^2) come from the spin rise and do not
+> apply (see phases 2-3). **Shipped gains kept**; spins still need the turn feed-forward (pending).
+
 > **Ground campaign at `motor_acceleration` 2.0, phases 4-5 (2026-10-09, battery 47 %).** *Top speed:* +-0.95 m/s
 > is reached within 0.5 % on all wheels (t50 0.67 s, output 1.00-1.01x the reference). *Spin breakaway*
 > (3.5 s holds, IMU sign-corrected): every rate turns closed loop, down to 0.3 rad/s (IMU 0.28-0.29, t50
