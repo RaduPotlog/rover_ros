@@ -69,6 +69,21 @@ def test_drive_controller_chains_through_declared_wheel_pids(wheel_type):
 
 
 @pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
+def test_turn_feedforward_matches_the_drive_controller(wheel_type):
+    """Each PID's turn side and track must be diff_drive's, and diff_drive must publish ω."""
+    config = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')['/**']
+    drive = config['rover_drive_controller']['ros__parameters']
+    track = drive['wheel_separation'] * drive['wheel_separation_multiplier']
+    assert drive['publish_limited_velocity'] is True
+    for names, side in ((drive['left_wheel_names'], -1.0), (drive['right_wheel_names'], 1.0)):
+        for wheel in names:
+            pid = config[wheel.split('/', 1)[0]]['ros__parameters']
+            assert pid['turn_side'] == side, wheel
+            assert pid['turn_track_width'] == pytest.approx(track, abs=1e-3), wheel
+            assert pid['turn_feedforward'] >= 0.0, wheel
+
+
+@pytest.mark.parametrize('wheel_type', WHEEL_TYPES)
 def test_calibration_multipliers_are_plausible(wheel_type):
     """Skid-steer separation multipliers are > 1; radius multipliers stay near 1."""
     drive = _load(CONTROLLER_CONFIG_DIR / f'{wheel_type}_controller.yaml')[

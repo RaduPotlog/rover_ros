@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <deque>
+#include <limits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -307,6 +308,188 @@ TEST(WheelSpeedLoop, ResetClearsEverything)
   loop.reset();
   EXPECT_EQ(loop.integral(), 0.0);
   EXPECT_EQ(loop.integral_reference(), 0.0);
+}
+
+using rover_controller::BodyCommand;
+
+constexpr double kTrack = 1.0236;  // 0.617 * 1.659, the rover's effective track
+
+WheelLoopOptions turn_options(double side, double feedforward = 1.8)
+{
+  WheelLoopOptions options;
+  options.turn_feedforward = feedforward;
+  options.turn_side = side;
+  options.turn_full_rate = 0.3;
+  options.turn_track_width = kTrack;
+  return options;
+}
+
+BodyCommand body(double linear, double angular, bool valid = true)
+{
+  BodyCommand command;
+  command.linear = linear;
+  command.angular = angular;
+  command.valid = valid;
+  return command;
+}
+
+TEST(TurnFeedforward, PushesEachSideTheWayItTurnsInASpin)
+{
+  // A left (counter-clockwise) spin drives the left wheels backwards, the right ones forwards.
+  EXPECT_DOUBLE_EQ(rover_controller::turn_feedforward(body(0.0, 0.6), turn_options(-1.0)), -1.8);
+  EXPECT_DOUBLE_EQ(rover_controller::turn_feedforward(body(0.0, 0.6), turn_options(1.0)), 1.8);
+  EXPECT_DOUBLE_EQ(rover_controller::turn_feedforward(body(0.0, -1.0), turn_options(-1.0)), 1.8);
+  EXPECT_DOUBLE_EQ(rover_controller::turn_feedforward(body(0.0, -1.0), turn_options(1.0)), -1.8);
+}
+
+TEST(TurnFeedforward, RampsInBelowTheFullRate)
+{
+  EXPECT_DOUBLE_EQ(rover_controller::turn_feedforward(body(0.0, 0.15), turn_options(1.0)), 0.9);
+  EXPECT_DOUBLE_EQ(rover_controller::turn_feedforward(body(0.0, 0.03), turn_options(1.0)), 0.18);
+}
+
+TEST(TurnFeedforward, ScalesWithTheAngularShareInAnArc)
+{
+  // 0.5 m/s with 0.3 rad/s: the turn is 0.3 * 1.0236 / 2 = 0.154 m/s of 0.654 m/s per wheel.
+  const double turn_speed = 0.3 * kTrack / 2.0;
+  EXPECT_NEAR(
+    rover_controller::turn_feedforward(body(0.5, 0.3), turn_options(1.0)),
+    1.8 * turn_speed / (0.5 + turn_speed), 1e-12);
+  // Reversing in the same arc: the share depends on |linear| only.
+  EXPECT_DOUBLE_EQ(
+    rover_controller::turn_feedforward(body(-0.5, 0.3), turn_options(1.0)),
+    rover_controller::turn_feedforward(body(0.5, 0.3), turn_options(1.0)));
+}
+
+TEST(TurnFeedforward, IsZeroStraightOffOrWithoutAValidCommand)
+{
+  EXPECT_EQ(rover_controller::turn_feedforward(body(0.8, 0.0), turn_options(1.0)), 0.0);
+  EXPECT_EQ(rover_controller::turn_feedforward(body(0.0, 1.0, false), turn_options(1.0)), 0.0);
+  EXPECT_EQ(rover_controller::turn_feedforward(body(0.0, 1.0), turn_options(0.0)), 0.0);
+  EXPECT_EQ(rover_controller::turn_feedforward(body(0.0, 1.0), turn_options(1.0, 0.0)), 0.0);
+  EXPECT_EQ(
+    rover_controller::turn_feedforward(body(std::nan(""), 1.0), turn_options(1.0)), 0.0);
+}
+
+TEST(TurnFeedforward, OffLeavesTheLoopOutputUnchanged)
+{
+  // turn_feedforward 0 must be bit-identical to the loop without a body command.
+  WheelSpeedLoop with_body;
+  WheelSpeedLoop without;
+  const auto gains = rover_gains(2.1);
+  auto options = delayed_integral();
+  options.turn_side = 1.0;  // a side, but no feed-forward
+  double measured = 0.0;
+  for (int k = 0; k < 200; ++k) {
+    const double reference = k < 100 ? 1.86 : -3.1;
+    measured += (0.5 * reference - measured) * 0.1;
+    ASSERT_EQ(
+      with_body.update(reference, measured, kDt, gains, options, body(0.0, 0.6)),
+      without.update(reference, measured, kDt, gains, options)) << "cycle " << k;
+  }
+}
+
+TEST(TurnFeedforward, AddsToTheLoopOutputUpToFullDuty)
+{
+  const auto gains = rover_gains(2.1);
+  {
+    WheelSpeedLoop plain;
+    WheelSpeedLoop turned;
+    const double base = plain.update(1.86, 1.86, kDt, gains, WheelLoopOptions{});
+    EXPECT_NEAR(
+      turned.update(1.86, 1.86, kDt, gains, turn_options(1.0), body(0.0, 0.6)), base + 1.8,
+      1e-12);
+  }
+  {
+    // Near full duty only the room up to u_max (12.58) is added.
+    WheelSpeedLoop loop;
+    EXPECT_DOUBLE_EQ(
+      loop.update(11.5, 11.5, kDt, gains, turn_options(1.0), body(0.0, 1.0)), gains.u_max);
+  }
+  {
+    // Already past full duty (feed-forward of a large reference): nothing is taken back.
+    WheelSpeedLoop plain;
+    WheelSpeedLoop turned;
+    const double base = plain.update(12.9, 12.9, kDt, gains, WheelLoopOptions{});
+    EXPECT_DOUBLE_EQ(
+      turned.update(12.9, 12.9, kDt, gains, turn_options(1.0), body(0.0, 1.0)), base);
+  }
+  {
+    // A zero reference still sends exactly 0 with the stop option.
+    WheelSpeedLoop loop;
+    auto options = turn_options(1.0);
+    options.stop_at_zero_reference = true;
+    EXPECT_EQ(loop.update(0.0, 0.3, kDt, gains, options, body(0.5, 0.98)), 0.0);
+  }
+}
+
+// A wheel in a skid-steer spin as the 2026-10-10 open-loop ground run saw it: scrub eats a constant
+// ~1.7 rad/s of command (0.6 rad/s spin: 0-12 % of the reference, 1.0 rad/s: ~45 %).
+class ScrubbingWheel
+{
+public:
+  double step(double command)
+  {
+    const double driving = std::copysign(std::max(0.0, std::abs(command) - kScrub), command);
+    return plant_.step(driving);
+  }
+  double speed() const {return plant_.speed();}
+
+private:
+  static constexpr double kScrub = 1.7;
+  WheelPlant plant_{1.0, 0.3, 0.12};
+};
+
+struct SpinResult
+{
+  double time_to_half;  // s until the wheel first reaches half the reference
+  double overshoot;     // fraction of the reference
+  double final_integral;
+};
+
+SpinResult spin(const WheelLoopOptions & options)
+{
+  // A right wheel in a 0.6 rad/s spin: reference 0.6 * 1.0236 / 2 / 0.1651 = 1.86 rad/s.
+  const double reference = 0.6 * kTrack / 2.0 / 0.1651;
+  WheelSpeedLoop loop;
+  ScrubbingWheel wheel;
+  SpinResult result{std::numeric_limits<double>::infinity(), 0.0, 0.0};
+  for (int k = 0; k < static_cast<int>(6.0 / kDt); ++k) {
+    const double speed = wheel.step(
+      loop.update(reference, wheel.speed(), kDt, rover_gains(2.1), options, body(0.0, 0.6)));
+    if (speed >= reference / 2.0 && k * kDt < result.time_to_half) {
+      result.time_to_half = k * kDt;
+    }
+    result.overshoot = std::max(result.overshoot, speed / reference - 1.0);
+  }
+  result.final_integral = loop.integral();
+  return result;
+}
+
+TEST(TurnFeedforward, SpinStartsSoonerWithoutPinningTheIntegral)
+{
+  // The shipped loop: model-reference integral 0.40 / 0.12, i_clamp 2.1.
+  WheelLoopOptions shipped;
+  shipped.integral_reference_delay = 0.40;
+  shipped.integral_reference_time_constant = 0.12;
+  auto with_turn = shipped;
+  with_turn.turn_feedforward = 1.8;
+  with_turn.turn_side = 1.0;
+  with_turn.turn_track_width = kTrack;
+
+  const auto without = spin(shipped);
+  const auto with = spin(with_turn);
+  // Without it the integral has to carry the scrub, near its 2.1 clamp.
+  EXPECT_GT(without.final_integral, 1.5);
+  EXPECT_LT(std::abs(with.final_integral), 0.3);
+  EXPECT_LT(with.time_to_half, without.time_to_half - 0.3)
+    << "with " << with.time_to_half << " s, without " << without.time_to_half << " s";
+  // This plant has a constant scrub and no stick-slip, so it can't show the ground runs' 4-18 %
+  // spin overshoot (the wheels breaking loose once the integral has wound up); that needs the
+  // lane. Here 1.8 of feed-forward over-supplies its 1.7 scrub and the wheel runs ~5 % fast until
+  // the integral trims it: bounded, not removed.
+  EXPECT_LT(with.overshoot, 0.08)
+    << "with " << with.overshoot << ", without " << without.overshoot;
 }
 
 }  // namespace

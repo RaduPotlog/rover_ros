@@ -62,7 +62,28 @@ struct WheelLoopOptions
   // the reference reaches 0; when the reference comes back up (command noise, a brief slow-down)
   // the trim is restored, so it does not leak away.
   bool scale_integral_with_reference = false;
+  // Turn feed-forward: extra command while the rover turns. Skid-steer scrub eats a roughly
+  // constant ~1.7 rad/s of wheel command in a spin, whatever the spin rate (2026-10-10, open-loop
+  // ground run), which the integral otherwise has to build up before the wheels break loose. The
+  // term is side * sign(angular) * turn_feedforward, ramped in up to turn_full_rate and scaled by
+  // the angular share of the body command (1 in a spin in place, 0 driving straight). It never
+  // takes the output past the u clamp (full duty). 0 or turn_side 0 = off.
+  double turn_feedforward = 0.0;  // rad/s of wheel command in a spin in place
+  double turn_side = 0.0;         // -1 left wheel, +1 right wheel, 0 = off
+  double turn_full_rate = 0.3;    // rad/s of body yaw rate from which the full term applies
+  double turn_track_width = 1.0;  // m, effective track (wheel_separation * multiplier)
 };
+
+/** @brief The body velocity the drive controller is commanding, for the turn feed-forward. */
+struct BodyCommand
+{
+  double linear = 0.0;   // m/s
+  double angular = 0.0;  // rad/s
+  bool valid = false;    // false (no command, or a stale one): no turn feed-forward
+};
+
+/** @brief The turn feed-forward term for one wheel (rad/s), 0 when off or not turning. */
+double turn_feedforward(const BodyCommand & body, const WheelLoopOptions & options);
 
 /**
  * @brief Velocity loop for one wheel: feed-forward + PID, stop at zero, model-reference integral.
@@ -77,10 +98,13 @@ public:
   /** @param history_capacity reference samples kept for the delay (>= delay * update rate + 1). */
   explicit WheelSpeedLoop(std::size_t history_capacity = 64);
 
-  /** @brief Command (rad/s) for one control period. dt <= 0 repeats the last command. */
+  /**
+   * @brief Command (rad/s) for one control period. dt <= 0 repeats the last command.
+   * @param body the commanded body motion; only the turn feed-forward uses it.
+   */
   double update(
     double reference, double measured, double dt, const WheelLoopGains & gains,
-    const WheelLoopOptions & options);
+    const WheelLoopOptions & options, const BodyCommand & body = BodyCommand{});
 
   /** @brief Clear the integral, the derivative memory and the reference history. */
   void reset();

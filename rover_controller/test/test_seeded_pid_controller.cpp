@@ -292,4 +292,52 @@ TEST_F(SeededPidControllerTest, OutOfRangeWheelLoopParameterFailsInit)
   EXPECT_EQ(controller->init(params), controller_interface::return_type::ERROR);
 }
 
+TEST_F(SeededPidControllerTest, TurnParametersAreValidatedAtRuntime)
+{
+  std::shared_ptr<rover_controller::SeededPidController> pid;
+  exported_after_activation(0.0, pid);
+  auto node = pid->get_node();
+  EXPECT_TRUE(node->set_parameter({"turn_side", -1.0}).successful);
+  EXPECT_TRUE(node->set_parameter({"turn_side", 0.0}).successful);
+  EXPECT_FALSE(node->set_parameter({"turn_side", 0.5}).successful);
+  EXPECT_TRUE(node->set_parameter({"turn_feedforward", 1.8}).successful);
+  EXPECT_FALSE(node->set_parameter({"turn_feedforward", -1.0}).successful);
+  EXPECT_FALSE(node->set_parameter({"turn_track_width", 0.0}).successful);
+  EXPECT_FALSE(node->set_parameter({"turn_command_timeout", 0.0}).successful);
+  EXPECT_DOUBLE_EQ(node->get_parameter("turn_side").as_double(), 0.0);
+}
+
+// Exposes the subscription callback, so the test can feed body commands without a publisher.
+class TestableSeededPidController : public rover_controller::SeededPidController
+{
+public:
+  using rover_controller::SeededPidController::on_turn_command;
+};
+
+TEST_F(SeededPidControllerTest, TurnFeedforwardUsesOnlyAFreshBodyCommand)
+{
+  std::shared_ptr<TestableSeededPidController> pid;
+  // A right wheel already at its 0.6 rad/s spin reference: no error, so P and I add nothing.
+  const double reference = 1.86;
+  exported_after_activation(
+    reference, pid, {{"turn_feedforward", 1.8}, {"turn_side", 1.0}, {"turn_track_width", 1.0236}});
+  const auto period = rclcpp::Duration::from_seconds(0.04);
+  const auto now = pid->get_node()->now();
+  auto command_at = [&](const rclcpp::Time & time) {
+      EXPECT_TRUE(reference_.at(0)->set_value(reference));
+      EXPECT_EQ(pid->update(time, period), controller_interface::return_type::OK);
+      return hw_command_;
+    };
+
+  EXPECT_NEAR(command_at(now), reference, 1e-9);  // nothing received yet
+
+  geometry_msgs::msg::TwistStamped spin;
+  spin.twist.angular.z = 0.6;
+  pid->on_turn_command(spin);
+  EXPECT_NEAR(command_at(now), reference + 1.8, 1e-9);
+
+  // Half a second later (timeout 0.2 s) the command is stale: no feed-forward.
+  EXPECT_NEAR(command_at(now + rclcpp::Duration::from_seconds(0.5)), reference, 1e-9);
+}
+
 }  // namespace

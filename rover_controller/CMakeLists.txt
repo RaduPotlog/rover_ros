@@ -4,22 +4,27 @@ project(rover_controller)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(controller_interface REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(pid_controller REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(realtime_tools REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME})
 
 # SeededPidController: pid_controller/PidController with its exported state seeded on
 # activation, so the chained diff_drive never reads NaN wheel feedback on its first cycle, and
-# with each wheel's command from WheelSpeedLoop (stop at zero, model-reference integral).
+# with each wheel's command from WheelSpeedLoop (stop at zero, model-reference integral, turn
+# feed-forward from diff_drive's limited body command).
 add_library(${PROJECT_NAME} SHARED src/seeded_pid_controller.cpp src/wheel_speed_loop.cpp)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 target_link_libraries(${PROJECT_NAME} PUBLIC
+  ${geometry_msgs_TARGETS}
   pid_controller::pid_controller
-  pluginlib::pluginlib)
+  pluginlib::pluginlib
+  realtime_tools::realtime_tools)
 pluginlib_export_plugin_description_file(controller_interface rover_controller_plugins.xml)
 
 install(TARGETS ${PROJECT_NAME}
@@ -59,5 +64,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(controller_interface pid_controller pluginlib)
+ament_export_dependencies(controller_interface geometry_msgs pid_controller pluginlib realtime_tools)
 ament_package()

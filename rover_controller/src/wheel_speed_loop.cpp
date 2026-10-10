@@ -35,6 +35,24 @@ double tracking_time_constant(const WheelLoopGains & gains)
 
 }  // namespace
 
+double turn_feedforward(const BodyCommand & body, const WheelLoopOptions & options)
+{
+  if (!body.valid || options.turn_feedforward <= 0.0 || options.turn_side == 0.0 ||
+    !std::isfinite(body.linear) || !std::isfinite(body.angular) || body.angular == 0.0)
+  {
+    return 0.0;
+  }
+  const double yaw_rate = std::abs(body.angular);
+  // Ramp in, so a tiny yaw command doesn't kick in the whole scrub offset.
+  const double ramp = options.turn_full_rate > 0.0 ?
+    std::min(1.0, yaw_rate / options.turn_full_rate) : 1.0;
+  // The angular share of the wheel speed: 1 spinning in place, small in a wide arc.
+  const double turn_speed = yaw_rate * options.turn_track_width / 2.0;
+  const double share = turn_speed / (std::abs(body.linear) + turn_speed);
+  return std::copysign(1.0, options.turn_side) * std::copysign(1.0, body.angular) *
+         options.turn_feedforward * ramp * share;
+}
+
 WheelSpeedLoop::WheelSpeedLoop(std::size_t history_capacity)
 : times_(std::max<std::size_t>(history_capacity, 1)),
   values_(std::max<std::size_t>(history_capacity, 1))
@@ -103,7 +121,7 @@ void WheelSpeedLoop::scale_integral(double reference)
 
 double WheelSpeedLoop::update(
   double reference, double measured, double dt, const WheelLoopGains & gains,
-  const WheelLoopOptions & options)
+  const WheelLoopOptions & options, const BodyCommand & body)
 {
   if (!(dt > 0.0)) {
     return last_output_;
@@ -175,7 +193,15 @@ double WheelSpeedLoop::update(
   }
   i_term_ = std::clamp(i_term_, gains.i_min, gains.i_max);
 
-  return last_output_ = gains.feedforward * reference + command;
+  double output = gains.feedforward * reference + command;
+  const double turn = turn_feedforward(body, options);
+  // Up to the u clamp (full duty), never taking back what the loop already commands.
+  if (turn > 0.0) {
+    output = std::max(output, std::min(output + turn, gains.u_max));
+  } else if (turn < 0.0) {
+    output = std::min(output, std::max(output + turn, gains.u_min));
+  }
+  return last_output_ = output;
 }
 
 }  // namespace rover_controller

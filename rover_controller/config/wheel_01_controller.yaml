@@ -95,6 +95,16 @@
   #             reference since the last stop (restored if it comes back up, cleared on reversal).
   #             A skid turn's ~1.5 rad/s of trim otherwise kept pushing through the whole
   #             ramp-down, and the turn ended late.
+  #   turn_feedforward / turn_side / turn_feedforward_full_rate / turn_track_width - extra command
+  #             while the rover turns: side * sign(w) * turn_feedforward, ramped in up to
+  #             turn_feedforward_full_rate and scaled by the turn's share of the wheel speed (1 in a
+  #             spin, 0 straight). Open loop on the ground (2026-10-10) skid scrub eats a constant
+  #             ~1.7 rad/s of wheel command in a spin, which the integral otherwise builds to ~1.8
+  #             of its 2.1 clamp before the wheels break loose. The body command comes from
+  #             rover_drive_controller's ~/cmd_vel_out (publish_limited_velocity); a command older
+  #             than turn_command_timeout (0.2 s) gives none. Never past u_clamp (full duty).
+  #             turn_track_width = wheel_separation * wheel_separation_multiplier. Shipped at 0.0
+  #             (off) until the lane test picks a value (start ~1.8).
   #
   # Ground tune 2026-10-02 (motor_acceleration 10.0, 26.6 V, wheel_step_response runs): dead time
   # 0.17-0.22 s. The old 0.25 / 0.15 s model (fitted at ramp 1-2) was now slower than the plant
@@ -141,6 +151,11 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
+      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
+      turn_feedforward: 0.0
+      turn_side: -1.0
+      turn_feedforward_full_rate: 0.3
+      turn_track_width: 1.0236
 
       gains:
         rl_wheel_base_to_rl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.1, "i_clamp_max": 2.1, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -161,6 +176,11 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
+      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
+      turn_feedforward: 0.0
+      turn_side: 1.0
+      turn_feedforward_full_rate: 0.3
+      turn_track_width: 1.0236
 
       gains:
         rr_wheel_base_to_rr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.1, "i_clamp_max": 2.1, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -181,6 +201,11 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
+      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
+      turn_feedforward: 0.0
+      turn_side: -1.0
+      turn_feedforward_full_rate: 0.3
+      turn_track_width: 1.0236
 
       gains:
         fl_wheel_base_to_fl_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 1.0, "i_clamp_min": -2.1, "i_clamp_max": 2.1, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -201,6 +226,11 @@
       integral_reference_delay: 0.40
       integral_reference_time_constant: 0.12
       scale_integral_with_reference: true
+      # Turn feed-forward (off until the lane test sets turn_feedforward; see the comment above).
+      turn_feedforward: 0.0
+      turn_side: 1.0
+      turn_feedforward_full_rate: 0.3
+      turn_track_width: 1.0236
 
       gains:
         fr_wheel_base_to_fr_wheel_joint: {"p": 0.05, "i": 1.0, "d": 0.04, "feedforward_gain": 0.96, "i_clamp_min": -2.1, "i_clamp_max": 2.1, "u_clamp_min": -12.58, "u_clamp_max": 12.58, "antiwindup_strategy": "back_calculation", "save_i_term": false}
@@ -278,8 +308,8 @@
       enable_odom_tf: false
 
       cmd_vel_timeout: 0.5
-      # Nothing consumes ~/cmd_vel_out; leave it off rather than publish it at the update rate.
-      publish_limited_velocity: false
+      # ~/cmd_vel_out is the limited body command the wheel PIDs' turn feed-forward reads.
+      publish_limited_velocity: true
 
       # linear.x and angular.z are limited independently, so the outer wheel rim speed can reach
       #   v + w * (wheel_separation * wheel_separation_multiplier) / 2  =  v + w * 0.5102

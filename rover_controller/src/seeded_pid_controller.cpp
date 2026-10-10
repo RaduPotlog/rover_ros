@@ -37,12 +37,40 @@ constexpr char kZeroReferenceTolerance[] = "zero_reference_tolerance";
 constexpr char kIntegralReferenceDelay[] = "integral_reference_delay";
 constexpr char kIntegralReferenceTimeConstant[] = "integral_reference_time_constant";
 constexpr char kScaleIntegralWithReference[] = "scale_integral_with_reference";
+constexpr char kTurnFeedforward[] = "turn_feedforward";
+constexpr char kTurnSide[] = "turn_side";
+constexpr char kTurnFullRate[] = "turn_feedforward_full_rate";
+constexpr char kTurnTrackWidth[] = "turn_track_width";
+constexpr char kTurnCommandTimeout[] = "turn_command_timeout";
+constexpr char kTurnCommandTopic[] = "turn_command_topic";
+
+// The double parameters this class adds; all are validated by reject_reason().
+constexpr const char * kDoubleParameters[] = {
+  kZeroReferenceTolerance, kIntegralReferenceDelay, kIntegralReferenceTimeConstant,
+  kTurnFeedforward, kTurnSide, kTurnFullRate, kTurnTrackWidth, kTurnCommandTimeout};
+
+bool is_double_parameter(const std::string & name)
+{
+  for (const char * candidate : kDoubleParameters) {
+    if (name == candidate) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Why `value` is not acceptable for parameter `name`, or empty if it is.
 std::string reject_reason(const std::string & name, double value)
 {
+  if (name == kTurnSide) {
+    return value == -1.0 || value == 0.0 || value == 1.0 ?
+           std::string{} : name + " must be -1 (left), 1 (right) or 0 (off)";
+  }
   if (!std::isfinite(value) || value < 0.0) {
     return name + " must be finite and >= 0";
+  }
+  if ((name == kTurnTrackWidth || name == kTurnCommandTimeout) && value == 0.0) {
+    return name + " must be > 0";
   }
   if (name == kIntegralReferenceDelay &&
     value > SeededPidController::kMaxIntegralReferenceDelay)
@@ -68,6 +96,12 @@ controller_interface::CallbackReturn SeededPidController::on_init()
     auto_declare<double>(kIntegralReferenceDelay, integral_reference_delay_.load());
     auto_declare<double>(
       kIntegralReferenceTimeConstant, integral_reference_time_constant_.load());
+    auto_declare<double>(kTurnFeedforward, turn_feedforward_.load());
+    auto_declare<double>(kTurnSide, turn_side_.load());
+    auto_declare<double>(kTurnFullRate, turn_feedforward_full_rate_.load());
+    auto_declare<double>(kTurnTrackWidth, turn_track_width_.load());
+    auto_declare<double>(kTurnCommandTimeout, turn_command_timeout_.load());
+    auto_declare<std::string>(kTurnCommandTopic, "rover_drive_controller/cmd_vel_out");
   } catch (const std::exception & e) {
     RCLCPP_ERROR(
       get_node()->get_logger(), "Declaring the wheel loop parameters failed: %s", e.what());
@@ -75,9 +109,7 @@ controller_interface::CallbackReturn SeededPidController::on_init()
   }
 
   // Values from the parameter file: validated here, then kept current by the callback below.
-  for (const char * name :
-    {kZeroReferenceTolerance, kIntegralReferenceDelay, kIntegralReferenceTimeConstant})
-  {
+  for (const char * name : kDoubleParameters) {
     const auto reason = reject_reason(name, get_node()->get_parameter(name).as_double());
     if (!reason.empty()) {
       RCLCPP_ERROR(get_node()->get_logger(), "%s", reason.c_str());
@@ -91,6 +123,11 @@ controller_interface::CallbackReturn SeededPidController::on_init()
   integral_reference_delay_ = get_node()->get_parameter(kIntegralReferenceDelay).as_double();
   integral_reference_time_constant_ =
     get_node()->get_parameter(kIntegralReferenceTimeConstant).as_double();
+  turn_feedforward_ = get_node()->get_parameter(kTurnFeedforward).as_double();
+  turn_side_ = get_node()->get_parameter(kTurnSide).as_double();
+  turn_feedforward_full_rate_ = get_node()->get_parameter(kTurnFullRate).as_double();
+  turn_track_width_ = get_node()->get_parameter(kTurnTrackWidth).as_double();
+  turn_command_timeout_ = get_node()->get_parameter(kTurnCommandTimeout).as_double();
 
   // Runtime changes (ros2 param set) take effect on the next update, like the gains do.
   on_set_parameters_handle_ = get_node()->add_on_set_parameters_callback(
@@ -102,9 +139,7 @@ controller_interface::CallbackReturn SeededPidController::on_init()
         if (name == kStopAtZeroReference || name == kScaleIntegralWithReference) {
           continue;  // the type check is rclcpp's
         }
-        if (name == kZeroReferenceTolerance || name == kIntegralReferenceDelay ||
-        name == kIntegralReferenceTimeConstant)
-        {
+        if (is_double_parameter(name)) {
           result.reason = reject_reason(name, parameter.as_double());
           if (!result.reason.empty()) {
             result.successful = false;
@@ -124,6 +159,16 @@ controller_interface::CallbackReturn SeededPidController::on_init()
           integral_reference_delay_ = parameter.as_double();
         } else if (name == kIntegralReferenceTimeConstant) {
           integral_reference_time_constant_ = parameter.as_double();
+        } else if (name == kTurnFeedforward) {
+          turn_feedforward_ = parameter.as_double();
+        } else if (name == kTurnSide) {
+          turn_side_ = parameter.as_double();
+        } else if (name == kTurnFullRate) {
+          turn_feedforward_full_rate_ = parameter.as_double();
+        } else if (name == kTurnTrackWidth) {
+          turn_track_width_ = parameter.as_double();
+        } else if (name == kTurnCommandTimeout) {
+          turn_command_timeout_ = parameter.as_double();
         }
       }
       return result;
@@ -142,7 +187,46 @@ controller_interface::CallbackReturn SeededPidController::on_configure(
   const double rate = std::max(1u, get_update_rate());
   const auto capacity = static_cast<size_t>(std::ceil(kMaxIntegralReferenceDelay * rate)) + 2;
   wheel_loops_.assign(dof_, WheelSpeedLoop(capacity));
+
+  // diff_drive's limited body command, for the turn feed-forward. Relative, so it resolves in
+  // the controller manager's namespace like the drive controller's own topics.
+  received_body_command_.set(ReceivedBodyCommand{});
+  last_body_command_ = ReceivedBodyCommand{};
+  const auto topic = get_node()->get_parameter(kTurnCommandTopic).as_string();
+  turn_command_subscriber_ = get_node()->create_subscription<geometry_msgs::msg::TwistStamped>(
+    topic, rclcpp::SystemDefaultsQoS(),
+    [this](const geometry_msgs::msg::TwistStamped::SharedPtr message) {
+      on_turn_command(*message);
+    });
   return result;
+}
+
+void SeededPidController::on_turn_command(const geometry_msgs::msg::TwistStamped & message)
+{
+  ReceivedBodyCommand command;
+  command.linear = message.twist.linear.x;
+  command.angular = message.twist.angular.z;
+  command.received_ns = get_node()->now().nanoseconds();
+  command.received = true;
+  received_body_command_.set(command);
+}
+
+BodyCommand SeededPidController::body_command(const rclcpp::Time & time)
+{
+  // Non-blocking: if the callback holds the box, use the last command seen.
+  if (const auto latest = received_body_command_.try_get(); latest.has_value()) {
+    last_body_command_ = *latest;
+  }
+  BodyCommand body;
+  if (!last_body_command_.received) {
+    return body;
+  }
+  const double age =
+    static_cast<double>(time.nanoseconds() - last_body_command_.received_ns) * 1e-9;
+  body.linear = last_body_command_.linear;
+  body.angular = last_body_command_.angular;
+  body.valid = std::abs(age) <= turn_command_timeout_;
+  return body;
 }
 
 controller_interface::CallbackReturn SeededPidController::on_activate(
@@ -250,6 +334,10 @@ WheelLoopOptions SeededPidController::wheel_options() const
   options.integral_reference_delay = integral_reference_delay_;
   options.integral_reference_time_constant = integral_reference_time_constant_;
   options.scale_integral_with_reference = scale_integral_with_reference_;
+  options.turn_feedforward = turn_feedforward_;
+  options.turn_side = turn_side_;
+  options.turn_full_rate = turn_feedforward_full_rate_;
+  options.turn_track_width = turn_track_width_;
   return options;
 }
 
@@ -274,6 +362,7 @@ controller_interface::return_type SeededPidController::update_and_write_commands
   }
 
   const auto options = wheel_options();
+  const auto body = body_command(time);
   const double dt = period.seconds();
   for (size_t i = 0; i < dof_; ++i) {
     const double reference = ordered_exported_reference_interfaces_[i]->get_optional<double>()
@@ -282,7 +371,8 @@ controller_interface::return_type SeededPidController::update_and_write_commands
       continue;  // upstream leaves the last command in place too
     }
     const double command =
-      wheel_loops_[i].update(reference, measured_state_values_[i], dt, wheel_gains(i), options);
+      wheel_loops_[i].update(
+      reference, measured_state_values_[i], dt, wheel_gains(i), options, body);
     if (!command_interfaces_[i].set_value(command)) {
       RCLCPP_ERROR(
         get_node()->get_logger(), "Failed to set command value for %s",

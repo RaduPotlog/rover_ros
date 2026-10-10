@@ -18,8 +18,11 @@
 #include <atomic>
 #include <vector>
 
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <pid_controller/pid_controller.hpp>
 #include <rclcpp/node_interfaces/node_parameters_interface.hpp>
+#include <rclcpp/subscription.hpp>
+#include <realtime_tools/realtime_thread_safe_box.hpp>
 
 #include "rover_controller/wheel_speed_loop.hpp"
 
@@ -52,6 +55,14 @@ namespace rover_controller
  *   integral_reference_delay          s, dead time of the reference the integral compares against
  *   integral_reference_time_constant  s, first-order lag of that reference
  *   scale_integral_with_reference     fade the integral with |reference| as it ramps down
+ *   turn_feedforward                  rad/s of extra command in a spin in place (0 = off)
+ *   turn_side                         -1 left wheel, +1 right wheel, 0 = off
+ *   turn_feedforward_full_rate        rad/s of yaw rate from which the full term applies
+ *   turn_track_width                  m, effective track (wheel_separation * multiplier)
+ *   turn_command_timeout              s, an older body command gives no turn feed-forward
+ * The turn feed-forward needs the body command, which only diff_drive knows: each PID subscribes
+ * to its limited command (turn_command_topic, read at configure; diff_drive's
+ * publish_limited_velocity must be on). See WheelLoopOptions::turn_feedforward.
  * Any other configuration (external measured states, position + velocity references, angle
  * wraparound) keeps the upstream update unchanged.
  */
@@ -82,6 +93,12 @@ protected:
   WheelLoopGains wheel_gains(size_t dof_index) const;
   WheelLoopOptions wheel_options() const;
 
+  /** @brief Store a body command from diff_drive (subscription callback, not real-time). */
+  void on_turn_command(const geometry_msgs::msg::TwistStamped & message);
+
+  /** @brief The latest body command, valid if it arrived within turn_command_timeout of `time`. */
+  BodyCommand body_command(const rclcpp::Time & time);
+
   std::vector<WheelSpeedLoop> wheel_loops_;
 
   std::atomic<bool> stop_at_zero_reference_{false};
@@ -89,6 +106,23 @@ protected:
   std::atomic<double> integral_reference_delay_{0.0};
   std::atomic<double> integral_reference_time_constant_{0.0};
   std::atomic<bool> scale_integral_with_reference_{false};
+  std::atomic<double> turn_feedforward_{0.0};
+  std::atomic<double> turn_side_{0.0};
+  std::atomic<double> turn_feedforward_full_rate_{0.3};
+  std::atomic<double> turn_track_width_{1.0};
+  std::atomic<double> turn_command_timeout_{0.2};
+
+  /** @brief A body command and when it arrived (node clock). */
+  struct ReceivedBodyCommand
+  {
+    double linear = 0.0;
+    double angular = 0.0;
+    rcl_time_point_value_t received_ns = 0;
+    bool received = false;
+  };
+  realtime_tools::RealtimeThreadSafeBox<ReceivedBodyCommand> received_body_command_;
+  ReceivedBodyCommand last_body_command_;  // kept when the box is busy (real-time side only)
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr turn_command_subscriber_;
 
 private:
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr on_set_parameters_handle_;
